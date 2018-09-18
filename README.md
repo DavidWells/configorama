@@ -2,12 +2,18 @@
 
 Dynamic configuration values.
 
+## About
+
+Resolves configuration variables from:
+
 - CLI options
 - ENV variables
 - File references
 - Other Key/values in config
 - Async/sync JS functions
-- Any source you'd like
+- Any source you'd like...
+
+See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for more examples.
 
 ## Usage
 
@@ -22,6 +28,35 @@ const configInstance = new Configorama(myConfigFilePath)
 // resolve config values
 const config = await configInstance.init(cliFlags)
 ```
+
+## Custom variable sources
+
+There are 2 ways to resolve variables from custom sources.
+
+1. Use the baked in javascript method for [sync](https://github.com/DavidWells/configorama/blob/master/tests/syncValues/syncValue.yml) or [aysnc](https://github.com/DavidWells/configorama/blob/master/tests/asyncValues/asyncValue.yml) resolution.
+
+2. Add your own variable syntax and resolver.
+
+    ```js
+    const config = new Configorama('path/to/configFile', {
+      variableSources: [{
+        // Match variables ${consul:xyz}
+        match: RegExp(/^consul:/g),
+        resolver: (varToProcess, opts, currentObject) => {
+          // Make remote call to consul
+          return Promise.resolve(varToProcess)
+        }
+      }]
+    })
+
+    const resolvedObject = await config.init(args)
+    ```
+
+    This would match the following config:
+
+    ```yml
+    key: ${consul:xyz}
+    ```
 
 ## Inspiration
 
