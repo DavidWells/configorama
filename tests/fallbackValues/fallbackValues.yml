@@ -24,6 +24,8 @@ fallbackSelfTwo: ${empty, ${value}}
 
 fallbackSelfThree: ${empty, ${self:valueTwo}}
 
+fallbackSelfFour: ${empty, 'value'}
+
 fallbackEnv: ${empty, env:envValue}
 
 fallbackEnvTwo: ${self:empty, ${env:envValue}}

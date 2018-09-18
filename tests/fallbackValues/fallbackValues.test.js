@@ -1,3 +1,4 @@
+/* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
 import Configorama from '../../lib'
