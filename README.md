@@ -42,6 +42,7 @@ There are 2 ways to resolve variables from custom sources.
       variableSources: [{
         // Match variables ${consul:xyz}
         match: RegExp(/^consul:/g),
+        // Custom variable source. Must return a promise
         resolver: (varToProcess, opts, currentObject) => {
           // Make remote call to consul
           return Promise.resolve(varToProcess)

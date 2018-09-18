@@ -1,0 +1,41 @@
+########################
+# Number variables
+########################
+
+value: 'xyz'
+
+valueTwo: two
+
+number: 10
+
+fallback: ${empty, number}
+
+fallbackNumber: ${empty, 99}
+
+fallbackNumberZero: ${empty, 0}
+
+fallbackString: ${empty, 'ninety-nine'}
+
+fallbackStringTwo: ${empty, "_nine-nine_"}
+
+fallbackSelf: ${empty, number}
+
+fallbackSelfTwo: ${empty, ${value}}
+
+fallbackSelfThree: ${empty, ${self:valueTwo}}
+
+fallbackEnv: ${empty, env:envValue}
+
+fallbackEnvTwo: ${self:empty, ${env:envValue}}
+
+fallbackEnvThree: ${empty, ${env:envValueTwo}}
+
+stages:
+  dev:
+    SECRET: dev-secret
+  prod:
+    SECRET: prod-secret
+
+fallbackNested:  ${empty, ${stages.${opt:stage}.SECRET}}
+
+fallbackNestedTwo:  ${empty, stages.${opt:stage}.SECRET}

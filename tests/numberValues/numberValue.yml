@@ -6,16 +6,26 @@ number: 10
 
 numberFromOpt: ${opt:count}
 
-numberFromSelf: ${self:number}
+numberFromSelf: ${number}
 
 numberFromEnv: ${env:envNumber}
 
-numberFromDefault: ${self:empty, 5}
+numberFromDefault: ${empty, 5}
 
-numberWithDecimals: ${self:empty, 5.55555}
+numberWithDecimals: ${empty, 5.55555}
 
-numberWithLongInput: ${self:empty, 50000000000}
+numberWithLongInput: ${empty, 50000000000}
+
+other: ${empty, number}
+
+otherTwo: ${empty, 99}
+
+otherThree: ${empty, 'ninety-nine'}
+
+otherFour: ${empty, '_nine-nine_'}
+
+otherFive: ${empty, env:envNumber}
 
 numberZero: 0
 
-numberAsZero: ${self:empty, 0}
+numberAsZero: ${empty, 0}
