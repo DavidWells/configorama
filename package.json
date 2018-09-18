@@ -2,7 +2,7 @@
   "name": "configorama",
   "version": "0.0.2",
   "description": "Variable support for configuration files",
-  "main": "/lib/index.js",
+  "main": "lib/index.js",
   "files": [
     "lib",
     "package.json",
