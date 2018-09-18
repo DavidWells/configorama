@@ -1,0 +1,7 @@
+# Conditional yml syntax
+
+conditionalYAML: ${file(./fixture.yml):${opt:stage, 'dev'}}
+
+conditionalYAMLTwo: ${file(./fixture.yml):prod}
+
+conditionalYAMLDefault: ${file(./fixture.yml):${opt:emptyOption, 'qa'}}

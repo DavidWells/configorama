@@ -1,0 +1,28 @@
+########################
+# recursive
+########################
+
+val1: ${depVal}
+depVal: ${val0}
+val0: my value
+val2: ${depVal}
+
+valSelf1: ${self:depSelfVal}
+depSelfVal: ${valSelf0}
+valSelf0: my value self
+valSelf2: ${self:depSelfVal}
+
+# TODO finish test should handle embedded deep variable replacements in overrides
+val00: ${self:not.a.value, "foo"}
+val01: ${self:not.a.value, "bar"}
+val02: ${self:val00}:${self:val01}
+val03: ${self:val02}
+
+
+testing:
+  hello:
+    what:
+      - lol:
+          what: true
+      - wow:
+          what: ${opt:stage}

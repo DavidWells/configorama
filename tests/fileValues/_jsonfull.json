@@ -1,0 +1,11 @@
+{
+  "fullJson": "fullJsonValue",
+  "fullJsonObject": {
+    "foo": true,
+    "bar": "zaz",
+    "opt": "${opt:stage}",
+    "optWithDefault": "${opt:empty, 'defaultOptFlag'}",
+    "envVar": "${env:WOW}",
+    "envVarWithDefault": "${env:BAZ, 'defaultEnvValue'}"
+  }
+}

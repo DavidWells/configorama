@@ -1,0 +1,4 @@
+# Parent yaml file for file ref testing
+
+parentRefChild: hello
+child: ${file(./child/child.yml)}

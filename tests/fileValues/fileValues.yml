@@ -1,0 +1,53 @@
+########################
+# Values from YML files
+########################
+
+normalKey: full
+
+yamlFullFile: ${file(./_ymlfull.yml)}
+
+yamlFullFileNoPath: ${file(_ymlfull.yml)}
+
+yamlFullFileNestedRef: ${file(./_yml${self:normalKey}.yml)}
+
+yamlFullFileMissing: ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}
+
+yamlPartialTopLevelKey: ${file(./_ymlpartial.yml):topLevel}
+
+yamlPartialTopLevelKeyNoPath: ${file(_ymlpartial.yml):topLevel}
+
+yamlPartialSecondLevelKey: ${file(./_ymlpartial.yml):nested.value}
+
+yamlPartialThirdLevelKey: ${file(./_ymlpartial.yml):nested.again.value}
+
+yamlPartialThirdLevelKeyNoPath: ${file(_ymlpartial.yml):nested.again.value}
+
+yamlPartialArrayRef: ${file(./_ymlpartial.yml):array.1}
+
+yamlPartialArrayObjectRef: ${file(./_ymlpartial.yml):arrayTwo.1.object}
+
+yamlPartialArrayObjectRefValue: ${file(./_ymlpartial.yml):arrayTwo.1.object.key}
+
+########################
+# Values from JSON files
+########################
+
+jsonFullFile: ${file(./_jsonfull.json)}
+
+jsonFullFileMissing: ${file(./_madeup-file.json), 'jsonFullFileMissingDefaultValue'}
+
+jsonPartialTopLevelKey: ${file(./_jsonpartial.json):topLevel}
+
+jsonPartialSecondLevelKey: ${file(./_jsonpartial.json):nested.value}
+
+jsonPartialThirdLevelKey: ${file(./_jsonpartial.json):nested.again.value}
+
+jsonPartialArrayRef: ${file(./_jsonpartial.json):array.0}
+
+########################
+# Nested Stage from file ref
+########################
+
+stageSpecific: ${file(./config.${opt:stage}.json)}
+
+stageSpecificTwo: ${file(./config.${opt:otherFlag}.json)}

@@ -1,0 +1,17 @@
+########################
+# File tree references
+########################
+
+siblingFile: ${file(sibling.yml)}
+
+childFile: ${file(./child/child.yml)}
+
+childRefParent: ${file(./child/childRefParent.yml)}
+
+parentFile: ${file(../parent.yml)}
+
+parentRefChild: ${file(../parentRefChild.yml)}
+
+noooooo: ${file(false.yml)}
+
+yesssss: ${file(../false.yml)}

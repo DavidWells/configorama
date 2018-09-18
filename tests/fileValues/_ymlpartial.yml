@@ -1,0 +1,18 @@
+topLevel: topLevelValue
+nested:
+  value: 1leveldown
+  again:
+    value: 2levelsdown
+
+array:
+  - zero
+  - one
+  - two
+
+arrayTwo:
+  - object:
+      key: helloOne
+  - object:
+      key: helloTwo
+  - object:
+      key: helloThree

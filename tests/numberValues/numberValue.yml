@@ -1,0 +1,21 @@
+########################
+# Number variables
+########################
+
+number: 10
+
+numberFromOpt: ${opt:count}
+
+numberFromSelf: ${self:number}
+
+numberFromEnv: ${env:envNumber}
+
+numberFromDefault: ${self:empty, 5}
+
+numberWithDecimals: ${self:empty, 5.55555}
+
+numberWithLongInput: ${self:empty, 50000000000}
+
+numberZero: 0
+
+numberAsZero: ${self:empty, 0}

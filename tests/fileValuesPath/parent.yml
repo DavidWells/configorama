@@ -1,0 +1,6 @@
+# Parent yaml file for file ref testing
+
+valuesFromParent: hi
+value: otherValue
+thirdValue: third
+otherP: ${file(./parentOther.yml)}

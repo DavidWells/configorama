@@ -1,0 +1,19 @@
+# Example of merging yaml props
+default_env: &default_env
+  ALL: 'pass down'
+  TABLE: 'default-table-name'
+
+dev:
+  <<: *default_env
+  TABLE: 'DEV-table-name'
+  PASSWORD: 'dev-password'
+
+qa:
+  <<: *default_env
+  TABLE: 'QA-table-name'
+  PASSWORD: 'qa-password'
+
+prod:
+  <<: *default_env
+  TABLE: 'PROD-table-name'
+  PASSWORD: 'production-password'

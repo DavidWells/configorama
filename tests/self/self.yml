@@ -1,0 +1,53 @@
+########################
+# Self Variables
+########################
+
+
+normalKey: valueHere
+
+wowTrue: true
+dev: what
+envTest: ${env:YOLO, self:wowTrue}
+
+envTestShorthand: ${env:YOLO, wowTrue}
+
+envTestNested: ${env:YOLO, ${opt:stage}}
+
+wowza: ${envTestNested}
+
+otherKey: otherKeyValue
+
+otherOtherKey: zzz
+
+nextValue: nextValueHere
+
+thirdValue: thirdValue1234
+
+deeper:
+  key: hi
+  lol: what
+
+topLevelSelf: ${otherKey}
+
+defaultValueExists: ${self:otherOtherKey}
+
+nestedKey:
+  very:
+    very: veryNested
+
+nested: ${self:nestedKey.very.very}
+
+deeperKey:
+  value: ${nextValue}
+
+emptyTwo: ${thirdValue}
+
+thisOkay: ${self:normaxlKey, "thisnot~fine"}
+
+# same: ${empty, 'whjat'}
+#
+# valueAsStringVariableSingleQuotesTwo: ${Other, 'two'}
+#
+# valueAsStringVariableSingleQuotesThree: ${lol, ${self:normalKey}}
+#
+# valueAsStringVariableSingleQuotesFour: ${lol, self:normalKey}

@@ -1,0 +1,73 @@
+########################
+# Values Types
+########################
+
+normalKey: value
+
+valueAsNumber: 1
+
+valueAsNumberVariable: ${self:empty, 5}
+
+valueAsString: string value
+
+valueAsStringSingleQuotes: 'single quotes'
+
+valueAsStringDoubleQuotes: "double quotes"
+
+valueAsStringVariableSingleQuotes: ${self:empty, 'single-quotes-var'}
+
+valueAsStringVariableDoubleQuotes: ${self:empty, "double-quotes-var"}
+
+valueWithEqualSign: ${self:doesnt, "this=value=has=equal"}
+
+valueWithAsterisk: ${opt:stage, '*.mystage.com'}
+
+valueWithTwoFallbackValues: ${self:custom.NOT_A_VAL1, self:custom.NOT_A_VAL2, self:valueAsNumber}
+
+valueAsBoolean: true
+
+CloudfrontEnabled:
+  Fn::Equals: [ '${self:normalKey}', true ]
+
+########################
+# Self Variables
+########################
+
+selfReference: ${self:normalKey}
+
+########################
+# Env Variables
+########################
+
+envReference: ${env:envReference}
+
+########################
+# CLI opt Flags
+########################
+
+stages:
+  dev:
+    SECRET: dev-secret
+  prod:
+    SECRET: prod-secret
+
+cliFlag: ${opt:stage}
+
+cliFlagEmtpy: ${opt:empty, 'cliFlagEmtpyValue'}
+
+cliFlagComposed: ${self:stages.${opt:stage}.SECRET}
+
+
+########################
+# Composed Objects
+########################
+
+domainName: my-site.com
+domains:
+  prod:    api.${domainName}
+  staging: api-staging.${domainName}
+  dev:     api-dev.${domainName}
+resolvedDomainName: ${domains.${opt:stage}}
+
+# alt
+domainNameAlt: my-site-${opt:stage}.com

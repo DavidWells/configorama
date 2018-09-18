@@ -1,0 +1,219 @@
+#
+# stage: ${opt:stage, 'dev'}
+# what: ${file(./fixtures/config.${self:stage}.json)}
+#
+
+normalKey: normalKeyValue
+
+stages:
+  dev:
+    SECRET: dev-secret
+  prod:
+    SECRET: prod-secret
+
+# empty: ${opt:empty}
+empty: null
+
+composedKey: composed-${self:normalKey}-key
+
+########################
+# CLI opt Flags
+########################
+
+cliFlag: ${opt:stage}
+
+cliFlagEmtpy: ${opt:empty, 'cliFlagEmtpyValue'}
+
+cliFlagComposed: ${self:stages.${opt:stage}.SECRET}
+
+########################
+# Values Types
+########################
+valueAsNumber: 1
+
+valueAsNumberVariable: ${self:empty, 5}
+
+valueAsString: string value
+
+valueAsStringSingleQuotes: 'single quotes'
+
+valueAsStringDoubleQuotes: "double quotes"
+
+valueAsStringVariableSingleQuotes: ${self:empty, 'single-quotes-var'}
+
+valueAsStringVariableDoubleQuotes: ${self:empty, "double-quotes-var"}
+
+valueWithEqualSign: ${self:doesnt, "this=value=has=equal"}
+
+valueAsBoolean: true
+
+CloudfrontEnabled:
+  Fn::Equals: [ '${self:normalKey}', true ]
+
+selfReference: ${self:normalKey}
+
+########################
+# Values from YML files
+########################
+yamlFullFile: ${file(./fixtures/ymlfull.yml)}
+
+full: full
+yamlFullFileestedRef: ${file(./fixtures/yml${self:full}.yml)}
+
+yamlFullFileMissing: ${file(./fixtures/madeup-file.yml), 'yamlFullFileMissingValue'}
+
+yamlPartialTopLevelKey: ${file(./fixtures/ymlpartial.yml):topLevel}
+
+yamlPartialSecondLevelKey: ${file(./fixtures/ymlpartial.yml):nested.value}
+
+yamlPartialThirdLevelKey: ${file(./fixtures/ymlpartial.yml):nested.again.value}
+
+yamlPartialArrayRef: ${file(./fixtures/ymlpartial.yml):array.1}
+
+########################
+# Values from JSON files
+########################
+jsonFullFile: ${file(./fixtures/jsonfull.json)}
+
+jsonPartialTopLevelKey: ${file(./fixtures/jsonpartial.json):topLevel}
+
+jsonPartialSecondLevelKey: ${file(./fixtures/jsonpartial.json):nested.value}
+
+jsonPartialThirdLevelKey: ${file(./fixtures/jsonpartial.json):nested.again.value}
+
+jsonPartialArrayRef: ${file(./fixtures/jsonpartial.json):array.0}
+
+# calls to custom.config.stage then the nested values in the file
+deepReference: ${self:custom.config.stage.vpc.securityGroupIds}
+
+refTest: stage
+deepReferenceNestedRef: ${self:custom.config.${self:refTest}.vpc.securityGroupIds}
+
+custom:
+  config:
+    stage: ${file(./fixtures/config.dev.json)}
+
+########################
+# Number variable
+########################
+number: 10
+
+numberFromOpt: ${opt:count}
+
+numberFromSelf: ${self:number}
+
+numberFromDefault: ${self:empty, 5}
+
+numberWithDecimals: ${self:empty, 5.55555}
+
+numberWithLongInput: ${self:empty, 50000000000}
+
+numberZero: 0
+
+numberAsZero: ${self:empty, 0}
+
+########################
+# Synchronous variable resolution from javascript files
+########################
+
+syncJSValue: ${file(./fixtures/_syncValue.js):func}
+
+syncKey: ${file(./fixtures/_syncValueSubKey.js):func.key}
+
+syncKeyTwo: ${file(./fixtures/_syncValueSubKey.js):func.keyTwo}
+
+syncKeyThreeVariable: ${file(./fixtures/_syncValueSubKey.js):func.keyThree}
+
+########################
+# Asynchronous variable resolution from javascript files
+########################
+
+asyncJSValue: ${file(./fixtures/_asyncValue.js)}
+
+asyncKey: ${file(./fixtures/_asyncValueSubKey.js):func.key}
+
+asyncKeyTwo: ${file(./fixtures/_asyncValueSubKey.js):func.keyTwo}
+
+asyncKeyThreeVariable: ${file(./fixtures/_asyncValueSubKey.js):func.keyThree}
+
+asyncJSValueReference: ${self:asyncKey}
+
+########################
+# Advanced YML
+########################
+
+# Composed Objects
+domainName: netlify-services.com
+domains:
+  prod:    api.${self:domainName}
+  staging: api-staging.${self:domainName}
+  dev:     api-dev.${self:domainName}
+resolvedDomainName: ${self:domains.${opt:stage}}
+
+# deep references into deep variables
+stage: ${env:stage, opt:what}
+secrets: ${self:${self:stage}}
+dev:
+  SECRET: secret
+prod:
+  SECRET: prod-secret
+environment:
+  SECRET: ${self:secrets.SECRET}
+
+# Conditional yml syntax
+conditionalYAML: ${file(./fixtures/conditional-yml.yml):${opt:stage, 'dev'}}
+
+#   val0: val
+#   other: nnooooo
+#   val1: val0
+#   val2: ${self:custom.val1}
+#   val3: ${self:custom.${self:custom.val2}, "fallback"}
+#   val4: ${self:custom.val3, self:custom.val3}
+#
+# settings:
+#   ID: Your_Site_ID
+# provider:
+#   stage: dev
+# build:
+#   #base: ${self:config.CREDS}
+#   publish: ${file(./fixtures/config.json):lol}
+#   command: ${file(./fixtures/config.json):wow.cool}
+#   yay: ${file(./fixtures/config.${opt:stage}.json):CREDS}
+#   functions: project/functions/
+#
+#   environment: ${file(./fixtures/config.${opt:stage}.json)}
+#
+# redirects:
+#   - from: /*
+#     to: '/blog/:splat'
+#   - from: /old-path
+#     to: /new-path
+#     status: 301
+#     force: false
+#     query:
+#       path: ':path'
+#     conditions:
+#       Language:
+#         - en
+#       Country:
+#         - US
+#       Role:
+#         - admin
+#     signed: API_SIGNATURE_TOKEN
+#     headers:
+#       X-From: Netlify
+#       X-Api-Key: some-api-key-string
+#   - from: /*
+#     to: /index.html
+#     status: 200
+# headers:
+#   - for: /*
+#     values:
+#       X-Frame-Options: DENY
+#       X-XSS-Protection: 1; mode=block
+#       Content-Security-Policy: 'frame-ancestors https://www.facebook.com'
+#       Link: |2-
+#             </assets/css/base.css>; rel=preload; as=style, \
+#             </assets/css/base2.css>; rel=preload; as=style, \
+#             </assets/css/base3.css>; rel=preload; as=style
+#       Basic-Auth: 'someuser:somepassword anotheruser:anotherpassword'

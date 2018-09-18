@@ -1,0 +1,3 @@
+childFile: two
+
+parentParentRef: ${file(../../parentOther.yml)}

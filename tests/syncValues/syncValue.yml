@@ -1,0 +1,13 @@
+########################
+# Synchronous variable resolution from javascript files
+########################
+
+normalKey: 'variable key three'
+
+syncJSValue: ${file(./syncValue.js):func}
+
+syncKey: ${file(./syncValueObject.js):func.key}
+
+syncKeyTwo: ${file(./syncValueObject.js):func.keyTwo}
+
+syncKeyThreeVariable: ${file(./syncValueObject.js):func.keyThree}

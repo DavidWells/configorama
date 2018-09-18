@@ -1,0 +1,15 @@
+########################
+# Asynchronous variable resolution from javascript files
+########################
+
+selfVar: 'Testing'
+
+asyncJSValue: ${file(./asyncValue.js)}
+
+asyncKey: ${file(./asyncValueObject.js):func.key}
+
+asyncKeyTwo: ${file(./asyncValueObject.js):func.keyTwo}
+
+asyncKeyThreeVariable: ${file(./asyncValueObject.js):func.keyThree}
+
+asyncJSValueReference: ${asyncKey}

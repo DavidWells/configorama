@@ -1,0 +1,51 @@
+{
+  "name": "configorama",
+  "version": "0.0.1",
+  "description": "Variable support for configuration files",
+  "main": "/lib/index.js",
+  "files": [
+    "lib",
+    "package.json",
+    "package-lock.json",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "ava -v",
+    "watch": "npm test -- --watch -v",
+    "publish": "git push origin && git push origin --tags",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish"
+  },
+  "author": "David Wells",
+  "license": "MIT",
+  "homepage": "https://github.com/DavidWells/configorama#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DavidWells/configorama"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.0.0",
+    "bluebird": "^3.5.1",
+    "find-up": "^3.0.0",
+    "js-yaml": "^3.12.0",
+    "lodash": "^4.17.10",
+    "replaceall": "^0.1.6"
+  },
+  "devDependencies": {
+    "ava": "^0.25.0",
+    "minimist": "^1.2.0"
+  },
+  "ava": {
+    "files": [
+      "tests/**/*.test.js"
+    ],
+    "sources": [
+      "**/*.{js,jsx}",
+      "*.yml",
+      "**/*.yml"
+    ],
+    "tap": true,
+    "verbose": true
+  }
+}
