@@ -45,7 +45,6 @@
       "*.yml",
       "**/*.yml"
     ],
-    "tap": true,
     "verbose": true
   }
 }

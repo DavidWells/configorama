@@ -1,3 +1,4 @@
+/* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
 import Configorama from '../../lib'
@@ -10,19 +11,10 @@ const args = {
   stage: 'dev',
 }
 
-const resolvedObject = {
-  foo: 'bar',
-  key: 'dev',
-  value: 'dev-bar',
-  env: '${consul:lol}'
-}
-
-
-test('Resolver', async (t) => {
+test('Custom variable source resolver', async (t) => {
   const object = {
     foo: 'bar',
     env: '${consul:${self:region}}',
-    upTop: '${tester:abc}',
     custom: {
       defaultStage: 'qa',
       profiles: {
@@ -39,11 +31,7 @@ test('Resolver', async (t) => {
     stage: '${opt:stage, self:custom.defaultStage}',
     profile: '${self:custom.profiles.${self:stage}}',
     region: '${opt:region, self:custom.regions.${self:stage}}',
-
-    other: 'lol',
-    value: '${tester:xyz}',
-    key: '${opt:stage}',
-    // tester: '${ssm:/path/to/service/myParam}'
+    key: '${opt:stage}'
   }
 
   const vars = new Configorama(object, {
@@ -51,15 +39,37 @@ test('Resolver', async (t) => {
     variableSources: [{
       match: RegExp(/^consul:/g),
       resolver: (varToProcess, opts, currentObject) => {
-        console.log('consul varToProcess', varToProcess)
-        console.log('consul cli flags', opts)
-        console.log('consul currentObject', currentObject)
-        return Promise.resolve(varToProcess)
+        // console.log('consul varToProcess', varToProcess)
+        // console.log('consul cli flags', opts)
+        // console.log('consul currentObject', currentObject)
+        return Promise.resolve(`fetch consul value ${varToProcess}`)
       }
     }]
   })
 
   const config = await vars.init(args)
-  console.log(config)
-  t.is('hi', 'hi')
+  // console.log(config)
+  t.is(config.env, 'fetch consul value consul:us-dev')
+})
+
+test('Custom variable source resolver match function', async (t) => {
+  const object = {
+    tester: '${REPLACE_ME}'
+  }
+
+  const vars = new Configorama(object, {
+    configDir: dirname, // needed for any file refs
+    variableSources: [{
+      match: (val) => {
+        return val === 'REPLACE_ME'
+      },
+      resolver: (varToProcess, opts, currentObject) => {
+        return Promise.resolve(`its replaced`)
+      }
+    }]
+  })
+
+  const config = await vars.init(args)
+  // console.log(config)
+  t.is(config.tester, 'its replaced')
 })
