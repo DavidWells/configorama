@@ -1,0 +1,56 @@
+# Toml file tests
+
+normalKey = "full"
+
+valueAsNumber = 1
+
+valueAsNumberVariable = "${self:empty, 5}"
+
+valueAsString = "string value"
+
+valueAsStringSingleQuotes = 'single quotes'
+
+valueAsStringDoubleQuotes = "double quotes"
+
+valueAsStringVariableSingleQuotes = "${self:empty, 'single-quotes-var'}"
+
+valueAsStringVariableDoubleQuotes= '${self:empty, "double-quotes-var"}'
+
+valueWithEqualSign = '${self:doesnt, "this=value=has=equal"}'
+
+valueWithAsterisk = "${opt:stage, '*.mystage.com'}"
+
+valueWithTwoFallbackValues = "${self:custom.NOT_A_VAL1, self:custom.NOT_A_VAL2, self:valueAsNumber}"
+
+valueAsBoolean = true
+
+tomlFullFile = "${file(./_tomlfull.toml)}"
+
+tomlFullFileNoPath = "${file(_tomlfull.toml)}"
+
+tomlFullFileNestedRef = "${file(./_toml${self:normalKey}.toml)}"
+
+tomlFullFileMissing = "${file(./_madeup-file.toml), 'tomlFullFileMissingDefaultValue'}"
+
+tomlPartialTopLevelKey = "${file(./_tomlpartial.toml):topLevel}"
+
+tomlPartialTopLevelKeyNoPath = "${file(_tomlpartial.toml):topLevel}"
+
+tomlPartialSecondLevelKey = "${file(./_tomlpartial.toml):nested.value}"
+
+tomlPartialThirdLevelKey = "${file(./_tomlpartial.toml):nested.again.value}"
+
+tomlPartialThirdLevelKeyNoPath = "${file(_tomlpartial.toml):nested.again.value}"
+
+tomlPartialArrayRef = "${file(./_tomlpartial.toml):array.1}"
+
+tomlPartialArrayObjectRef = "${file(./_tomlpartial.toml):arrayTwo.1.object}"
+
+tomlPartialArrayObjectRefValue = "${file(./_tomlpartial.toml):arrayTwo.1.object.key}"
+
+# objects
+[build]
+  base    = "${opt:stage, 'test'}"
+  publish = "${file(./config.dev.json):CREDS}"
+  command = "echo 'default context'"
+  functions = "project/functions/"

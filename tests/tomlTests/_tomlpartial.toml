@@ -1,0 +1,20 @@
+topLevel = "topLevelValue"
+array = [ "zero", "one", "two" ]
+
+[nested]
+value = "1leveldown"
+
+  [nested.again]
+  value = "2levelsdown"
+
+[[arrayTwo]]
+  [arrayTwo.object]
+  key = "helloOne"
+
+[[arrayTwo]]
+  [arrayTwo.object]
+  key = "helloTwo"
+
+[[arrayTwo]]
+  [arrayTwo.object]
+  key = "helloThree"
