@@ -6,7 +6,13 @@ value: 'xyz'
 
 valueTwo: two
 
+valueWithSpaces: I have spaces
+
 number: 10
+
+fallbackValueSpaces: ${empty, 'space is cool'}
+
+fallbackValueSpacesTwo: ${empty, valueWithSpaces}
 
 fallback: ${empty, number}
 

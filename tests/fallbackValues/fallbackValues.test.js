@@ -36,6 +36,14 @@ test('fallbackNumber: ${empty, 99}', (t) => {
   t.is(config.fallbackNumber, 99)
 })
 
+test('fallbackValue should have spaces', (t) => {
+  t.is(config.fallbackValueSpaces, 'space is cool')
+})
+
+test('fallbackValue should have spaces from other variable', (t) => {
+  t.is(config.fallbackValueSpacesTwo, 'I have spaces')
+})
+
 test('fallbackNumberZero: ${empty, 0}', (t) => {
   t.is(config.fallbackNumberZero, 0)
 })
