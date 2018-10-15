@@ -1,0 +1,20 @@
+########################
+# Manual test file
+########################
+
+selfVar: 'Testing'
+
+asyncJSValue: ${file(./asyncValues/asyncValue.js)}
+
+asyncKey: ${file(./asyncValues/asyncValueObject.js):func.key}
+
+asyncKeyTwo: ${file(./asyncValues/asyncValueObject.js):func.keyTwo}
+
+asyncKeyThreeVariable: ${file(./asyncValues/asyncValueObject.js):func.keyThree }
+
+# TODO doesnt work with filters
+asyncWithFilter: ${file(./asyncValues/asyncValueObject.js):func.keyTwo | toLowerCase }
+
+asyncWithFilterTwo: ${file(./asyncValues/asyncValueObject.js):func.key | toUpperCase }
+
+asyncJSValueReference: ${asyncKey}
