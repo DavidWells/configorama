@@ -1,0 +1,63 @@
+########################
+# Filters
+########################
+
+normalKey: value
+
+keyTwo: what-is-up
+
+keyThree: TheGooseIsLoose
+
+toUpperCaseString: ${'value' | toUpperCase }
+
+toKebabCaseString: ${'valueHere' | toKebabCase }
+
+originalStage: ${opt:stage}
+
+stageToUpper: ${opt:stage | toUpperCase}
+
+# TODO toUpperCaseVar: 'deep0', is wrong... works now but doesnt process filter
+deepVarTest: ${self:keyTwo | capitalize}
+
+deepVarTestTwo: ${keyTwo | toCamelCase}
+
+toKebabCase: ${keyThree | toKebabCase }
+
+toCamelCase: ${keyTwo | toCamelCase }
+
+valueWithAsterisk: ${opt:empty, '*.mystage.com' | toUpperCase }
+
+filter: ${self:normalKey | toUpperCase}
+
+valueWithSeparators: lol-hi-_ ha,ha
+
+inner: ${'HI' | toLowerCase }
+
+#####
+# Filter edge cases
+# Writing configuration like this is not advised
+#####
+
+innerObject:
+  value: ${'HA' | toLowerCase }
+
+filterUsingVariableInputs: ${valueWithSeparators }
+
+filterUsingVariableObjectInputs: ${valueWithSeparators }
+
+test: value
+
+# testTwo: ${toLowerCase(${test})}
+
+splitTest: ${valueWithSeparators | toUpperCase }
+
+splitTestTwo: ${valueWithSeparators | toUpperCase }
+
+domainName: my-site.com
+domains:
+  prod:    api.${domainName}
+  staging: api-staging.${domainName}
+  dev:     api-dev.${domainName}
+
+# TODO: variables get replaced only once. This means opt:stage if filtered toUpper can't resolve here
+resolvedDomainName: ${domains.${originalStage}}

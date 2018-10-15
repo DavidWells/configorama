@@ -1,0 +1,31 @@
+########################
+# Filters
+########################
+
+# normalKey: value
+#
+# myOther: what-is-up
+#
+toUpperCase: ${'value' | toUpperCase }
+
+stage: ${opt:stage | toUpperCase}
+
+#toUpperCaseVar: ${self:stage}
+
+# toCamel: ${myOther | toCamelCase | capitalize }
+#
+# valueWithAsterisk: ${opt:empty, '*.mystage.com' | toUpperCase | addPeriod }
+#
+# filter: ${self:normalKey | toUpperCase}
+#
+# commas: lol-hi-_ ha,ha
+#
+# splitTest: ${commas | split(",", 2) }
+
+
+domainName: my-site.com
+domains:
+  prod:    api.${domainName}
+  staging: api-staging.${domainName}
+  dev:     api-dev.${domainName}
+resolvedDomainName: ${domains.${self:stage}}
