@@ -1,0 +1,46 @@
+########################
+# Functions
+########################
+
+key: 'haha'
+
+object:
+  one: once
+  two: twice
+
+objectTwo:
+  three: third
+  four: fourth
+
+# TODO objects don't both resolve first so this merge fails.
+mergeObjects: ${merge(${object}, ${objectTwo})}
+
+array:
+  - yess!sss
+  - no
+
+splitTest: ${split('my!string!whatever', !)}
+
+mergeTest: ${merge('haha', 'wawawaw')}
+
+# Transform keys to uppercase
+upperKeysTest: ${upperKeys(${object})}
+
+other: '!'
+joinIt: ${join(${array}, ${other})}
+
+# Comma separater
+separater: ','
+splitString: yayaaya,whwhwhwhwh,hahahaha,wowowowo
+splitWithVariables: ${split(${splitString}, ${separater})}
+
+# Exclaimation separater
+separaterTwo: '!'
+splitStringTwo: yayaaya!whwhwhwhwh!hahahaha!wowowowo
+splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}
+
+# four: ${split(${self:key}, 'a')}
+
+merge: ${merge('haha', 'wowowow')}
+
+nestedFunctions: ${split(merge('haha', 'wawawaw'), 'a')}
