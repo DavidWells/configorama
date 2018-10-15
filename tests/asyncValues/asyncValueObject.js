@@ -4,7 +4,8 @@ module.exports.func = (config) => {
 }
 
 function fetchSecretsFromRemoteStore() {
-  return delay(3000).then(() => {
+  // TODO with promise track refactor, the variables get called N number of times
+  return delay(0).then(() => {
     return Promise.resolve({
       key: 'asyncValueFromObject',
       keyTwo: 'asyncValueFromObjectTwo',

@@ -16,7 +16,7 @@ test.before(async t => {
 
   const yamlFile = path.join(__dirname, 'asyncValue.yml')
   const configorama = new Configorama(yamlFile)
-
+  console.time('perf')
   config = await configorama.init(args)
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
@@ -25,6 +25,7 @@ test.before(async t => {
 })
 
 test.after(t => {
+  console.timeEnd('perf')
   console.log(`-------------`)
 })
 
@@ -42,4 +43,16 @@ test('Object return two ${file(./asyncValueObject.js):func.keyTwo}', (t) => {
 
 test('Object return ${self:selfVar}', (t) => {
   t.is(config.asyncKeyThreeVariable, 'Testing')
+})
+
+test('asyncWithFilter', (t) => {
+  t.is(config.asyncWithFilter, 'asyncvaluefromobjecttwo')
+})
+
+test('asyncWithFilterTwo', (t) => {
+  t.is(config.asyncWithFilterTwo, 'ASYNCVALUEFROMOBJECT')
+})
+
+test('asyncJSValueReference', (t) => {
+  t.is(config.asyncJSValueReference, 'asyncValueFromObject')
 })
