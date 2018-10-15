@@ -6,6 +6,7 @@ import Configorama from '../../lib'
 let config
 
 process.env.envNumber = 100
+process.env.MY_SECRET = 'lol hi there'
 
 // This runs before all tests
 test.before(async t => {

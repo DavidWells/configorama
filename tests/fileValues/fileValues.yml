@@ -51,3 +51,13 @@ jsonPartialArrayRef: ${file(./_jsonpartial.json):array.0}
 stageSpecific: ${file(./config.${opt:stage}.json)}
 
 stageSpecificTwo: ${file(./config.${opt:otherFlag}.json)}
+
+
+###############
+# Pass args into file
+###############
+
+additionalValues: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+
+# TODO fix file path refs
+additionalValuesTWO: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}

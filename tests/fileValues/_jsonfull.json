@@ -5,7 +5,7 @@
     "bar": "zaz",
     "opt": "${opt:stage}",
     "optWithDefault": "${opt:empty, 'defaultOptFlag'}",
-    "envVar": "${env:WOW}",
+    "envVar": "${env:WOW, 'fallback'}",
     "envVarWithDefault": "${env:BAZ, 'defaultEnvValue'}"
   }
 }
