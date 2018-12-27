@@ -1,6 +1,6 @@
 # Configorama
 
-Dynamic configuration values.
+Dynamic configuration values with variable support.
 
 ## About
 
