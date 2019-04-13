@@ -4,6 +4,12 @@
 
 key: 'haha'
 
+otherWW:
+  haha: true
+  whatever:
+    lol:
+      woot: wee
+
 object:
   one: once
   two: twice
@@ -12,16 +18,32 @@ objectTwo:
   three: third
   four: fourth
 
+asyncObj: ${file(./async.js)}
+
+mergeInlineObjects: ${merge(${object}, ${objectTwo})}
 # TODO objects don't both resolve first so this merge fails.
-mergeObjects: ${merge(${object}, ${objectTwo})}
+
+mergeObjects: ${merge(${object}, ${asyncObj})}
+
+mergeObjectsX: ${merge(${otherWW}, ${asyncObj})}
+
+subKey: ${mergeObjectsX.whatever.lol.woot}
 
 array:
   - yess!sss
   - no
 
+arrayTwo:
+  - ${split('my!string!whatever', !)}
+  - ${merge('xxx', 'yyy')}
+
 splitTest: ${split('my!string!whatever', !)}
 
-mergeTest: ${merge('haha', 'wawawaw')}
+mergeTest: ${merge('stuff', 'new')}
+
+mergeTestTwo: ${merge('other', 'smashedcaps') | toUpperCase}
+
+otherLOL: ${mergeTest}
 
 # Transform keys to uppercase
 upperKeysTest: ${upperKeys(${object})}
@@ -38,8 +60,6 @@ splitWithVariables: ${split(${splitString}, ${separater})}
 separaterTwo: '!'
 splitStringTwo: yayaaya!whwhwhwhwh!hahahaha!wowowowo
 splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}
-
-# four: ${split(${self:key}, 'a')}
 
 merge: ${merge('haha', 'wowowow')}
 

@@ -14,7 +14,7 @@ toKebabCaseString: ${'valueHere' | toKebabCase }
 
 originalStage: ${opt:stage}
 
-stageToUpper: ${opt:stage | toUpperCase}
+stageToUpper: ${opt:stage | toUpperCase }
 
 # TODO toUpperCaseVar: 'deep0', is wrong... works now but doesnt process filter
 deepVarTest: ${self:keyTwo | capitalize}
@@ -31,7 +31,7 @@ filter: ${self:normalKey | toUpperCase}
 
 valueWithSeparators: lol-hi-_ ha,ha
 
-inner: ${'HI' | toLowerCase }
+inner: ${'HI' | toLowerCase}
 
 #####
 # Filter edge cases

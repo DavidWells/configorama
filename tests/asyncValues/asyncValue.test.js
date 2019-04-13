@@ -46,7 +46,7 @@ test('Object return ${self:selfVar}', (t) => {
 })
 
 test('asyncWithFilter', (t) => {
-  t.is(config.asyncWithFilter, 'asyncvaluefromobjecttwo')
+  t.is(config.asyncWithFilter, 'asyncValueFromObjectTwo')
 })
 
 test('asyncWithFilterTwo', (t) => {

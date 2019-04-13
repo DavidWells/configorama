@@ -3,11 +3,15 @@ module.exports = (config) => {
   return fetchSecretsFromRemoteStore()
 }
 
-function fetchSecretsFromRemoteStore(x, y, z) {
-  console.log(x, y, z)
+function fetchSecretsFromRemoteStore() {
   return delay(2000).then(() => {
     console.log('delay 1000')
-    return Promise.resolve('asyncval')
+    return Promise.resolve({
+      test: true,
+      nested: {
+        yolo: 'hi'
+      }
+    })
   })
 }
 

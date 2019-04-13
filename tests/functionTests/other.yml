@@ -8,7 +8,7 @@
 #
 toUpperCase: ${'value' | toUpperCase }
 
-stage: ${opt:stage | toUpperCase}
+stage: ${opt:stage | toUpperCase }
 
 #toUpperCaseVar: ${self:stage}
 

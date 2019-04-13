@@ -2,6 +2,8 @@ import test from 'ava'
 import path from 'path'
 import Configorama from '../../lib'
 
+
+
 let config
 
 process.env.envReference = 'env var'
@@ -40,8 +42,8 @@ test("splitTest: ${split('my!string!whatever', !)}", (t) => {
   t.deepEqual(config.splitTest, [ 'my', 'string', 'whatever' ])
 })
 
-test("mergeTest: ${merge('haha', 'wawawaw')}", (t) => {
-  t.is(config.mergeTest, 'hahawawawaw')
+test("mergeTest: ${merge('stuff', 'new')}", (t) => {
+  t.is(config.mergeTest, 'stuffnew')
 })
 
 test("upperKeysTest: ${upperKeys(${object})}", (t) => {
@@ -60,8 +62,33 @@ test("splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}", (t) 
 test("nestedFunctions: ${split(merge('haha', 'wawawaw'), 'a')}", (t) => {
   t.deepEqual(config.nestedFunctions, [ 'h', 'h', 'w', 'w', 'w', 'w' ])
 })
-/*
 
+test("mergeInlineObjects: ${merge(${object}, ${objectTwo})}", (t) => {
+  t.deepEqual(config.mergeInlineObjects, {
+    one: 'once',
+    two: 'twice',
+    three: 'third',
+    four: 'fourth'
+  })
+})
+
+test("mergeObjects: ${merge(${object}, ${asyncObj})}", (t) => {
+  t.deepEqual(config.mergeObjects, {
+    one: 'once',
+    two: 'twice',
+    test: true,
+    nested: {
+      yolo: 'hi'
+    }
+  })
+})
+
+test("subKey: ${mergeObjects.two}", (t) => {
+  t.deepEqual(config.subKey, 'wee')
+})
+
+/*
+old tests when functions were in resolution path
 
 test('splitTestTwo "lol-hi-_ ha,ha" | split("-", 2) | toUpperCase', (t) => {
   t.deepEqual(config.splitTestTwo, [
@@ -77,4 +104,4 @@ test('filterUsingVariableInputs ${"lol-hi-_ ha,ha" | split(${inner===hi}, 2, ${o
     '-_ ha,ha',
   ])
 })
- */
+*/
