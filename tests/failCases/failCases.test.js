@@ -37,20 +37,4 @@ test('throw if opt not found', async (t) => {
   t.regex(error.message, /Variable not found/)
 })
 
-// noooooo: ${file(false.yml)}
-
-test('throw on not filter not found', async (t) => {
-  const object = {
-    foo: 'hi',
-    value: '${opt:stage}-${foo | fake}',
-  }
-
-  const vars = new Variables(object, {
-    configDir: dirname
-  })
-
-  const error = await t.throws(vars.init(args))
-  t.is(error.message, 'Filter "fake" not found')
-})
-
 // Nested fallbacks ACCESS_TOKEN = "${file(asyncValue.js, ${env:MY_SECxRET, 'hi'}, ${self:sharedValue})}"

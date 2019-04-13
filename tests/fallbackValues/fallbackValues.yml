@@ -14,6 +14,8 @@ fallbackValueSpaces: ${empty, 'space is cool'}
 
 fallbackValueSpacesTwo: ${empty, valueWithSpaces}
 
+# fallbackValueThree: ${empty, ${doh}, 'this thing'}
+
 fallback: ${empty, number}
 
 fallbackNumber: ${empty, 99}
@@ -23,6 +25,8 @@ fallbackNumberZero: ${empty, 0}
 fallbackString: ${empty, 'ninety-nine'}
 
 fallbackStringTwo: ${empty, "_nine-nine_"}
+
+fallbackWithAtSign: ${env:c, "foo@bar"}
 
 fallbackSelf: ${empty, number}
 

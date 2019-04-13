@@ -56,6 +56,10 @@ test('fallbackStringTwo: ${empty, "_nine-nine_"}', (t) => {
   t.is(config.fallbackStringTwo, '_nine-nine_')
 })
 
+test('fallbackWithAtSign: ${empty, "foo@bar"}', (t) => {
+  t.is(config.fallbackWithAtSign, 'foo@bar')
+})
+
 test('fallbackSelf: ${empty, number}', (t) => {
   t.is(config.fallbackSelf, 10)
 })
