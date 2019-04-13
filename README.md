@@ -96,7 +96,7 @@ How is this different than the serverless variable system?
 
     # Now
     key: ${keyOne.subKey}
-    ```  
+    ```
 
 5. Numbers as defaults are supported
 
@@ -107,7 +107,7 @@ How is this different than the serverless variable system?
 6. TOML, YML, JSON, etc support
 
     Configorama works off normal JS objects. Parse your config and pass it into configorama.
-    
+
 
 ## Inspiration
 
@@ -117,7 +117,8 @@ This is forked out of the [serverless framework](https://github.com/serverless/s
 
 [erikerikson](https://github.com/erikerikson), [eahefnawy](https://github.com/eahefnawy), [HyperBrain](https://github.com/HyperBrain), [ac360](https://github.com/ac360), [gcphost](https://github.com/gcphost), [pmuens](https://github.com/pmuens), [horike37](https://github.com/horike37), [lorengordon](https://github.com/lorengordon), [AndrewFarley](https://github.com/AndrewFarley), [tobyhede](https://github.com/tobyhede), [johncmckim](https://github.com/johncmckim), [mangas](https://github.com/mangas), [e-e-e](https://github.com/e-e-e), [BasileTrujillo](https://github.com/BasileTrujillo), [miltador](https://github.com/miltador), [sammarks](https://github.com/sammarks), [RafalWilinski](https://github.com/RafalWilinski), [indieisaconcept](https://github.com/indieisaconcept), [svdgraaf](https://github.com/svdgraaf), [infiniteluke](https://github.com/infiniteluke), [j0k3r](https://github.com/j0k3r), [craigw](https://github.com/craigw), [bsdkurt](https://github.com/bsdkurt), [aoskotsky-amplify](https://github.com/aoskotsky-amplify), and all the other folks who contributed to the variable system.
 
+Additionally these tools were very helpful:
 
-## Todo
-
-Finish filter function param matching
+- [yaml-boost](https://github.com/blackflux/yaml-boost)
+- [serverless-merge-config](https://github.com/CruGlobal/serverless-merge-config)
+- [terraform variables](https://www.npmjs.com/package/serverless-terraform-variables)
