@@ -6,22 +6,31 @@ normalKey: full
 
 yamlFullFile: ${file(./_ymlfull.yml)}
 
+# import full yml file object
 yamlFullFileNoPath: ${file(_ymlfull.yml)}
 
+# import full yml file object with variable filename
 yamlFullFileNestedRef: ${file(./_yml${self:normalKey}.yml)}
 
+# fallback to default value if file not found
 yamlFullFileMissing: ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}
 
+# import partial yml file key value
 yamlPartialTopLevelKey: ${file(./_ymlpartial.yml):topLevel}
 
+# import partial yml file no relative path
 yamlPartialTopLevelKeyNoPath: ${file(_ymlpartial.yml):topLevel}
 
+# import partial yml file nested key value pair
 yamlPartialSecondLevelKey: ${file(./_ymlpartial.yml):nested.value}
 
+# import partial yml file triple nested key value pair
 yamlPartialThirdLevelKey: ${file(./_ymlpartial.yml):nested.again.value}
 
+# import partial yml file triple nested key value pair (no relative path)
 yamlPartialThirdLevelKeyNoPath: ${file(_ymlpartial.yml):nested.again.value}
 
+# import partial yml file array value
 yamlPartialArrayRef: ${file(./_ymlpartial.yml):array.1}
 
 yamlPartialArrayObjectRef: ${file(./_ymlpartial.yml):arrayTwo.1.object}
