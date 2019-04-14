@@ -1,0 +1,11 @@
+########################
+# Sync API test
+########################
+
+selfVar: 'Testing'
+
+asyncJSValue: ${file(./asyncValue.js)}
+
+asyncKey: ${file(./asyncValueObject.js):func.key}
+
+stage: ${opt:stage}
