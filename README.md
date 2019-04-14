@@ -2,9 +2,11 @@
 
 Dynamic configuration values with variable support.
 
+Works with `yml`, `json`, `toml` config formats and anything that parsed down to a plain ol' javascript object
+
 ## About
 
-Resolves configuration variables from:
+Configorama extends your configuration with a powerful variable system. It resolves configuration variables from:
 
 - CLI options
 - ENV variables
@@ -44,12 +46,6 @@ const myConfigFilePath = path.join(__dirname, 'config.yml')
 
 const options = {}
 const config = Configorama.sync(myConfigFilePath, options, cliFlags)
-```
-
-## Examples
-
-```yml
-myValue: ${env:STAGE}
 ```
 
 ## Variable Sources
@@ -126,6 +122,8 @@ function delay(t, v) {
 
 ### Git references
 
+Resolve values from `cwd` git data.
+
 ```yml
 repository: ${git:repository}
 
@@ -148,11 +146,45 @@ remoteDefinedNoQuotes: ${git:remote(origin)}
 repoUrl: ${git:repoUrl}
 ```
 
+### (experimental) Filters
+
+Filters will transform the resolved variables 
+
+```yml
+toUpperCaseString: ${'value' | toUpperCase }
+
+toKebabCaseString: ${'valueHere' | toKebabCase }
+
+key: lol_hi
+
+keyTwo: lol_hi
+
+toKebabCase: ${key | toKebabCase }
+
+toCamelCase: ${keyTwo | toCamelCase }
+```
+
+### (experimental) Functions
+
+Functions will convert resolved config values with various methods.
+
+```yml
+object:
+  one: once
+  two: twice
+
+objectTwo:
+  three: third
+  four: fourth
+
+mergeObjects: ${merge(${object}, ${objectTwo})}
+```
+
 ### More Examples
 
 See the [tests folder](./tests) for a bunch of examples!
 
-## Custom variable sources
+## Custom Variable Sources
 
 Configorama allows you to bring your own variable sources.
 
