@@ -21,7 +21,8 @@ test('throw if self not found', async (t) => {
   })
 
   const error = await t.throws(vars.init(args))
-  t.is(error.message, 'Invalid variable reference syntax for variable "foo" ${opt:stage}-${foo}')
+  // t.is(error.message, 'Invalid variable reference syntax for variable "foo" ${opt:stage}-${foo}')
+  t.regex(error.message, /Invalid variable reference syntax/)
 })
 
 test('throw if opt not found', async (t) => {
