@@ -58,10 +58,6 @@ test('deepVarTestTwo toCamelCase', (t) => {
   t.is(config.deepVarTestTwo, 'whatIsUp')
 })
 
-test('deepVarTestTwo toCamelCase', (t) => {
-  t.is(config.deepVarTestTwo, 'whatIsUp')
-})
-
 test('resolvedDomainName', (t) => {
   t.is(config.resolvedDomainName, 'api-dev.my-site.com')
 })

@@ -64,10 +64,6 @@ test('yamlPartialTopLevelKeyNoPath', (t) => {
   t.deepEqual(config.yamlPartialTopLevelKeyNoPath, 'topLevelValue')
 })
 
-test('yamlPartialTopLevelKeyNoPath', (t) => {
-  t.deepEqual(config.yamlPartialTopLevelKeyNoPath, 'topLevelValue')
-})
-
 test('yamlPartialSecondLevelKey', (t) => {
   t.deepEqual(config.yamlPartialSecondLevelKey, '1leveldown')
 })

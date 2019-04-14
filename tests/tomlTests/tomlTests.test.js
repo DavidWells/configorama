@@ -103,10 +103,6 @@ test('tomlPartialTopLevelKeyNoPath', (t) => {
   t.deepEqual(config.tomlPartialTopLevelKeyNoPath, 'topLevelValue')
 })
 
-test('tomlPartialTopLevelKeyNoPath', (t) => {
-  t.deepEqual(config.tomlPartialTopLevelKeyNoPath, 'topLevelValue')
-})
-
 test('tomlPartialSecondLevelKey', (t) => {
   t.deepEqual(config.tomlPartialSecondLevelKey, '1leveldown')
 })
