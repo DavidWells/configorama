@@ -29,6 +29,8 @@ mergeObjectsX: ${merge(${otherWW}, ${asyncObj})}
 
 subKey: ${mergeObjectsX.whatever.lol.woot}
 
+md5: ${md5('lol')}
+
 array:
   - yess!sss
   - no
@@ -64,3 +66,9 @@ splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}
 merge: ${merge('haha', 'wowowow')}
 
 nestedFunctions: ${split(merge('haha', 'wawawaw'), 'a')}
+
+nestedOne: 'hi'
+nestedTwo: ${merge('haha', 'wowowow')}
+mergeNested: ${merge('lol', ${nestedTwo})}
+
+fileRef: ${file(./other.yml)}

@@ -106,8 +106,18 @@ How is this different than the serverless variable system?
 
 6. TOML, YML, JSON, etc support
 
-    Configorama works off normal JS objects. Parse your config and pass it into configorama.
+    Configorama will work on any configuration format that can be converted into a JS object.
 
+    Parse any config format and pass it into configorama.
+
+
+7. Configorama has a number of built-in functions.
+
+    Build in functions can be used within expressions as another way to transform and combine values. These are similar to the operators but all follow a common syntax:
+
+    ```
+    <FUNCTION NAME>(<ARGUMENT 1>, <ARGUMENT 2>)
+    ```
 
 ## Inspiration
 

@@ -11,7 +11,7 @@ process.env.envReference = 'env var'
 // This runs before all tests
 test.before(async t => {
   const args = {
-    stage: 'dev',
+    stage: 'prod',
   }
 
   const configFile = path.join(__dirname, 'functions.yml')
@@ -46,11 +46,14 @@ test("mergeTest: ${merge('stuff', 'new')}", (t) => {
   t.is(config.mergeTest, 'stuffnew')
 })
 
+test("joinIt: ${join(${array}, ${other})}", (t) => {
+  t.is(config.joinIt, 'yess!sss!no')
+})
+
 test("upperKeysTest: ${upperKeys(${object})}", (t) => {
   t.deepEqual(config.upperKeysTest, { ONE: 'once', TWO: 'twice' })
 })
 
-// Broken
 test("splitWithVariables: ${split(${splitString}, ${separater})}", (t) => {
   t.deepEqual(config.splitWithVariables, [ 'yayaaya', 'whwhwhwhwh', 'hahahaha', 'wowowowo' ])
 })
@@ -87,6 +90,35 @@ test("subKey: ${mergeObjects.two}", (t) => {
   t.deepEqual(config.subKey, 'wee')
 })
 
+
+test("mergeNested: ${merge('lol', ${nestedTwo})}", (t) => {
+  t.deepEqual(config.mergeNested, 'lolhahawowowow')
+})
+
+test("Nested fileRef: ${file(./other.yml)}", (t) => {
+  t.deepEqual(config.fileRef, {
+    toUpperCase: 'VALUE',
+    domainName: 'my-site.com',
+    domains: {
+      prod: 'api.my-site.com',
+      staging: 'api-staging.my-site.com',
+      dev: 'api-dev.my-site.com'
+    },
+    resolvedDomainName: 'api.my-site.com',
+    subThing: 'haha',
+    domainNameTwo: 'my-site-two.com',
+    domainsTwo: {
+      prod: 'api.my-site-two.com',
+      staging: 'api-staging.my-site-two.com',
+      dev: 'api-dev.my-site-two.com',
+    },
+    resolvedDomainNameTwo: 'api.my-site-two.com'
+  })
+})
+
+test("subThing: ${self:key}", (t) => {
+  t.deepEqual(config.fileRef.subThing, 'haha')
+})
 /*
 old tests when functions were in resolution path
 
