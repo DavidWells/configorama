@@ -35,7 +35,109 @@ const config = await configInstance.init(cliFlags)
 myValue: ${env:STAGE}
 ```
 
+## Variable Sources
+
+### Environment variables
+
+```yml
+apiKey: ${env:SECRET_KEY}
+```
+
+### CLI option flags
+
+```yml
+# CLI option. Example `cmd --stage dev` makes `bar: dev`
+bar: ${opt:stage}
+
+# Composed example makes `foo: dev-hello`
+foo: ${opt:stage}-hello
+```
+
+### Self references
+
+```yml
+foo: bar
+
+# Self file reference. Resolves to `bar`
+one: ${self:foo}
+
+# Shorthand self reference. Resolves to `bar`
+two: ${foo}
+```
+
+### File references
+
+```yml
+# import full yml/json/toml file via relative path
+yamlFileRef: ${file(./subFile.yml)}
+
+# import sub values from files. This imports other-config.yml `topLevel:` value
+yamlFileValue: ${file(./other-config.yml):topLevel}
+
+# import sub values from files. This imports other-config.json `nested.value` value
+yamlFileValueSubKey: ${file(./other-config.json):nested.value}
+
+# fallback to default value if file not found
+fallbackValueExample: ${file(./not-found.yml), 'fall back value'}
+```
+
+### Sync/Async file references
+
+```yml
+asyncJSValue: ${file(./async-value.js)}
+# resolves to 'asyncval'
+```
+
+`${file(./asyncValue.js)}` will call into `async-value` and run/resolve the async function with values. These values can be strings, objects, arrays, whatever.
+
+```js
+/* async-value.js */
+module.exports = (config) => {
+  return fetchSecretsFromRemoteStore()
+}
+
+function fetchSecretsFromRemoteStore() {
+  return delay(1000).then(() => {
+    return Promise.resolve('asyncval')
+  })
+}
+
+function delay(t, v) {
+  return new Promise((resolve) => setTimeout(resolve.bind(null, v), t))
+}
+```
+
+### Git references
+
+```yml
+repository: ${git:repository}
+
+describe: ${git:describe}
+
+branch: ${git:branch}
+
+commit: ${git:commit}
+
+sha1: ${git:sha1}
+
+message: ${git:message}
+
+remote: ${git:remote}
+
+remoteDefined: ${git:remote('origin')}
+
+remoteDefinedNoQuotes: ${git:remote(origin)}
+
+repoUrl: ${git:repoUrl}
+```
+
+### More Examples
+
+See the [tests folder](./tests) for a bunch of examples!
+
 ## Custom variable sources
+
+Configorama allows you to bring your own variable sources.
 
 There are 2 ways to resolve variables from custom sources.
 
@@ -70,6 +172,21 @@ There are 2 ways to resolve variables from custom sources.
 **Q: Why should I use this?**
 
 Never rendering a stale configuration file again!
+
+**Q: Does this work with `serverless.yml`**
+
+Yes it does. Using `serverless.js` as your main entry point!
+
+```js
+const path = require('path')
+const minimist = require('minimist')
+
+const yamlFile = path.join(__dirname, 'serverless.config.yml')
+const configorama = new Configorama(yamlFile)
+const args = minimist(process.argv.slice(2))
+const slsJS = await configorama.init(args)
+module.exports = slsJS
+```
 
 ## Whats new
 
