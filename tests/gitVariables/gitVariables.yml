@@ -1,0 +1,27 @@
+########################
+# Values Types
+########################
+
+normalKey: value
+
+number: 1
+
+repository: ${git:repository}
+
+describe: ${git:describe}
+
+branch: ${git:branch}
+
+commit: ${git:commit}
+
+sha1: ${git:sha1}
+
+message: ${git:message}
+
+remote: ${git:remote}
+
+remoteDefined: ${git:remote('origin')}
+
+remoteDefinedNoQuotes: ${git:remote(origin)}
+
+repoUrl: ${git:repoUrl}
