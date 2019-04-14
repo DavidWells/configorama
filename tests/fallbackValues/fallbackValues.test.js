@@ -44,6 +44,10 @@ test('fallbackValue should have spaces from other variable', (t) => {
   t.is(config.fallbackValueSpacesTwo, 'I have spaces')
 })
 
+test("fallbackValueShouldBeThird: ${empty, ${alsoEmpty}, 'here it is'}", (t) => {
+  t.is(config.fallbackValueShouldBeThird, 'here it is')
+})
+
 test('fallbackNumberZero: ${empty, 0}', (t) => {
   t.is(config.fallbackNumberZero, 0)
 })
@@ -82,4 +86,12 @@ test('fallbackEnvTwo: ${self:empty, ${env:envValue}}', (t) => {
 
 test('fallbackEnvThree: ${empty, ${env:envValueTwo}}', (t) => {
   t.is(config.fallbackEnvThree, 'three')
+})
+
+test('fallbackInFile:  ${empty, ${file(./config.json):KEY}}', (t) => {
+  t.is(config.fallbackInFile, 'hi there')
+})
+
+test("fallbackInFileNested: ${empty, ${file(./config.${opt:stage, 'dev'}.json):KEY }}", (t) => {
+  t.is(config.fallbackInFileNested, 'hi there dev')
 })

@@ -14,7 +14,11 @@ fallbackValueSpaces: ${empty, 'space is cool'}
 
 fallbackValueSpacesTwo: ${empty, valueWithSpaces}
 
-# fallbackValueThree: ${empty, ${doh}, 'this thing'}
+doh: hey
+
+fallbackValueThree: ${empty, ${doh}, 'this thing'}
+
+fallbackValueShouldBeThird: ${empty, ${alsoEmpty}, 'here it is'}
 
 fallback: ${empty, number}
 
@@ -51,3 +55,7 @@ stages:
 fallbackNested:  ${empty, ${stages.${opt:stage}.SECRET}}
 
 fallbackNestedTwo:  ${empty, stages.${opt:stage}.SECRET}
+
+fallbackInFile:  ${empty, ${file(./config.json):KEY}}
+
+fallbackInFileNested:  ${empty, ${file(./config.${opt:stage, 'dev'}.json):KEY }}
