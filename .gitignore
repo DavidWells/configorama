@@ -1,3 +1,23 @@
+*-debug.log
+*-error.log
+/.nyc_output
+/dist
+/tmp
 node_modules
-output
+misc
+coverage
+.netlify
+
+# node sdk
+vendor
+
+# osx
+.DS_STORE
+.vscode
+.netlify
+coverage
+test-site
+site/dist
+
 convert.js
+yaml-boost-master
