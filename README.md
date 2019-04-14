@@ -17,16 +17,33 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
 
 ## Usage
 
+Async API:
+
 ```js
 const path = require('path')
 const Configorama = require('configorama')
 const cliFlags = require('minimist')(process.argv.slice(2))
 
+// Path to yaml/json/toml config
 const myConfigFilePath = path.join(__dirname, 'config.yml')
 const configInstance = new Configorama(myConfigFilePath)
 
 // resolve config values
 const config = await configInstance.init(cliFlags)
+```
+
+Sync API:
+
+```js
+const path = require('path')
+const Configorama = require('configorama')
+const cliFlags = require('minimist')(process.argv.slice(2))
+
+// Path to yaml/json/toml config
+const myConfigFilePath = path.join(__dirname, 'config.yml')
+
+const options = {}
+const config = Configorama.sync(myConfigFilePath, options, cliFlags)
 ```
 
 ## Examples
@@ -234,6 +251,12 @@ How is this different than the serverless variable system?
 
     ```
     <FUNCTION NAME>(<ARGUMENT 1>, <ARGUMENT 2>)
+    ```
+
+    example:
+
+    ```
+    ${merge('one', 'two')} => 'onetwo'
     ```
 
 ## Inspiration
