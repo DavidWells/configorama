@@ -148,7 +148,7 @@ repoUrl: ${git:repoUrl}
 
 ### (experimental) Filters
 
-Filters will transform the resolved variables 
+Filters will transform the resolved variables
 
 ```yml
 toUpperCaseString: ${'value' | toUpperCase }
@@ -227,14 +227,18 @@ Never rendering a stale configuration file again!
 Yes it does. Using `serverless.js` as your main entry point!
 
 ```js
+/* serverless.js */
 const path = require('path')
 const minimist = require('minimist')
-
-const yamlFile = path.join(__dirname, 'serverless.config.yml')
-const configorama = new Configorama(yamlFile)
+const configorama = require('configorama')
 const args = minimist(process.argv.slice(2))
-const slsJS = await configorama.init(args)
-module.exports = slsJS
+
+// Path to serverless config to be parsed
+const yamlFile = path.join(__dirname, 'serverless.config.yml')
+
+/* sync invoke */
+const opts = {}
+module.exports = configorama.sync(yamlFile, opts, args)
 ```
 
 ## Whats new
