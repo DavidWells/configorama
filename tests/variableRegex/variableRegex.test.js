@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Variables from '../../lib'
+import configorama from '../../lib'
 
 const dirname = path.dirname(__dirname)
 
@@ -41,11 +41,11 @@ test('${ } syntax', async (t) => {
     // tester: '${ssm:/path/to/service/myParam}'
   }
 
-  const vars = new Variables(object, {
-    configDir: dirname
+  const config = await configorama(object, {
+    configDir: dirname,
+    options: args
   })
 
-  const config = await vars.init(args)
   t.deepEqual(config, resolvedObject)
 })
 
@@ -64,12 +64,12 @@ test('${{ }} syntax', async (t) => {
     resolvedDomainName: '${{domains.${{opt:stage}}}}'
   }
 
-  const vars = new Variables(object, {
+  const config = await configorama(object, {
     syntax: '\\${{([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)}}',
-    configDir: dirname
+    configDir: dirname,
+    options: args
   })
 
-  const config = await vars.init(args)
   t.deepEqual(config, resolvedObject)
 })
 
@@ -88,12 +88,12 @@ test('#{ } syntax', async (t) => {
     resolvedDomainName: '#{domains.#{opt:stage}}'
   }
 
-  const vars = new Variables(object, {
+  const config = await configorama(object, {
     syntax: '\\#{([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)}',
-    configDir: dirname
+    configDir: dirname,
+    options: args
   })
 
-  const config = await vars.init(args)
   t.deepEqual(config, resolvedObject)
 })
 
@@ -112,12 +112,12 @@ test('< > syntax', async (t) => {
     resolvedDomainName: '<domains.<opt:stage>>'
   }
 
-  const vars = new Variables(object, {
+  const config = await configorama(object, {
     syntax: '\\<([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)>',
-    configDir: dirname
+    configDir: dirname,
+    options: args
   })
 
-  const config = await vars.init(args)
   t.deepEqual(config, resolvedObject)
 })
 
@@ -136,12 +136,12 @@ test('[ ] syntax', async (t) => {
     resolvedDomainName: '[domains.[opt:stage]]'
   }
 
-  const vars = new Variables(object, {
+  const config = await configorama(object, {
     syntax: '\\[([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)]',
-    configDir: dirname
+    configDir: dirname,
+    options: args
   })
 
-  const config = await vars.init(args)
   t.deepEqual(config, resolvedObject)
 })
 
@@ -152,12 +152,11 @@ test('[[ ]] syntax', async (t) => {
     value: '[[opt:stage]]-[[foo]]'
   }
 
-  const vars = new Variables(object, {
+  const config = await configorama(object, {
     syntax: '\\[\\[([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)]]',
-    configDir: dirname
+    configDir: dirname,
+    options: args
   })
-
-  const config = await vars.init(args)
   t.is(config.key, 'dev')
   t.is(config.value, 'dev-bar')
 })

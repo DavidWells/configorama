@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Variables from '../../lib'
+import configorama from '../../lib'
 
 const dirname = path.dirname(__dirname)
 
@@ -16,12 +16,10 @@ test('throw if self not found', async (t) => {
     value: '${opt:stage}-${foo}',
   }
 
-  const vars = new Variables(object, {
-    configDir: dirname
-  })
-
   const error = await t.throwsAsync(async () => {
-    const x = await vars.init(args)
+    const x = await configorama(object, {
+      configDir: dirname
+    })
     return x
   })
   // const error = await t.throws(vars.init(args))
@@ -34,12 +32,10 @@ test('throw if opt not found', async (t) => {
     value: '${opt:what}',
   }
 
-  const vars = new Variables(object, {
-    configDir: dirname
-  })
-
   const error = await t.throwsAsync(async () => {
-    const x = await vars.init(args)
+    const x = await configorama(object, {
+      configDir: dirname
+    })
     return x
   })
   t.regex(error.message, /Variable not found/)

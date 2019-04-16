@@ -1,17 +1,18 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Configorama from '../../lib'
+import configorama from '../../lib'
 
 test.cb('API is asynchronous', (t) => {
   let order = [
     'one'
   ]
   const configFile = path.join(__dirname, 'api.yml')
-  const configorama = new Configorama(configFile)
 
-  configorama.init({
-    stage: 'dev',
+  const config = configorama(configFile, {
+    options: {
+      stage: 'dev',
+    }
   }).then((c) => {
     console.log(`-------------`)
     console.log(`Value count`, Object.keys(c).length)
@@ -54,12 +55,11 @@ test('Allow unknown variables to pass through', async (t) => {
     whatever: '${stuff}'
   }
 
-  const vars = new Configorama(object, {
-    passThrough: true
+  const config = await configorama(object, {
+    passThrough: true,
+    options: args
   })
 
-  const config = await vars.init(args)
-  console.log(config)
   t.is(config.env, '${consul:us-dev}')
   t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
   t.is(config.ssm, '${ssm:/path/to/service/id}-service')

@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Configorama from '../../lib'
+import configorama from '../../lib'
 
 let config
 
@@ -15,9 +15,11 @@ test.before(async t => {
   }
 
   const yamlFile = path.join(__dirname, 'asyncValue.yml')
-  const configorama = new Configorama(yamlFile)
   console.time('perf')
-  config = await configorama.init(args)
+  config = await configorama(yamlFile, {
+    options: args
+  })
+
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)

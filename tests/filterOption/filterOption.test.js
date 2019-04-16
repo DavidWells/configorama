@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Configorama from '../../lib'
+import configorama from '../../lib'
 
 const dirname = path.dirname(__dirname)
 
@@ -17,7 +17,8 @@ test('Custom filter', async (t) => {
     key: '${opt:stage | addExclamation}'
   }
 
-  const vars = new Configorama(object, {
+  const config = await configorama(object, {
+    options: args,
     configDir: dirname, // needed for any file refs
     filters: {
       addExclamation: (val) => {
@@ -26,6 +27,5 @@ test('Custom filter', async (t) => {
     }
   })
 
-  const config = await vars.init(args)
   t.is(config.key, 'dev!')
 })

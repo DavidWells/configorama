@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Configorama from '../../lib'
+import configorama from '../../lib'
 
 const dirname = path.dirname(__dirname)
 
@@ -34,8 +34,9 @@ test('Custom variable source resolver', async (t) => {
     key: '${opt:stage}'
   }
 
-  const vars = new Configorama(object, {
+  const config = await configorama(object, {
     configDir: dirname, // needed for any file refs
+    options: args,
     variableSources: [{
       match: RegExp(/^consul:/g),
       resolver: (varToProcess, opts, currentObject) => {
@@ -46,8 +47,6 @@ test('Custom variable source resolver', async (t) => {
       }
     }]
   })
-
-  const config = await vars.init(args)
   // console.log(config)
   t.is(config.env, 'fetch consul value consul:us-dev')
 })
@@ -57,7 +56,7 @@ test('Custom variable source resolver match function', async (t) => {
     tester: '${REPLACE_ME}'
   }
 
-  const vars = new Configorama(object, {
+  const config = await configorama(object, {
     configDir: dirname, // needed for any file refs
     variableSources: [{
       match: (val) => {
@@ -69,7 +68,6 @@ test('Custom variable source resolver match function', async (t) => {
     }]
   })
 
-  const config = await vars.init(args)
   // console.log(config)
   t.is(config.tester, 'its replaced')
 })

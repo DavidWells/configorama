@@ -1,6 +1,6 @@
 import test from 'ava'
 import path from 'path'
-import Configorama from '../../lib'
+import configorama from '../../lib'
 
 let config
 
@@ -13,9 +13,9 @@ test.before(async t => {
   }
 
   const configFile = path.join(__dirname, 'gitVariables.yml')
-  const configorama = new Configorama(configFile)
-
-  config = await configorama.init(args)
+  config = await configorama(configFile, {
+    options: args
+  })
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)

@@ -48,29 +48,30 @@ Async API:
 
 ```js
 const path = require('path')
-const Configorama = require('configorama')
+const configorama = require('configorama')
 const cliFlags = require('minimist')(process.argv.slice(2))
 
 // Path to yaml/json/toml config
 const myConfigFilePath = path.join(__dirname, 'config.yml')
-const configInstance = new Configorama(myConfigFilePath)
 
-// resolve config values
-const config = await configInstance.init(cliFlags)
+const config = await configorama(myConfigFilePath, {
+  options: args
+})
 ```
 
 Sync API:
 
 ```js
 const path = require('path')
-const Configorama = require('configorama')
+const configorama = require('configorama')
 const cliFlags = require('minimist')(process.argv.slice(2))
 
 // Path to yaml/json/toml config
 const myConfigFilePath = path.join(__dirname, 'config.yml')
 
-const options = {}
-const config = Configorama.sync(myConfigFilePath, options, cliFlags)
+const config = configorama.sync(myConfigFilePath, {
+  options: cliFlags
+})
 ```
 
 ## Variable Sources
@@ -220,7 +221,7 @@ There are 2 ways to resolve variables from custom sources.
 2. Add your own variable syntax and resolver.
 
     ```js
-    const config = new Configorama('path/to/configFile', {
+    const config = configorama('path/to/configFile', {
       variableSources: [{
         // Match variables ${consul:xyz}
         match: RegExp(/^consul:/g),
@@ -231,8 +232,7 @@ There are 2 ways to resolve variables from custom sources.
         }
       }]
     })
-
-    const resolvedObject = await config.init(args)
+    console.log(config)
     ```
 
     This would match the following config:
@@ -254,16 +254,13 @@ Yes it does. Using `serverless.js` as your main entry point!
 ```js
 /* serverless.js */
 const path = require('path')
-const minimist = require('minimist')
 const configorama = require('configorama')
-const args = minimist(process.argv.slice(2))
+const args = require('minimist')(process.argv.slice(2))
 
 // Path to serverless config to be parsed
 const yamlFile = path.join(__dirname, 'serverless.config.yml')
 
-/* sync invoke */
-const opts = {}
-module.exports = configorama.sync(yamlFile, opts, args)
+module.exports = configorama.sync(yamlFile, { options: args })
 ```
 
 ## Whats new

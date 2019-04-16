@@ -1,7 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 import test from 'ava'
 import path from 'path'
-import Configorama, { sync } from '../../lib'
+import configorama from '../../lib'
 
 let config
 let order = [
@@ -17,7 +17,9 @@ test.before(async t => {
   }
 
   const yamlFile = path.join(__dirname, 'syncApi.yml')
-  config = sync(yamlFile, {}, args)
+  config = configorama.sync(yamlFile, {
+    options: args
+  })
   order.push('two')
   console.time('perf')
   console.log(`-------------`)
