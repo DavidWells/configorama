@@ -17,6 +17,31 @@ Configorama extends your configuration with a powerful variable system. It resol
 
 See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for more examples.
 
+## Table of Contents
+<!-- ⛔️ AUTO-GENERATED-CONTENT:START (TOC:collapse=true&collapseText=Click to expand) -->
+<details>
+<summary>Click to expand</summary>
+
+- [About](#about)
+- [Usage](#usage)
+- [Variable Sources](#variable-sources)
+  * [Environment variables](#environment-variables)
+  * [CLI option flags](#cli-option-flags)
+  * [Self references](#self-references)
+  * [File references](#file-references)
+  * [Sync/Async file references](#syncasync-file-references)
+  * [Git references](#git-references)
+  * [Filters (experimental)](#filters-experimental)
+  * [Functions (experimental)](#functions-experimental)
+  * [More Examples](#more-examples)
+- [Custom Variable Sources](#custom-variable-sources)
+- [FAQ](#faq)
+- [Whats new](#whats-new)
+- [Inspiration](#inspiration)
+
+</details>
+<!-- ⛔️ AUTO-GENERATED-CONTENT:END -->
+
 ## Usage
 
 Async API:
@@ -146,7 +171,7 @@ remoteDefinedNoQuotes: ${git:remote(origin)}
 repoUrl: ${git:repoUrl}
 ```
 
-### (experimental) Filters
+### Filters (experimental)
 
 Filters will transform the resolved variables
 
@@ -164,7 +189,7 @@ toKebabCase: ${key | toKebabCase }
 toCamelCase: ${keyTwo | toCamelCase }
 ```
 
-### (experimental) Functions
+### Functions (experimental)
 
 Functions will convert resolved config values with various methods.
 
