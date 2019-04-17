@@ -1,0 +1,9 @@
+########################
+# Sync API test
+########################
+
+selfVar: 'Testing'
+
+secrets: ${secrets:lol}
+
+context: ${context:lol}
