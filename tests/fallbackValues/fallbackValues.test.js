@@ -7,6 +7,7 @@ let config
 
 process.env.envValue = 'env-value'
 process.env.envValueTwo = 'three'
+// process.env.holo = 'ololo'
 
 // This runs before all tests
 test.before(async t => {
@@ -45,9 +46,29 @@ test('fallbackValue should have spaces from other variable', (t) => {
 })
 
 // TODO fix third fallback
-// test("fallbackValueShouldBeThird: ${empty, ${alsoEmpty}, 'here it is'}", (t) => {
-//   t.is(config.fallbackValueShouldBeThird, 'here it is')
-// })
+test("fallbackValueThree: ${empty, ${doh}, 'this thing'}", (t) => {
+  t.is(config.fallbackValueThree, 'hey')
+})
+
+test("fallbackValueShouldBeSelf: ${empty, ${holoDeck}, 'here it is'}", (t) => {
+  t.is(config.fallbackValueShouldBeSelf, 'here it is')
+})
+
+test("fallbackValueShouldBeSelfLong: ${empty, ${self:madeUpThing}, 'self fallback'}", (t) => {
+  t.is(config.fallbackValueShouldBeSelfLong, 'self fallback')
+})
+
+test("fallbackValueShouldBeEnv: ${empty, ${env:nothingHere}, 'env fallback'}", (t) => {
+  t.is(config.fallbackValueShouldBeEnv, 'env fallback')
+})
+
+test("fallbackValueShouldBeOpt: ${empty, ${opt:nothingHere}, 'opt fallback'}", (t) => {
+  t.is(config.fallbackValueShouldBeOpt, 'opt fallback')
+})
+
+test("fallbackValueShouldBeFile: ${empty, ${file(./fakeFile.yml)}, 'file fallback'}", (t) => {
+  t.is(config.fallbackValueShouldBeFile, 'file fallback')
+})
 
 test('fallbackNumberZero: ${empty, 0}', (t) => {
   t.is(config.fallbackNumberZero, 0)

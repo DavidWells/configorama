@@ -2,7 +2,6 @@
 # Self Variables
 ########################
 
-
 normalKey: valueHere
 
 wowTrue: true
@@ -44,10 +43,10 @@ emptyTwo: ${thirdValue}
 
 thisOkay: ${self:normaxlKey, "thisnot~fine"}
 
-# same: ${empty, 'whjat'}
-#
-# valueAsStringVariableSingleQuotesTwo: ${Other, 'two'}
-#
-# valueAsStringVariableSingleQuotesThree: ${lol, ${self:normalKey}}
-#
-# valueAsStringVariableSingleQuotesFour: ${lol, self:normalKey}
+same: ${empty, 'whjat'}
+
+valueAsStringVariableSingleQuotesTwo: ${Other, 'two'}
+
+valueAsStringVariableSingleQuotesThree: ${lol, ${self:normalKey}}
+
+valueAsStringVariableSingleQuotesFour: ${lol, self:normalKey}

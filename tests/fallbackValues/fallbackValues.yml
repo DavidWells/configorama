@@ -18,18 +18,37 @@ doh: hey
 
 fallbackValueThree: ${empty, ${doh}, 'this thing'}
 
-fallbackValueShouldBeThird: ${empty, ${alsoEmpty}, 'here it is'}
+# Unknown first and second self param
+fallbackValueShouldBeSelf: ${empty, ${holoDeck}, 'here it is'}
 
+# Unknown first and second self long param
+fallbackValueShouldBeSelfLong: ${empty, ${self:madeUpThing}, 'self fallback'}
+
+# Unknown first and second env param
+fallbackValueShouldBeEnv: ${empty, ${env:nothingHere}, 'env fallback'}
+
+# Unknown first and second opt param
+fallbackValueShouldBeOpt: ${empty, ${opt:nothingHere}, 'opt fallback'}
+
+# Unknown first and second file param
+fallbackValueShouldBeFile: ${empty, ${file(./fakeFile.yml)}, 'file fallback'}
+
+# Number fallback
 fallback: ${empty, number}
 
+# Number inline fallback
 fallbackNumber: ${empty, 99}
 
+# Number inline fallback as zero
 fallbackNumberZero: ${empty, 0}
 
+# String fallback in single quotes
 fallbackString: ${empty, 'ninety-nine'}
 
+# String fallback in double quotes
 fallbackStringTwo: ${empty, "_nine-nine_"}
 
+# String fallback with @ symbol
 fallbackWithAtSign: ${env:c, "foo@bar"}
 
 fallbackSelf: ${empty, number}
