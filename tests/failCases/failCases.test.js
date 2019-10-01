@@ -52,7 +52,7 @@ test('throw if value resolved is undefined', async (t) => {
     })
     return x
   })
-  t.regex(error.message, /Please verify the variable/)
+  t.regex(error.message, /resolved to "undefined"/)
 })
 
 test('Allow undefined values', async (t) => {
