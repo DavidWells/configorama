@@ -41,6 +41,16 @@ test('throw if opt not found', async (t) => {
   t.regex(error.message, /Variable not found/)
 })
 
+test('throw if deep value not found', async (t) => {
+  const configFile = path.join(__dirname, 'fail.yml')
+
+  const error = await t.throwsAsync(async () => {
+    const x = await configorama(configFile)
+    return x
+  })
+  t.regex(error.message, /Missing Value/)
+})
+
 test('throw if value resolved is undefined', async (t) => {
   const object = {
     value: '${env:no, ${env:empty}}',

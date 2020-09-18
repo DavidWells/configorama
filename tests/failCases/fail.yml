@@ -1,0 +1,23 @@
+# provider:
+#   stage: x
+custom:
+  settings:
+    x: ${self:provider.stage}
+    stackPolicy:
+      dev: # allow all changes
+        - { Effect: Allow, Principal: "*", Action: "Update:*", Resource: "*" }
+      prod: # Protect cognito resources in prod
+        - { Effect: Allow, Principal: "*", Action: "Update:*", Resource: "*" }
+        - Effect: Deny
+          Principal: "*"
+          Action:
+            - Update:Replace
+            - Update:Delete
+          Resource: "*"
+          Condition:
+            StringEquals:
+              ResourceType:
+                - AWS::Cognito::UserPool
+                - AWS::Cognito::UserPoolGroup
+                - AWS::Cognito::UserPoolClient
+      value: ${self:custom.settings.stackPolicy.${self:provider.stage}, self:custom.settings.stackPolicy.no, self:custom.settings.stackPolicy.prod}
