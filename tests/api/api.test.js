@@ -56,7 +56,7 @@ test('Allow unknown variables to pass through', async (t) => {
   }
 
   const config = await configorama(object, {
-    passThrough: true,
+    passThroughUnknown: true,
     options: args
   })
 
