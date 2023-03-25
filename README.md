@@ -317,6 +317,10 @@ How is this different than the serverless variable system?
     ${merge('one', 'two')} => 'onetwo'
     ```
 
+## Alt libs
+
+- https://github.com/01alchemist/sls-yaml
+
 ## Inspiration
 
 This is forked out of the [serverless framework](https://github.com/serverless/serverless/) variable system.
