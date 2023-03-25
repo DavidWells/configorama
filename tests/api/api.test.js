@@ -59,6 +59,7 @@ test('Allow unknown variables to pass through', async (t) => {
     passThroughUnknown: true,
     options: args
   })
+  // console.log('config', config)
 
   t.is(config.env, '${consul:us-dev}')
   t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
@@ -66,3 +67,77 @@ test('Allow unknown variables to pass through', async (t) => {
   t.is(config.cloudformation, '${cf:another-stack.functionPrefix}-world')
   t.is(config.whatever, '${stuff}')
 })
+
+
+test('Allow unknown variables to pass through with postfixes', async (t) => {
+  const args = {
+    stage: 'dev',
+  }
+  const object = {
+    foo: 'bar',
+    s3: '${s3:myBucket/myKey-${stage}}-hello',
+    stage: '${opt:stage, self:custom.defaultStage}',
+  }
+
+  const config = await configorama(object, {
+    passThroughUnknown: true,
+    options: args
+  })
+  t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
+})
+
+test('Allow unknown variables', async (t) => {
+  const args = {
+    stage: 'dev',
+  }
+  const object = {
+    "provider": {
+      "stage": "dev"
+    },
+    "custom": {
+      "honeycomb": {
+        "dev": {
+          "dataset": "${ssm:/honeycomb/dataset}"
+        },
+        "staging": {
+          "dataset": "staging-share-backend"
+        },
+        "prod": {
+          "dataset": "prod-share-backend"
+        }
+      },
+      "honeycombDataset": "${self:custom.honeycomb.${self:provider.stage}.dataset}",
+      "honeycombWriteKey": "foo"
+    },
+    "environment": {
+      "HONEYCOMB_DATASET": "${self:custom.honeycombDataset}",
+      "HONEYCOMB_WRITE_KEY": "${self:custom.honeycombWriteKey}",
+      "OTEL_EXPORTER_OTLP_HEADERS": "x-honeycomb-dataset=${self:custom.honeycombDataset},x-honeycomb-team=${self:custom.honeycombWriteKey}"
+    }
+  }
+
+  const config = await configorama(object, {
+    passThroughUnknown: true,
+    options: args
+  })
+  t.deepEqual(config, {
+    provider: { stage: 'dev' },
+    custom: {
+      honeycomb: {
+        dev: { dataset: '${ssm:/honeycomb/dataset}' },
+        staging: { dataset: 'staging-share-backend' },
+        prod: { dataset: 'prod-share-backend' }
+      },
+      honeycombDataset: '${ssm:/honeycomb/dataset}',
+      honeycombWriteKey: 'foo'
+    },
+    environment: {
+      HONEYCOMB_DATASET: '${ssm:/honeycomb/dataset}',
+      HONEYCOMB_WRITE_KEY: 'foo',
+      OTEL_EXPORTER_OTLP_HEADERS: 'x-honeycomb-dataset=${ssm:/honeycomb/dataset},x-honeycomb-team=foo'
+    }
+  })
+})
+
+
+

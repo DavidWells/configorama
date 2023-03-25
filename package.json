@@ -12,6 +12,7 @@
   "scripts": {
     "docs": "node ./scripts/docs.js",
     "test": "ava -v",
+    "test:api": "ava ./tests/api/api.test.js -v",
     "watch": "npm test -- --watch -v",
     "publish": "git push origin && git push origin --tags",
     "release:patch": "npm version patch && npm publish",
