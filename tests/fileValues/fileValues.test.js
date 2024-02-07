@@ -99,3 +99,15 @@ test('stageSpecificTwo', (t) => {
     'CREDS': 'prod creds here'
   })
 })
+
+test('singleQuotes', (t) => {
+  t.deepEqual(config.singleQuotes, {
+    'CREDS': 'dev creds here'
+  })
+})
+
+test('doubleQuotes', (t) => {
+  t.deepEqual(config.doubleQuotes, {
+    'CREDS': 'prod creds here'
+  })
+})

@@ -61,6 +61,13 @@ stageSpecific: ${file(./config.${opt:stage}.json)}
 
 stageSpecificTwo: ${file(./config.${opt:otherFlag}.json)}
 
+###############
+# Allow for single or double quote around file path
+###############
+
+singleQuotes: ${file('./config.${opt:stage}.json')}
+
+doubleQuotes: ${file("./config.${opt:otherFlag}.json")}
 
 ###############
 # Pass args into file
