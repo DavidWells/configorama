@@ -56,7 +56,7 @@ test('Allow unknown variables to pass through', async (t) => {
   }
 
   const config = await configorama(object, {
-    passThroughUnknown: true,
+    allowUnknownVars: true,
     options: args
   })
   // console.log('config', config)
@@ -80,7 +80,7 @@ test('Allow unknown variables to pass through with postfixes', async (t) => {
   }
 
   const config = await configorama(object, {
-    passThroughUnknown: true,
+    allowUnknownVars: true,
     options: args
   })
   t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
@@ -117,7 +117,7 @@ test('Allow unknown variables', async (t) => {
   }
 
   const config = await configorama(object, {
-    passThroughUnknown: true,
+    allowUnknownVars: true,
     options: args
   })
   t.deepEqual(config, {
@@ -138,6 +138,3 @@ test('Allow unknown variables', async (t) => {
     }
   })
 })
-
-
-

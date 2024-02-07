@@ -4,7 +4,7 @@ const args = require('minimist')(process.argv.slice(2))
 
 const config = require('./lib').sync(serverlessConfig, {
   options: args,
-  passThroughUnknown: true,
+  allowUnknownVars: true,
 })
 
 console.log(require('util').inspect(config, {showHidden: false, depth: null}))
