@@ -1,0 +1,35 @@
+
+custom:
+  fun: "${file(./config.json):slug}"
+  # The domain name to be used
+  domainName: "${file(./config.json):domainName}"
+  # Hosted zone id
+  hostedZoneId: xyy12661621
+  nested: "${file(./config.json):na, 'default-value'}"
+
+empty: "${file(./config.json):na, ''}"
+
+set: ${self:custom.empty, "default-value"}
+#############################
+## Serverless config
+#############################
+provider:
+  name: aws
+
+#############################
+## Raw Cloudformation
+#############################
+resources:
+  Description: DNS stack
+  x: ${self:custom.domainName}
+  y: ${self:custom.nested}
+  subItem:
+    set: ${self:custom.empty, "default-value-two"}
+    # Default: ${self:custom.domainName}
+    Default: ${self:custom.fun, ''}
+  Parameters:
+    ExistingHostedZoneId:
+      Default: ${self:custom.hostedZoneId, ''}
+    Domain:
+      # Default: ${self:custom.domainName}
+      Default: ${self:custom.domainName, ''}

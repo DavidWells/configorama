@@ -12,9 +12,8 @@ asyncKeyTwo: ${file(./asyncValues/asyncValueObject.js):func.keyTwo}
 
 asyncKeyThreeVariable: ${file(./asyncValues/asyncValueObject.js):func.keyThree }
 
-# TODO doesnt work with filters
-asyncWithFilter: ${file(./asyncValues/asyncValueObject.js):func.keyTwo | toLowerCase }
+asyncWithFilterLower: ${file(./asyncValues/asyncValueObject.js):func.keyTwo | toLowerCase }
 
-asyncWithFilterTwo: ${file(./asyncValues/asyncValueObject.js):func.key | toUpperCase }
+asyncWithFilterUpper: ${file(./asyncValues/asyncValueObject.js):func.key | toUpperCase }
 
 asyncJSValueReference: ${asyncKey}

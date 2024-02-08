@@ -1,10 +1,19 @@
 const path = require('path')
 const serverlessConfig = path.join(__dirname, 'x.yml')
 const args = require('minimist')(process.argv.slice(2))
+const configorama = require('./lib')
+const deepLog = require('./lib/utils/deep-log')
 
-const config = require('./lib').sync(serverlessConfig, {
-  options: args,
-  allowUnknownVars: true,
+async function getConfig() {
+  const settings = {
+    options: args,
+    allowUnknownVars: true,
+  }
+  const resolvedConfig = await configorama(serverlessConfig, settings)
+  deepLog('resolved config', resolvedConfig)
+  return configorama(serverlessConfig, settings)
+}
+
+getConfig().then((resolvedConfig) => {
+  deepLog('resolved config', resolvedConfig)
 })
-
-console.log(require('util').inspect(config, {showHidden: false, depth: null}))

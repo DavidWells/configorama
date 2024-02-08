@@ -87,6 +87,7 @@ test("mergeObjects: ${merge(${object}, ${asyncObj})}", (t) => {
 })
 
 test("subKey: ${mergeObjects.two}", (t) => {
+  // console.log('config.subKey', config.subKey)
   t.deepEqual(config.subKey, 'wee')
 })
 
