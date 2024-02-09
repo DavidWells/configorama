@@ -27,7 +27,13 @@ test.after(t => {
 })
 
 test('${git:repository} === configorama', (t) => {
-  t.is(config.repository, 'configorama')
+  t.is(config.repository, 'DavidWells/configorama')
+})
+
+test("repo urls", (t) => {
+  t.is(config.url, 'https://github.com/DavidWells/configorama')
+  t.is(config.repoUrl, 'https://github.com/DavidWells/configorama')
+  t.is(config.repoUrlDashed, 'https://github.com/DavidWells/configorama')
 })
 
 test('${git:branch} === master', (t) => {

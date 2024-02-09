@@ -9,8 +9,6 @@ async function getConfig() {
     options: args,
     allowUnknownVars: true,
   }
-  const resolvedConfig = await configorama(serverlessConfig, settings)
-  deepLog('resolved config', resolvedConfig)
   return configorama(serverlessConfig, settings)
 }
 
