@@ -20,6 +20,8 @@ url: ${git:url}
 repoUrl: ${git:repoUrl}
 repoUrlDashed: ${git:repo-url}
 
+dir: ${git:dir}
+
 # Branch
 branch: ${git:branch}
 

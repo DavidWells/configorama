@@ -36,6 +36,10 @@ test("repo urls", (t) => {
   t.is(config.repoUrlDashed, 'https://github.com/DavidWells/configorama')
 })
 
+test('${git:dir}', (t) => {
+  t.is(config.dir, 'https://github.com/DavidWells/configorama/tree/master/tests/gitVariables')
+})
+
 test('${git:branch} === master', (t) => {
   t.is(config.branch, 'master')
 })
