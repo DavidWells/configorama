@@ -1,0 +1,65 @@
+# Yml file tests
+
+valueAsNumber: 1
+
+################
+# Objects
+################
+
+normalObject: 
+  cool: ${self:empty, 'no value here'}
+
+objectJSStyle: {
+  woot: wee
+}
+
+objectNoWrapper: {
+  cool: ${self:empty, 'no value here'}
+}
+
+objectNoWrapperNested: {
+  nice: { red: ${self:empty, 'woooo'} }
+}
+
+################
+# ARRAYS
+################
+
+stage: xyz
+
+key:
+  - string1
+  - string2      
+  - string3
+  - string4
+  - string5
+  - string6
+
+## Preprocessor fixes nested variable reference
+y: !Not [!Equals [!Join ['', ${param:xyz}]]]
+
+Test: !Not [!Equals ["", !Join ['', ${param:githubActionsAllowedAwsActions}]]]
+
+TestTwo: !Not [!Equals ["", !Join ['', ${opt:otherFlag}]]]
+
+# Fix unwrapped variable reference
+TestThree:
+  foo: 
+    - ['a', 'b', 'c']
+    - ['d', 'e', ${ opt:otherFlag }, ${ opt:chillFlag }]
+    - ['d', 'e', ${opt:otherFlag}, ${opt:chillFlag}]
+    - ['d', 'e', "${opt:otherFlag}", '${opt:chillFlag}']
+    - ['d', 'e', '${opt:otherFlag}', '${opt:chillFlag}']
+
+# multiline array
+multiLineArray: ['string1', 'string2', 'string3', 
+  'string4', ${opt:otherFlag}, 
+  'string6']
+
+keyTwo: ['string1', 'long
+  string', 'string3', 'string4', 'string5', 'string6']
+
+array: [
+  String1, ${self:empty, 'no value here'}, String3,
+  String4, String5, String5, String7
+]
