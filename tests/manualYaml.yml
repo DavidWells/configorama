@@ -2,6 +2,8 @@
 # Manual test file
 ########################
 
+Uri: 'https://${stageVariables.endpoint}/api/items'
+
 selfVar: 'Testing'
 
 asyncJSValue: ${file(./asyncValues/asyncValue.js)}
