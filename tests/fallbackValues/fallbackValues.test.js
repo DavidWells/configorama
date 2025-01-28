@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
@@ -9,8 +10,8 @@ process.env.envValue = 'env-value'
 process.env.envValueTwo = 'three'
 // process.env.holo = 'ololo'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -23,97 +24,103 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('fallback: ${empty, number}', () => {
+  assert.is(config.fallback, 10)
 })
 
-test('fallback: ${empty, number}', (t) => {
-  t.is(config.fallback, 10)
+test('fallbackNumber: ${empty, 99}', () => {
+  assert.is(config.fallbackNumber, 99)
 })
 
-test('fallbackNumber: ${empty, 99}', (t) => {
-  t.is(config.fallbackNumber, 99)
+test('fallbackValue should have spaces', () => {
+  assert.is(config.fallbackValueSpaces, 'space is cool')
 })
 
-test('fallbackValue should have spaces', (t) => {
-  t.is(config.fallbackValueSpaces, 'space is cool')
-})
-
-test('fallbackValue should have spaces from other variable', (t) => {
-  t.is(config.fallbackValueSpacesTwo, 'I have spaces')
+test('fallbackValue should have spaces from other variable', () => {
+  assert.is(config.fallbackValueSpacesTwo, 'I have spaces')
 })
 
 // TODO fix third fallback
-test("fallbackValueThree: ${empty, ${doh}, 'this thing'}", (t) => {
-  t.is(config.fallbackValueThree, 'hey')
+test("fallbackValueThree: ${empty, ${doh}, 'this thing'}", () => {
+  assert.is(config.fallbackValueThree, 'hey')
 })
 
-test("fallbackValueShouldBeSelf: ${empty, ${holoDeck}, 'here it is'}", (t) => {
-  t.is(config.fallbackValueShouldBeSelf, 'here it is')
+test("fallbackValueShouldBeSelf: ${empty, ${holoDeck}, 'here it is'}", () => {
+  assert.is(config.fallbackValueShouldBeSelf, 'here it is')
 })
 
-test("fallbackValueShouldBeSelfLong: ${empty, ${self:madeUpThing}, 'self fallback'}", (t) => {
-  t.is(config.fallbackValueShouldBeSelfLong, 'self fallback')
+test("fallbackValueShouldBeSelfLong: ${empty, ${self:madeUpThing}, 'self fallback'}", () => {
+  assert.is(config.fallbackValueShouldBeSelfLong, 'self fallback')
 })
 
-test("fallbackValueShouldBeEnv: ${empty, ${env:nothingHere}, 'env fallback'}", (t) => {
-  t.is(config.fallbackValueShouldBeEnv, 'env fallback')
+test("fallbackValueShouldBeEnv: ${empty, ${env:nothingHere}, 'env fallback'}", () => {
+  assert.is(config.fallbackValueShouldBeEnv, 'env fallback')
 })
 
-test("fallbackValueShouldBeOpt: ${empty, ${opt:nothingHere}, 'opt fallback'}", (t) => {
-  t.is(config.fallbackValueShouldBeOpt, 'opt fallback')
+test("fallbackValueShouldBeOpt: ${empty, ${opt:nothingHere}, 'opt fallback'}", () => {
+  assert.is(config.fallbackValueShouldBeOpt, 'opt fallback')
 })
 
-test("fallbackValueShouldBeFile: ${empty, ${file(./fakeFile.yml)}, 'file fallback'}", (t) => {
-  t.is(config.fallbackValueShouldBeFile, 'file fallback')
+test("fallbackValueShouldBeFile: ${empty, ${file(./fakeFile.yml)}, 'file fallback'}", () => {
+  assert.is(config.fallbackValueShouldBeFile, 'file fallback')
 })
 
-test('fallbackNumberZero: ${empty, 0}', (t) => {
-  t.is(config.fallbackNumberZero, 0)
+test('fallbackNumberZero: ${empty, 0}', () => {
+  assert.is(config.fallbackNumberZero, 0)
 })
 
-test("fallbackString: ${empty, 'ninety-nine'}", (t) => {
-  t.is(config.fallbackString, 'ninety-nine')
+test("fallbackString: ${empty, 'ninety-nine'}", () => {
+  assert.is(config.fallbackString, 'ninety-nine')
 })
 
-test('fallbackStringTwo: ${empty, "_nine-nine_"}', (t) => {
-  t.is(config.fallbackStringTwo, '_nine-nine_')
+test('fallbackStringTwo: ${empty, "_nine-nine_"}', () => {
+  assert.is(config.fallbackStringTwo, '_nine-nine_')
 })
 
-test('fallbackWithAtSign: ${empty, "foo@bar"}', (t) => {
-  t.is(config.fallbackWithAtSign, 'foo@bar')
+test('fallbackWithAtSign: ${empty, "foo@bar"}', () => {
+  assert.is(config.fallbackWithAtSign, 'foo@bar')
 })
 
-test('fallbackSelf: ${empty, number}', (t) => {
-  t.is(config.fallbackSelf, 10)
+test('fallbackSelf: ${empty, number}', () => {
+  assert.is(config.fallbackSelf, 10)
 })
 
-test('fallbackSelfTwo: ${empty, ${value}}', (t) => {
-  t.is(config.fallbackSelfTwo, 'xyz')
+test('fallbackSelfTwo: ${empty, ${value}}', () => {
+  assert.is(config.fallbackSelfTwo, 'xyz')
 })
 
-test('fallbackSelfThree: ${empty, ${self:valueTwo}}', (t) => {
-  t.is(config.fallbackSelfThree, 'two')
+test('fallbackSelfThree: ${empty, ${self:valueTwo}}', () => {
+  assert.is(config.fallbackSelfThree, 'two')
 })
 
-test('fallbackEnv: ${empty, env:envValue}', (t) => {
-  t.is(config.fallbackEnv, 'env-value')
+test('fallbackEnv: ${empty, env:envValue}', () => {
+  assert.is(config.fallbackEnv, 'env-value')
 })
 
-test('fallbackEnvTwo: ${self:empty, ${env:envValue}}', (t) => {
-  t.is(config.fallbackEnvTwo, 'env-value')
+test('fallbackEnvTwo: ${self:empty, ${env:envValue}}', () => {
+  assert.is(config.fallbackEnvTwo, 'env-value')
 })
 
-test('fallbackEnvThree: ${empty, ${env:envValueTwo}}', (t) => {
-  t.is(config.fallbackEnvThree, 'three')
+test('fallbackEnvThree: ${empty, ${env:envValueTwo}}', () => {
+  assert.is(config.fallbackEnvThree, 'three')
 })
 
-test('fallbackInFile:  ${empty, ${file(./config.json):KEY}}', (t) => {
-  t.is(config.fallbackInFile, 'hi there')
+test('fallbackInFile:  ${empty, ${file(./config.json):KEY}}', () => {
+  assert.is(config.fallbackInFile, 'hi there')
 })
 
-test("fallbackInFileNested: ${empty, ${file(./config.${opt:stage, 'dev'}.json):KEY }}", (t) => {
-  t.is(config.fallbackInFileNested, 'hi there dev')
+test("fallbackInFileNested: ${empty, ${file(./config.${opt:stage, 'dev'}.json):KEY }}", () => {
+  assert.is(config.fallbackInFileNested, 'hi there dev')
 })
+
+test.run()

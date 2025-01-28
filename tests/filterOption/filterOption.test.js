@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 const dirname = path.dirname(__dirname)
 
@@ -11,7 +12,7 @@ const args = {
   stage: 'dev',
 }
 
-test('Custom filter', async (t) => {
+test('Custom filter', async () => {
   const object = {
     foo: 'bar',
     key: '${opt:stage | addExclamation}'
@@ -19,7 +20,7 @@ test('Custom filter', async (t) => {
 
   const config = await configorama(object, {
     options: args,
-    configDir: dirname, // needed for any file refs
+    configDir: dirname,
     filters: {
       addExclamation: (val) => {
         return `${val}!`
@@ -27,5 +28,7 @@ test('Custom filter', async (t) => {
     }
   })
 
-  t.is(config.key, 'dev!')
+  assert.is(config.key, 'dev!')
 })
+
+test.run()

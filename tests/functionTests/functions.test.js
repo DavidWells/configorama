@@ -1,15 +1,15 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
-
-
+/* eslint-disable no-template-curly-in-string */
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envReference = 'env var'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'prod',
   }
@@ -22,52 +22,50 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-  // const secondConfigorama = new Configorama(config)
-  // const secondConfig = await configorama.init(args)
-  // console.log(`-------------`)
-  // console.log(`secondConfig Value count`, Object.keys(secondConfig).length)
-  // console.log(secondConfig)
-  // console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('key', () => {
+  assert.is(config.key, 'haha')
 })
 
-test('key', (t) => {
-  t.is(config.key, 'haha')
+test("splitTest: ${split('my!string!whatever', !)}", () => {
+  assert.equal(config.splitTest, [ 'my', 'string', 'whatever' ])
 })
 
-test("splitTest: ${split('my!string!whatever', !)}", (t) => {
-  t.deepEqual(config.splitTest, [ 'my', 'string', 'whatever' ])
+test("mergeTest: ${merge('stuff', 'new')}", () => {
+  assert.is(config.mergeTest, 'stuffnew')
 })
 
-test("mergeTest: ${merge('stuff', 'new')}", (t) => {
-  t.is(config.mergeTest, 'stuffnew')
+test("joinIt: ${join(${array}, ${other})}", () => {
+  assert.is(config.joinIt, 'yess!sss!no')
 })
 
-test("joinIt: ${join(${array}, ${other})}", (t) => {
-  t.is(config.joinIt, 'yess!sss!no')
+test("upperKeysTest: ${upperKeys(${object})}", () => {
+  assert.equal(config.upperKeysTest, { ONE: 'once', TWO: 'twice' })
 })
 
-test("upperKeysTest: ${upperKeys(${object})}", (t) => {
-  t.deepEqual(config.upperKeysTest, { ONE: 'once', TWO: 'twice' })
+test("splitWithVariables: ${split(${splitString}, ${separater})}", () => {
+  assert.equal(config.splitWithVariables, [ 'yayaaya', 'whwhwhwhwh', 'hahahaha', 'wowowowo' ])
 })
 
-test("splitWithVariables: ${split(${splitString}, ${separater})}", (t) => {
-  t.deepEqual(config.splitWithVariables, [ 'yayaaya', 'whwhwhwhwh', 'hahahaha', 'wowowowo' ])
+test("splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}", () => {
+  assert.equal(config.splitWithVariablesTwo, [ 'yayaaya', 'whwhwhwhwh', 'hahahaha', 'wowowowo' ])
 })
 
-test("splitWithVariablesTwo: ${split(${splitStringTwo}, ${separaterTwo})}", (t) => {
-  t.deepEqual(config.splitWithVariablesTwo, [ 'yayaaya', 'whwhwhwhwh', 'hahahaha', 'wowowowo' ])
+test("nestedFunctions: ${split(merge('haha', 'wawawaw'), 'a')}", () => {
+  assert.equal(config.nestedFunctions, [ 'h', 'h', 'w', 'w', 'w', 'w' ])
 })
 
-test("nestedFunctions: ${split(merge('haha', 'wawawaw'), 'a')}", (t) => {
-  t.deepEqual(config.nestedFunctions, [ 'h', 'h', 'w', 'w', 'w', 'w' ])
-})
-
-test("mergeInlineObjects: ${merge(${object}, ${objectTwo})}", (t) => {
-  t.deepEqual(config.mergeInlineObjects, {
+test("mergeInlineObjects: ${merge(${object}, ${objectTwo})}", () => {
+  assert.equal(config.mergeInlineObjects, {
     one: 'once',
     two: 'twice',
     three: 'third',
@@ -75,8 +73,8 @@ test("mergeInlineObjects: ${merge(${object}, ${objectTwo})}", (t) => {
   })
 })
 
-test("mergeObjects: ${merge(${object}, ${asyncObj})}", (t) => {
-  t.deepEqual(config.mergeObjects, {
+test("mergeObjects: ${merge(${object}, ${asyncObj})}", () => {
+  assert.equal(config.mergeObjects, {
     one: 'once',
     two: 'twice',
     test: true,
@@ -86,18 +84,16 @@ test("mergeObjects: ${merge(${object}, ${asyncObj})}", (t) => {
   })
 })
 
-test("subKey: ${mergeObjects.two}", (t) => {
-  // console.log('config.subKey', config.subKey)
-  t.deepEqual(config.subKey, 'wee')
+test("subKey: ${mergeObjects.two}", () => {
+  assert.equal(config.subKey, 'wee')
 })
 
-
-test("mergeNested: ${merge('lol', ${nestedTwo})}", (t) => {
-  t.deepEqual(config.mergeNested, 'lolhahawowowow')
+test("mergeNested: ${merge('lol', ${nestedTwo})}", () => {
+  assert.equal(config.mergeNested, 'lolhahawowowow')
 })
 
-test("Nested fileRef: ${file(./other.yml)}", (t) => {
-  t.deepEqual(config.fileRef, {
+test("Nested fileRef: ${file(./other.yml)}", () => {
+  assert.equal(config.fileRef, {
     toUpperCase: 'VALUE',
     domainName: 'my-site.com',
     domains: {
@@ -117,12 +113,12 @@ test("Nested fileRef: ${file(./other.yml)}", (t) => {
   })
 })
 
-test("subThing: ${self:key}", (t) => {
-  t.deepEqual(config.fileRef.subThing, 'haha')
+test("subThing: ${self:key}", () => {
+  assert.equal(config.fileRef.subThing, 'haha')
 })
+
 /*
 old tests when functions were in resolution path
-
 test('splitTestTwo "lol-hi-_ ha,ha" | split("-", 2) | toUpperCase', (t) => {
   t.deepEqual(config.splitTestTwo, [
     'LOL',
@@ -130,7 +126,6 @@ test('splitTestTwo "lol-hi-_ ha,ha" | split("-", 2) | toUpperCase', (t) => {
     '_ HA,HA',
   ])
 })
-
 test('filterUsingVariableInputs ${"lol-hi-_ ha,ha" | split(${inner===hi}, 2, ${opt:stage}) }', (t) => {
   t.deepEqual(config.filterUsingVariableInputs, [
     'lol-',
@@ -138,3 +133,5 @@ test('filterUsingVariableInputs ${"lol-hi-_ ha,ha" | split(${inner===hi}, 2, ${o
   ])
 })
 */
+
+test.run()

@@ -2,7 +2,7 @@
 # Manual test file
 ########################
 
-Uri: 'https://${stageVariables.endpoint}/api/items'
+Uri: !Sub 'https://${stageVariables.endpoint}/api/items'
 
 selfVar: 'Testing'
 

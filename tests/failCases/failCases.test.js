@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 const dirname = path.dirname(__dirname)
 
@@ -11,61 +12,63 @@ const args = {
   stage: 'dev',
 }
 
-test('throw if self not found', async (t) => {
+test('throw if self not found', async () => {
   const object = {
     value: '${opt:stage}-${foo}',
   }
 
-  const error = await t.throwsAsync(async () => {
-    const x = await configorama(object, {
+  try {
+    await configorama(object, {
       configDir: dirname
     })
-    return x
-  })
-  // const error = await t.throws(vars.init(args))
-  // t.is(error.message, 'Invalid variable reference syntax for variable "foo" ${opt:stage}-${foo}')
-  t.regex(error.message, /Invalid variable reference syntax/)
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    assert.match(error.message, /Invalid variable reference syntax/)
+  }
 })
 
-test('throw if opt not found', async (t) => {
+test('throw if opt not found', async () => {
   const object = {
     value: '${opt:what}',
   }
 
-  const error = await t.throwsAsync(async () => {
-    const x = await configorama(object, {
+  try {
+    await configorama(object, {
       configDir: dirname
     })
-    return x
-  })
-  t.regex(error.message, /Variable not found/)
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    assert.match(error.message, /Variable not found/)
+  }
 })
 
-test('throw if deep value not found', async (t) => {
+test('throw if deep value not found', async () => {
   const configFile = path.join(__dirname, 'fail.yml')
 
-  const error = await t.throwsAsync(async () => {
-    const x = await configorama(configFile)
-    return x
-  })
-  t.regex(error.message, /Missing Value/)
+  try {
+    await configorama(configFile)
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    assert.match(error.message, /Missing Value/)
+  }
 })
 
-test('throw if value resolved is undefined', async (t) => {
+test('throw if value resolved is undefined', async () => {
   const object = {
     value: '${env:no, ${env:empty}}',
   }
 
-  const error = await t.throwsAsync(async () => {
-    const x = await configorama(object, {
+  try {
+    await configorama(object, {
       configDir: dirname
     })
-    return x
-  })
-  t.regex(error.message, /resolved to "undefined"/)
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    assert.match(error.message, /resolved to "undefined"/)
+  }
 })
 
-test('Allow undefined values', async (t) => {
+test('Allow undefined values', async () => {
   const object = {
     value: '${env:no, ${env:empty}}',
   }
@@ -74,7 +77,9 @@ test('Allow undefined values', async (t) => {
     configDir: dirname,
     allowUndefinedValues: true
   })
-  t.is(x.value, undefined)
+  assert.is(x.value, undefined)
 })
 
 // Nested fallbacks ACCESS_TOKEN = "${file(asyncValue.js, ${env:MY_SECxRET, 'hi'}, ${self:sharedValue})}"
+
+test.run()

@@ -1,13 +1,14 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envReference = 'env var'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -20,36 +21,42 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('normalKey', () => {
+  assert.is(config.normalKey, 'valueHere')
 })
 
-test('normalKey', (t) => {
-  t.is(config.normalKey, 'valueHere')
+test('wowTrue', () => {
+  assert.is(config.wowTrue, true)
 })
 
-test('wowTrue', (t) => {
-  t.is(config.wowTrue, true)
+test('env from wowTrue', () => {
+  assert.is(config.envTest, true)
 })
 
-test('env from wowTrue', (t) => {
-  t.is(config.envTest, true)
+test('topLevelSelf', () => {
+  assert.is(config.topLevelSelf, 'otherKeyValue')
 })
 
-test('topLevelSelf', (t) => {
-  t.is(config.topLevelSelf, 'otherKeyValue')
+test('nested', () => {
+  assert.is(config.nested, 'veryNested')
 })
 
-test('nested', (t) => {
-  t.is(config.nested, 'veryNested')
+test('deeperKey', () => {
+  assert.is(config.deeperKey.value, 'nextValueHere')
 })
 
-test('deeperKey', (t) => {
-  t.is(config.deeperKey.value, 'nextValueHere')
+test('emptyTwo equals toplevel self', () => {
+  assert.is(config.emptyTwo, 'thirdValue1234')
 })
 
-test('emptyTwo equals toplevel self', (t) => {
-  t.is(config.emptyTwo, 'thirdValue1234')
-})
+test.run()

@@ -1,15 +1,19 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+/* eslint-disable no-template-curly-in-string */
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
-process.env.envReference = 'env var'
+process.env.envNumber = 100
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
+    otherFlag: 'prod',
+    count: 25
   }
 
   const configFile = path.join(__dirname, 'valueTypes.yml')
@@ -20,72 +24,78 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('valueAsNumber', () => {
+  assert.is(config.valueAsNumber, 1)
 })
 
-test('valueAsNumber', (t) => {
-  t.is(config.valueAsNumber, 1)
+test('valueAsNumberVariable', () => {
+  assert.is(config.valueAsNumberVariable, 5)
 })
 
-test('valueAsNumberVariable', (t) => {
-  t.is(config.valueAsNumberVariable, 5)
+test('valueAsString', () => {
+  assert.is(config.valueAsString, 'string value')
 })
 
-test('valueAsString', (t) => {
-  t.is(config.valueAsString, 'string value')
+test('valueAsStringSingleQuotes', () => {
+  assert.is(config.valueAsStringSingleQuotes, 'single quotes')
 })
 
-test('valueAsStringSingleQuotes', (t) => {
-  t.is(config.valueAsStringSingleQuotes, 'single quotes')
+test('valueAsStringDoubleQuotes', () => {
+  assert.is(config.valueAsStringDoubleQuotes, 'double quotes')
 })
 
-test('valueAsStringDoubleQuotes', (t) => {
-  t.is(config.valueAsStringDoubleQuotes, 'double quotes')
+test('valueAsStringVariableSingleQuotes', () => {
+  assert.is(config.valueAsStringVariableSingleQuotes, 'single-quotes-var')
 })
 
-test('valueAsStringVariableSingleQuotes', (t) => {
-  t.is(config.valueAsStringVariableSingleQuotes, 'single-quotes-var')
+test('valueAsStringVariableDoubleQuotes', () => {
+  assert.is(config.valueAsStringVariableDoubleQuotes, 'double-quotes-var')
 })
 
-test('valueAsStringVariableDoubleQuotes', (t) => {
-  t.is(config.valueAsStringVariableDoubleQuotes, 'double-quotes-var')
+test('valueWithEqualSign', () => {
+  assert.is(config.valueWithEqualSign, 'this=value=has=equal')
 })
 
-test('valueWithEqualSign', (t) => {
-  t.is(config.valueWithEqualSign, 'this=value=has=equal')
+test('valueWithTwoFallbackValues', () => {
+  assert.is(config.valueWithTwoFallbackValues, 1)
 })
 
-test('valueWithTwoFallbackValues', (t) => {
-  t.is(config.valueWithTwoFallbackValues, 1)
-})
-
-test('valueAsBoolean', (t) => {
-  t.is(config.valueAsBoolean, true)
+test('valueAsBoolean', () => {
+  assert.is(config.valueAsBoolean, true)
 })
 
 test('selfReference', (t) => {
-  t.is(config.selfReference, 'value')
+  assert.is(config.selfReference, 'value')
 })
 
 test('envReference', (t) => {
-  t.is(config.envReference, 'env var')
+  assert.is(config.envReference, 'env var')
 })
 
 test('cliFlag', (t) => {
-  t.is(config.cliFlag, 'dev')
+  assert.is(config.cliFlag, 'dev')
 })
 
 test('cliFlagEmtpy', (t) => {
-  t.is(config.cliFlagEmtpy, 'cliFlagEmtpyValue')
+  assert.is(config.cliFlagEmtpy, 'cliFlagEmtpyValue')
 })
 
 test('cliFlagComposed', (t) => {
-  t.is(config.cliFlagComposed, 'dev-secret')
+  assert.is(config.cliFlagComposed, 'dev-secret')
 })
 
 test('Composed objects', (t) => {
-  t.is(config.resolvedDomainName, 'api-dev.my-site.com')
+  assert.is(config.resolvedDomainName, 'api-dev.my-site.com')
 })
+
+test.run()

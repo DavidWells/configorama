@@ -1,14 +1,15 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envNumber = 100
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     otherFlag: 'prod',
@@ -24,11 +25,15 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
-})
+}
+
+test.before(setup)
+test.after(teardown)
 
 // from tomlfull
 const tomlContents = {
@@ -39,90 +44,92 @@ const tomlContents = {
   }
 }
 
-test('toml valueAsNumber', (t) => {
-  t.is(config.valueAsNumber, 1)
+test('toml valueAsNumber', () => {
+  assert.is(config.valueAsNumber, 1)
 })
 
-test('toml valueAsNumberVariable', (t) => {
-  t.is(config.valueAsNumberVariable, 5)
+test('toml valueAsNumberVariable', () => {
+  assert.is(config.valueAsNumberVariable, 5)
 })
 
-test('toml valueAsString', (t) => {
-  t.is(config.valueAsString, 'string value')
+test('toml valueAsString', () => {
+  assert.is(config.valueAsString, 'string value')
 })
 
-test('toml valueAsStringSingleQuotes', (t) => {
-  t.is(config.valueAsStringSingleQuotes, 'single quotes')
+test('toml valueAsStringSingleQuotes', () => {
+  assert.is(config.valueAsStringSingleQuotes, 'single quotes')
 })
 
-test('toml valueAsStringDoubleQuotes', (t) => {
-  t.is(config.valueAsStringDoubleQuotes, 'double quotes')
+test('toml valueAsStringDoubleQuotes', () => {
+  assert.is(config.valueAsStringDoubleQuotes, 'double quotes')
 })
 
-test('toml valueAsStringVariableSingleQuotes', (t) => {
-  t.is(config.valueAsStringVariableSingleQuotes, 'single-quotes-var')
+test('toml valueAsStringVariableSingleQuotes', () => {
+  assert.is(config.valueAsStringVariableSingleQuotes, 'single-quotes-var')
 })
 
-test('toml valueAsStringVariableDoubleQuotes', (t) => {
-  t.is(config.valueAsStringVariableDoubleQuotes, 'double-quotes-var')
+test('toml valueAsStringVariableDoubleQuotes', () => {
+  assert.is(config.valueAsStringVariableDoubleQuotes, 'double-quotes-var')
 })
 
-test('toml valueWithEqualSign', (t) => {
-  t.is(config.valueWithEqualSign, 'this=value=has=equal')
+test('toml valueWithEqualSign', () => {
+  assert.is(config.valueWithEqualSign, 'this=value=has=equal')
 })
 
-test('toml valueWithTwoFallbackValues', (t) => {
-  t.is(config.valueWithTwoFallbackValues, 1)
+test('toml valueWithTwoFallbackValues', () => {
+  assert.is(config.valueWithTwoFallbackValues, 1)
 })
 
-test('toml valueAsBoolean', (t) => {
-  t.is(config.valueAsBoolean, true)
+test('toml valueAsBoolean', () => {
+  assert.is(config.valueAsBoolean, true)
 })
 
-test('full toml file reference > ${file(./_tomlfull.toml)}', (t) => {
-  t.deepEqual(config.tomlFullFile, tomlContents)
+test('full toml file reference > ${file(./_tomlfull.toml)}', () => {
+  assert.equal(config.tomlFullFile, tomlContents)
 })
 
-test('full toml file no path > ${file(_tomlfull.toml)}', (t) => {
-  t.deepEqual(config.tomlFullFileNoPath, tomlContents)
+test('full toml file no path > ${file(_tomlfull.toml)}', () => {
+  assert.equal(config.tomlFullFileNoPath, tomlContents)
 })
 
-test('tomlFullFileNestedRef > ${file(./_toml${self:normalKey}.toml)}', (t) => {
-  t.deepEqual(config.tomlFullFileNestedRef, tomlContents)
+test('tomlFullFileNestedRef > ${file(./_toml${self:normalKey}.toml)}', () => {
+  assert.equal(config.tomlFullFileNestedRef, tomlContents)
 })
 
-test("tomlFullFileMissing > ${file(./_madeup-file.toml), 'tomlFullFileMissingDefaultValue'}", (t) => {
-  t.deepEqual(config.tomlFullFileMissing, 'tomlFullFileMissingDefaultValue')
+test("tomlFullFileMissing > ${file(./_madeup-file.toml), 'tomlFullFileMissingDefaultValue'}", () => {
+  assert.equal(config.tomlFullFileMissing, 'tomlFullFileMissingDefaultValue')
 })
 
-test('tomlPartialTopLevelKey', (t) => {
-  t.deepEqual(config.tomlPartialTopLevelKey, 'topLevelValue')
+test('tomlPartialTopLevelKey', () => {
+  assert.equal(config.tomlPartialTopLevelKey, 'topLevelValue')
 })
 
-test('tomlPartialTopLevelKeyNoPath', (t) => {
-  t.deepEqual(config.tomlPartialTopLevelKeyNoPath, 'topLevelValue')
+test('tomlPartialTopLevelKeyNoPath', () => {
+  assert.equal(config.tomlPartialTopLevelKeyNoPath, 'topLevelValue')
 })
 
-test('tomlPartialSecondLevelKey', (t) => {
-  t.deepEqual(config.tomlPartialSecondLevelKey, '1leveldown')
+test('tomlPartialSecondLevelKey', () => {
+  assert.equal(config.tomlPartialSecondLevelKey, '1leveldown')
 })
 
-test('tomlPartialThirdLevelKey', (t) => {
-  t.deepEqual(config.tomlPartialThirdLevelKey, '2levelsdown')
+test('tomlPartialThirdLevelKey', () => {
+  assert.equal(config.tomlPartialThirdLevelKey, '2levelsdown')
 })
 
-test('tomlPartialThirdLevelKeyNoPath', (t) => {
-  t.deepEqual(config.tomlPartialThirdLevelKeyNoPath, '2levelsdown')
+test('tomlPartialThirdLevelKeyNoPath', () => {
+  assert.equal(config.tomlPartialThirdLevelKeyNoPath, '2levelsdown')
 })
 
-test('tomlPartialArrayRef', (t) => {
-  t.deepEqual(config.tomlPartialArrayRef, 'one')
+test('tomlPartialArrayRef', () => {
+  assert.equal(config.tomlPartialArrayRef, 'one')
 })
 
-test('tomlPartialArrayObjectRef', (t) => {
-  t.deepEqual(config.tomlPartialArrayObjectRef, { key: 'helloTwo' })
+test('tomlPartialArrayObjectRef', () => {
+  assert.equal(config.tomlPartialArrayObjectRef, { key: 'helloTwo' })
 })
 
-test('tomlPartialArrayObjectRefValue', (t) => {
-  t.deepEqual(config.tomlPartialArrayObjectRefValue, 'helloTwo')
+test('tomlPartialArrayObjectRefValue', () => {
+  assert.equal(config.tomlPartialArrayObjectRefValue, 'helloTwo')
 })
+
+test.run()

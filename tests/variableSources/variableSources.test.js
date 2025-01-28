@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 const dirname = path.dirname(__dirname)
 
@@ -11,7 +12,7 @@ const args = {
   stage: 'dev',
 }
 
-test('Custom variable source resolver', async (t) => {
+test('Custom variable source resolver', async () => {
   const object = {
     foo: 'bar',
     env: '${consul:${self:region}}',
@@ -40,18 +41,14 @@ test('Custom variable source resolver', async (t) => {
     variableSources: [{
       match: RegExp(/^consul:/g),
       resolver: (varToProcess, opts, currentObject) => {
-        // console.log('consul varToProcess', varToProcess)
-        // console.log('consul cli flags', opts)
-        // console.log('consul currentObject', currentObject)
         return Promise.resolve(`fetch consul value ${varToProcess}`)
       }
     }]
   })
-  // console.log(config)
-  t.is(config.env, 'fetch consul value consul:us-dev')
+  assert.is(config.env, 'fetch consul value consul:us-dev')
 })
 
-test('Custom variable source resolver match function', async (t) => {
+test('Custom variable source resolver match function', async () => {
   const object = {
     tester: '${REPLACE_ME}'
   }
@@ -68,6 +65,7 @@ test('Custom variable source resolver match function', async (t) => {
     }]
   })
 
-  // console.log(config)
-  t.is(config.tester, 'its replaced')
+  assert.is(config.tester, 'its replaced')
 })
+
+test.run()

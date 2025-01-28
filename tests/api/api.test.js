@@ -1,12 +1,12 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
-test.cb('API is asynchronous', (t) => {
-  let order = [
-    'one'
-  ]
+let order = ['one']
+
+test('API is asynchronous', async () => {
   const configFile = path.join(__dirname, 'api.yml')
 
   const config = configorama(configFile, {
@@ -19,13 +19,13 @@ test.cb('API is asynchronous', (t) => {
     console.log(c)
     console.log(`-------------`)
     order.push('three')
-    t.deepEqual(order, ['one', 'two', 'three'])
-    t.end()
+    console.log('order', order)
+    assert.equal(order, ['one', 'two', 'three'])
   })
   order.push('two')
 })
 
-test('Allow unknown variables to pass through', async (t) => {
+test('Allow unknown variables to pass through', async () => {
   const args = {
     stage: 'dev',
   }
@@ -59,17 +59,15 @@ test('Allow unknown variables to pass through', async (t) => {
     allowUnknownVars: true,
     options: args
   })
-  // console.log('config', config)
 
-  t.is(config.env, '${consul:us-dev}')
-  t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
-  t.is(config.ssm, '${ssm:/path/to/service/id}-service')
-  t.is(config.cloudformation, '${cf:another-stack.functionPrefix}-world')
-  t.is(config.whatever, '${stuff}')
+  assert.is(config.env, '${consul:us-dev}')
+  assert.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
+  assert.is(config.ssm, '${ssm:/path/to/service/id}-service')
+  assert.is(config.cloudformation, '${cf:another-stack.functionPrefix}-world')
+  assert.is(config.whatever, '${stuff}')
 })
 
-
-test('Allow unknown variables to pass through with postfixes', async (t) => {
+test('Allow unknown variables to pass through with postfixes', async () => {
   const args = {
     stage: 'dev',
   }
@@ -83,10 +81,10 @@ test('Allow unknown variables to pass through with postfixes', async (t) => {
     allowUnknownVars: true,
     options: args
   })
-  t.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
+  assert.is(config.s3, '${s3:myBucket/myKey-dev}-hello')
 })
 
-test('Allow unknown variables', async (t) => {
+test('Allow unknown variables', async () => {
   const args = {
     stage: 'dev',
   }
@@ -120,7 +118,7 @@ test('Allow unknown variables', async (t) => {
     allowUnknownVars: true,
     options: args
   })
-  t.deepEqual(config, {
+  assert.equal(config, {
     provider: { stage: 'dev' },
     custom: {
       honeycomb: {
@@ -138,3 +136,5 @@ test('Allow unknown variables', async (t) => {
     }
   })
 })
+
+test.run()

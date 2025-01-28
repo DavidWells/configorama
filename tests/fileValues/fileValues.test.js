@@ -1,20 +1,20 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envNumber = 100
 process.env.MY_SECRET = 'lol hi there'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     otherFlag: 'prod',
     count: 25
-    // empty: 'HEHEHE'
   }
 
   const configFile = path.join(__dirname, 'fileValues.yml')
@@ -25,11 +25,15 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
-})
+}
+
+test.before(setup)
+test.after(teardown)
 
 // from ymlfull
 const ymlContents = {
@@ -40,74 +44,76 @@ const ymlContents = {
   }
 }
 
-test('full yaml file reference > ${file(./_ymlfull.yml)}', (t) => {
-  t.deepEqual(config.yamlFullFile, ymlContents)
+test('full yaml file reference > ${file(./_ymlfull.yml)}', () => {
+  assert.equal(config.yamlFullFile, ymlContents)
 })
 
-test('full yaml file no path > ${file(_ymlfull.yml)}', (t) => {
-  t.deepEqual(config.yamlFullFileNoPath, ymlContents)
+test('full yaml file no path > ${file(_ymlfull.yml)}', () => {
+  assert.equal(config.yamlFullFileNoPath, ymlContents)
 })
 
-test('yamlFullFileNestedRef > ${file(./_yml${self:normalKey}.yml)}', (t) => {
-  t.deepEqual(config.yamlFullFileNestedRef, ymlContents)
+test('yamlFullFileNestedRef > ${file(./_yml${self:normalKey}.yml)}', () => {
+  assert.equal(config.yamlFullFileNestedRef, ymlContents)
 })
 
-test("yamlFullFileMissing > ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}", (t) => {
-  t.deepEqual(config.yamlFullFileMissing, 'yamlFullFileMissingDefaultValue')
+test("yamlFullFileMissing > ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}", () => {
+  assert.equal(config.yamlFullFileMissing, 'yamlFullFileMissingDefaultValue')
 })
 
-test('yamlPartialTopLevelKey', (t) => {
-  t.deepEqual(config.yamlPartialTopLevelKey, 'topLevelValue')
+test('yamlPartialTopLevelKey', () => {
+  assert.equal(config.yamlPartialTopLevelKey, 'topLevelValue')
 })
 
-test('yamlPartialTopLevelKeyNoPath', (t) => {
-  t.deepEqual(config.yamlPartialTopLevelKeyNoPath, 'topLevelValue')
+test('yamlPartialTopLevelKeyNoPath', () => {
+  assert.equal(config.yamlPartialTopLevelKeyNoPath, 'topLevelValue')
 })
 
-test('yamlPartialSecondLevelKey', (t) => {
-  t.deepEqual(config.yamlPartialSecondLevelKey, '1leveldown')
+test('yamlPartialSecondLevelKey', () => {
+  assert.equal(config.yamlPartialSecondLevelKey, '1leveldown')
 })
 
-test('yamlPartialThirdLevelKey', (t) => {
-  t.deepEqual(config.yamlPartialThirdLevelKey, '2levelsdown')
+test('yamlPartialThirdLevelKey', () => {
+  assert.equal(config.yamlPartialThirdLevelKey, '2levelsdown')
 })
 
-test('yamlPartialThirdLevelKeyNoPath', (t) => {
-  t.deepEqual(config.yamlPartialThirdLevelKeyNoPath, '2levelsdown')
+test('yamlPartialThirdLevelKeyNoPath', () => {
+  assert.equal(config.yamlPartialThirdLevelKeyNoPath, '2levelsdown')
 })
 
-test('yamlPartialArrayRef', (t) => {
-  t.deepEqual(config.yamlPartialArrayRef, 'one')
+test('yamlPartialArrayRef', () => {
+  assert.equal(config.yamlPartialArrayRef, 'one')
 })
 
-test('yamlPartialArrayObjectRef', (t) => {
-  t.deepEqual(config.yamlPartialArrayObjectRef, { key: 'helloTwo' })
+test('yamlPartialArrayObjectRef', () => {
+  assert.equal(config.yamlPartialArrayObjectRef, { key: 'helloTwo' })
 })
 
-test('yamlPartialArrayObjectRefValue', (t) => {
-  t.deepEqual(config.yamlPartialArrayObjectRefValue, 'helloTwo')
+test('yamlPartialArrayObjectRefValue', () => {
+  assert.equal(config.yamlPartialArrayObjectRefValue, 'helloTwo')
 })
 
-test('stageSpecific', (t) => {
-  t.deepEqual(config.stageSpecific, {
+test('stageSpecific', () => {
+  assert.equal(config.stageSpecific, {
     'CREDS': 'dev creds here'
   })
 })
 
-test('stageSpecificTwo', (t) => {
-  t.deepEqual(config.stageSpecificTwo, {
+test('stageSpecificTwo', () => {
+  assert.equal(config.stageSpecificTwo, {
     'CREDS': 'prod creds here'
   })
 })
 
-test('singleQuotes', (t) => {
-  t.deepEqual(config.singleQuotes, {
+test('singleQuotes', () => {
+  assert.equal(config.singleQuotes, {
     'CREDS': 'dev creds here'
   })
 })
 
-test('doubleQuotes', (t) => {
-  t.deepEqual(config.doubleQuotes, {
+test('doubleQuotes', () => {
+  assert.equal(config.doubleQuotes, {
     'CREDS': 'prod creds here'
   })
 })
+
+test.run()

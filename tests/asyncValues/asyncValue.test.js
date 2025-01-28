@@ -1,17 +1,17 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     what: 'prod',
     count: 25
-    // empty: 'HEHEHE'
   }
 
   const yamlFile = path.join(__dirname, 'asyncValue.yml')
@@ -24,37 +24,43 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.timeEnd('perf')
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('Normal return ${file(./asyncValue.js)}', () => {
+  assert.is(config.asyncJSValue, 'asyncval')
 })
 
-test('Normal return ${file(./asyncValue.js)}', (t) => {
-  t.is(config.asyncJSValue, 'asyncval')
+test('Object return ${file(./asyncValueObject.js):func.key}', () => {
+  assert.is(config.asyncKey, 'asyncValueFromObject')
 })
 
-test('Object return ${file(./asyncValueObject.js):func.key}', (t) => {
-  t.is(config.asyncKey, 'asyncValueFromObject')
+test('Object return two ${file(./asyncValueObject.js):func.keyTwo}', () => {
+  assert.is(config.asyncKeyTwo, 'asyncValueFromObjectTwo')
 })
 
-test('Object return two ${file(./asyncValueObject.js):func.keyTwo}', (t) => {
-  t.is(config.asyncKeyTwo, 'asyncValueFromObjectTwo')
+test('Object return ${self:selfVar}', () => {
+  assert.is(config.asyncKeyThreeVariable, 'Testing')
 })
 
-test('Object return ${self:selfVar}', (t) => {
-  t.is(config.asyncKeyThreeVariable, 'Testing')
+test('asyncWithFilter', () => {
+  assert.is(config.asyncWithFilter, 'asyncValueFromObjectTwo')
 })
 
-test('asyncWithFilter', (t) => {
-  t.is(config.asyncWithFilter, 'asyncValueFromObjectTwo')
+test('asyncWithFilterTwo', () => {
+  assert.is(config.asyncWithFilterTwo, 'ASYNCVALUEFROMOBJECT')
 })
 
-test('asyncWithFilterTwo', (t) => {
-  t.is(config.asyncWithFilterTwo, 'ASYNCVALUEFROMOBJECT')
+test('asyncJSValueReference', () => {
+  assert.is(config.asyncJSValueReference, 'asyncValueFromObject')
 })
 
-test('asyncJSValueReference', (t) => {
-  t.is(config.asyncJSValueReference, 'asyncValueFromObject')
-})
+test.run()

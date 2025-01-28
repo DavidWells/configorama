@@ -1,14 +1,15 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envNumber = 100
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     otherFlag: 'prod',
@@ -26,36 +27,40 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('yml valueAsNumber', () => {
+  assert.is(config.valueAsNumber, 1)
 })
 
-test('yml valueAsNumber', (t) => {
-  t.is(config.valueAsNumber, 1)
-})
-
-test('yml fix nested OBJECT var syntax', (t) => {
-  t.deepEqual(config.objectNoWrapper, {
+test('yml fix nested OBJECT var syntax', () => {
+  assert.equal(config.objectNoWrapper, {
     cool: 'no value here'
   })
 })
 
-test('yml fix nested OBJECT var syntax 2', (t) => {
-  t.deepEqual(config.objectNoWrapperNested, {
+test('yml fix nested OBJECT var syntax 2', () => {
+  assert.equal(config.objectNoWrapperNested, {
     nice: { red: 'woooo' }
   })
 })
 
-test('yml OBJECT', (t) => {
-  t.deepEqual(config.objectJSStyle, {
+test('yml OBJECT', () => {
+  assert.equal(config.objectJSStyle, {
     woot: 'wee'
   })
 })
 
-test('yml fix nested array var syntax', (t) => {
-  t.deepEqual(config.y, {
+test('yml fix nested array var syntax', () => {
+  assert.equal(config.y, {
     'Fn::Not': [
       {
         'Fn::Equals': [ { 'Fn::Join': [ '', '${param:xyz}' ] } ]
@@ -64,8 +69,8 @@ test('yml fix nested array var syntax', (t) => {
   })
 })
 
-test('yml fix nested array var syntax 2', (t) => {
-  t.deepEqual(config.Test, {
+test('yml fix nested array var syntax 2', () => {
+  assert.equal(config.Test, {
     'Fn::Not': [
       {
         'Fn::Equals': [
@@ -79,8 +84,8 @@ test('yml fix nested array var syntax 2', (t) => {
   })
 })
 
-test('yml fix nested array var syntax 3', (t) => {
-  t.deepEqual(config.TestTwo, {
+test('yml fix nested array var syntax 3', () => {
+  assert.equal(config.TestTwo, {
     'Fn::Not': [
       {
         'Fn::Equals': [
@@ -94,8 +99,8 @@ test('yml fix nested array var syntax 3', (t) => {
   })
 })
 
-test('yml fix nested array var syntax 4', (t) => {
-  t.deepEqual(config.TestThree, {
+test('yml fix nested array var syntax 4', () => {
+  assert.equal(config.TestThree, {
     foo: [
       [ 'a', 'b', 'c' ],
       [ 'd', 'e', 'prod', 'nice' ],
@@ -106,7 +111,8 @@ test('yml fix nested array var syntax 4', (t) => {
   })
 })
 
-
-test('yml fix multiLineArray', (t) => {
-  t.deepEqual(config.multiLineArray, [ 'string1', 'string2', 'string3', 'string4', 'prod', 'string6' ])
+test('yml fix multiLineArray', () => {
+  assert.equal(config.multiLineArray, [ 'string1', 'string2', 'string3', 'string4', 'prod', 'string6' ])
 })
+
+test.run()

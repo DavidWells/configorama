@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 const dirname = path.dirname(__dirname)
 
@@ -25,7 +26,7 @@ const resolvedObject = {
   resolvedDomainName: 'api-dev.my-site.com'
 }
 
-test('${ } syntax', async (t) => {
+test('${ } syntax', async () => {
   const object = {
     foo: 'bar',
     key: '${opt:stage}',
@@ -46,10 +47,10 @@ test('${ } syntax', async (t) => {
     options: args
   })
 
-  t.deepEqual(config, resolvedObject)
+  assert.equal(config, resolvedObject)
 })
 
-test('${{ }} syntax', async (t) => {
+test('${{ }} syntax', async () => {
   const object = {
     foo: 'bar',
     key: '${{opt:stage}}',
@@ -70,10 +71,10 @@ test('${{ }} syntax', async (t) => {
     options: args
   })
 
-  t.deepEqual(config, resolvedObject)
+  assert.equal(config, resolvedObject)
 })
 
-test('#{ } syntax', async (t) => {
+test('#{ } syntax', async () => {
   const object = {
     foo: 'bar',
     key: '#{opt:stage}',
@@ -94,10 +95,10 @@ test('#{ } syntax', async (t) => {
     options: args
   })
 
-  t.deepEqual(config, resolvedObject)
+  assert.equal(config, resolvedObject)
 })
 
-test('< > syntax', async (t) => {
+test('< > syntax', async () => {
   const object = {
     foo: 'bar',
     key: '<opt:stage>',
@@ -118,10 +119,10 @@ test('< > syntax', async (t) => {
     options: args
   })
 
-  t.deepEqual(config, resolvedObject)
+  assert.equal(config, resolvedObject)
 })
 
-test('[ ] syntax', async (t) => {
+test('[ ] syntax', async () => {
   const object = {
     foo: 'bar',
     key: '[opt:stage]',
@@ -142,10 +143,10 @@ test('[ ] syntax', async (t) => {
     options: args
   })
 
-  t.deepEqual(config, resolvedObject)
+  assert.equal(config, resolvedObject)
 })
 
-test('[[ ]] syntax', async (t) => {
+test('[[ ]] syntax', async () => {
   const object = {
     foo: 'bar',
     key: '[[opt:stage]]',
@@ -157,6 +158,8 @@ test('[[ ]] syntax', async (t) => {
     configDir: dirname,
     options: args
   })
-  t.is(config.key, 'dev')
-  t.is(config.value, 'dev-bar')
+  assert.is(config.key, 'dev')
+  assert.is(config.value, 'dev-bar')
 })
+
+test.run()

@@ -11,9 +11,9 @@
   ],
   "scripts": {
     "docs": "node ./scripts/docs.js",
-    "test": "ava -v",
-    "test:api": "ava ./tests/api/api.test.js -v",
-    "watch": "npm test -- --watch -v",
+    "test": "uvu tests \".*\\.test.js$\"",
+    "test:api": "uvu tests/api api.test.js",
+    "watch": "watchlist tests -- npm test",
     "publish": "git push origin && git push origin --tags",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
@@ -40,19 +40,9 @@
     "traverse": "^0.6.8"
   },
   "devDependencies": {
-    "ava": "^2.4.0",
     "markdown-magic": "^2.6.1",
-    "minimist": "^1.2.8"
-  },
-  "ava": {
-    "files": [
-      "tests/**/*.test.js"
-    ],
-    "sources": [
-      "**/*.{js,jsx}",
-      "*.yml",
-      "**/*.yml"
-    ],
-    "verbose": true
+    "minimist": "^1.2.8",
+    "uvu": "^0.5.6",
+    "watchlist": "^0.3.1"
   }
 }

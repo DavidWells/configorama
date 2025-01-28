@@ -1,16 +1,16 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     what: 'prod',
     count: 25
-    // empty: 'HEHEHE'
   }
 
   const configFile = path.join(__dirname, 'syncValue.yml')
@@ -21,24 +21,30 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('Normal return', () => {
+  assert.is(config.syncJSValue, 'SyncValue')
 })
 
-test('Normal return', (t) => {
-  t.is(config.syncJSValue, 'SyncValue')
+test('Object return', () => {
+  assert.is(config.syncKey, 'syncValueFromObject')
 })
 
-test('Object return', (t) => {
-  t.is(config.syncKey, 'syncValueFromObject')
+test('Object return two', () => {
+  assert.is(config.syncKeyTwo, 'syncValueTwoFromObject')
 })
 
-test('Object return two', (t) => {
-  t.is(config.syncKeyTwo, 'syncValueTwoFromObject')
+test('Object return ${self:normalKey}', () => {
+  assert.is(config.syncKeyThreeVariable, 'variable key three')
 })
 
-test('Object return ${self:normalKey}', (t) => {
-  t.is(config.syncKeyThreeVariable, 'variable key three')
-})
+test.run()

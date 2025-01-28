@@ -1,14 +1,15 @@
-import test from 'ava'
-import util from 'util'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const util = require('util')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envReference = 'env var'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -21,22 +22,28 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(util.inspect(config, false, null, true))
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('recursively populate, regardless of order and duplication', () => {
+  assert.is(config.val1, 'my value')
+  assert.is(config.depVal, 'my value')
+  assert.is(config.val0, 'my value')
+  assert.is(config.val2, 'my value')
 })
 
-test('recursively populate, regardless of order and duplication', (t) => {
-  t.is(config.val1, 'my value')
-  t.is(config.depVal, 'my value')
-  t.is(config.val0, 'my value')
-  t.is(config.val2, 'my value')
+test('self: recursively populate, regardless of order and duplication', () => {
+  assert.is(config.valSelf1, 'my value self')
+  assert.is(config.depSelfVal, 'my value self')
+  assert.is(config.valSelf0, 'my value self')
+  assert.is(config.valSelf2, 'my value self')
 })
 
-test('self: recursively populate, regardless of order and duplication', (t) => {
-  t.is(config.valSelf1, 'my value self')
-  t.is(config.depSelfVal, 'my value self')
-  t.is(config.valSelf0, 'my value self')
-  t.is(config.valSelf2, 'my value self')
-})
+test.run()

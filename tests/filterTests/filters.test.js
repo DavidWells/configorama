@@ -1,13 +1,15 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+/* eslint-disable no-template-curly-in-string */
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envReference = 'env var'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -20,44 +22,50 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('toUpperCaseString normal value', () => {
+  assert.is(config.toUpperCaseString, 'VALUE')
 })
 
-test('toUpperCaseString normal value', (t) => {
-  t.is(config.toUpperCaseString, 'VALUE')
+test('toKebabCaseString', () => {
+  assert.is(config.toKebabCaseString, 'value-here')
 })
 
-test('toKebabCaseString', (t) => {
-  t.is(config.toKebabCaseString, 'value-here')
+test('stageToUpper', () => {
+  assert.is(config.stageToUpper, 'DEV')
 })
 
-test('stageToUpper', (t) => {
-  t.is(config.stageToUpper, 'DEV')
+test('toKebabCase TheGooseIsLoose > the-goose-is-loose', () => {
+  assert.is(config.toKebabCase, 'the-goose-is-loose')
 })
 
-test('toKebabCase TheGooseIsLoose > the-goose-is-loose', (t) => {
-  t.is(config.toKebabCase, 'the-goose-is-loose')
+test('toCamelCase what-is-up', () => {
+  assert.is(config.toCamelCase, 'whatIsUp')
 })
 
-test('toCamelCase what-is-up', (t) => {
-  t.is(config.toCamelCase, 'whatIsUp')
+test('valueWithAsterisk', () => {
+  assert.is(config.valueWithAsterisk, '*.MYSTAGE.COM')
 })
 
-test('valueWithAsterisk', (t) => {
-  t.is(config.valueWithAsterisk, '*.MYSTAGE.COM')
+test('deepVarTest capitalize', () => {
+  assert.is(config.deepVarTest, 'What-is-up')
 })
 
-test('deepVarTest capitalize', (t) => {
-  t.is(config.deepVarTest, 'What-is-up')
+test('deepVarTestTwo toCamelCase', () => {
+  assert.is(config.deepVarTestTwo, 'whatIsUp')
 })
 
-test('deepVarTestTwo toCamelCase', (t) => {
-  t.is(config.deepVarTestTwo, 'whatIsUp')
+test('resolvedDomainName', () => {
+  assert.is(config.resolvedDomainName, 'api-dev.my-site.com')
 })
 
-test('resolvedDomainName', (t) => {
-  t.is(config.resolvedDomainName, 'api-dev.my-site.com')
-})
+test.run()

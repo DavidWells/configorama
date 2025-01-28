@@ -5,7 +5,7 @@ module.exports = (config) => {
 
 function fetchSecretsFromRemoteStore() {
   return delay(2000).then(() => {
-    console.log('delay 1000')
+    console.log('fetchSecretsFromRemoteStore delay 1000')
     return Promise.resolve({
       test: true,
       nested: {

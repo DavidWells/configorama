@@ -1,18 +1,18 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../../lib')
 
 let config
 
 process.env.envNumber = 100
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
     otherFlag: 'prod',
     count: 25
-    // empty: 'HEHEHE'
   }
 
   const configFile = path.join(__dirname, 'fileValuesPath.yml')
@@ -23,22 +23,26 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('siblingFile', () => {
+  assert.equal(config.siblingFile, { siblingFile: true })
 })
 
-test('siblingFile', (t) => {
-  t.deepEqual(config.siblingFile, { siblingFile: true })
+test('childFile', () => {
+  assert.equal(config.childFile, { childFile: true })
 })
 
-test('childFile', (t) => {
-  t.deepEqual(config.childFile, { childFile: true })
-})
-
-test('child file with reference to parent file', (t) => {
-  t.deepEqual(config.childRefParent, {
+test('child file with reference to parent file', () => {
+  assert.equal(config.childRefParent, {
     childFile: 'two',
     parentParentRef: {
       otherParent: 'otherParentValue'
@@ -46,8 +50,8 @@ test('child file with reference to parent file', (t) => {
   })
 })
 
-test('parentFile', (t) => {
-  t.deepEqual(config.parentFile, {
+test('parentFile', () => {
+  assert.equal(config.parentFile, {
     valuesFromParent: 'hi',
     value: 'otherValue',
     thirdValue: 'third',
@@ -55,11 +59,13 @@ test('parentFile', (t) => {
   })
 })
 
-test('parent file with reference to child file', (t) => {
-  t.deepEqual(config.parentRefChild, {
+test('parent file with reference to child file', () => {
+  assert.equal(config.parentRefChild, {
     parentRefChild: 'hello',
     child: {
       childFile: true
     }
   })
 })
+
+test.run()

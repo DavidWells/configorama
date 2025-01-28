@@ -1,7 +1,8 @@
 /* eslint-disable no-template-curly-in-string */
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
@@ -9,8 +10,8 @@ process.env.envValue = 'env-value'
 process.env.envValueTwo = 'three'
 // process.env.holo = 'ololo'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -23,32 +24,38 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test("Default: ${self:custom.fun, ''}", () => {
+  assert.is(config.resources.subItem.Default, 'my-slug')
 })
 
-test("Default: ${self:custom.fun, ''}", (t) => {
-  t.is(config.resources.subItem.Default, 'my-slug')
+test("${self:custom.domainName, ''}", () => {
+  assert.is(config.resources.Parameters.Domain.Default, 'domainxyz.com')
 })
 
-test("${self:custom.domainName, ''}", (t) => {
-  t.is(config.resources.Parameters.Domain.Default, 'domainxyz.com')
+test("config.resources.x", () => {
+  assert.is(config.resources.x, 'domainxyz.com')
 })
 
-test("config.resources.x", (t) => {
-  t.is(config.resources.x, 'domainxyz.com')
+test("config.resources.y", () => {
+  assert.is(config.resources.y, 'default-value')
 })
 
-test("config.resources.y", (t) => {
-  t.is(config.resources.y, 'default-value')
+test("set default", () => {
+  assert.is(config.set, 'default-value')
 })
 
-test("set default", (t) => {
-  t.is(config.set, 'default-value')
+test("default-value-two", () => {
+  assert.is(config.resources.subItem.set, 'default-value-two')
 })
 
-test("default-value-two", (t) => {
-  t.is(config.resources.subItem.set, 'default-value-two')
-})
+test.run()

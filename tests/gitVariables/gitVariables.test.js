@@ -1,13 +1,15 @@
-import test from 'ava'
-import path from 'path'
-import configorama from '../../lib'
+/* eslint-disable no-template-curly-in-string */
+const { test } = require('uvu')
+const assert = require('uvu/assert')
+const path = require('path')
+const configorama = require('../../lib')
 
 let config
 
 process.env.envReference = 'env var'
 
-// This runs before all tests
-test.before(async t => {
+// Setup function
+const setup = async () => {
   const args = {
     stage: 'dev',
   }
@@ -20,38 +22,44 @@ test.before(async t => {
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
   console.log(`-------------`)
-})
+}
 
-test.after(t => {
+// Teardown function
+const teardown = () => {
   console.log(`-------------`)
+}
+
+test.before(setup)
+test.after(teardown)
+
+test('${git:repository} === configorama', () => {
+  assert.is(config.repository, 'DavidWells/configorama')
 })
 
-test('${git:repository} === configorama', (t) => {
-  t.is(config.repository, 'DavidWells/configorama')
+test("repo urls", () => {
+  assert.is(config.url, 'https://github.com/DavidWells/configorama')
+  assert.is(config.repoUrl, 'https://github.com/DavidWells/configorama')
+  assert.is(config.repoUrlDashed, 'https://github.com/DavidWells/configorama')
 })
 
-test("repo urls", (t) => {
-  t.is(config.url, 'https://github.com/DavidWells/configorama')
-  t.is(config.repoUrl, 'https://github.com/DavidWells/configorama')
-  t.is(config.repoUrlDashed, 'https://github.com/DavidWells/configorama')
+test('${git:dir}', () => {
+  assert.is(config.dir, 'https://github.com/DavidWells/configorama/tree/master/tests/gitVariables')
 })
 
-test('${git:dir}', (t) => {
-  t.is(config.dir, 'https://github.com/DavidWells/configorama/tree/master/tests/gitVariables')
+test('${git:branch} === master', () => {
+  assert.is(config.branch, 'master')
 })
 
-test('${git:branch} === master', (t) => {
-  t.is(config.branch, 'master')
+test('sha1: ${git:sha1}', async () => {
+  assert.match(config.sha1, /\b[0-9a-f]{5,40}\b/)
 })
 
-test('sha1: ${git:sha1}', async (t) => {
-  t.regex(config.sha1, /\b[0-9a-f]{5,40}\b/)
+test("remoteDefined: ${git:remote('origin')}", () => {
+  assert.is(config.remoteDefined, 'https://github.com/DavidWells/configorama')
 })
 
-test("remoteDefined: ${git:remote('origin')}", (t) => {
-  t.is(config.remoteDefined, 'https://github.com/DavidWells/configorama')
+test("remoteDefinedNoQuotes: ${git:remote(origin)}", () => {
+  assert.is(config.remoteDefinedNoQuotes, 'https://github.com/DavidWells/configorama')
 })
 
-test("remoteDefinedNoQuotes: ${git:remote(origin)}", (t) => {
-  t.is(config.remoteDefinedNoQuotes, 'https://github.com/DavidWells/configorama')
-})
+test.run()
