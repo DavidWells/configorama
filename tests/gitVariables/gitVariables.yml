@@ -40,3 +40,5 @@ remoteDefinedNoQuotes: ${git:remote(origin)}
 # Tags
 tag: ${git:tag}
 describe: ${git:describe}
+
+gitTimestamp: ${git:timestamp('../../package.json')}

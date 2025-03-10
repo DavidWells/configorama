@@ -12,12 +12,16 @@ depSelfVal: ${valSelf0}
 valSelf0: my value self
 valSelf2: ${self:depSelfVal}
 
-# TODO finish test should handle embedded deep variable replacements in overrides
 val00: ${self:not.a.value, "foo"}
+val00a: ${val00}
+withFilter: ${val00 | toUpperCase}
 val01: ${self:not.a.value, "bar"}
+val01a: ${val01}
 val02: ${self:val00}:${self:val01}
+val02a: ${val00}:${val01}
 val03: ${self:val02}
-
+val04: ${val03}
+val05: ${val04 | toUpperCase}
 
 testing:
   hello:

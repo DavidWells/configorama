@@ -68,4 +68,14 @@ test('resolvedDomainName', () => {
   assert.is(config.resolvedDomainName, 'api-dev.my-site.com')
 })
 
+test('fooInCaps', () => {
+  assert.is(config.fooInCaps, 'FOO')
+})
+
+test('fooInLowerCase', () => {
+  assert.is(config.fooInLowerCase, 'foo')
+})
+
+
+
 test.run()

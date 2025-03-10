@@ -15,20 +15,25 @@ const args = {
 test('Custom filter', async () => {
   const object = {
     foo: 'bar',
-    key: '${opt:stage | addExclamation}'
+    key: '${opt:stage | addExclamation }',
+    keyTwo: '${"hi" | addExclamation}',
+    envKey: '${env:envReference | addExclamation}'
   }
 
   const config = await configorama(object, {
     options: args,
     configDir: dirname,
     filters: {
-      addExclamation: (val) => {
+      addExclamation: (val, from) => {
+        // console.log('addExclamation', val, from)
         return `${val}!`
       }
     }
   })
-
+  console.log('config', config)
   assert.is(config.key, 'dev!')
+  assert.is(config.keyTwo, 'hi!')
+  assert.is(config.envKey, 'env var!')
 })
 
 test.run()

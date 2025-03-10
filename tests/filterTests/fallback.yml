@@ -1,0 +1,8 @@
+
+fallbackTest: ${self:not.a.value, "foo bar"}
+fallbackTestTwo: ${fallbackTest}
+fooInCaps: ${fallbackTest | toUpperCase}
+fooInLowerCase: ${fallbackTest | toLowerCase}
+fooInCapitalize: ${fallbackTest | capitalize}
+fooInCamelCase: ${fallbackTest | toCamelCase}
+fooInKebabCase: ${fallbackTest | toKebabCase}
