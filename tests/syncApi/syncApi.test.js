@@ -17,7 +17,7 @@ const args = {
 const setup = async () => {
   try {
     const yamlFile = path.join(__dirname, 'syncApi.yml')
-    config = await configorama.sync(yamlFile, {
+    config = configorama.sync(yamlFile, {
       options: args
     })
     order.push('two')
@@ -102,7 +102,8 @@ test('throw if match resolver not path', () => {
         resolver: () => {
           return 'xyz'
         }
-      }, {
+      }, 
+      {
         match: '^secrets:',
         resolver: () => {
           return 'xyz'
