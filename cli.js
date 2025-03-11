@@ -2,7 +2,7 @@
 
 const fs = require('fs')
 const minimist = require('minimist')
-const Configorama = require('./lib/main')
+const Configorama = require('./src/main')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {

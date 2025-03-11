@@ -2,7 +2,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const util = require('util')
 const path = require('path')
-const configorama = require('../../lib')
+const configorama = require('../../src')
 
 let config
 

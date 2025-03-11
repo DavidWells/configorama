@@ -1,5 +1,5 @@
 const path = require('path')
-const configorama = require('../lib')
+const configorama = require('../src')
 
 const yamlFile = path.join(__dirname, 'manualYaml.yml')
 

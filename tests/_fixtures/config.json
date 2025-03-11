@@ -1,0 +1,9 @@
+{
+  "key": "slug",
+  "slug": "funkyslug",
+  "domainName": "nice.com",
+  "resourcePrefix": "Nice",
+  "xyz": "config-fallback",
+  "config-fallback": "resolved",
+  "fallback": "fallthrough"
+}
