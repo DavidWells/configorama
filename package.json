@@ -11,6 +11,7 @@
     "README.md"
   ],
   "bin": {
+    "config": "./cli.js",
     "configorama": "./cli.js"
   },
   "scripts": {

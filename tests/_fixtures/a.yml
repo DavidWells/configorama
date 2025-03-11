@@ -1,8 +1,15 @@
-# shorthand variable declaration
-domainNameTwo: my-site-two.com
-stage: dev
-domainsTwo:
-  prod:    api.${domainNameTwo}
-  staging: api-staging.${domainNameTwo}
-  dev:     api-dev.${domainNameTwo}
-resolvedDomainNameTwo: ${domainsTwo.${opt:stage, prod}}
+
+# Base domain name
+baseDomainName: site.com
+
+# Stage
+defaultStage: dev
+
+# Domain by stage
+domainByStage:
+  prod:    api.${baseDomainName}
+  staging: api-staging.${baseDomainName}
+  dev:     api-dev.${baseDomainName}
+
+# Resolved domain name. Looks for option flag then falls back to defined "defaultStage"
+resolvedDomainName: ${domainByStage.${opt:stage, ${defaultStage}}}

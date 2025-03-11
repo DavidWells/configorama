@@ -1,15 +1,16 @@
 const path = require('path')
-const serverlessConfig = path.join(__dirname, 'tests/_fixtures/git.yml')
+
 const args = require('minimist')(process.argv.slice(2))
-const configorama = require('./lib')
-const deepLog = require('./lib/utils/deep-log')
+const configorama = require('../src')
+const deepLog = require('../src/utils/deep-log')
 
 async function getConfig() {
   const settings = {
     options: args,
     allowUnknownVars: true,
   }
-  return configorama(serverlessConfig, settings)
+  const configFile = path.join(__dirname, '../tests/_fixtures/git.yml')
+  return configorama(configFile, settings)
 }
 
 getConfig().then((resolvedConfig) => {
