@@ -1,0 +1,6 @@
+
+Resources:
+  S3BucketTwo:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: some-bucket-name-two

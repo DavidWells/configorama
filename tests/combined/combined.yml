@@ -1,0 +1,16 @@
+test:
+  - ${file(./first-cf-resources.yml)}
+  - ${file(./second-cf-resources.yml)}
+
+resources:
+  - Resources:
+      ApiGatewayRestApi:
+        Type: AWS::ApiGateway::RestApi
+  
+  - ${file(./first-cf-resources.yml)}
+  - ${file(./second-cf-resources.yml)}
+
+  - Outputs:
+      CognitoUserPoolId:
+        Value:
+          Ref: CognitoUserPool
