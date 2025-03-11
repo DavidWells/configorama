@@ -8,7 +8,7 @@ let config
 
 process.env.envReference = 'env var'
 
-test.only('fallbackTest', async () => {
+test('fallbackTest', async () => {
   const configFile = path.join(__dirname, 'fallback.yml')
   const newConfig = await configorama(configFile)
   console.log('newConfig', newConfig)

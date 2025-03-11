@@ -21,7 +21,6 @@ objectTwo:
 asyncObj: ${file(./async.js)}
 
 mergeInlineObjects: ${merge(${object}, ${objectTwo})}
-# TODO objects don't both resolve first so this merge fails.
 
 mergeObjects: ${merge(${object}, ${asyncObj})}
 

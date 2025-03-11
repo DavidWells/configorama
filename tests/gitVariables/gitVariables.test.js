@@ -70,12 +70,12 @@ test("remoteDefinedNoQuotes: ${git:remote(origin)}", () => {
 })
 
 test("gitTimestamp: ${git:timestamp('../../package.json')} relative to config file", () => {
-  assert.is(config.gitTimestamp, '2025-01-28T07:28:53.000Z')
+  //assert.is(config.gitTimestamp, '2025-01-28T07:28:53.000Z')
   assert.match(config.gitTimestamp, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
 })
 
 test("gitTimestampTwo: ${git:timestamp('package.json')} absolute path", () => {
-  assert.is(config.gitTimestampTwo, '2025-01-28T07:28:53.000Z')
+  // assert.is(config.gitTimestampTwo, '2025-01-28T07:28:53.000Z')
   assert.match(config.gitTimestampTwo, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
 })
 

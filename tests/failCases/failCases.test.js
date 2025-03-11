@@ -83,4 +83,61 @@ test('Allow undefined values', async () => {
 
 // Nested fallbacks ACCESS_TOKEN = "${file(asyncValue.js, ${env:MY_SECxRET, 'hi'}, ${self:sharedValue})}"
 
+const failConfig = {
+  noParams: '${file:}',
+  noParams2: '${file():}',
+  invalidYaml: '${file(invalid.yml)}',
+  invalidJson: '${file(invalid.json)}',
+  invalidJs: '${file(invalid.js)}',
+  invalidJs2: '${file(invalid2.js)}',
+  nonStandardExt: '${file(non-standard.ext)}',
+  unresolvable: '${unknown:}'
+}
+
+test('failConfig', async () => {
+  try {
+    await configorama(failConfig, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    // console.log('error', error)
+    assert.match(error.message, /invalid variable syntax/)
+  }
+})
+
+const envFailConfig = {
+  noAddress: '${env:}',
+}
+
+test('env failConfig', async () => {
+  try {
+    const x = await configorama(envFailConfig, {
+      configDir: dirname
+    })
+    console.log('x', x)
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    console.log('error', error)
+    assert.match(error.message, /Invalid variable syntax/)
+  }
+})
+
+const envFailConfig2 = {
+  nonStringAddress: '${env:${self:someObject}}',
+  someObject: {},
+}
+
+test('env ref is object', async () => {
+  try {
+    await configorama(envFailConfig2, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown')
+  } catch (error) {
+    console.log('error', error)
+    assert.match(error.message, /Invalid variable syntax/)
+  }
+})
+
 test.run()

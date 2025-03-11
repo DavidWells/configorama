@@ -14,17 +14,22 @@ const args = {
 }
 
 // Setup function
-const setup = () => {
-  const yamlFile = path.join(__dirname, 'syncApi.yml')
-  config = configorama.sync(yamlFile, {
-    options: args
-  })
-  order.push('two')
-  console.time('perf')
-  console.log(`-------------`)
-  console.log(`Value count`, Object.keys(config).length)
-  console.log(config)
-  console.log(`-------------`)
+const setup = async () => {
+  try {
+    const yamlFile = path.join(__dirname, 'syncApi.yml')
+    config = await configorama.sync(yamlFile, {
+      options: args
+    })
+    order.push('two')
+    console.time('perf')
+    console.log(`-------------`)
+    console.log(`Value count`, Object.keys(config).length)
+    console.log(config)
+    console.log(`-------------`)
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
 }
 
 // Teardown function

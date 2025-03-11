@@ -13,14 +13,19 @@ const setup = async () => {
     stage: 'dev',
   }
 
-  const configFile = path.join(__dirname, 'self.yml')
-  config = await configorama(configFile, {
-    options: args
-  })
-  console.log(`-------------`)
-  console.log(`Value count`, Object.keys(config).length)
-  console.log(config)
-  console.log(`-------------`)
+  try {
+    const configFile = path.join(__dirname, 'self.yml')
+    config = await configorama(configFile, {
+      options: args
+    })
+    console.log(`-------------`)
+    console.log(`Value count`, Object.keys(config).length)
+    console.log(config)
+    console.log(`-------------`)
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
 }
 
 // Teardown function

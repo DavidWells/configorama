@@ -15,16 +15,20 @@ const setup = async () => {
     stage: 'prod',
   }
 
-  const configFile = path.join(__dirname, 'functions.yml')
-
-  const rawConfig = await configorama(configFile, {
-    options: args
-  })
-  config = createTrackingProxy(rawConfig)
-  console.log(`-------------`)
-  console.log(`Value count`, Object.keys(config).length)
-  console.log(config)
-  console.log(`-------------`)
+  try {
+    const configFile = path.join(__dirname, 'functions.yml')
+    const rawConfig = await configorama(configFile, {
+      options: args
+    })
+    config = createTrackingProxy(rawConfig)
+    console.log(`-------------`)
+    console.log(`Value count`, Object.keys(config).length)
+    console.log(config)
+    console.log(`-------------`)
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
 }
 
 // Teardown function
