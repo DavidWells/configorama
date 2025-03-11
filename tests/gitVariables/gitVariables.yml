@@ -20,7 +20,11 @@ url: ${git:url}
 repoUrl: ${git:repoUrl}
 repoUrlDashed: ${git:repo-url}
 
+# Directory
 dir: ${git:dir}
+# https://github.com/DavidWells/configorama/tree/master/tests/gitVariables
+
+directory: ${git:directory}
 
 # Branch
 branch: ${git:branch}
@@ -42,3 +46,5 @@ tag: ${git:tag}
 describe: ${git:describe}
 
 gitTimestamp: ${git:timestamp('../../package.json')}
+
+gitTimestampTwo: ${git:timestamp('package.json')}

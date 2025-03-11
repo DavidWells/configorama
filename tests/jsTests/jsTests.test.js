@@ -4,6 +4,7 @@ const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../lib')
 process.env.envNumber = 100
+
 const args = {
   stage: 'dev',
   otherFlag: 'prod',

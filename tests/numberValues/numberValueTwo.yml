@@ -1,0 +1,8 @@
+########################
+# Number variables
+########################
+
+envVarToNumber: ${empty, env:envNumber | toNumber }
+envVarNumberAsString: ${env:envNumberTwo}
+envVarNumberAsStringFallback: ${empty, env:envNumberTwo}
+envVarNumberAsNumberToString: ${env:envNumberTwo | toNumber | toString}

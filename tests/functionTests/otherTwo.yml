@@ -1,0 +1,18 @@
+
+toUpperCase: ${'value' | toUpperCase }
+
+# self: variable declaration
+domainName: my-site.com
+domains:
+  prod:    api.${self:domainName}
+  staging: api-staging.${self:domainName}
+  dev:     api-dev.${self:domainName}
+resolvedDomainName: ${self:domains.${opt:stage}}
+
+# shorthand variable declaration
+domainNameTwo: my-site-two.com
+domainsTwo:
+  prod:    api.${domainNameTwo}
+  staging: api-staging.${domainNameTwo}
+  dev:     api-dev.${domainNameTwo}
+resolvedDomainNameTwo: ${domainsTwo.${opt:stage}}

@@ -3,6 +3,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../lib')
+const { createTrackingProxy, checkUnusedConfigValues } = require('../utils')
 
 let config
 
@@ -17,9 +18,11 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'fallbackValues.yml')
-  config = await configorama(configFile, {
+  const rawConfig = await configorama(configFile, {
     options: args
   })
+  // Wrap config in tracking proxy
+  config = createTrackingProxy(rawConfig)
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
@@ -28,6 +31,7 @@ const setup = async () => {
 
 // Teardown function
 const teardown = () => {
+  checkUnusedConfigValues(config)
   console.log(`-------------`)
 }
 
@@ -121,6 +125,18 @@ test('fallbackInFile:  ${empty, ${file(./config.json):KEY}}', () => {
 
 test("fallbackInFileNested: ${empty, ${file(./config.${opt:stage, 'dev'}.json):KEY }}", () => {
   assert.is(config.fallbackInFileNested, 'hi there dev')
+})
+
+test("fallbackNested", () => {
+  assert.is(config.fallbackNested, 'dev-secret')
+})
+
+test("fallbackNestedTwo", () => {
+  assert.is(config.fallbackNestedTwo, 'dev-secret')
+})
+
+test("fallbackSelfFour", () => {
+  assert.is(config.fallbackSelfFour, 'value')
 })
 
 test.run()

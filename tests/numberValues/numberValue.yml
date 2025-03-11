@@ -24,7 +24,7 @@ otherThree: ${empty, 'ninety-nine'}
 
 otherFour: ${empty, '_nine-nine_'}
 
-otherFive: ${empty, env:envNumber}
+otherFive: ${empty, env:envNumber | toNumber}
 
 numberZero: 0
 

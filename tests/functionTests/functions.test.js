@@ -3,6 +3,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../lib')
+const { createTrackingProxy, checkUnusedConfigValues } = require('../utils')
 
 let config
 
@@ -15,9 +16,11 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'functions.yml')
-  config = await configorama(configFile, {
+
+  const rawConfig = await configorama(configFile, {
     options: args
   })
+  config = createTrackingProxy(rawConfig)
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
@@ -26,6 +29,7 @@ const setup = async () => {
 
 // Teardown function
 const teardown = () => {
+  checkUnusedConfigValues(config)
   console.log(`-------------`)
 }
 
@@ -82,6 +86,28 @@ test("mergeObjects: ${merge(${object}, ${asyncObj})}", () => {
       yolo: 'hi'
     }
   })
+})
+
+test("mergeObjectsX: ${merge(${otherWW}, ${asyncObj})}", () => {
+  // console.log('config.mergeObjectsX', config.mergeObjectsX)
+  assert.equal(config.mergeObjectsX, {
+    haha: true,
+    whatever: { lol: { woot: 'wee' } },
+    test: true,
+    nested: { yolo: 'hi' }
+  })
+})
+
+test('mergeTestTwo', () => {
+  assert.equal(config.mergeTestTwo, 'OTHERSMASHEDCAPS')
+})
+
+test('md5', () => {
+  assert.equal(config.md5, '9cdfb439c7876e703e307864c9167a15')
+})
+
+test('merge', () => {
+  assert.equal(config.merge, 'hahawowowow')
 })
 
 test("subKey: ${mergeObjects.two}", () => {

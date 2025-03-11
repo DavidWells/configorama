@@ -3,6 +3,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../lib')
+const { createTrackingProxy, checkUnusedConfigValues } = require('../utils')
 
 let config
 
@@ -15,9 +16,11 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'filters.yml')
-  config = await configorama(configFile, {
+  const rawConfig = await configorama(configFile, {
     options: args
   })
+  // Wrap config in tracking proxy
+  config = createTrackingProxy(rawConfig)
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)
@@ -26,11 +29,52 @@ const setup = async () => {
 
 // Teardown function
 const teardown = () => {
+  checkUnusedConfigValues(config)
   console.log(`-------------`)
 }
 
 test.before(setup)
 test.after(teardown)
+
+test('deep equality', () => {
+  assert.equal(config, {
+    normalKey: 'value',
+    keyTwo: 'what-is-up',
+    keyThree: 'TheGooseIsLoose',
+    toUpperCaseString: 'VALUE',
+    toKebabCaseString: 'value-here',
+    originalStage: 'dev',
+    stageToUpper: 'DEV',
+    deepVarTest: 'What-is-up',
+    deepVarTestTwo: 'whatIsUp',
+    toKebabCase: 'the-goose-is-loose',
+    toCamelCase: 'whatIsUp',
+    valueWithAsterisk: '*.MYSTAGE.COM',
+    filter: 'VALUE',
+    valueWithSeparators: 'lol-hi-_ ha,ha',
+    inner: 'hi',
+    innerObject: { value: 'ha' },
+    filterUsingVariableInputs: 'lol-hi-_ ha,ha',
+    filterUsingVariableObjectInputs: 'lol-hi-_ ha,ha',
+    test: 'value',
+    splitTest: 'LOL-HI-_ HA,HA',
+    splitTestTwo: 'LOL-HI-_ HA,HA',
+    domainName: 'my-site.com',
+    domains: {
+      prod: 'api.my-site.com',
+      staging: 'api-staging.my-site.com',
+      dev: 'api-dev.my-site.com'
+    },
+    resolvedDomainName: 'api-dev.my-site.com',
+    fallbackTest: 'foo',
+    fallbackTestTwo: 'foo',
+    fooInCaps: 'FOO',
+    fooInLowerCase: 'foo',
+    fooInCapitalize: 'Foo',
+    fooInCamelCase: 'foo',
+    fooInKebabCase: 'foo'
+  })
+})
 
 test('toUpperCaseString normal value', () => {
   assert.is(config.toUpperCaseString, 'VALUE')

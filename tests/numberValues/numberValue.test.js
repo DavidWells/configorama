@@ -2,10 +2,12 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../lib')
+const { createTrackingProxy, checkUnusedConfigValues } = require('../utils')
 
 let config
 
 process.env.envNumber = 100
+console.log('typeof', typeof process.env.envNumber)
 
 // Setup function
 const setup = async () => {
@@ -16,17 +18,26 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'numberValue.yml')
-  config = await configorama(configFile, {
-    options: args
-  })
-  console.log(`-------------`)
-  console.log(`Value count`, Object.keys(config).length)
-  console.log(config)
-  console.log(`-------------`)
+  try {
+    const rawConfig = await configorama(configFile, {
+      options: args
+    })  
+    console.log('rawConfig', rawConfig)
+    // Wrap config in tracking proxy
+    config = createTrackingProxy(rawConfig)
+    console.log(`-------------`)
+    console.log(`Value count`, Object.keys(config).length)
+    console.log(config)
+    console.log(`-------------`)
+  } catch (err) {
+    console.log('err', err)
+    throw err
+  }
 }
 
 // Teardown function
 const teardown = () => {
+  checkUnusedConfigValues(config)
   console.log(`-------------`)
 }
 

@@ -10,7 +10,6 @@ process.env.envReference = 'env var'
 
 // Setup function
 const setup = async () => {
-  console.log('setup')
   const args = {
     stage: 'dev',
   }
@@ -70,9 +69,14 @@ test("remoteDefinedNoQuotes: ${git:remote(origin)}", () => {
   assert.is(config.remoteDefinedNoQuotes, 'https://github.com/DavidWells/configorama')
 })
 
-test("gitTimestamp: ${git:timestamp('package.json')}", () => {
+test("gitTimestamp: ${git:timestamp('../../package.json')} relative to config file", () => {
   assert.is(config.gitTimestamp, '2025-01-28T07:28:53.000Z')
   assert.match(config.gitTimestamp, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+})
+
+test("gitTimestampTwo: ${git:timestamp('package.json')} absolute path", () => {
+  assert.is(config.gitTimestampTwo, '2025-01-28T07:28:53.000Z')
+  assert.match(config.gitTimestampTwo, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
 })
 
 test.run()
