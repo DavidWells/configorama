@@ -1,5 +1,5 @@
 const path = require('path')
-const serverlessConfig = path.join(__dirname, 'x.yml')
+const serverlessConfig = path.join(__dirname, 'tests/_fixtures/git.yml')
 const args = require('minimist')(process.argv.slice(2))
 const configorama = require('./lib')
 const deepLog = require('./lib/utils/deep-log')

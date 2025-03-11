@@ -4,11 +4,15 @@
   "description": "Variable support for configuration files",
   "main": "lib/index.js",
   "files": [
+    "cli.js",
     "lib",
     "package.json",
     "package-lock.json",
     "README.md"
   ],
+  "bin": {
+    "configorama": "./cli.js"
+  },
   "scripts": {
     "docs": "node ./scripts/docs.js",
     "test": "npm run testlib && uvu tests \".*\\.test.js$\" ",

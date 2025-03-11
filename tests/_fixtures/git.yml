@@ -1,0 +1,4 @@
+
+# empty: 'jk im here'
+
+normalObject: ${git:timestamp('package.json')}
