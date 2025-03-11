@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const fs = require('fs')
-const path = require('path')
 const minimist = require('minimist')
 const Configorama = require('./lib/main')
 
@@ -80,7 +79,7 @@ const configorama = new Configorama(inputFile, options)
 
 // Process the configuration
 configorama.init(argv)
-  .then(config => {
+  .then((config) => {
     let output
 
     // Format the output
@@ -88,9 +87,10 @@ configorama.init(argv)
       case 'yaml':
       case 'yml':
         const YAML = require('./lib/parsers/yaml')
-        output = YAML.stringify(config)
+        output = YAML.dump(config)
         break
       case 'js':
+      case 'javascript':
         output = `module.exports = ${JSON.stringify(config, null, 2)}`
         break
       case 'json':
@@ -106,11 +106,11 @@ configorama.init(argv)
       console.log(output)
     }
   })
-  .catch(error => {
+  .catch((error) => {
     console.error(`Error processing configuration: ${inputFile}`)
     console.error(error.message)
     if (argv.debug) {
       console.error(error.stack)
     }
     process.exit(1)
-  }) 
+  })
