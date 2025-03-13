@@ -1,50 +1,48 @@
 ########################
-# Values Types
+# Git Variables
 ########################
 
-normalKey: value
-
-number: 1
-
-# owner/name
+# Repo owner/name. E.g. DavidWells/configorama
 repo: ${git:repo}
 repository: ${git:repository}
 
-# owner/name
+# Repo owner. E.g. DavidWells
 owner: ${git:owner}
 repoOwner: ${git:repoOwner}
 repoOwnerDashed: ${git:repo-owner}
 
-# Url
+# Url. E.g. https://github.com/DavidWells/configorama
 url: ${git:url}
 repoUrl: ${git:repoUrl}
 repoUrlDashed: ${git:repo-url}
 
-# Directory
+# Directory. E.g. https://github.com/DavidWells/configorama/tree/master/tests/gitVariables
 dir: ${git:dir}
-# https://github.com/DavidWells/configorama/tree/master/tests/gitVariables
-
 directory: ${git:directory}
 
 # Branch
 branch: ${git:branch}
 
-# Commits
+# Commits. E.g. 785fa6b982d67b079d53099d57c27fa87c075211
 commit: ${git:commit}
 
+# Sha1. E.g. 785fa6b
 sha1: ${git:sha1}
 
+# Message. E.g. 'Initial commit'
 message: ${git:message}
 
-# Remotes
+# Remotes. E.g. https://github.com/DavidWells/configorama
 remote: ${git:remote}
 remoteDefined: ${git:remote('origin')}
 remoteDefinedNoQuotes: ${git:remote(origin)}
 
-# Tags
+# Tags. E.g. v0.5.2-1-g785fa6b
 tag: ${git:tag}
+# Describe. E.g. v0.5.2-1-g785fa6b
 describe: ${git:describe}
 
-gitTimestamp: ${git:timestamp('../../package.json')}
-
-gitTimestampTwo: ${git:timestamp('package.json')}
+# Timestamp. E.g. 2025-01-28T07:28:53.000Z
+gitTimestampRelativePath: ${git:timestamp('../../package.json')}
+# Timestamp. E.g. 2025-01-28T07:28:53.000Z
+gitTimestampAbsolutePath: ${git:timestamp('package.json')}

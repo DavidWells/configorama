@@ -80,6 +80,9 @@ const config = configorama.sync(myConfigFilePath, {
 
 ```yml
 apiKey: ${env:SECRET_KEY}
+
+# Fallback to default value if env var not found
+apiKeyWithFallback: ${env:SECRET_KEY, 'defaultApiKey'}
 ```
 
 ### CLI option flags
@@ -90,6 +93,9 @@ bar: ${opt:stage}
 
 # Composed example makes `foo: dev-hello`
 foo: ${opt:stage}-hello
+
+# You can also provide a default value. If no --stage flag is provided, it will use 'dev'
+foo: ${opt:stage, 'dev'}
 ```
 
 ### Self references
@@ -97,26 +103,34 @@ foo: ${opt:stage}-hello
 ```yml
 foo: bar
 
+zaz:
+  matazaz: 1
+  wow:
+    cool: 2
+
 # Self file reference. Resolves to `bar`
 one: ${self:foo}
 
 # Shorthand self reference. Resolves to `bar`
-two: ${foo}
+two: ${foo} 
+
+# Dot prop reference will traverse the object. Resolves to `2`
+three: ${zaz.wow.cool}
 ```
 
 ### File references
 
 ```yml
-# import full yml/json/toml file via relative path
-yamlFileRef: ${file(./subFile.yml)}
+# Import full yml/json/toml file via relative path
+fileRef: ${file(./subFile.yml)}
 
-# import sub values from files. This imports other-config.yml `topLevel:` value
-yamlFileValue: ${file(./other-config.yml):topLevel}
+# Import sub values from files. This imports other-config.yml `topLevel:` value
+fileValue: ${file(./other-config.yml):topLevel}
 
-# import sub values from files. This imports other-config.json `nested.value` value
-yamlFileValueSubKey: ${file(./other-config.json):nested.value}
+# Import sub values from files. This imports other-config.json `nested.value` value
+fileValueSubKey: ${file(./other-config.json):nested.value}
 
-# fallback to default value if file not found
+# Fallback to default value if file not found
 fallbackValueExample: ${file(./not-found.yml), 'fall back value'}
 ```
 
@@ -131,46 +145,74 @@ asyncJSValue: ${file(./async-value.js)}
 
 ```js
 /* async-value.js */
-module.exports = (config) => {
-  return fetchSecretsFromRemoteStore()
-}
-
-function fetchSecretsFromRemoteStore() {
-  return delay(1000).then(() => {
-    return Promise.resolve('asyncval')
-  })
-}
-
 function delay(t, v) {
   return new Promise((resolve) => setTimeout(resolve.bind(null, v), t))
 }
+
+async function fetchSecretsFromRemoteStore(config) {
+  await delay(1000)
+  return 'asyncval'
+}
+
+module.exports = fetchSecretsFromRemoteStore
 ```
 
 ### Git references
 
 Resolve values from `cwd` git data.
 
+<!-- doc-gen CODE src=tests/gitVariables/gitVariables.yml -->
 ```yml
+########################
+# Git Variables
+########################
+
+# Repo owner/name. E.g. DavidWells/configorama
+repo: ${git:repo}
 repository: ${git:repository}
 
-describe: ${git:describe}
+# Repo owner. E.g. DavidWells
+owner: ${git:owner}
+repoOwner: ${git:repoOwner}
+repoOwnerDashed: ${git:repo-owner}
 
+# Url. E.g. https://github.com/DavidWells/configorama
+url: ${git:url}
+repoUrl: ${git:repoUrl}
+repoUrlDashed: ${git:repo-url}
+
+# Directory. E.g. https://github.com/DavidWells/configorama/tree/master/tests/gitVariables
+dir: ${git:dir}
+directory: ${git:directory}
+
+# Branch
 branch: ${git:branch}
 
+# Commits. E.g. 785fa6b982d67b079d53099d57c27fa87c075211
 commit: ${git:commit}
 
+# Sha1. E.g. 785fa6b
 sha1: ${git:sha1}
 
+# Message. E.g. 'Initial commit'
 message: ${git:message}
 
+# Remotes. E.g. https://github.com/DavidWells/configorama
 remote: ${git:remote}
-
 remoteDefined: ${git:remote('origin')}
-
 remoteDefinedNoQuotes: ${git:remote(origin)}
 
-repoUrl: ${git:repoUrl}
+# Tags. E.g. v0.5.2-1-g785fa6b
+tag: ${git:tag}
+# Describe. E.g. v0.5.2-1-g785fa6b
+describe: ${git:describe}
+
+# Timestamp. E.g. 2025-01-28T07:28:53.000Z
+gitTimestampRelativePath: ${git:timestamp('../../package.json')}
+# Timestamp. E.g. 2025-01-28T07:28:53.000Z
+gitTimestampAbsolutePath: ${git:timestamp('package.json')}
 ```
+<!-- end-doc-gen -->
 
 ### Filters (experimental)
 

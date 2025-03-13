@@ -4,75 +4,74 @@
 
 normalKey: full
 
+# Import full yml file object via relative path
 yamlFullFile: ${file(./_ymlfull.yml)}
 
-# import full yml file object
+# Import full yml file object via absolute path
 yamlFullFileNoPath: ${file(_ymlfull.yml)}
 
-# import full yml file object with variable filename
+# Import full yml file object with variable filename. 
+# normalKey === 'full' so this will resolve to _ymlfull.yml
 yamlFullFileNestedRef: ${file(./_yml${self:normalKey}.yml)}
 
 # fallback to default value if file not found
 yamlFullFileMissing: ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}
 
-# import partial yml file key value
+# Import partial yml file key value
 yamlPartialTopLevelKey: ${file(./_ymlpartial.yml):topLevel}
-
-# import partial yml file no relative path
+# Import partial yml file no relative path
 yamlPartialTopLevelKeyNoPath: ${file(_ymlpartial.yml):topLevel}
 
-# import partial yml file nested key value pair
+# Import partial yml file nested key value pair
 yamlPartialSecondLevelKey: ${file(./_ymlpartial.yml):nested.value}
-
-# import partial yml file triple nested key value pair
+# Import partial yml file triple nested key value pair
 yamlPartialThirdLevelKey: ${file(./_ymlpartial.yml):nested.again.value}
-
-# import partial yml file triple nested key value pair (no relative path)
+# Import partial yml file triple nested key value pair (no relative path)
 yamlPartialThirdLevelKeyNoPath: ${file(_ymlpartial.yml):nested.again.value}
 
-# import partial yml file array value
+# Import partial yml file array value
 yamlPartialArrayRef: ${file(./_ymlpartial.yml):array.1}
-
+# Import partial yml file array object value
 yamlPartialArrayObjectRef: ${file(./_ymlpartial.yml):arrayTwo.1.object}
-
+# Import partial yml file array object value key
 yamlPartialArrayObjectRefValue: ${file(./_ymlpartial.yml):arrayTwo.1.object.key}
 
 ########################
 # Values from JSON files
 ########################
-
 jsonFullFile: ${file(./_jsonfull.json)}
-
+# Import missing file with fallback value
 jsonFullFileMissing: ${file(./_madeup-file.json), 'jsonFullFileMissingDefaultValue'}
-
+# Import partial json file key value
 jsonPartialTopLevelKey: ${file(./_jsonpartial.json):topLevel}
-
+# Import partial json file nested dot prop key value
 jsonPartialSecondLevelKey: ${file(./_jsonpartial.json):nested.value}
-
+# Import partial json file triple nested dot prop key value
 jsonPartialThirdLevelKey: ${file(./_jsonpartial.json):nested.again.value}
-
+# Import partial json file array value
 jsonPartialArrayRef: ${file(./_jsonpartial.json):array.0}
 
 ########################
-# Nested Stage from file ref
+# Dynamic File Names
 ########################
-
-stageSpecific: ${file(./config.${opt:stage}.json)}
-
-stageSpecificTwo: ${file(./config.${opt:otherFlag}.json)}
+# Here we resolve the inner config variable then read its file
+# With --stage dev, this will resolve to config.dev.json
+stageSpecificViaFlag: ${file(./config.${opt:stage}.json)}
+# With MY_ENV_VAR=prod, this will resolve to config.prod.json
+stageSpecificViaEnvVar: ${file(./config.${env:MY_ENV_VAR}.json)}
+# With --otherFlag, this will resolve to config.otherFlag.json
+stageSpecificViaFlagTwo: ${file(./config.${opt:otherFlag}.json)}
 
 ###############
 # Allow for single or double quote around file path
 ###############
-
+noQuotes: ${file(./config.${opt:stage}.json)}
 singleQuotes: ${file('./config.${opt:stage}.json')}
-
 doubleQuotes: ${file("./config.${opt:otherFlag}.json")}
 
 ###############
 # Pass args into file
 ###############
-
 additionalValues: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
 
 # TODO fix file path refs

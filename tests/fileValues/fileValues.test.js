@@ -3,11 +3,13 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../src')
+const { deepLog, createTrackingProxy, checkUnusedConfigValues } = require('../utils')
 
 let config
 
 process.env.envNumber = 100
 process.env.MY_SECRET = 'lol hi there'
+process.env.MY_ENV_VAR = 'prod'
 
 // Setup function
 const setup = async () => {
@@ -19,12 +21,15 @@ const setup = async () => {
 
   try {
     const configFile = path.join(__dirname, 'fileValues.yml')
-    config = await configorama(configFile, {
+
+    const rawConfig = await configorama(configFile, {
       options: args
     })
+
+    config = createTrackingProxy(rawConfig)
     console.log(`-------------`)
     console.log(`Value count`, Object.keys(config).length)
-    console.log(config)
+    deepLog('config', config)
     console.log(`-------------`)
   } catch (err) {
     console.log('err', err)
@@ -34,6 +39,7 @@ const setup = async () => {
 
 // Teardown function
 const teardown = () => {
+  checkUnusedConfigValues(config)
   console.log(`-------------`)
 }
 
@@ -97,14 +103,34 @@ test('yamlPartialArrayObjectRefValue', () => {
   assert.equal(config.yamlPartialArrayObjectRefValue, 'helloTwo')
 })
 
-test('stageSpecific', () => {
-  assert.equal(config.stageSpecific, {
+test('jsonFullFile', () => {
+  assert.equal(config.jsonFullFile, {
+    fullJson: 'fullJsonValue',
+    fullJsonObject: {
+      foo: true,
+      bar: 'zaz',
+      opt: 'dev',
+      optWithDefault: 'defaultOptFlag',
+      envVar: 'fallback',
+      envVarWithDefault: 'defaultEnvValue'
+    }
+  })
+})
+
+test('stageSpecificViaFlag', () => {
+  assert.equal(config.stageSpecificViaFlag, {
     'CREDS': 'dev creds here'
   })
 })
 
-test('stageSpecificTwo', () => {
-  assert.equal(config.stageSpecificTwo, {
+test('stageSpecificViaEnvVar', () => {
+  assert.equal(config.stageSpecificViaEnvVar, {
+    'CREDS': 'prod creds here'
+  })
+})
+
+test('stageSpecificViaFlagTwo', () => {
+  assert.equal(config.stageSpecificViaFlagTwo, {
     'CREDS': 'prod creds here'
   })
 })
