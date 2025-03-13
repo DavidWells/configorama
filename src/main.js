@@ -132,6 +132,8 @@ class Configorama {
 
       // set config objects
       this.config = configObject
+      // Keep a copy of the original file contents
+      this.originalString = fileContents
       // Keep a copy
       this.originalConfig = cloneDeep(configObject)
       // Set configPath for file references
@@ -375,6 +377,13 @@ class Configorama {
     this.options = cliOpts || {}
     const configoramaOpts = this.opts
     const originalConfig = this.originalConfig
+
+    /* If no variables found just return early */
+    if (this.originalString && !this.originalString.match(this.variableSyntax)) {
+      return originalConfig
+    }
+
+    /* Parse variables */
     return this.initialCall(() => {
       return Promise.resolve()
         .then(() => {
