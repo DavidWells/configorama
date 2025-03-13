@@ -1,5 +1,5 @@
 {
   "slug": "nice",
   "resourcePrefix": "Nice",
-  "CREDS": "prod creds here"
+  "CREDS": "dev creds here"
 }

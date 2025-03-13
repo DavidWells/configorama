@@ -1,0 +1,4 @@
+provider:
+  name: aws
+  environment:
+    MY_SECRET: ${file(./config.${opt:stage, 'dev'}.json):CREDS}

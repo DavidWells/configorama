@@ -42,7 +42,7 @@ const { getFallbackString, verifyVariable } = require('./utils/variableUtils')
 const { encodeUnknown, decodeUnknown } = require('./utils/unknownValues')
 const { mergeByKeys } = require('./utils/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
-
+const { findNestedVariables } = require('./utils/find-nested-variables')
 /**
  * Maintainer's notes:
  *
@@ -347,6 +347,10 @@ class Configorama {
         return Object.keys(o).reduce((c, k) => ((c[k.toUpperCase()] = o[k]), c), {}) // eslint-disable-line
       },
       md5: md5Function,
+      // ServiceName@${replace(${ self : version }, /\\./gi, - )}
+      // replace: (value, search, replace) => {
+      //   return value.replace(search, replace)
+      // },
     }
 
     // Apply user defined functions
@@ -1189,10 +1193,11 @@ Missing Value ${missingValue} - ${matchedString}
       return false
     })
     // console.log('found', found)
-
+    // console.log('resolverFunction', resolverFunction)
     if (found && resolverFunction) {
       // TODO finalize resolverFunction API
-      const valuePromise = resolverFunction(variableString, this.options, this.config, valueObject).then((val) => {
+      const valuePromise = resolverFunction(variableString, this.options, this.config, valueObject)
+        .then((val) => {
         // console.log('VALUE', val)
         if (
           val === null ||
@@ -1202,6 +1207,8 @@ Missing Value ${missingValue} - ${matchedString}
         ) {
           // console.log('variableString', variableString)
           const cleanV = cleanVariable(propertyString, this.variableSyntax)
+          // console.log('cleanV', cleanV)
+          // console.log('nestedVars', nestedVars)
           const valueCount = splitByComma(cleanV)
 
           if (variableString.match(/deep\:/)) {
@@ -1219,9 +1226,12 @@ Missing Value ${missingValue} - ${matchedString}
               }
             }
           }
+          // console.log('valueCount', valueCount)
           // TODO throw on empty values?
           // No fallback value found AND this is undefined, throw error
-          if (valueCount.length === 1) {
+          const nestedVars = findNestedVariables(propertyString, this.variableSyntax)
+          const noNestedVars = nestedVars.length < 2
+          if (valueCount.length === 1 && noNestedVars) {
             throw new Error(`
 Unable to resolve variable ${propertyString} from "${valueObject.originalSource}" at path ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'na'}
 \nFix this reference, your inputs and/or provide a valid fallback value.
@@ -1239,6 +1249,7 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
         /** */
         // No filters found. return value
         if (!newHasFilter) {
+          // console.log('no newHasFilter', val, valueObject)
           return Promise.resolve(val)
         }
 
