@@ -23,6 +23,7 @@ Example: \${env:MY_ENV_VAR}
 }
 
 module.exports = {
+  type: 'env',
   match: envRefSyntax,
   resolver: getValueFromEnv
 }

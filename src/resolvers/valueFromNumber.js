@@ -10,6 +10,7 @@ function getValueFromNumber(variableString) {
 }
 
 module.exports = {
+  type: 'number',
   match: isNumberVariable,
   resolver: getValueFromNumber
 }

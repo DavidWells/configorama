@@ -61,11 +61,12 @@ class PromiseTracker {
     }
     // console.log('SET PROMISE', nameSpacedVariable)
 
-    promise.waitList = `${variable} waited on by: ${specifier} ${nameSpacedVariable}`
+    promise.waitList = `Var [${variable}] waited on by: ${specifier}. key: ${nameSpacedVariable}`
     promise.state = 'pending'
     promise.then( // creates a promise with the following effects but that we otherwise ignore
       () => { promise.state = 'resolved' },
-      () => { promise.state = 'rejected' })
+      () => { promise.state = 'rejected' }
+    )
 
     this.promiseList.push(promise)
 

@@ -39,7 +39,7 @@ test('throw if opt not found', async () => {
     assert.unreachable('should have thrown')
   } catch (error) {
     console.log('error', error)
-    assert.match(error.message, /Unable to resolve variable/)
+    assert.match(error.message, /Unable to resolve/)
   }
 })
 

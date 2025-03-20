@@ -13,6 +13,8 @@ function getValueFromOptions(variableString, options) {
 }
 
 module.exports = {
+  type: 'options',
+  prefix: 'opt',
   match: optRefSyntax,
   resolver: getValueFromOptions
 }

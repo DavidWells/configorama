@@ -294,6 +294,8 @@ async function getGitRemote(name = 'origin') {
 
 module.exports = function createGitResolver(cwd) {
   return {
+    type: 'git',
+    prefix: 'git',
     match: gitVariableSyntax,
     resolver: createResolver(cwd)
   }
