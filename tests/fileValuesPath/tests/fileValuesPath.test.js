@@ -16,9 +16,14 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'fileValuesPath.yml')
-  config = await configorama(configFile, {
-    options: args
-  })
+  try {
+    config = await configorama(configFile, {
+      options: args
+    })
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)
   console.log(config)

@@ -16,9 +16,14 @@ const setup = async () => {
 
   const yamlFile = path.join(__dirname, 'asyncValue.yml')
   console.time('perf')
-  config = await configorama(yamlFile, {
-    options: args
-  })
+  try {
+    config = await configorama(yamlFile, {
+      options: args
+    })
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
 
   console.log(`-------------`)
   console.log(`Value count`, Object.keys(config).length)

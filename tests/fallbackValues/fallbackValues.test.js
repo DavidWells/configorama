@@ -18,15 +18,20 @@ const setup = async () => {
   }
 
   const configFile = path.join(__dirname, 'fallbackValues.yml')
-  const rawConfig = await configorama(configFile, {
-    options: args
-  })
-  // Wrap config in tracking proxy
-  config = createTrackingProxy(rawConfig)
-  console.log(`-------------`)
-  console.log(`Value count`, Object.keys(config).length)
-  console.log(config)
-  console.log(`-------------`)
+  try {
+    const rawConfig = await configorama(configFile, {
+      options: args
+    })
+    // Wrap config in tracking proxy
+    config = createTrackingProxy(rawConfig)
+    console.log(`-------------`)
+    console.log(`Value count`, Object.keys(config).length)
+    console.log(config)
+    console.log(`-------------`)
+  } catch (err) {
+    console.log('err', err)
+    process.exit(1)
+  }
 }
 
 // Teardown function
