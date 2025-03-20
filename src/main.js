@@ -1,6 +1,11 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
+/*
+console.log = () => {}
+// process.exit(1)
+/** */
+
 const promiseFinallyShim = require('promise.prototype.finally').shim()
 // @TODO only import lodash we need
 
@@ -105,6 +110,7 @@ class Configorama {
     } else if (variableSyntax instanceof RegExp) {
       varRegex = variableSyntax
     }
+    // console.log('varRegex', varRegex)
     this.variableSyntax = varRegex
 
     // Set initial config object to populate
@@ -130,6 +136,7 @@ class Configorama {
         this.opts
       )
 
+      this.configFilePath = fileOrObject
       // set config objects
       this.config = configObject
       // Keep a copy of the original file contents
@@ -167,6 +174,8 @@ class Configorama {
        * // or ${self:otherKeyInConfig}
        */
       {
+        type: 'self',
+        prefix: 'self',
         match: selfRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           return this.getValueFromSelf(varString, o, x, pathValue)
@@ -179,6 +188,8 @@ class Configorama {
        * ${file(pathToFile.yml), "fallbackValue"}
        */
       {
+        type: 'file',
+        prefix: 'file',
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           // console.log('pathValue getValueFromFile', pathValue)
@@ -199,8 +210,10 @@ class Configorama {
       getValueFromString,
       /* Resolve deep references */
       {
+        type: 'deep',
         match: deepRefSyntax,
-        resolver: (varString) => {
+        resolver: (varString, o, x, pathValue) => {
+          // console.log('>>>>>getValueFromDeep', varString)
           return this.getValueFromDeep(varString)
         },
       },
@@ -210,10 +223,13 @@ class Configorama {
 
     /* Nicer self: references. Match key in object */
     const fallThroughSelfMatcher = {
+      type: 'fallthrough',
       match: (varString, fullObject, valueObject) => {
-        // console.log('fallthrough varString', varString)
-        // console.log('fallthrough valueObject', valueObject)
-        // console.log('fullObject', fullObject)
+        /*
+        console.log('fallthrough varString', varString)
+        console.log('fallthrough valueObject', valueObject)
+        console.log('fullObject', fullObject)
+        /** */
         /* its file ref so we need to shift lookup for self in nested files */
         if (valueObject.isFileRef) {
           const exists = dotProp.get(fullObject, varString)
@@ -231,8 +247,14 @@ class Configorama {
         const startOf = varString.split('.')
         return fullObject[startOf[0]]
       },
-      resolver: (varString, o, x, pathValue) => {
-        return this.getValueFromSelf(varString, o, x, pathValue)
+      resolver: (varString, options, config, pathValue) => {
+        /*
+        console.log('fallthrough resolver', varString)
+        console.log('fallthrough options', options)
+        console.log('fallthrough config', config)
+        console.log('fallthrough pathValue', pathValue)
+        /** */
+        return this.getValueFromSelf(varString, options, config, pathValue)
       },
     }
 
@@ -244,6 +266,9 @@ class Configorama {
     /* attach self matcher last */
     this.variableTypes = this.variableTypes.concat(fallThroughSelfMatcher)
 
+    this.variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
+    // console.log('this.variablesKnownTypes', this.variablesKnownTypes)
+    // process.exit(1)
     // Additional filters on values. ${thing | filterFunction}
     this.filters = {
       capitalize: (val) => {
@@ -384,7 +409,7 @@ class Configorama {
 
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
-      return originalConfig
+      return Promise.resolve(originalConfig)
     }
 
     /* Parse variables */
@@ -416,7 +441,7 @@ class Configorama {
                   // console.log('RAW FUNCTION', rawFunction)
                   const funcString = rawValue.replace(/> function /g, '')
                   // console.log('funcString', funcString)
-                  const func = cleanVariable(funcString, varSyntax, true)
+                  const func = cleanVariable(funcString, varSyntax, true, `init ${this.callCount}`)
                   const funcVal = transform(func)
                   const hasObjectRef = rawValue.match(/\.\S*$/)
                   if (hasObjectRef && typeof funcVal === 'object') {
@@ -497,7 +522,7 @@ class Configorama {
     let replaceVal = funcValue
     if (typeof funcValue === 'string') {
       const replaceIt = variableString.replace(hasFunc[0], funcValue)
-      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true)
+      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
     }
 
     // If wrapped in outer function, recurse
@@ -573,7 +598,7 @@ class Configorama {
       }
       leaf.originalSource = originalValue
       if (originalValue && isString(originalValue)) {
-        const varString = cleanVariable(originalValue, this.variableSyntax)
+        const varString = cleanVariable(originalValue, this.variableSyntax, true, `getProperties ${this.callCount}`)
         if (varString.match(fileRefSyntax)) {
           leaf.isFileRef = true
         }
@@ -677,7 +702,7 @@ class Configorama {
       // console.log('match', match)
       return {
         match: match,
-        variable: cleanVariable(match, this.variableSyntax),
+        variable: cleanVariable(match, this.variableSyntax, true, `getMatches ${this.callCount}`),
       }
     })
   }
@@ -688,9 +713,9 @@ class Configorama {
    * @returns {Promise[]} Promises for the eventual populated values of the given matches
    */
   populateMatches(matches, valueObject, root) {
-    // console.log('matches', matches)
+    // console.log('populateMatches matches', matches)
     return map(matches, (match) => {
-      return this.splitAndGet(match.variable, valueObject, root)
+      return this.splitAndGet(match.variable, valueObject, root, match.match)
     })
   }
   /**
@@ -748,7 +773,10 @@ class Configorama {
     }
     const populations = this.populateMatches(matches, valueObject, root)
     return Promise.all(populations)
-      .then((results) => this.renderMatches(valueObject, matches, results))
+      .then((results) => {
+        // console.log('populateMatches results', results)
+        return this.renderMatches(valueObject, matches, results)
+      })
       .then((result) => {
         // console.log('renderMatches result', result)
         if (root && isArray(matches)) {
@@ -775,7 +803,7 @@ class Configorama {
    * @param property The original property string the given variable was extracted from
    * @returns {Promise} A promise resolving to the final value of the given variable
    */
-  splitAndGet(variable, valueObject, root) {
+  splitAndGet(variable, valueObject, root, originalVar) {
     if (DEBUG) {
       console.log('>>>>>>>> Split and Get', variable)
       console.log('valueObject', valueObject)
@@ -788,19 +816,20 @@ class Configorama {
       // valueObject.value = `> function ${valueObject.value}`
     }*/
 
-    const parts = splitByComma(variable)
+    const parts = splitByComma(variable, this.variableSyntax)
     if (DEBUG) {
       console.log('parts', parts)
       console.log('parts variable:', variable)
-      console.log('parts property:', valueObject.value)
+      console.log('parts originalVar:', originalVar)
+      console.log('parts property:', valueObject)
       console.log('All parts:', parts)
       console.log('-----')
     }
     if (parts.length <= 1) {
-      return this.getValueFromSource(parts[0], valueObject, 'splitAndGet')
+      return this.getValueFromSource(parts[0], valueObject, 'splitAndGet', originalVar)
     }
     // More than 2 parts, so we need to overwrite
-    return this.overwrite(parts, valueObject)
+    return this.overwrite(parts, valueObject, originalVar)
   }
   /**
    * Populate a given property, given the matched string to replace and the value to replace the
@@ -947,7 +976,7 @@ class Configorama {
         missingValue = this.deep[i]
       }
 
-      const cleanVar = cleanVariable(property, this.variableSyntax)
+      const cleanVar = cleanVariable(property, this.variableSyntax, true, `populateVariable fallback ${this.callCount}`)
       const cleanVarNoFilters = cleanVar.split('|')[0]
       const splitVars = splitByComma(cleanVarNoFilters)
       const nestedVar = findNestedVariable(splitVars, valueObject.originalSource)
@@ -979,7 +1008,7 @@ Missing Value ${missingValue} - ${matchedString}
 
     if (property && typeof property === 'string') {
       // console.log('property', property)
-      const prop = cleanVariable(property, this.variableSyntax)
+      const prop = cleanVariable(property, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
       // console.log('prop', prop)
       if (property.match(/^> function /g) && prop) {
         // console.log('func prop', property)
@@ -1083,25 +1112,49 @@ Missing Value ${missingValue} - ${matchedString}
    * @returns {Promise.<TResult>|*} A promise resolving to the first validly populating variable
    *  in the given variable strings string.
    */
-  overwrite(variableStrings, valueObject) {
+  overwrite(variableStrings, valueObject, originalVar) {
     const propertyString = valueObject.value
-    // console.log('variableStrings', variableStrings)
+    /*
+    console.log('overwrite variableStrings', variableStrings)
+    console.log('overwrite valueObject', valueObject)
+    console.log('overwrite originalVar', originalVar)
+    // process.exit(1)
+    /** */
+
+    if (variableStrings.length === 2) {
+      const firstValue = variableStrings[0]
+      const secondValue = variableStrings[1]
+      if (
+        isString(firstValue) && firstValue.match(this.variablesKnownTypes) 
+        && isString(secondValue) && !secondValue.match(this.variablesKnownTypes) && !secondValue.match(this.variableSyntax)
+      ) {
+        if (!isSurroundedByQuotes(secondValue) && !/^-?\d+(\.\d+)?$/.test(secondValue) && !startsWithQuotedPipe(secondValue)) {
+          variableStrings = [firstValue, ensureQuote(secondValue)]
+        }
+        // console.log('new overwrite variableStrings', variableStrings)
+      }
+    }
+
     // console.log('propertyString', typeof propertyString)
     const variableValues = variableStrings.map((variableString) => {
       // This runs on nested variable resolution
       return this.getValueFromSource(variableString, valueObject, 'overwrite')
     })
+    
     // console.log('variableValues', variableValues)
     return Promise.all(variableValues).then((values) => {
       let deepPropertyStr = propertyString
       let deepProperties = 0
+      // console.log('overwrite values', valuesToUse)
       values.forEach((value, index) => {
         // console.log('───────────────────────────────> value', value)
         if (isString(value) && value.match(this.variableSyntax)) {
           deepProperties += 1
           // console.log('makeDeepVariable overwrite', value)
-          const deepVariable = this.makeDeepVariable(value)
-          const newValue = cleanVariable(deepVariable, this.variableSyntax)
+          const deepVariable = this.makeDeepVariable(value, 'via overwrite')
+          // console.log('deepVariable', deepVariable)
+          const newValue = cleanVariable(deepVariable, this.variableSyntax, true, `overwrite ${this.callCount}`)
+          // console.log(`overwrite newValue ${variableStrings[index]}`, newValue)
           // console.log('variableStrings', variableStrings)
           deepPropertyStr = deepPropertyStr.replace(variableStrings[index], newValue)
           // console.log('deepPropertyString', deepPropertyStr)
@@ -1117,11 +1170,11 @@ Missing Value ${missingValue} - ${matchedString}
    * @param variableString The variable string to retrieve a value for.
    * @returns {Promise.<TResult>|*} A promise resolving to the given variables value.
    */
-  getValueFromSource(variableString, valueObject, caller) {
-    // console.log('getValueFromSource caller', caller)
+  getValueFromSource(variableString, valueObject, caller, originalVar) {
+    // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
-    // console.log('getValueFromSource propertyString', propertyString)
+    // console.log('getValueFromSrc propertyString', propertyString)
     // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
     if (this.tracker.contains(variableString)) {
       // console.log('try to get', variableString)
@@ -1131,7 +1184,7 @@ Missing Value ${missingValue} - ${matchedString}
     let newHasFilter
     // Else lookup value from various sources
     if (DEBUG) {
-      console.log(`>>>>> getValueFromSource() call - ${caller}`)
+      console.log(`>>>>> getValueFromSrc() call - ${caller}`)
       console.log('variableString:', variableString)
       console.log('propertyString:', propertyString)
       console.log('pathValue:', pathValue)
@@ -1143,7 +1196,7 @@ Missing Value ${missingValue} - ${matchedString}
     let promiseKey
     // TODO match () or pipes |
     if (filters) {
-      const string = cleanVariable(propertyString, this.variableSyntax, true)
+      const string = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc filter ${this.callCount}`)
       // console.log('string', string)
       const deeperValue = getTextAfterOccurance(string, variableString)
       // console.log('deeperValue', deeperValue)
@@ -1176,28 +1229,49 @@ Missing Value ${missingValue} - ${matchedString}
     }
 
     let resolverFunction
+    let resolverType
     /* Loop over variables and set getterFunction when match found. */
     const found = this.variableTypes.some((r, i) => {
       if (r.match instanceof RegExp && variableString.match(r.match)) {
         // set resolver function
         resolverFunction = r.resolver
+        resolverType = r.type || 'unknown'
         return true
       } else if (typeof r.match === 'function') {
         // TODO finalize match API
         if (r.match(variableString, this.config, valueObject)) {
           // set resolver function
           resolverFunction = r.resolver
+          resolverType = r.type || 'unknown'
           return true
         }
       }
       return false
     })
-    // console.log('found', found)
+    /*
+    // console.log('found variable resolver', found)
     // console.log('resolverFunction', resolverFunction)
+    /** */
+
     if (found && resolverFunction) {
+      /*
+      console.log(`----------Resolver [${resolverType}]----------------------`)
+      console.log(`Resolver TYPE [${resolverType}]`, caller)
+      console.log('WITH INPUTS ▼')
+      console.log('variableString: ', variableString)
+      console.log('this.options:   ', this.options)
+      console.log('this.config:    ', this.config)
+      console.log('valueObject:    ', valueObject)
+      // process.exit(1)
+      /** */
       // TODO finalize resolverFunction API
-      const valuePromise = resolverFunction(variableString, this.options, this.config, valueObject)
-        .then((val) => {
+      const valuePromise = resolverFunction(
+        variableString,
+        this.options,
+        this.config,
+        valueObject,
+
+      ).then((val) => {
         // console.log('VALUE', val)
         if (
           val === null ||
@@ -1205,8 +1279,9 @@ Missing Value ${missingValue} - ${matchedString}
           /* match deep refs as empty {}, they need resolving via functions */
           (typeof val === 'object' && isEmpty(val) && variableString.match(/deep\:/))
         ) {
+          
+          const cleanV = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc resolverFunction ${this.callCount}`)
           // console.log('variableString', variableString)
-          const cleanV = cleanVariable(propertyString, this.variableSyntax)
           // console.log('cleanV', cleanV)
           // console.log('nestedVars', nestedVars)
           const valueCount = splitByComma(cleanV)
@@ -1222,6 +1297,7 @@ Missing Value ${missingValue} - ${matchedString}
               // console.log('deepIndexValue', deepIndexValue)
               // console.log('FINAL', `${deepIndexValue}.${deepRef}`)
               if (deepIndexValue) {
+                // console.log('> RESOLVER RETURN newValue 1', `${deepIndexValue}.${deepRef}`)
                 return Promise.resolve(`${deepIndexValue}.${deepRef}`)
               }
             }
@@ -1230,13 +1306,20 @@ Missing Value ${missingValue} - ${matchedString}
           // TODO throw on empty values?
           // No fallback value found AND this is undefined, throw error
           const nestedVars = findNestedVariables(propertyString, this.variableSyntax)
+          // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
           if (valueCount.length === 1 && noNestedVars) {
+            const configFilePath = (this.configFilePath) ? ` in ${this.configFilePath}` : ''
             throw new Error(`
-Unable to resolve variable ${propertyString} from "${valueObject.originalSource}" at path ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'na'}
+Unable to resolve configuration variable
+
+  Value  "${propertyString}" 
+  From   "${valueObject.originalSource}" 
+  At location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'na'}${configFilePath}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
+          // console.log('> RESOLVER RETURN newValue 2', val)
           // no value resolved but fallback value exists, keep moving on
           return Promise.resolve(val)
         }
@@ -1250,6 +1333,7 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
         // No filters found. return value
         if (!newHasFilter) {
           // console.log('no newHasFilter', val, valueObject)
+          // console.log('> RESOLVER RETURN newValue 3', val, originalVar)
           return Promise.resolve(val)
         }
 
@@ -1280,6 +1364,7 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
           // add filters to deep references if filter is used
           const deepValueWithFilters = newHasFilter[1] ? val.replace(/}$/, ` ${allFilters}}`) : val
           // console.log('deepValueWithFilters', deepValueWithFilters)
+          // console.log('RESOLVER RETURN newValue 4', deepValueWithFilters)
           return Promise.resolve(deepValueWithFilters)
         }
         /* Loop over filters used and produce new value */
@@ -1291,15 +1376,18 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
           }
           if (c.args) {
             this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterName)
-            return c.filter(theValue, ...c.args, 'from getValueFromSource with args')
+            return c.filter(theValue, ...c.args, 'from getValueFromSrc with args')
           }
           this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterName)
-          return c.filter(theValue, 'from getValueFromSource')
+          return c.filter(theValue, 'from getValueFromSrc')
         }, val)
-        // console.log('newValue', newValue)
-
+        // console.log('> RESOLVER RETURN newValue', newValue)
+        // console.log('> RESOLVER RETURN newValue 5', newValue)
         return Promise.resolve(newValue)
       })
+
+      // console.log('valuePromise', valuePromise)
+      // console.log(`----------End Resolver [${resolverType}]-------------------`)
       // console.log('newHasFilter', newHasFilter)
       // TODO do something with func here?
       return this.tracker.add(variableString, valuePromise, propertyString, newHasFilter, promiseKey)
@@ -1308,9 +1396,9 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
     /* fall through case with self refs */
     if (variableString) {
       // console.log('before clean propertyString', propertyString, variableString)
-      const clean = cleanVariable(propertyString, this.variableSyntax)
+      const clean = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc self ${this.callCount}`)
       // TODO @DWELLS cleanVariable makes fallback values with spaces have no spaces
-      // console.log('cleanVariable', clean)
+      // console.log('AFTER cleanVariable', clean)
       const cleanClean = clean.split('|')[0]
       // console.log('cleanCleanVariable', cleanClean)
       if (funcRegex.exec(cleanClean)) {
@@ -1362,7 +1450,7 @@ Unable to resolve variable ${propertyString} from "${valueObject.originalSource}
         return this.tracker.add(fallbackValue, valuePromise, propertyString, newHasFilter)
       }
 
-      // has fallback but needs deeper lookup. Call getValueFromSource again
+      // has fallback but needs deeper lookup. Call getValueFromSrc again
       if (fallbackValue) {
         if (DEBUG) console.log('fallbackValue', fallbackValue)
         // console.log('fallbackValue', fallbackValue)
@@ -1607,7 +1695,7 @@ Please use ":" to reference sub properties`
     // const index = this.getDeepIndex(variableString)
     /*
     console.log('FIND INDEX', index)
-    console.log(this.deep)
+    console.log(this.deep, this.deep[index])
     /** */
     return this.deep[index]
   }
@@ -1620,14 +1708,13 @@ Please use ":" to reference sub properties`
     console.log('getValueFromDeep variable', variable)
     /** */
     let ret = this.populateValue({ value: variable }, undefined, 'getValueFromDeep')
-    // console.log('variable ret', ret)
     if (deepRef.length) {
       // if there is a deep reference remaining
       ret = ret.then((result) => {
         // console.log('DEEP RESULT', result)
         if (isString(result.value) && result.value.match(this.variableSyntax)) {
           // console.log('makeDeepVariable getValueFromDeep', result.value)
-          const deepVariable = this.makeDeepVariable(result.value)
+          const deepVariable = this.makeDeepVariable(result.value, 'via getValueFromDeep')
           return Promise.resolve(appendDeepVariable(deepVariable, deepRef))
         }
         return this.getDeeperValue(deepRef.split('.'), result.value)
@@ -1635,8 +1722,8 @@ Please use ":" to reference sub properties`
     }
     return ret
   }
-  makeDeepVariable(variable) {
-    // console.log('MAKE DEEP', variable)
+  makeDeepVariable(variable, caller) {
+    // variable = variable.replace("dev", '"dev"')
     let index = this.deep.findIndex((item) => variable === item)
     if (index < 0) {
       // console.log('this.deep.push', variable)
@@ -1644,11 +1731,18 @@ Please use ":" to reference sub properties`
     }
     // console.log("makeDeepVariable SET INDEX", index)
     const variableContainer = variable.match(this.variableSyntax)[0]
-    const variableString = cleanVariable(variableContainer, this.variableSyntax)
+    const variableString = cleanVariable(variableContainer, this.variableSyntax, true, `makeDeepVariable ${this.callCount}`)
     const deepVar = variableContainer.replace(variableString, `deep:${index}`)
+    /*
+    console.log('MAKE DEEP', variable, caller)
+    console.log('this.deep', this.deep)
+    console.log('variableContainer', variable)
+    console.log('variableString', variableString)
+    console.log('deepVar', deepVar)
+    // process.exit(1)
+    /** */
     // TODO debugging space removal. Seems like this helps
     // const deepVar = variableContainer.replace(/\s/g, '').replace(variableString, `deep:${index}`)
-
     return deepVar
   }
   /**
@@ -1709,7 +1803,7 @@ Please use ":" to reference sub properties`
         }
         if (typeof reducedValue === 'string' && reducedValue.match(this.variableSyntax)) {
           // console.log('makeDeepVariable reducedValue', reducedValue)
-          reducedValue = this.makeDeepVariable(reducedValue)
+          reducedValue = this.makeDeepVariable(reducedValue, 'via getDeeperValue')
         }
       }
       // console.log('fin', reducedValue)
@@ -1744,6 +1838,39 @@ Please use ":" to reference sub properties`
     }
     return valueToPopulate
   }
+}
+
+function ensureQuote(value, open = '"', close) {
+  let i = -1
+  const result = []
+  const end = close || open
+  if (typeof value === 'string') {
+    return startChar(value, open) + value + endChar(value, end)
+  }
+  while (++i < value.length) {
+    result[i] = startChar(value[i], open) + value[i] + endChar(value[i], end)
+  }
+  return result
+}
+
+function startChar(str, char) {
+  return (str[0] === char) ? '' : char
+}
+
+function endChar(str, char) {
+  return (str[str.length -1] === char) ? '' : char
+}
+
+function isSurroundedByQuotes(str) {
+  if (!str || str.length < 2) return false
+  const firstChar = str[0]
+  const lastChar = str[str.length - 1]
+  return (firstChar === "'" && lastChar === "'") || (firstChar === '"' && lastChar === '"')
+}
+
+function startsWithQuotedPipe(str) {
+  // Matches either 'xyz' | or "xyz" |
+  return /^(['"])(.*?)\1\s*\|/.test(str)
 }
 
 module.exports = Configorama
