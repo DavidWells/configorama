@@ -9,7 +9,7 @@ async function getConfig() {
     options: args,
     allowUnknownVars: true,
   }
-  const configFile = path.join(__dirname, '../tests/_fixtures/git.yml')
+  const configFile = path.join(__dirname, '../tests/_fixtures/deep.yml')
   return configorama(configFile, settings)
 }
 

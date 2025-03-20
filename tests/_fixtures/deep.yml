@@ -1,0 +1,21 @@
+
+defaultStage: ${opt:stage, 'dev'}
+nested:
+  value: prod
+
+# file(./config.[stage].json):CREDS
+
+# With Quotes
+SHORTHAND_DOUBLE_QUOTES: ${file(./config.${opt:stage, "${defaultStage}"}.json):CREDS}
+SHORTHAND_SINGLE_QUOTES: ${file(./config.${opt:stage, '${defaultStage}'}.json):CREDS}
+
+# No Quotes
+SHORTHAND_NO_QUOTES: ${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}
+
+SELF_DOUBLE_QUOTES: ${file(./config.${opt:stage, "${self:defaultStage}"}.json):CREDS}
+SELF_SINGLE_QUOTES: ${file(./config.${opt:stage, '${self:defaultStage}'}.json):CREDS}
+
+# No Quotes self
+SELF_NO_QUOTES: ${file(./config.${opt:stage, ${self:defaultStage}}.json):CREDS}
+
+NESTED_SHORTHAND: ${file(./config.${opt:stage, ${nested.value}}.json):CREDS}

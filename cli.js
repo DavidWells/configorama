@@ -76,6 +76,7 @@ const options = {
 
 // Create Configorama instance
 const configorama = new Configorama(inputFile, options)
+// console.log('configorama', configorama)
 
 // Process the configuration
 configorama.init(argv)

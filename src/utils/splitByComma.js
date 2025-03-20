@@ -1,6 +1,6 @@
-const { match } = require('../resolvers/valueFromString')
+const stringResolver = require('../resolvers/valueFromString')
 const overwriteSyntax = RegExp(/\s*(?:,\s*)+/g) // /\s*(?:,\s*)+/g
-const stringRefSyntax = match
+const stringRefSyntax = stringResolver.match
 /**
  * Split a given string by whitespace padded commas excluding those within single or double quoted
  * strings.
@@ -14,56 +14,68 @@ const stringRefSyntax = match
 // https://regex101.com/r/4uPmpt/1
 const commasOutsideOfParens = /(?!<(?:\(|\[)[^)\]]+),(?![^(\[]+(?:\)|\]))/
 // const commasOutOfParens = /(?!(?:\()[^)\]]+),(?![^(\[]+(?:\)))/g
-function splitByComma(string) {
-  // If comma is not outside of parens, return early,
-  // for file(file.js, param, paramTwo) & function support
-  // TODO clean this up
-  if (!string.match(commasOutsideOfParens)) {
-    return [ string ]
+function splitByComma(string, regexPattern) {
+  // Handle empty or undefined input
+  if (!string || string.trim() === "") {
+    return [""]
   }
-  const input = string.trim()
-  const stringMatches = []
-  let match = stringRefSyntax.exec(input)
-  while (match) {
-    stringMatches.push({
-      start: match.index,
-      end: stringRefSyntax.lastIndex,
+
+  // Extract regex patterns to protect them
+  const placeholders = []
+  let protectedString = string
+  if (regexPattern) {
+    protectedString = string.replace(regexPattern, (match) => {
+      placeholders.push(match)
+      return `__PLACEHOLDER_${placeholders.length - 1}__`
     })
-    match = stringRefSyntax.exec(input)
   }
-  const commaReplacements = []
-  const contained = (commaMatch) => { // curry the current commaMatch
-    return (stringMatch) => { // check whether stringMatch containing the commaMatch
-      return stringMatch.start < commaMatch.index && overwriteSyntax.lastIndex < stringMatch.end
+
+  const result = []
+  let current = ""
+  let inQuote = false
+  let quoteChar = ""
+  let bracketDepth = 0  // Includes both () and []
+  
+  for (let i = 0; i < protectedString.length; i++) {
+    const char = protectedString[i]
+    
+    // Handle quotes
+    if ((char === "'" || char === '"') && (i === 0 || protectedString[i-1] !== "\\")) {
+      if (!inQuote) {
+        inQuote = true
+        quoteChar = char
+      } else if (char === quoteChar) {
+        inQuote = false
+      }
+    }
+    
+    // Handle parentheses and brackets
+    if ((char === "(" || char === "[") && !inQuote) bracketDepth++
+    if ((char === ")" || char === "]") && !inQuote) bracketDepth--
+    
+    // Process comma
+    if (char === "," && !inQuote && bracketDepth === 0) {
+      result.push(current.trim())
+      current = ""
+    } else {
+      current += char
     }
   }
-  match = overwriteSyntax.exec(input)
-  while (match) {
-    const matchContained = contained(match)
-    const containedBy = stringMatches.find(matchContained)
-    if (!containedBy) { // if un-contained, this comma represents a splitting location
-      commaReplacements.push({
-        start: match.index,
-        end: overwriteSyntax.lastIndex,
-      })
-    }
-    match = overwriteSyntax.exec(input)
+  
+  if (current.trim() || result.length > 0) {
+    result.push(current.trim())
   }
-  let prior = 0
-  const results = []
-  commaReplacements.forEach((replacement) => {
-    results.push(input.slice(prior, replacement.start))
-    prior = replacement.end
+
+  if (!regexPattern) {
+    return result
+  }
+  
+  // Restore placeholders in the result
+  return result.map(item => {
+    return item.replace(/__PLACEHOLDER_(\d+)__/g, (match, index) => {
+      return placeholders[parseInt(index)]
+    })
   })
-  // const what = input.slice(prior)
-  // // TODO finish digit string matching
-  // const matchDigitString = /^['|"]\d+['|"]$/g
-  // if (what.match(matchDigitString)) {
-  //   console.log('Is digit string')
-  // }
-  // console.log('what', what)
-  results.push(input.slice(prior))
-  return results
 }
 
 module.exports = {
