@@ -1,6 +1,6 @@
 {
   "name": "configorama",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Variable support for configuration files",
   "main": "lib/index.js",
   "files": [
