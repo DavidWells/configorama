@@ -79,6 +79,7 @@ const base64WrapperRegex = /\[_\[([A-Za-z0-9+/=\s]*)\]_\]/g
 const logLines = '─────────────────────────────────────────────────'
 
 let DEBUG = process.argv.includes('--debug') ? true : false
+let VERBOSE = process.argv.includes('--verbose') ? true : false
 // DEBUG = true
 
 const ENABLE_FUNCTIONS = true
@@ -135,6 +136,13 @@ class Configorama {
         varRegex, 
         this.opts
       )
+
+      if (VERBOSE) {
+        console.log('───────────── Input Config ──────────────────────')
+        console.log()
+        deepLog(configObject)
+        console.log()
+      }
 
       this.configFilePath = fileOrObject
       // set config objects
@@ -477,6 +485,12 @@ class Configorama {
           /* Final post-processing here */
           if (this.mergeKeys && this.config) {
             this.config = mergeByKeys(this.config, '', this.mergeKeys)
+          }
+          if (VERBOSE) {
+            console.log('───────────── Resolved Config ───────────────────')
+            console.log()
+            deepLog(this.config)
+            console.log()
           }
           return this.config
         })

@@ -3,17 +3,17 @@
 const fs = require('fs')
 const minimist = require('minimist')
 const Configorama = require('./src/main')
+const deepLog = require('./src/utils/deep-log')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f'],
-  boolean: ['help', 'h', 'version', 'v', 'debug', 'd', 'allow-unknown', 'allow-undefined'],
+  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined'],
   alias: {
     h: 'help',
     v: 'version',
     o: 'output',
     f: 'format',
-    d: 'debug'
   },
   default: {
     format: 'json'
@@ -74,6 +74,29 @@ const options = {
   dynamicArgs: argv
 }
 
+if (options.dynamicArgs.verbose) {
+  console.log('───────────── Input Options ──────────────────────')
+  const dynamicArgs = options.dynamicArgs || {}
+  const { 
+    _, 
+    verbose, 
+    v, 
+    debug, 
+    d, 
+    help, 
+    h, 
+    version,
+    f,
+    format,
+    'allow-unknown': allowUnknown, 
+    'allow-undefined': allowUndefined, 
+    ...rest 
+  } = dynamicArgs
+  console.log()
+  deepLog(rest)
+  console.log()
+}
+
 // Create Configorama instance
 const configorama = new Configorama(inputFile, options)
 // console.log('configorama', configorama)
@@ -104,7 +127,9 @@ configorama.init(argv)
       fs.writeFileSync(argv.output, output)
       console.log(`Configuration written to ${argv.output}`)
     } else {
-      console.log(output)
+      if (!argv.verbose) {
+        console.log(output)
+      }
     }
   })
   .catch((error) => {
