@@ -16,9 +16,10 @@
   },
   "scripts": {
     "docs": "node ./scripts/docs.js",
-    "test": "npm run testlib && uvu tests \".*\\.test.js$\" ",
+    "test": "npm run test:lib && uvu tests \".*\\.test.js$\" ",
+    "test:tests": "uvu tests \".*\\.test.js$\" ",
     "test:api": "uvu tests/api api.test.js",
-    "testlib": "uvu src \".*\\.test.js$\"",
+    "test:lib": "uvu src \".*\\.test.js$\"",
     "watch": "watchlist tests -- npm test",
     "publish": "git push origin && git push origin --tags",
     "release:patch": "npm version patch && npm publish",

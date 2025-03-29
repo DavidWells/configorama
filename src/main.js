@@ -66,7 +66,7 @@ const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
-const fileRefSyntax = RegExp(/^file\((~?[a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const fileRefSyntax = RegExp(/^file\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const envRefSyntax = RegExp(/^env:/g)
@@ -83,6 +83,16 @@ let VERBOSE = process.argv.includes('--verbose') ? true : false
 // DEBUG = true
 
 const ENABLE_FUNCTIONS = true
+
+function combineRegexes(regexes) {
+  // Extract the pattern from each RegExp and join with OR operator
+  const patterns = regexes.map(regex => {
+    // Get source pattern string without flags
+    return regex.source
+  }).filter(Boolean)
+  // Join patterns with the OR operator and create new RegExp
+  return new RegExp(`(${patterns.join('|')})`)
+}
 
 class Configorama {
   constructor(fileOrObject, opts) {
@@ -101,18 +111,21 @@ class Configorama {
 
     this.filterCache = {}
 
+    this.foundVariables = []
+
     const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
   
-    const variableSyntax = options.syntax || defaultSyntax
+    const varSyntax = options.syntax || defaultSyntax
     let varRegex
-    if (typeof variableSyntax === 'string') {
-      varRegex = new RegExp(variableSyntax, 'g')
+    if (typeof varSyntax === 'string') {
+      varRegex = new RegExp(varSyntax, 'g')
       // this.variableSyntax = /\${((?!AWS)([ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?|(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*))}/
-    } else if (variableSyntax instanceof RegExp) {
-      varRegex = variableSyntax
+    } else if (varSyntax instanceof RegExp) {
+      varRegex = varSyntax
     }
     // console.log('varRegex', varRegex)
-    this.variableSyntax = varRegex
+    const variableSyntax = varRegex
+    this.variableSyntax = variableSyntax
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
@@ -136,13 +149,6 @@ class Configorama {
         varRegex, 
         this.opts
       )
-
-      if (VERBOSE) {
-        console.log('───────────── Input Config ──────────────────────')
-        console.log()
-        deepLog(configObject)
-        console.log()
-      }
 
       this.configFilePath = fileOrObject
       // set config objects
@@ -274,7 +280,13 @@ class Configorama {
     /* attach self matcher last */
     this.variableTypes = this.variableTypes.concat(fallThroughSelfMatcher)
 
-    this.variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
+    // const variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
+    const variablesKnownTypes = combineRegexes(this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match))
+    // console.log('variablesKnownTypes', variablesKnownTypes)
+    this.variablesKnownTypes = variablesKnownTypes
+
+    // this.allPatterns = combineRegexes(...this.variableTypes.map((v) => v.match))
+    // console.log('this.allPatterns', this.allPatterns)
     // console.log('this.variablesKnownTypes', this.variablesKnownTypes)
     // process.exit(1)
     // Additional filters on values. ${thing | filterFunction}
@@ -389,6 +401,63 @@ class Configorama {
     // Apply user defined functions
     if (options.functions) {
       this.functions = Object.assign({}, this.functions, options.functions)
+    }
+
+    if (VERBOSE) {
+      console.log('───────────── Input Config ──────────────────────')
+      console.log()
+      deepLog(this.originalConfig)
+      console.log()
+
+      const foundVariables = []
+      let loggedHeader = false
+      traverse(this.originalConfig).forEach(function (rawValue) {
+        if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
+          if (!loggedHeader) {
+            console.log('───────────── Variables Detected ──────────────────────')
+            console.log()
+            loggedHeader = true
+          }
+          const configValuePath = this.path.join('.')
+          const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
+          /*
+          console.log(nested)
+          /** */
+          
+          console.log(`▷ Path: ${configValuePath}`)
+          console.log('\n  Key/value:')
+          console.log(`  ${configValuePath}: ${rawValue}`)
+          if (nested.length > 0) {
+            const nestedCount = nested.length - 1
+            console.log('\n  Variable:')
+            console.log(`  ${nested[nested.length - 1].fullMatch}`)
+            
+            if (nestedCount) {
+              console.log(`\n  Contains ${nestedCount} nested values.`)
+            }
+  
+            // non mutate remove last
+            const removeLast = (nested.length > 1) ? nested.slice(0, -1) : nested
+            console.log()
+            removeLast.forEach((v) => {
+              if (v.hasFallback) {
+                console.log('  Resolve order:')
+                console.log(`    1. ${v.valueBeforeFallback}`)
+                v.fallbackValues.forEach((f, i) => {
+                  console.log(`    ${i + 2}. ${f.fullMatch}${f.isFallback ? ' (Fallback string value)' : ''}`)
+                })
+              }
+            })
+          }
+          console.log()
+          foundVariables.push(rawValue)
+        }
+      })
+
+      console.log(`───────────── Found ${foundVariables.length} Variables ──────────────────────`)
+      console.log()
+      deepLog(foundVariables)
+      console.log()
     }
 
     this.deep = []
@@ -639,7 +708,7 @@ class Configorama {
       // Initial check if value has variable string in it
       return isString(property.value) && property.value.match(this.variableSyntax)
     })
-    // console.log('variables', variables)
+
     return map(variables, (valueObject) => {
       // console.log('valueObject', valueObject)
       return this.populateValue(valueObject, false, '_populateVariables').then((populated) => {

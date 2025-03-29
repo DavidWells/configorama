@@ -92,8 +92,13 @@ if (options.dynamicArgs.verbose) {
     'allow-undefined': allowUndefined, 
     ...rest 
   } = dynamicArgs
+
   console.log()
-  deepLog(rest)
+  if (Object.keys(rest).length) {
+    deepLog(rest)
+  } else {
+    console.log('No flag options provided. Set flags like --flag value')
+  }
   console.log()
 }
 
