@@ -469,6 +469,10 @@ class Configorama {
       console.log()
       deepLog(foundVariables)
       console.log()
+      /* Exit early if list or info flag is set */
+      if (showFoundVariables) {
+        process.exit(0)
+      }
     }
 
     this.deep = []
