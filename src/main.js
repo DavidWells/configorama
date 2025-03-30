@@ -1580,6 +1580,12 @@ Unable to resolve configuration variable
         allowSpecialCase = true
       } else if (params && params[variableString]) {
         allowSpecialCase = true
+      } else if (variableString === 'ApiGatewayRestApi') {
+        // Allow for "hidden" cloudformation variables, set by sls framework
+        allowSpecialCase = true
+      } else if (variableString === 'HttpApi') {
+        // Allow for "hidden" cloudformation variables, set by sls framework
+        allowSpecialCase = true
       }
     }
     /* Todo handle stage variables */
