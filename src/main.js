@@ -413,12 +413,18 @@ class Configorama {
       let loggedHeader = false
       traverse(this.originalConfig).forEach(function (rawValue) {
         if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
+          const configValuePath = this.path.join('.')
+          if (configValuePath.endsWith('Fn::Sub')) {
+            return
+          }
+
+
           if (!loggedHeader) {
             console.log('───────────── Variables Detected ──────────────────────')
             console.log()
             loggedHeader = true
           }
-          const configValuePath = this.path.join('.')
+      
           const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
           /*
           console.log(nested)
@@ -1080,11 +1086,13 @@ class Configorama {
         }
       }
 
+      const currentPath = valueObject.path.join('.')
+
       const errorMessage = `
 Missing Value ${missingValue} - ${matchedString}
 \nMake sure the property is being passed in correctly
 \nFor variable:
-\n${valueObject.path}: ${valueObject.originalSource}
+\n${currentPath}: ${valueObject.originalSource}
 `
       throw new Error(errorMessage)
     }
@@ -1549,9 +1557,10 @@ Unable to resolve configuration variable
     }
 
     // Variable NOT FOUND. Warn user
+    const key = valueObject.path ? valueObject.path.join('.') : 'na'
     const errorMessage = [
       `Invalid variable reference syntax`,
-      `Key: "${valueObject.path ? valueObject.path.join('.') : 'na'}"`,
+      `Key: "${key}"`,
       `Variable: "${variableString}" from ${propertyString} not found`,
     ]
 
@@ -1560,9 +1569,23 @@ Unable to resolve configuration variable
       errorMessage.push('\n Default values for self referenced values are not allowed')
       errorMessage.push(`\n Fix the ${propertyString} variable`)
     }
+    
+    let allowSpecialCase = false
+    /* handle special cases for cloudformation ${Sub} values */
+    if (this.originalConfig && key.endsWith('Fn::Sub')) {
+      const params = this.originalConfig.Parameters || (this.originalConfig.parameters || {}).Parameters
+      const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
+      /* Cloudformation Resource References */
+      if (resources && resources[variableString]) {
+        allowSpecialCase = true
+      } else if (params && params[variableString]) {
+        allowSpecialCase = true
+      }
+    }
+    /* Todo handle stage variables */
 
     /* Pass through unknown variables */
-    if (this.opts.allowUnknownVars) {
+    if (this.opts.allowUnknownVars || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
