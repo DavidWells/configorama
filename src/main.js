@@ -100,6 +100,9 @@ class Configorama {
     if (opts && !opts.sync) {
       handleSignalEvents()
     }
+
+    const showFoundVariables = opts && opts.dynamicArgs && (opts.dynamicArgs.list || opts.dynamicArgs.info)
+  
     const options = opts || {}
     // Set opts to pass into JS file calls
     this.opts = Object.assign({}, {
@@ -408,7 +411,9 @@ class Configorama {
       console.log()
       deepLog(this.originalConfig)
       console.log()
+    }
 
+    if (VERBOSE || showFoundVariables) {
       const foundVariables = []
       let loggedHeader = false
       traverse(this.originalConfig).forEach(function (rawValue) {

@@ -8,12 +8,14 @@ const deepLog = require('./src/utils/deep-log')
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f'],
-  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined'],
+  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info'],
   alias: {
     h: 'help',
     v: 'version',
     o: 'output',
     f: 'format',
+    l: 'list',
+    i: 'info',
   },
   default: {
     format: 'json'
@@ -34,11 +36,13 @@ Options:
   -o, --output <file>       Write output to file instead of stdout
   -f, --format <format>     Output format: json, yaml, or js (default: json)
   -d, --debug               Enable debug mode
+  -i, --info                Show info about the config
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
 
 Examples:
   configorama config.yml
+  configorama --info config.yml
   configorama --format yaml config.json
   configorama --output resolved.json config.yml
   configorama --allow-unknown config.toml
@@ -88,6 +92,10 @@ if (options.dynamicArgs.verbose) {
     version,
     f,
     format,
+    list,
+    l,
+    info,
+    i,
     'allow-unknown': allowUnknown, 
     'allow-undefined': allowUndefined, 
     ...rest 
