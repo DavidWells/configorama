@@ -51,6 +51,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
     
     // Store match details
     const matchInfo = {
+      varType: undefined,
       location,
       value: input,
       fullMatch: match[0],
@@ -91,32 +92,33 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
     matches[i].varString = matches[i].variable
     /* Save additional meta data about the variable */
     // console.log('matches[i].varString', matches[i].varString)
-    if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-      matches[i].varType = matches[i].varString.match(variablesKnownTypes)[1]
-      if (FALLBACK_REGEX.test(matches[i].varString)) {
-        const split = splitByComma(matches[i].varString, regex)
-        matches[i].hasFallback = true
 
-        matches[i].valueBeforeFallback = split[0]
-        // remove first element from split
-        matches[i].fallbackValues = split.slice(1).map((item) => {
-          // console.log('item', item)
-          const isVariable = variablesKnownTypes.test(item) || VAR_MATCH_REGEX.test(item)
-          const fallbackData = {
-            isVariable,
-            fullMatch: item,
-            variable: item
-          }
+    // if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
+    //   matches[i].varType = matches[i].varString.match(variablesKnownTypes)[1] 
+    //   if (FALLBACK_REGEX.test(matches[i].varString)) {
+    //     const split = splitByComma(matches[i].varString, regex)
+    //     matches[i].hasFallback = true
 
-          if (!isVariable && typeof item === 'string') {
-            fallbackData.stringValue = trimQuotes(item)
-            fallbackData.isFallback = true
-          }
+    //     matches[i].valueBeforeFallback = split[0]
+    //     // remove first element from split
+    //     matches[i].fallbackValues = split.slice(1).map((item) => {
+    //       // console.log('item', item)
+    //       const isVariable = variablesKnownTypes.test(item) || VAR_MATCH_REGEX.test(item)
+    //       const fallbackData = {
+    //         isVariable,
+    //         fullMatch: item,
+    //         variable: item,
+    //       }
+
+    //       if (!isVariable && typeof item === 'string') {
+    //         fallbackData.stringValue = trimQuotes(item)
+    //         fallbackData.isResolvedFallback = true
+    //       }
           
-          return fallbackData
-        })
-      }
-    }
+    //       return fallbackData
+    //     })
+    //   }
+    // }
   }
   
   // Second pass: Reconstruct each variable with original nested syntax
@@ -161,9 +163,102 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
     // Reconstruct with all nested variables
     currentMatch.fullMatch = replaceAllPlaceholders(currentMatch.fullMatch, matches)
     currentMatch.variable = replaceAllPlaceholders(currentMatch.variable, matches)
-
-  
   }
+
+
+    // We need to store varString - the variable string with placeholders
+  for (let i = 0; i < matches.length; i++) {
+    matches[i].varString = matches[i].variable
+    /* Save additional meta data about the variable */
+    // console.log('matches[i].varString', matches[i].varString)
+
+    if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
+      matches[i].varType = matches[i].varString.match(variablesKnownTypes)[1] 
+      if (FALLBACK_REGEX.test(matches[i].varString)) {
+        const split = splitByComma(matches[i].varString, regex)
+        matches[i].hasFallback = true
+
+        matches[i].valueBeforeFallback = split[0]
+        // remove first element from split
+        matches[i].fallbackValues = split.slice(1).map((item) => {
+          // console.log('item', item)
+          const isVariable = variablesKnownTypes.test(item) || VAR_MATCH_REGEX.test(item)
+          const fallbackData = {
+            isVariable,
+            fullMatch: item,
+            variable: item,
+          }
+
+          if (!isVariable && typeof item === 'string') {
+            fallbackData.stringValue = trimQuotes(item)
+            fallbackData.isResolvedFallback = true
+          }
+          
+          return fallbackData
+        })
+      }
+    } else if (typeof matches[i].varType === 'undefined') {
+      matches[i].varType = 'dot.prop'
+    }
+  }
+
+  const finalMatches = matches.map((m) => {
+    delete m.placeholder
+    if (typeof m.varType === 'undefined') {
+      /*
+      {
+        varType: 'dot.prop',
+        location: 'resolvedDomainName',
+        value: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        fullMatch: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        variable: 'domainByStage.${opt:stage, ${defaultStage}}',
+        varString: 'domainByStage.__VAR_1__',
+        resolveOrder: 3,
+        start: 0,
+        end: 26
+      }
+      {
+        varType: 'dot.prop',
+        location: 'resolvedDomainName',
+        value: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        fullMatch: '${defaultStage}',
+        variable: 'defaultStage',
+        varString: 'defaultStage',
+        resolveOrder: 1,
+        start: 29,
+        end: 44
+      }
+      */
+      // console.log('m', m)
+    }
+    if (m.hasFallback) {
+      const combinedFallbacks = m.fallbackValues.reduce((acc, f) => {
+        const child = matches.find((m) => m.variable === f.variable)
+        if (child && child.fallbackValues && child.fallbackValues.length) {
+          const split = splitByComma(child.variable, regex)
+          f.valueBeforeFallback = split[0]
+          f.fallbackValues = child.fallbackValues
+        }
+        return acc
+      }, m.fallbackValues)
+      m.fallbackValues = combinedFallbacks
+    }
+    if (m.varType === 'dot.prop') {
+      // const reversedMatches = matches.reverse()
+      // const test = reversedMatches.reduce((acc, f) => {
+      //   console.log('f', f)
+      //   const child = reversedMatches.find((m) => m.variable === f.variable)
+      //   if (child && child.fallbackValues && child.fallbackValues.length) {
+      //     const split = splitByComma(child.variable, regex)
+      //     f.valueBeforeFallback = split[0]
+      //     f.fallbackValues = child.fallbackValues
+      //   }
+      //   return acc
+      // }, reversedMatches)
+      // console.log('test', test)
+    }
+    return m
+  })
   
   if (debug) {
     console.log("\nReconstructed matches:")
@@ -176,7 +271,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
     })
   }
   
-  return matches
+  return finalMatches
 }
 
 

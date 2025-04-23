@@ -153,7 +153,9 @@ function preProcess(ymlStr = '') {
 
   /* If have yaml object and vars not wrapped in quotes, wrap them */
   if (ymlStr.match(KEY_OBJECT)) {
-    const hasObjects = matchOutermostBraces(ymlStr)
+    const values = matchOutermostBraces(ymlStr)
+    // console.log('values', values)
+    const hasObjects = values.filter((x) => !x.match(/{{resolve:/))
     // console.log('hasObjects', hasObjects)
     if (hasObjects && hasObjects.length) {
       hasObjects.forEach((txt) => {
@@ -185,6 +187,15 @@ function preProcess(ymlStr = '') {
           })
           ymlStr = ymlStr.replace(txt, fixedText)
         }
+      })
+    }
+    // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html 
+    const cfParams = values.filter((x) => !x.match(/\s/) && x.match(/{{resolve:/))
+    if (cfParams && cfParams.length) {
+      cfParams.forEach((txt) => {
+        const pat = new RegExp(`([^'"])${txt}([^'"])`, 'g')
+        const fixedText = `$1"${txt}"$2`
+        ymlStr = ymlStr.replace(pat, fixedText)
       })
     }
   }

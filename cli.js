@@ -4,6 +4,7 @@ const fs = require('fs')
 const minimist = require('minimist')
 const Configorama = require('./src/main')
 const deepLog = require('./src/utils/deep-log')
+const { logHeader } = require('./src/utils/logs')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
@@ -79,7 +80,7 @@ const options = {
 }
 
 if (options.dynamicArgs.verbose) {
-  console.log('───────────── Input Options ──────────────────────')
+  logHeader('Config Input Options')
   const dynamicArgs = options.dynamicArgs || {}
   const { 
     _, 

@@ -1,0 +1,7 @@
+
+stageConfig: 
+  foo: 
+    - ${file(./config.${opt:stage, ${opt:stageOne}, ${opt:stageTwo}, "three"}.json)} heheh
+
+
+fun: ${env:FOO, "nice"}

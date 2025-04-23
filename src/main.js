@@ -12,6 +12,8 @@ const promiseFinallyShim = require('promise.prototype.finally').shim()
 const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
+const chalk = require('./utils/chalk')
+
 /* Default Value resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
@@ -48,6 +50,8 @@ const { encodeUnknown, decodeUnknown } = require('./utils/unknownValues')
 const { mergeByKeys } = require('./utils/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
 const { findNestedVariables } = require('./utils/find-nested-variables')
+const { makeBox } = require('@davidwells/box-logger')
+const { logHeader } = require('./utils/logs')
 /**
  * Maintainer's notes:
  *
@@ -407,7 +411,7 @@ class Configorama {
     }
 
     if (VERBOSE) {
-      console.log('───────────── Input Config ──────────────────────')
+      logHeader('Config Input before processing')
       console.log()
       deepLog(this.originalConfig)
       console.log()
@@ -415,60 +419,229 @@ class Configorama {
 
     if (VERBOSE || showFoundVariables) {
       const foundVariables = []
-      let loggedHeader = false
+      const variableData = {}
+      let matchCount = 1
       traverse(this.originalConfig).forEach(function (rawValue) {
         if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
           const configValuePath = this.path.join('.')
           if (configValuePath.endsWith('Fn::Sub')) {
             return
           }
-
-
-          if (!loggedHeader) {
-            console.log('───────────── Variables Detected ──────────────────────')
-            console.log()
-            loggedHeader = true
-          }
       
           const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
           /*
-          console.log(nested)
+          console.log('traverse nested result', nested)
           /** */
           
-          console.log(`▷ Path: ${configValuePath}`)
-          console.log('\n  Key/value:')
-          console.log(`  ${configValuePath}: ${rawValue}`)
-          if (nested.length > 0) {
-            const nestedCount = nested.length - 1
-            console.log('\n  Variable:')
-            console.log(`  ${nested[nested.length - 1].fullMatch}`)
-            
-            if (nestedCount) {
-              console.log(`\n  Contains ${nestedCount} nested values.`)
-            }
-  
-            // non mutate remove last
-            const removeLast = (nested.length > 1) ? nested.slice(0, -1) : nested
-            console.log()
-            removeLast.forEach((v) => {
-              if (v.hasFallback) {
-                console.log('  Resolve order:')
-                console.log(`    1. ${v.valueBeforeFallback}`)
-                v.fallbackValues.forEach((f, i) => {
-                  console.log(`    ${i + 2}. ${f.fullMatch}${f.isFallback ? ' (Fallback string value)' : ''}`)
-                })
-              }
-            })
+          // console.log(`▷ Path: ${configValuePath}`)
+          // console.log('\n  Key/value:')
+          // console.log(`  ${configValuePath}: ${rawValue}`)
+          const lastItem = nested[nested.length - 1]
+          const lastKeyPath = this.path[this.path.length - 1]
+          const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
+          const key = lastItem.fullMatch
+          const varData = {
+            path: configValuePath,
+            key: itemKey,
+            value: rawValue,
+            variable: lastItem.fullMatch,
+            isRequired: false,
+            defaultValue: undefined,
+            matchIndex: matchCount++,
+            // hasFallback: false,
+            resolveOrder: [],
+            resolveDetails: nested,
           }
-          console.log()
+
+          function calculateResolveOrder(item) {
+            if (item && item.fallbackValues) {
+              let hasResolvedFallback
+              const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
+                if (f.fallbackValues) {
+                  const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                  if (!hasResolvedFallback && nestedResolvedFallback) {
+                    hasResolvedFallback = nestedResolvedFallback
+                  }
+                  return nestedOrder // Return just the order part
+                }
+                if (!hasResolvedFallback && f.isResolvedFallback) {
+                  hasResolvedFallback = f.stringValue
+                }
+                return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+              })).flat()
+              
+              return [order, hasResolvedFallback]
+            }
+            return [[item.variable], false] // Return array instead of just the value
+          }
+
+          const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
+          varData.resolveOrder = resolveOrder
+          
+          if (hasResolvedFallback) {
+            varData.defaultValue = hasResolvedFallback
+          }
+
+
+          if (!varData.defaultValue) {
+            varData.isRequired = true
+          }
+      
+
+          if (varData.resolveOrder.length > 1) {
+            varData.hasFallback = true
+          }
+
+          variableData[key] = (variableData[key] || []).concat(varData)
+
           foundVariables.push(rawValue)
         }
       })
 
-      console.log(`───────────── Found ${foundVariables.length} Variables ──────────────────────`)
-      console.log()
-      deepLog(foundVariables)
-      console.log()
+
+      if (!foundVariables.length) {
+        logHeader('No Variables Found in Config')
+        if (this.configFilePath) {
+          console.log(`File: ${this.configFilePath}`)
+        }
+        
+        console.log(`\nVariable syntax: `, variableSyntax)
+
+        const varTypes = Object.keys(this.variableTypes)
+        if (varTypes.length) {
+          const exclude = ['fallthrough', 'deep']
+          console.log('\nAllowed variable types:')
+          varTypes.filter((v) => v.type !== 'fallthrough').forEach((v) => {
+            const vData = this.variableTypes[v]
+            if (exclude.includes(vData.type)) {
+              return
+            }
+            console.log(`  - ${vData.type}: `, vData.match)
+          })
+        }
+        console.log()
+      }
+
+      // make foundVariables array unique
+      const finalFoundVariables = [...new Set(foundVariables)]
+      if (finalFoundVariables.length > 0) {
+        const varKeys = Object.keys(variableData)
+        const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
+
+        logHeader(`Found ${varKeys.length} Variables${fileName}`)
+
+        // deepLog('variableData', variableData)
+
+        if (varKeys.length) {
+          console.log()
+          const longestKey = varKeys.reduce((acc, k) => {
+            return Math.max(acc, k.length)
+          }, 0)
+          console.log(varKeys.map((k) => {
+            const placesWord = variableData[k].length > 1 ? 'places' : 'place'
+            return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${variableData[k].length} ${placesWord}`
+          }).join('\n'))
+          console.log()
+        }
+
+        logHeader('Variable Details')
+    
+        const indent = ''
+        varKeys.forEach((key, i) => {
+          const variableInstances = variableData[key]
+      
+          const firstInstance = variableInstances[0]
+
+          let requiredText = ''
+          let defaultValueSrc = ''
+          if (!firstInstance.defaultValue) {
+            // console.log('no default value', firstInstance)
+            /* Check if the fallback variable is a self reference */
+            const hasDotPropOrSelf = variableInstances.reduce((acc, v) => {
+              const dotProp = v.resolveDetails.find((d) => d.varType === 'dot.prop')
+              if (dotProp) {
+                acc.push(dotProp)
+              }
+              if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].varType === 'self:') {
+                // console.log('dot.prop', v.resolveDetails)
+                acc.push(v.resolveDetails[0])
+              }
+              return acc
+            }, [])
+            // console.log('hasDotPropOrSelf', hasDotPropOrSelf)
+            if (!hasDotPropOrSelf.length) {
+              requiredText = '[Required] '
+            } else {
+              const fallBackValues = variableInstances.filter((v) => v.resolveDetails.find((d) => d.hasFallback)).map((v) => v.resolveDetails)
+              // console.log('fallBackValues', fallBackValues)
+              if (fallBackValues.length) {
+                // console.log('fallBackValues.resolveDetails', fallBackValues)
+              }
+
+              const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
+              defaultValueSrc = cleanPath
+              // Find the dot prop value in the original config
+              const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
+              // console.log('dotPropValue', dotPropValue)
+              if (typeof dotPropValue !== 'undefined') {
+                requiredText = ''
+                const niceString = typeof dotPropValue === 'object' ? JSON.stringify(dotPropValue) : dotPropValue
+                // truncate niceString to 100 characters
+                const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
+                firstInstance.defaultValue = truncatedString
+              }
+            }
+            //this.originalConfig[key] = undefined
+          }
+          const spacing = '           '
+          const titleText = `Variable:${spacing}`
+          const reqText = (requiredText) ? `${chalk.red.bold(requiredText)}\n` : ''
+          let varMsg = `${reqText}`
+          const VALUE_HEX = '#899499' // '#708090'
+          const keyChalk = chalk.whiteBright
+          const valueChalk = chalk.hex(VALUE_HEX)
+
+          if (firstInstance.defaultValue) {
+            const defaultValueText = `${indent}${keyChalk(`DefaultValue:`.padEnd(titleText.length, ' '))}`
+            // ensure padding is even 
+            varMsg += `${defaultValueText} ${valueChalk(firstInstance.defaultValue)}`
+          }
+
+          if(defaultValueSrc) {
+            varMsg += `\n${indent}${keyChalk('DefaultValue path:'.padEnd(titleText.length, ' '))} `
+            varMsg += `${valueChalk(defaultValueSrc)}`
+          }
+
+          if (firstInstance.resolveOrder.length > 1) {
+            varMsg += `\n${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
+            const resolveOrder = firstInstance.resolveOrder.join(', ')
+            varMsg += ` ${valueChalk(resolveOrder)}`
+          }
+
+          let locationRender = valueChalk(variableInstances[0].path)
+  
+          let locationLabel = `${indent}${keyChalk('Used at:'.padEnd(titleText.length, ' '))}`
+          if (variableInstances.length > 1) {
+            locationRender = `\n${variableInstances.map((v) => valueChalk(`${indent}- ${v.path}`)).join('\n')}`
+            const locationLabelText = `${indent}${keyChalk('Used at:')}`
+            locationLabel = locationLabelText
+          }
+
+          varMsg += `\n${locationLabel} ${locationRender}`
+    
+          // console.log(` ${chalk.bold(key)}`)
+          console.log(makeBox(varMsg, {
+            title: `${key}`,
+            borderColor: 'gray',
+            // style: 'bold',
+            minWidth: 120,
+          }))
+          if(i < varKeys.length - 1) {
+            //console.log()
+          }
+        })
+      }
+    
       /* Exit early if list or info flag is set */
       if (showFoundVariables) {
         process.exit(0)
@@ -571,7 +744,7 @@ class Configorama {
             this.config = mergeByKeys(this.config, '', this.mergeKeys)
           }
           if (VERBOSE) {
-            console.log('───────────── Resolved Config ───────────────────')
+            logHeader('Resolved Configuration value')
             console.log()
             deepLog(this.config)
             console.log()
