@@ -164,6 +164,26 @@ class Configorama {
       this.originalString = fileContents
       // Keep a copy
       this.originalConfig = cloneDeep(configObject)
+
+      const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
+      if ((useDotEnv && useDotEnv === true) || this.opts.useDotEnvFiles) {
+        const loadStageEnv = require('env-stage-loader')
+        let providerStage
+        if (this.originalConfig && this.originalConfig.provider && this.originalConfig.provider.stage) {
+          providerStage = this.originalConfig.provider.stage
+          // @TODO check value to see if variable and needs pre-resolving to resolve stage vars
+        }
+        const stage = this.opts.stage || providerStage || 'dev'
+        /* Load env variables into process.env */
+        const values = loadStageEnv({
+          // silent: true,
+          // debug: true,
+          env: stage,
+          // defaultEnv: 'prod',
+          // ignoreFiles: ['.env']
+        })
+      }
+
       // Set configPath for file references
       this.configPath = fileDirectory
     }
