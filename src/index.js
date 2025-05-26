@@ -1,6 +1,5 @@
 const Configorama = require('./main')
 const parsers = require('./parsers')
-const forceSync = require('sync-rpc')
 
 module.exports.Configorama = Configorama
 
@@ -23,12 +22,16 @@ module.exports = async (configPathOrObject, settings = {}) => {
 }
 
 module.exports.sync = (configPathOrObject, settings = {}) => {
-  if (settings.dynamicArgs && typeof settings.dynamicArgs === 'function') {
+  const _settings = settings || {}
+  if (_settings.dynamicArgs && typeof _settings.dynamicArgs === 'function') {
     throw new Error('Dynamic args must be serializable value for sync usage. Use Async instead')
   }
-  return forceSync(require.resolve('./sync'), settings.variableSources)({
+  const forceSync = require('sync-rpc')
+  const cliArgs = require('minimist')(process.argv.slice(2))
+  _settings.options = Object.assign({}, _settings.options || {}, cliArgs)
+  return forceSync(require.resolve('./sync'), _settings.variableSources)({
     filePath: configPathOrObject,
-    settings: settings
+    settings: _settings
   })
 }
 

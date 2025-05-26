@@ -164,26 +164,6 @@ class Configorama {
       this.originalString = fileContents
       // Keep a copy
       this.originalConfig = cloneDeep(configObject)
-
-      const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
-      if ((useDotEnv && useDotEnv === true) || this.opts.useDotEnvFiles) {
-        const loadStageEnv = require('env-stage-loader')
-        let providerStage
-        if (this.originalConfig && this.originalConfig.provider && this.originalConfig.provider.stage) {
-          providerStage = this.originalConfig.provider.stage
-          // @TODO check value to see if variable and needs pre-resolving to resolve stage vars
-        }
-        const stage = this.opts.stage || providerStage || 'dev'
-        /* Load env variables into process.env */
-        const values = loadStageEnv({
-          // silent: true,
-          // debug: true,
-          env: stage,
-          // defaultEnv: 'prod',
-          // ignoreFiles: ['.env']
-        })
-      }
-
       // Set configPath for file references
       this.configPath = fileDirectory
     }
@@ -695,6 +675,27 @@ class Configorama {
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
       return Promise.resolve(originalConfig)
+    }
+
+    const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
+    if ((useDotEnv && useDotEnv === true) || this.opts.useDotEnvFiles) {
+      let providerStage
+      /* has hardcoded stage */
+      if (
+        this.originalConfig && this.originalConfig.provider && 
+        this.originalConfig.provider.stage && !this.originalConfig.provider.stage.match(this.variableSyntax)
+      ) {
+        providerStage = this.originalConfig.provider.stage
+      }
+      const stage = cliOpts.stage || providerStage || process.env.NODE_ENV || 'dev'
+      /* Load env variables into process.env */
+      const values = require('env-stage-loader')({
+        // silent: true,
+        // debug: true,
+        env: stage,
+        // defaultEnv: 'prod',
+        // ignoreFiles: ['.env']
+      })
     }
 
     /* Parse variables */
