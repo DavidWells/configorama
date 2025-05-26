@@ -26,9 +26,11 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
   if (_settings.dynamicArgs && typeof _settings.dynamicArgs === 'function') {
     throw new Error('Dynamic args must be serializable value for sync usage. Use Async instead')
   }
+  if (!_settings.options) {
+    const cliArgs = require('minimist')(process.argv.slice(2))
+    _settings.options = cliArgs
+  }
   const forceSync = require('sync-rpc')
-  const cliArgs = require('minimist')(process.argv.slice(2))
-  _settings.options = Object.assign({}, _settings.options || {}, cliArgs)
   return forceSync(require.resolve('./sync'), _settings.variableSources)({
     filePath: configPathOrObject,
     settings: _settings
