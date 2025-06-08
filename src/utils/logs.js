@@ -5,7 +5,8 @@ function logHeader(message) {
     text: message, 
     rightBorder: true, 
     minWidth: 80, 
-    textStyle: 'normal',
+    textStyle: 'bold',
+    borderStyle: 'bold',
     borderColor: 'cyanBright',
   }))
 }

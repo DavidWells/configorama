@@ -193,7 +193,16 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
             fallbackData.stringValue = trimQuotes(item)
             fallbackData.isResolvedFallback = true
           }
-          
+
+          if (isVariable) {
+            const varType = item.match(variablesKnownTypes)[1]
+            fallbackData.varType = varType
+            // if (varType === 'self:') {
+            //   fallbackData.fullMatch = item.replace('self:', '')
+            //   fallbackData.variable = item.replace('self:', '')
+            //   fallbackData.varType = 'dot.prop'
+            // }
+          }
           return fallbackData
         })
       }

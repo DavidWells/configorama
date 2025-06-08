@@ -7,6 +7,7 @@ const configorama = require('../../src')
 let config
 
 process.env.envNumber = 100
+process.env.envReference = 'env var'
 
 // Setup function
 const setup = async () => {

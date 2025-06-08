@@ -44,13 +44,13 @@ const {
 const { parseFileContents } = require('./utils/parse')
 const { splitCsv } = require('./utils/splitCsv')
 const { replaceAll } = require('./utils/replaceAll')
-const { getTextAfterOccurance, findNestedVariable } = require('./utils/textUtils')
+const { getTextAfterOccurrence, findNestedVariable } = require('./utils/textUtils')
 const { getFallbackString, verifyVariable } = require('./utils/variableUtils')
 const { encodeUnknown, decodeUnknown } = require('./utils/unknownValues')
 const { mergeByKeys } = require('./utils/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
 const { findNestedVariables } = require('./utils/find-nested-variables')
-const { makeBox } = require('@davidwells/box-logger')
+const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 const { logHeader } = require('./utils/logs')
 /**
  * Maintainer's notes:
@@ -452,52 +452,69 @@ class Configorama {
             resolveOrder: [],
             resolveDetails: nested,
           }
-
+          let defaultValueIsVar = false
           function calculateResolveOrder(item) {
             if (item && item.fallbackValues) {
               let hasResolvedFallback
+              // console.log('item.fallbackValues', item.fallbackValues)
               const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
+                // console.log('f', f)
                 if (f.fallbackValues) {
                   const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                  // console.log('nestedOrder', nestedOrder)
+                  // console.log('nestedResolvedFallback', nestedResolvedFallback)
                   if (!hasResolvedFallback && nestedResolvedFallback) {
                     hasResolvedFallback = nestedResolvedFallback
                   }
                   return nestedOrder // Return just the order part
                 }
+        
                 if (!hasResolvedFallback && f.isResolvedFallback) {
                   hasResolvedFallback = f.stringValue
                 }
+                if (f.isResolvedFallback) {
+                  hasResolvedFallback = f.stringValue
+                }
+
+                if (!hasResolvedFallback && f.isVariable) {
+                  defaultValueIsVar = f
+                }
+                // console.log('hasResolvedFallback', hasResolvedFallback)
                 return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
               })).flat()
               
               return [order, hasResolvedFallback]
             }
-            return [[item.variable], false] // Return array instead of just the value
+            return [[item.variable], undefined] // Return array instead of just the value
           }
 
           const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
           varData.resolveOrder = resolveOrder
           
-          if (hasResolvedFallback) {
+          if (defaultValueIsVar) {
+            varData.defaultValueIsVar = defaultValueIsVar
+          }
+
+          // console.log('hasResolvedFallback', hasResolvedFallback)
+          if (typeof hasResolvedFallback !== 'undefined') {
             varData.defaultValue = hasResolvedFallback
           }
 
-
-          if (!varData.defaultValue) {
+          // console.log('varData.defaultValue', varData.defaultValue)
+          if (typeof varData.defaultValue === 'undefined') {
             varData.isRequired = true
           }
       
-
           if (varData.resolveOrder.length > 1) {
             varData.hasFallback = true
           }
+          //console.log('varData', varData)
 
           variableData[key] = (variableData[key] || []).concat(varData)
 
           foundVariables.push(rawValue)
         }
       })
-
 
       if (!foundVariables.length) {
         logHeader('No Variables Found in Config')
@@ -547,18 +564,30 @@ class Configorama {
         logHeader('Variable Details')
     
         const indent = ''
-        varKeys.forEach((key, i) => {
+        const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
+          // console.log('variableInstances', variableInstances)
       
           const firstInstance = variableInstances[0]
 
           let requiredText = ''
           let defaultValueSrc = ''
-          if (!firstInstance.defaultValue) {
+          if (typeof firstInstance.defaultValue === 'undefined') {
             // console.log('no default value', firstInstance)
+
+            let dotPropArr = []
+            if (firstInstance.defaultValueIsVar && (
+              firstInstance.defaultValueIsVar.varType === 'self:' ||
+              firstInstance.defaultValueIsVar.varType === 'dot.prop'
+            )) {
+              dotPropArr = [firstInstance.defaultValueIsVar]
+            }
             /* Check if the fallback variable is a self reference */
             const hasDotPropOrSelf = variableInstances.reduce((acc, v) => {
-              const dotProp = v.resolveDetails.find((d) => d.varType === 'dot.prop')
+              const dotProp = v.resolveDetails.find((d) => {
+                // console.log('d', d)
+                return d.varType === 'dot.prop'
+              })
               if (dotProp) {
                 acc.push(dotProp)
               }
@@ -567,10 +596,12 @@ class Configorama {
                 acc.push(v.resolveDetails[0])
               }
               return acc
-            }, [])
+            }, dotPropArr)
             // console.log('hasDotPropOrSelf', hasDotPropOrSelf)
+            
             if (!hasDotPropOrSelf.length) {
-              requiredText = '[Required] '
+              const debug = (false) ? JSON.stringify(firstInstance, null, 2) : ''
+              requiredText = `[Required Variable] ${debug}`
             } else {
               const fallBackValues = variableInstances.filter((v) => v.resolveDetails.find((d) => d.hasFallback)).map((v) => v.resolveDetails)
               // console.log('fallBackValues', fallBackValues)
@@ -589,6 +620,9 @@ class Configorama {
                 // truncate niceString to 100 characters
                 const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
                 firstInstance.defaultValue = truncatedString
+              } else {
+                deepLog('Missing default var', firstInstance)
+                throw new Error(`Variable misconfiguration at ${firstInstance.variable}\n\n"${hasDotPropOrSelf[0].variable}" resolves to undefined value.\n`)
               }
             }
             //this.originalConfig[key] = undefined
@@ -601,14 +635,16 @@ class Configorama {
           const keyChalk = chalk.whiteBright
           const valueChalk = chalk.hex(VALUE_HEX)
 
-          if (firstInstance.defaultValue) {
-            const defaultValueText = `${indent}${keyChalk(`DefaultValue:`.padEnd(titleText.length, ' '))}`
+          if (typeof firstInstance.defaultValue !== 'undefined') {
+            // console.log('firstInstance.defaultValue', firstInstance.defaultValue)
+            const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
+            const defaultValueText = `${indent}${keyChalk(`Default value:`.padEnd(titleText.length, ' '))}`
             // ensure padding is even 
-            varMsg += `${defaultValueText} ${valueChalk(firstInstance.defaultValue)}`
+            varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}`
           }
 
-          if(defaultValueSrc) {
-            varMsg += `\n${indent}${keyChalk('DefaultValue path:'.padEnd(titleText.length, ' '))} `
+          if (defaultValueSrc) {
+            varMsg += `\n${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
             varMsg += `${valueChalk(defaultValueSrc)}`
           }
 
@@ -620,26 +656,27 @@ class Configorama {
 
           let locationRender = valueChalk(variableInstances[0].path)
   
-          let locationLabel = `${indent}${keyChalk('Used at:'.padEnd(titleText.length, ' '))}`
+          let locationLabel = `${indent}${keyChalk('Path:'.padEnd(titleText.length, ' '))}`
           if (variableInstances.length > 1) {
             locationRender = `\n${variableInstances.map((v) => valueChalk(`${indent}- ${v.path}`)).join('\n')}`
-            const locationLabelText = `${indent}${keyChalk('Used at:')}`
+            const locationLabelText = `${indent}${keyChalk('Paths:')}`
             locationLabel = locationLabelText
           }
 
           varMsg += `\n${locationLabel} ${locationRender}`
     
           // console.log(` ${chalk.bold(key)}`)
-          console.log(makeBox(varMsg, {
-            title: `${key}`,
-            borderColor: 'gray',
-            // style: 'bold',
-            minWidth: 120,
-          }))
-          if(i < varKeys.length - 1) {
-            //console.log()
+          return {
+            text: varMsg,
+            title: `▶ ${key}`,
           }
         })
+
+        console.log(makeStackedBoxes(boxes, {
+          borderColor: 'gray',
+          minWidth: 120,
+          borderStyle: 'bold',
+        }))
       }
     
       /* Exit early if list or info flag is set */
@@ -1492,7 +1529,7 @@ Missing Value ${missingValue} - ${matchedString}
     if (filters) {
       const string = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc filter ${this.callCount}`)
       // console.log('string', string)
-      const deeperValue = getTextAfterOccurance(string, variableString)
+      const deeperValue = getTextAfterOccurrence(string, variableString)
       // console.log('deeperValue', deeperValue)
       // console.log('filters', filters)
       // console.log('variableString', variableString)

@@ -4,7 +4,7 @@
  * @param {string} search - String to search for
  * @returns {string} Text after search string or empty string if not found
  */
-function getTextAfterOccurance(str, search) {
+function getTextAfterOccurrence(str, search) {
   const index = str.indexOf(search)
   if (index === -1) return ''
   return str.substring(index)
@@ -26,6 +26,6 @@ function findNestedVariable(split, originalSource) {
 }
 
 module.exports = {
-  getTextAfterOccurance,
+  getTextAfterOccurrence,
   findNestedVariable
 } 

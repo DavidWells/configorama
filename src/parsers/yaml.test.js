@@ -110,7 +110,7 @@ resolvedDomainNameTwo: \${domainsTwo.\${opt:stage, "prod"}}
   assert.equal(result, expected)
 })
 
-test('preProcess - should wrap variables in quotes inside array brackets', () => {
+test('preProcess - should wrap variables in quotes inside array brackets two', () => {
   const input = `
 service: my-service
 custom:
