@@ -1,0 +1,9 @@
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references.html
+param: '{{resolve:ssm:parameter-name:version}}'
+secureParam: '{{resolve:ssm-secure:parameter-name:version}}'
+secrets: '{{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}'
+
+# TODO fix this in preprocessor
+paramAsObj: {{resolve:ssm:parameter-name:version}}
+secureParamAsObj: {{resolve:ssm-secure:parameter-name:version}}
+secretsAsObj: {{resolve:secretsmanager:secret-id:secret-string:json-key:version-stage:version-id}}
