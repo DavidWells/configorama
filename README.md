@@ -18,29 +18,31 @@ Configorama extends your configuration with a powerful variable system. It resol
 See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for more examples.
 
 ## Table of Contents
-<!-- ⛔️ AUTO-GENERATED-CONTENT:START (TOC:collapse=true&collapseText=Click to expand) -->
+<!-- doc-gen {TOC} collapse=true collapseText="Click to expand" -->
 <details>
 <summary>Click to expand</summary>
 
 - [About](#about)
 - [Usage](#usage)
 - [Variable Sources](#variable-sources)
-  * [Environment variables](#environment-variables)
-  * [CLI option flags](#cli-option-flags)
-  * [Self references](#self-references)
-  * [File references](#file-references)
-  * [Sync/Async file references](#syncasync-file-references)
-  * [Git references](#git-references)
-  * [Filters (experimental)](#filters-experimental)
-  * [Functions (experimental)](#functions-experimental)
-  * [More Examples](#more-examples)
+  - [Environment variables](#environment-variables)
+  - [CLI option flags](#cli-option-flags)
+  - [Self references](#self-references)
+  - [File references](#file-references)
+  - [Sync/Async file references](#syncasync-file-references)
+  - [Git references](#git-references)
+  - [Cron Values](#cron-values)
+  - [Filters (experimental)](#filters-experimental)
+  - [Functions (experimental)](#functions-experimental)
+  - [More Examples](#more-examples)
 - [Custom Variable Sources](#custom-variable-sources)
 - [FAQ](#faq)
 - [Whats new](#whats-new)
+- [Alt libs](#alt-libs)
 - [Inspiration](#inspiration)
 
 </details>
-<!-- ⛔️ AUTO-GENERATED-CONTENT:END -->
+<!-- end-doc-gen -->
 
 ## Usage
 
@@ -213,6 +215,41 @@ gitTimestampRelativePath: ${git:timestamp('../../package.json')}
 gitTimestampAbsolutePath: ${git:timestamp('package.json')}
 ```
 <!-- end-doc-gen -->
+
+
+### Cron Values
+
+Convert human-readable time expressions into cron expressions. Supports single quotes for values.
+
+```yml
+# Basic patterns
+everyMinute: ${cron('every minute')}        # * * * * *
+everyHour: ${cron('every hour')}            # 0 * * * *
+everyDay: ${cron('every day')}              # 0 0 * * *
+weekdays: ${cron('weekdays')}               # 0 0 * * 1-5
+midnight: ${cron('midnight')}               # 0 0 * * *
+noon: ${cron('noon')}                       # 0 12 * * *
+
+# Interval patterns
+every5Minutes: ${cron('every 5 minutes')}   # */5 * * * *
+every15Minutes: ${cron('every 15 minutes')} # */15 * * * *
+every2Hours: ${cron('every 2 hours')}       # 0 */2 * * *
+every3Days: ${cron('every 3 days')}         # 0 0 */3 * * *
+
+# Specific times
+at930: ${cron('at 9:30')}                   # 30 9 * * *
+at930pm: ${cron('at 9:30 pm')}              # 30 21 * * *
+at1200: ${cron('at 12:00')}                 # 0 12 * * *
+at1230am: ${cron('at 12:30 am')}            # 30 0 * * *
+
+# Weekday patterns
+mondayMorning: ${cron('on monday at 9:00')}  # 0 9 * * 1
+fridayEvening: ${cron('on friday at 17:00')} # 0 17 * * 5
+sundayNoon: ${cron('on sunday at 12:00')}    # 0 12 * * 0
+
+# Pre-existing cron expressions
+customCron: ${cron('15 2 * * *')}           # 15 2 * * *
+```
 
 ### Filters (experimental)
 
