@@ -19,6 +19,7 @@ const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
+const getValueFromCron = require('./resolvers/valueFromCron')
 const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
@@ -187,6 +188,14 @@ class Configorama {
        * ${opt:other, "fallbackValue"}
        */
       getValueFromOptions,
+      /**
+       * Cron expressions
+       * Usage:
+       * ${cron:every minute}
+       * ${cron:weekdays}
+       * ${cron:at 9:30}
+       */
+      getValueFromCron,
       /**
        * Self references
        * Usage:
