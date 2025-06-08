@@ -1,4 +1,4 @@
-const cronRefSyntax = RegExp(/^cron:/g)
+const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 
 /**
  * Convert human-readable strings to cron expressions
@@ -79,11 +79,11 @@ function parseCronExpression(input) {
   if (atTimeMatch) {
     let hour = parseInt(atTimeMatch[1])
     const minute = parseInt(atTimeMatch[2])
-    const ampm = atTimeMatch[4]
+    const amPm = atTimeMatch[4]
     
-    if (ampm && ampm.toLowerCase() === 'pm' && hour !== 12) {
+    if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
       hour += 12
-    } else if (ampm && ampm.toLowerCase() === 'am' && hour === 12) {
+    } else if (amPm && amPm.toLowerCase() === 'am' && hour === 12) {
       hour = 0
     }
     
@@ -122,11 +122,11 @@ function parseCronExpression(input) {
     const dayOfWeek = dayMap[weekdayTimeMatch[1].toLowerCase()]
     let hour = parseInt(weekdayTimeMatch[2])
     const minute = parseInt(weekdayTimeMatch[3])
-    const ampm = weekdayTimeMatch[5]
+    const amPm = weekdayTimeMatch[5]
     
-    if (ampm && ampm.toLowerCase() === 'pm' && hour !== 12) {
+    if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
       hour += 12
-    } else if (ampm && ampm.toLowerCase() === 'am' && hour === 12) {
+    } else if (amPm && amPm.toLowerCase() === 'am' && hour === 12) {
       hour = 0
     }
     
@@ -148,7 +148,9 @@ function parseCronExpression(input) {
 }
 
 function getValueFromCron(variableString) {
-  const cronExpression = variableString.split(':')[1]
+  // Get value from cron(expression)
+  const cronExpression = variableString.match(/cron\((.*)\)/)[1]
+  console.log('cronExpression', cronExpression)
   
   if (!cronExpression || cronExpression.trim() === '') {
     throw new Error(`Invalid variable syntax for cron reference "${variableString}". 
@@ -156,23 +158,33 @@ function getValueFromCron(variableString) {
 \${cron} variable must have a pattern. 
 
 Examples: 
-  \${cron:every minute}
-  \${cron:weekdays}
-  \${cron:at 9:30}
-  \${cron:every 5 minutes}
+  \${cron("every minute")}
+  \${cron("weekdays")}
+  \${cron("at 9:30")}
+  \${cron("every 5 minutes")}
 `)
+  }
+  
+  // Remove surrounding quotes if present
+  const cleanExpression = cronExpression.replace(/^['"`](.*)['"`]$/, '$1')
+  
+  // If already a cron expression, return it
+  if (cleanExpression.match(/^[\*\/,\-\d]+$/)) {
+    return cleanExpression
   }
 
   try {
-    const resolvedCron = parseCronExpression(cronExpression)
+    const resolvedCron = parseCronExpression(cleanExpression)
+    // console.log('resolvedCron', resolvedCron)
     return Promise.resolve(resolvedCron)
   } catch (error) {
-    throw new Error(`Failed to parse cron expression "${cronExpression}": ${error.message}`)
+    throw new Error(`Failed to parse cron expression "${cleanExpression}": ${error.message}`)
   }
 }
 
 module.exports = {
   type: 'cron',
+  prefix: 'cron',
   match: cronRefSyntax,
   resolver: getValueFromCron,
   // Export the parser for testing

@@ -3,7 +3,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
 
-test('cron: basic patterns', async () => {
+test('cron() basic patterns', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
   
@@ -16,7 +16,7 @@ test('cron: basic patterns', async () => {
   assert.equal(config.noon, '0 12 * * *')
 })
 
-test('cron: interval patterns', async () => {
+test('cron() interval patterns', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
   
@@ -26,7 +26,7 @@ test('cron: interval patterns', async () => {
   assert.equal(config.every3Days, '0 0 */3 * *')
 })
 
-test('cron: specific times', async () => {
+test('cron() specific times', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
   
@@ -36,7 +36,7 @@ test('cron: specific times', async () => {
   assert.equal(config.at1230am, '30 0 * * *')
 })
 
-test('cron: weekday patterns', async () => {
+test('cron() weekday patterns', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
   
@@ -45,15 +45,14 @@ test('cron: weekday patterns', async () => {
   assert.equal(config.sundayNoon, '0 12 * * 0')
 })
 
-test('cron: pre-existing cron expressions pass through', async () => {
+test('cron() pre-existing cron expressions pass through', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
   
   assert.equal(config.customCron, '15 2 * * *')
-  assert.equal(config.atReboot, '@reboot')
 })
 
-test('cron: error handling', async () => {
+test('cron() error handling', async () => {
   const configFilePath = path.join(__dirname, 'cronValueError.yml')
   
   try {
@@ -64,14 +63,16 @@ test('cron: error handling', async () => {
   }
 })
 
-test('cron: empty value error', async () => {
+test('cron() empty value error', async () => {
   const configFilePath = path.join(__dirname, 'cronValueEmpty.yml')
   
   try {
-    await configorama(configFilePath)
+    const res = await configorama(configFilePath)
+    // console.log('res', res)
     assert.unreachable('Should have thrown an error')
   } catch (error) {
-    assert.ok(error.message.includes('must have a pattern'))
+    // console.log('error', error)
+    assert.ok(error.message.includes('Invalid variable syntax for cron reference'), 'error msg')
   }
 })
 

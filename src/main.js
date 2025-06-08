@@ -188,14 +188,16 @@ class Configorama {
        * ${opt:other, "fallbackValue"}
        */
       getValueFromOptions,
+
       /**
        * Cron expressions
        * Usage:
-       * ${cron:every minute}
-       * ${cron:weekdays}
-       * ${cron:at 9:30}
+       * ${cron(every minute)}
+       * ${cron(weekdays)}
+       * ${cron(at 9:30)}
        */
       getValueFromCron,
+
       /**
        * Self references
        * Usage:
@@ -298,7 +300,6 @@ class Configorama {
 
     // const variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
     const variablesKnownTypes = combineRegexes(this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match))
-    // console.log('variablesKnownTypes', variablesKnownTypes)
     this.variablesKnownTypes = variablesKnownTypes
 
     // this.allPatterns = combineRegexes(...this.variableTypes.map((v) => v.match))
@@ -829,7 +830,7 @@ class Configorama {
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
     // console.log('hasFunc', hasFunc)
-    if (!hasFunc) {
+    if (!hasFunc || hasFunc && hasFunc[1] === 'cron') {
       return variableString
     }
     // test for object
@@ -963,6 +964,8 @@ class Configorama {
       // Initial check if value has variable string in it
       return isString(property.value) && property.value.match(this.variableSyntax)
     })
+
+    console.log('variables', variables)
 
     return map(variables, (valueObject) => {
       // console.log('valueObject', valueObject)
