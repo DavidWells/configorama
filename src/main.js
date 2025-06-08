@@ -299,7 +299,9 @@ class Configorama {
     this.variableTypes = this.variableTypes.concat(fallThroughSelfMatcher)
 
     // const variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
-    const variablesKnownTypes = combineRegexes(this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match))
+    const variablesKnownTypes = combineRegexes(
+      this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match)
+    )
     this.variablesKnownTypes = variablesKnownTypes
 
     // this.allPatterns = combineRegexes(...this.variableTypes.map((v) => v.match))
@@ -960,12 +962,23 @@ class Configorama {
    */
   populateVariables(properties) {
     // console.log('properties', properties)
-    const variables = properties.filter((property) => {
+    let variables = properties.filter((property) => {
       // Initial check if value has variable string in it
       return isString(property.value) && property.value.match(this.variableSyntax)
     })
 
-    console.log('variables', variables)
+    /*
+      console.log(`variables ${this.callCount}`, variables)
+    /** */
+
+    /* Exclude git messages from being processed */
+    // Was failing on git msgs like "xyz cron:pattern to cron(pattern) for improved clarity"
+    if (this.callCount > 1) {
+      // filter out git vars
+      variables = variables.filter(property => {
+        return !property.originalSource?.startsWith('${git:')
+      })
+    }
 
     return map(variables, (valueObject) => {
       // console.log('valueObject', valueObject)
