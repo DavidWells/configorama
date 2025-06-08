@@ -3,8 +3,10 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../src')
+const { execSync } = require('child_process')
 
 let config
+let currentBranch
 
 process.env.envReference = 'env var'
 
@@ -12,6 +14,14 @@ process.env.envReference = 'env var'
 const setup = async () => {
   const args = {
     stage: 'dev',
+  }
+
+  // Get current git branch
+  try {
+    currentBranch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim()
+  } catch (err) {
+    console.error('Failed to get current git branch:', err)
+    process.exit(1)
   }
 
   const configFile = path.join(__dirname, 'gitVariables.yml')
@@ -50,11 +60,11 @@ test("repo urls", () => {
 })
 
 test('${git:dir}', () => {
-  assert.is(config.dir, 'https://github.com/DavidWells/configorama/tree/master/tests/gitVariables')
+  assert.is(config.dir, `https://github.com/DavidWells/configorama/tree/${currentBranch}/tests/gitVariables`)
 })
 
-test('${git:branch} === master', () => {
-  assert.is(config.branch, 'master')
+test('${git:branch} matches current branch', () => {
+  assert.is(config.branch, currentBranch)
 })
 
 test('sha1: ${git:sha1}', async () => {

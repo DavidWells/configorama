@@ -1,0 +1,1 @@
+invalidPattern: ${cron(this is not a valid pattern)}

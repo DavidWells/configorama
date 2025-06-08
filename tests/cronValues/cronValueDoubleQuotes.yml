@@ -1,0 +1,27 @@
+# Basic patterns
+everyMinute: ${cron("every minute")}
+everyHour: ${cron("every hour")}
+everyDay: ${cron("every day")}
+weekdays: ${cron("weekdays")}
+midnight: ${cron("midnight")}
+noon: ${cron("noon")}
+
+# Interval patterns
+every5Minutes: ${cron("every 5 minutes")}
+every15Minutes: ${cron("every 15 minutes")}
+every2Hours: ${cron("every 2 hours")}
+every3Days: ${cron("every 3 days")}
+
+# Specific times
+at930: ${cron("at 9:30")}
+at930pm: ${cron("at 9:30 pm")}
+at1200: ${cron("at 12:00")}
+at1230am: ${cron("at 12:30 am")}
+
+# Weekday patterns
+mondayMorning: ${cron("on monday at 9:00")}
+fridayEvening: ${cron("on friday at 17:00")}
+sundayNoon: ${cron("on sunday at 12:00")}
+
+# Pre-existing cron expressions
+customCron: ${cron("15 2 * * *")} 
