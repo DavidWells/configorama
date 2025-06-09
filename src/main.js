@@ -2041,7 +2041,6 @@ Check if your javascript is returning the correct data.`
         }
         if (fileExtension === 'ini') {
           valueToPopulate = INI.toJson(valueToPopulate)
-          return Promise.resolve(valueToPopulate)
         }
         // console.log('deep', variableString)
         // console.log('matchedFileString', matchedFileString)
@@ -2067,17 +2066,6 @@ Please use ":" to reference sub properties`
 
       if (fileExtension === 'ini') {
         valueToPopulate = INI.parse(valueToPopulate)
-        // File reference has :subKey lookup. Must dig deeper
-        if (matchedFileString !== variableString) {
-          let deepProperties = variableString.replace(matchedFileString, '')
-          if (deepProperties.substring(0, 1) !== ':') {
-            const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" to reference sub properties`
-            return Promise.reject(new Error(errorMessage))
-          }
-          deepProperties = deepProperties.slice(1).split('.')
-          return this.getDeeperValue(deepProperties, valueToPopulate)
-        }
         return Promise.resolve(valueToPopulate)
       }
 
