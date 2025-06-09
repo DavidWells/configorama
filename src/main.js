@@ -13,6 +13,7 @@ const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const chalk = require('./utils/chalk')
+const resolveAlias = require('./utils/resolveAlias')
 
 /* Default Value resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
@@ -1938,7 +1939,10 @@ Unable to resolve configuration variable
       matchedFileString.replace(fileRefSyntax, (match, varName) => varName.trim()).replace('~', os.homedir()),
     )
 
-    let fullFilePath = path.isAbsolute(relativePath) ? relativePath : path.join(this.configPath, relativePath)
+    // Resolve alias if the path contains alias syntax
+    const resolvedPath = resolveAlias(relativePath, this.configPath)
+
+    let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(this.configPath, resolvedPath)
 
     // console.log('fullFilePath', fullFilePath)
 
@@ -1947,13 +1951,13 @@ Unable to resolve configuration variable
       fullFilePath = fs.realpathSync(fullFilePath)
 
       // Only match files that are relative
-    } else if (relativePath.match(/\.\//)) {
+    } else if (resolvedPath.match(/\.\//)) {
       // TODO test higher parent refs
-      const cleanName = path.basename(relativePath)
+      const cleanName = path.basename(resolvedPath)
       fullFilePath = findUp.sync(cleanName, { cwd: this.configPath })
     }
 
-    let fileExtension = relativePath.split('.')
+    let fileExtension = resolvedPath.split('.')
 
     fileExtension = fileExtension[fileExtension.length - 1]
 
