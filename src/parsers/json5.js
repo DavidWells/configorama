@@ -45,6 +45,7 @@ function toToml(jsonContents) {
 module.exports = {
   parse: parse,
   dump: dump,
+  stringify: JSON.stringify,
   toYaml: toYaml,
   toYml: toYaml,
   toToml: toToml

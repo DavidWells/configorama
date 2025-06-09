@@ -35,7 +35,7 @@ function toYaml(iniContents) {
 function toJson(iniContents) {
   let json
   try {
-    json = JSON.dump(parse(iniContents))
+    json = JSON.stringify(parse(iniContents))
   } catch (e) {
     throw new Error(e)
   }
