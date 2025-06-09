@@ -24,6 +24,7 @@ const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
 const TOML = require('./parsers/toml')
+const INI = require('./parsers/ini')
 /* functions */
 const md5Function = require('./functions/md5')
 
@@ -2038,6 +2039,10 @@ Check if your javascript is returning the correct data.`
         if (fileExtension === 'toml') {
           valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
         }
+        if (fileExtension === 'ini') {
+          valueToPopulate = INI.toJson(valueToPopulate)
+          return Promise.resolve(valueToPopulate)
+        }
         // console.log('deep', variableString)
         // console.log('matchedFileString', matchedFileString)
         let deepProperties = variableString.replace(matchedFileString, '')
@@ -2057,6 +2062,22 @@ Please use ":" to reference sub properties`
 
       if (fileExtension === 'toml') {
         valueToPopulate = TOML.parse(valueToPopulate)
+        return Promise.resolve(valueToPopulate)
+      }
+
+      if (fileExtension === 'ini') {
+        valueToPopulate = INI.parse(valueToPopulate)
+        // File reference has :subKey lookup. Must dig deeper
+        if (matchedFileString !== variableString) {
+          let deepProperties = variableString.replace(matchedFileString, '')
+          if (deepProperties.substring(0, 1) !== ':') {
+            const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
+Please use ":" to reference sub properties`
+            return Promise.reject(new Error(errorMessage))
+          }
+          deepProperties = deepProperties.slice(1).split('.')
+          return this.getDeeperValue(deepProperties, valueToPopulate)
+        }
         return Promise.resolve(valueToPopulate)
       }
 

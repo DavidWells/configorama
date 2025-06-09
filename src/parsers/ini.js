@@ -1,11 +1,11 @@
 const INI = require('ini')
 const YAML = require('./yaml')
-const JSON = require('./json5')
+const JSON5 = require('./json5')
 
 function parse(contents) {
   let object
   try {
-    object = INI.parse(contents)
+    object = JSON.parse(JSON.stringify(INI.parse(contents)))
   } catch (e) {
     throw new Error(e)
   }

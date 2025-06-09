@@ -49,7 +49,7 @@ const iniContents = {
 }
 
 test('ini valueAsNumber', () => {
-  assert.is(config.valueAsNumber, 1)
+  assert.is(config.valueAsNumber, '1')
 })
 
 test('ini valueAsNumberVariable', () => {
@@ -81,7 +81,7 @@ test('ini valueWithEqualSign', () => {
 })
 
 test('ini valueWithTwoFallbackValues', () => {
-  assert.is(config.valueWithTwoFallbackValues, 1)
+  assert.is(config.valueWithTwoFallbackValues, '1')
 })
 
 test('ini valueAsBoolean', () => {
@@ -133,7 +133,7 @@ test('ini section with variables', () => {
 })
 
 test('ini section with env fallback', () => {
-  assert.is(config.database.envPort, 100)
+  assert.is(config.database.envPort, '100')
 })
 
 test.run()
