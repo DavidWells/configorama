@@ -1,11 +1,12 @@
 const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
+const INI = require('../parsers/ini')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 /**
  * Parse file contents based on file extension
  * @param {string} fileContents - Raw file contents to parse
- * @param {string} fileType - File extension (.yml, .yaml, .json, etc)
+ * @param {string} fileType - File extension (.yml, .yaml, .json, .ini, etc)
  * @param {string} filePath - Full file path (used for error messages)
  * @param {RegExp} varRegex - Variable syntax regex
  * @param {Object} opts - Additional options
@@ -34,6 +35,8 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
     }
   } else if (fileType.match(/\.(toml)/)) {
     configObject = TOML.parse(fileContents)
+  } else if (fileType.match(/\.(ini)/)) {
+    configObject = INI.parse(fileContents)
   } else if (fileType.match(/\.(json)/)) {
     configObject = JSON.parse(fileContents)
   } else if (fileType.match(/\.(js)/)) {
