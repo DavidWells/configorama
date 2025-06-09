@@ -1,0 +1,6 @@
+appName: "My Test App"
+version: "1.0.0"
+settings:
+  theme: "dark"
+  language: "en"
+  timeout: 30

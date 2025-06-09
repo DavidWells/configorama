@@ -1,0 +1,25 @@
+# Test alias resolution functionality
+
+# Standard file reference (should work as before)
+normalFileRef: ${file(./src/test-data.json)}
+
+# Alias references using @alias
+aliasJsonFile: ${file(@alias/test-data.json)}
+aliasJsonProperty: ${file(@alias/test-data.json):database.host}
+aliasJsonNestedProperty: ${file(@alias/test-data.json):features.enableLogging}
+
+# Alias references using @config
+configYmlFile: ${file(@config/app-config.yml)}
+configYmlProperty: ${file(@config/app-config.yml):appName}
+configYmlNestedProperty: ${file(@config/app-config.yml):settings.theme}
+
+# Alias references using @data  
+dataJsonFile: ${file(@data/secrets.json)}
+dataJsonProperty: ${file(@data/secrets.json):apiKey}
+dataJsonNestedProperty: ${file(@data/secrets.json):tokens.access}
+
+# Test fallback for missing alias file
+missingAliasFile: ${file(@alias/nonexistent.json), "default-value"}
+
+# Test alias with quotes
+quotedAlias: ${file("@config/app-config.yml"):version}
