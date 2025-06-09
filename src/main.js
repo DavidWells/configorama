@@ -25,6 +25,7 @@ const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
 const TOML = require('./parsers/toml')
+const INI = require('./parsers/ini')
 /* functions */
 const md5Function = require('./functions/md5')
 
@@ -2043,6 +2044,9 @@ Check if your javascript is returning the correct data.`
         if (fileExtension === 'toml') {
           valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
         }
+        if (fileExtension === 'ini') {
+          valueToPopulate = INI.toJson(valueToPopulate)
+        }
         // console.log('deep', variableString)
         // console.log('matchedFileString', matchedFileString)
         let deepProperties = variableString.replace(matchedFileString, '')
@@ -2062,6 +2066,11 @@ Please use ":" to reference sub properties`
 
       if (fileExtension === 'toml') {
         valueToPopulate = TOML.parse(valueToPopulate)
+        return Promise.resolve(valueToPopulate)
+      }
+
+      if (fileExtension === 'ini') {
+        valueToPopulate = INI.parse(valueToPopulate)
         return Promise.resolve(valueToPopulate)
       }
 

@@ -16,6 +16,7 @@
   },
   "scripts": {
     "docs": "node ./scripts/docs.js",
+    "t": "./scripts/run-tests.sh",
     "test": "npm run test:lib && uvu tests \".*\\.test.js$\" ",
     "test:tests": "uvu tests \".*\\.test.js$\" ",
     "test:api": "uvu tests/api api.test.js",
@@ -41,6 +42,7 @@
     "env-stage-loader": "^1.1.1",
     "find-up": "^3.0.0",
     "git-url-parse": "^14.0.0",
+    "ini": "^5.0.0",
     "js-yaml": "^3.14.1",
     "json5": "^2.2.3",
     "lodash.assign": "^4.2.0",
