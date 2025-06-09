@@ -1,5 +1,6 @@
 const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
+const INI = require('../parsers/ini')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 /**
@@ -34,6 +35,8 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
     }
   } else if (fileType.match(/\.(toml)/)) {
     configObject = TOML.parse(fileContents)
+  } else if (fileType.match(/\.(ini)/)) {
+    configObject = INI.parse(fileContents)
   } else if (fileType.match(/\.(json)/)) {
     configObject = JSON.parse(fileContents)
   } else if (fileType.match(/\.(js)/)) {
