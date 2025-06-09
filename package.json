@@ -16,6 +16,7 @@
   },
   "scripts": {
     "docs": "node ./scripts/docs.js",
+    "t": "./scripts/run-tests.sh",
     "test": "npm run test:lib && uvu tests \".*\\.test.js$\" ",
     "test:tests": "uvu tests \".*\\.test.js$\" ",
     "test:api": "uvu tests/api api.test.js",
