@@ -2,79 +2,102 @@ const path = require('path')
 const fs = require('fs')
 const findUp = require('find-up')
 
-let aliasMappings = null
+const DEBUG = false
+const DEBUG_LOG = (message) => {
+  if (DEBUG) {
+    DEBUG_LOG(message)
+  }
+}
+/**
+ * Finds the nearest config file (tsconfig.json or jsconfig.json) in the directory tree
+ * @param {string} configDir - The directory to start searching from
+ * @returns {string|null} - Path to the config file or null if not found
+ */
+function findConfigFile(configDir) {
+  // Try tsconfig.json first
+  const tsconfigPath = findUp.sync('tsconfig.json', { cwd: configDir })
+  if (tsconfigPath) {
+    return tsconfigPath
+  }
+
+  // Fall back to jsconfig.json
+  const jsconfigPath = findUp.sync('jsconfig.json', { cwd: configDir })
+  if (jsconfigPath) {
+    return jsconfigPath
+  }
+
+  return null
+}
 
 /**
- * Resolves path aliases using TypeScript path mappings from tsconfig.json
+ * Resolves path aliases using TypeScript/JavaScript path mappings from config files
  * @param {string} filePath - The potentially aliased file path
  * @param {string} configDir - The base directory to search for config files
  * @returns {string} - The resolved file path
  */
 function resolveAlias(filePath, configDir) {
-  console.log('resolveAlias', filePath, configDir)
-  console.log('aliasMappings', aliasMappings)
-  // Only process paths that start with alias syntax (contain @)
-  if (!filePath.includes('@')) {
-    return filePath
-  }
-
   try {
-    // Lazy load alias mappings only when needed
-    if (!aliasMappings) {
-      // Find tsconfig.json in the config directory
-      const tsconfigPath = findUp.sync('tsconfig.json', { cwd: configDir })
-      if (!tsconfigPath) {
-        throw new Error('No tsconfig.json found in directory tree')
-      }
-
-      // Read and parse tsconfig.json
-      const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'))
-      const { paths, baseUrl } = tsconfig.compilerOptions || {}
-
-      if (!paths || !baseUrl) {
-        throw new Error('No paths or baseUrl found in tsconfig.json')
-      }
-
-      // Convert TypeScript path mappings to our format
-      aliasMappings = {}
-      for (const [alias, [mapping]] of Object.entries(paths)) {
-        // Remove the /* from the alias and mapping
-        const cleanAlias = alias.replace('/*', '')
-        const cleanMapping = mapping.replace('/*', '')
-        aliasMappings[cleanAlias] = path.resolve(path.dirname(tsconfigPath), baseUrl, cleanMapping)
-      }
-      
-      // Log successful initialization
-      console.log(`Initialized alias mappings with config from: ${tsconfigPath}`)
-      console.log('Alias mappings:', aliasMappings)
+    // Find and load config file
+    const configPath = findConfigFile(configDir)
+    if (!configPath) {
+      console.warn(
+        `Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`
+      )
+      return filePath
     }
 
+    // Read and parse config file
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const { paths = {}, baseUrl = '.' } = config.compilerOptions || {}
+
     // Extract the alias prefix and path
-    const match = filePath.match(/^(@[^/]+)(\/.*)$/)
+    // Match any non-slash characters at the start of the path
+    const match = filePath.match(/^([^/]+)(\/.*)?$/)
     if (!match) {
       return filePath
     }
 
-    const [, aliasPrefix, restPath] = match
-    // Use aliasPrefix directly as key (e.g. '@alias')
-    const aliasKey = aliasPrefix
+    const [, aliasPrefix, restPath = ''] = match
 
-    // Check if we have a mapping for this alias
-    if (aliasMappings && aliasMappings[aliasKey]) {
-      // Join the mapped directory with the rest of the path (removing leading slash)
-      const mappedDir = aliasMappings[aliasKey]
-      const relativeRest = restPath.replace(/^\//, '')
-      const resolvedPath = path.join(mappedDir, relativeRest)
-      
-      // Log the resolution for debugging
-      console.log(`Resolving ${filePath} to ${resolvedPath}`)
-      
+    // Try exact match first (e.g. settings)
+    const exactKey = aliasPrefix
+    if (paths[exactKey]) {
+      const mappedPath = paths[exactKey][0]
+      const resolvedPath = path.resolve(path.dirname(configPath), baseUrl, mappedPath)
+      DEBUG_LOG(`Resolving exact alias ${filePath} to ${resolvedPath}`)
       return resolvedPath
     }
-    
+
+    // Try wildcard match (e.g. alias/*)
+    const wildcardKey = `${aliasPrefix}/*`
+    if (paths[wildcardKey]) {
+      const mappedPath = paths[wildcardKey][0]
+      const basePath = path.resolve(path.dirname(configPath), baseUrl, mappedPath.replace('*', ''))
+      const relativeRest = restPath.replace(/^\//, '')
+      const resolvedPath = path.join(basePath, relativeRest)
+      DEBUG_LOG(`Resolving wildcard alias ${filePath} to ${resolvedPath}`)
+      return resolvedPath
+    }
+
+    // Try nested alias resolution
+    const nestedMatch = filePath.match(/^([^/]+\/[^/]+)(\/.*)?$/)
+    if (nestedMatch) {
+      const [, nestedPrefix, nestedRest = ''] = nestedMatch
+      const nestedKey = `${nestedPrefix}/*`
+      if (paths[nestedKey]) {
+        const mappedPath = paths[nestedKey][0]
+        const basePath = path.resolve(path.dirname(configPath), baseUrl, mappedPath.replace('*', ''))
+        const relativeRest = nestedRest.replace(/^\//, '')
+        const resolvedPath = path.join(basePath, relativeRest)
+        DEBUG_LOG(`Resolving nested alias ${filePath} to ${resolvedPath}`)
+        return resolvedPath
+      }
+    }
+
     // Fall back to original path if no alias matched
+    console.warn(`Warning: No alias mapping found for ${filePath}`)
     return filePath
-    
+
   } catch (error) {
     // If alias resolution fails, fall back to original path
     console.warn(`Warning: Failed to resolve alias for "${filePath}":`, error.message)
@@ -82,4 +105,38 @@ function resolveAlias(filePath, configDir) {
   }
 }
 
-module.exports = resolveAlias
+/**
+ * Gets all configured aliases from tsconfig.json or jsconfig.json
+ * @param {string} configDir - The base directory to search for config files
+ * @returns {Object} - Object containing alias names and their resolved paths
+ */
+function getAliases(configDir) {
+  try {
+    const configPath = findConfigFile(configDir)
+    if (!configPath) {
+      console.warn(`Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`)
+      return { names: [], lookup: [] }
+    }
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const { paths = {}, baseUrl = '.' } = config.compilerOptions || {}
+
+    const names = Object.keys(paths).map(key => key.replace('/*', ''))
+    const lookup = Object.entries(paths).map(([key, [value]]) => {
+      const name = key.replace('/*', '')
+      const absPath = path.resolve(path.dirname(configPath), baseUrl, value.replace('/*', ''))
+      const relPath = path.relative(configDir, absPath)
+      return { name, absPath, relPath }
+    })
+
+    return { names, lookup }
+  } catch (error) {
+    console.warn(`Warning: Failed to get aliases:`, error.message)
+    return { names: [], lookup: [] }
+  }
+}
+
+module.exports = {
+  resolveAlias,
+  getAliases
+} 

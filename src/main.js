@@ -13,7 +13,7 @@ const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const chalk = require('./utils/chalk')
-const resolveAlias = require('./utils/resolveAlias')
+const { resolveAlias } = require('./utils/resolveAlias')
 
 /* Default Value resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
@@ -968,8 +968,8 @@ class Configorama {
       return isString(property.value) && property.value.match(this.variableSyntax)
     })
 
-    //*
-      console.log(`variables ${this.callCount}`, variables)
+    /*
+    console.log(`variables ${this.callCount}`, variables)
     /** */
 
     /* Exclude git messages from being processed */
@@ -1022,7 +1022,7 @@ class Configorama {
     }
 
     const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
-    console.log('leaves', leaves)
+    // console.log('leaves', leaves)
     const populations = this.populateVariables(leaves)
     // console.log("FILL LEAVES", populations)
 
