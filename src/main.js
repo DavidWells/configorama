@@ -72,7 +72,7 @@ const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
-const fileRefSyntax = RegExp(/^file\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const envRefSyntax = RegExp(/^env:/g)
@@ -968,7 +968,7 @@ class Configorama {
       return isString(property.value) && property.value.match(this.variableSyntax)
     })
 
-    /*
+    //*
       console.log(`variables ${this.callCount}`, variables)
     /** */
 
@@ -1022,7 +1022,7 @@ class Configorama {
     }
 
     const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
-    // console.log('leaves', leaves)
+    console.log('leaves', leaves)
     const populations = this.populateVariables(leaves)
     // console.log("FILL LEAVES", populations)
 
@@ -1941,6 +1941,7 @@ Unable to resolve configuration variable
 
     // Resolve alias if the path contains alias syntax
     const resolvedPath = resolveAlias(relativePath, this.configPath)
+    console.log('resolvedPath', resolvedPath)
 
     let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(this.configPath, resolvedPath)
 

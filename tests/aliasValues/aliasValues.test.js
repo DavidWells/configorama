@@ -16,9 +16,11 @@ const setup = async () => {
 
   try {
     const configFile = path.join(__dirname, 'aliasValues.yml')
+    const configDir = path.dirname(configFile)
 
     const rawConfig = await configorama(configFile, {
-      options: args
+      options: args,
+      // configPath: configDir
     })
 
     config = createTrackingProxy(rawConfig)
