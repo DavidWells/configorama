@@ -151,24 +151,16 @@ class Configorama {
       const fileDirectory = path.dirname(path.resolve(fileOrObject))
       const fileType = path.extname(fileOrObject)
 
-      // Parse file contents using extracted function
-      const configObject = parseFileContents(
-        fileContents, 
-        fileType, 
-        fileOrObject, 
-        varRegex, 
-        this.opts
-      )
-
       this.configFilePath = fileOrObject
-      // set config objects
-      this.config = configObject
+      // Set configFileType
+      this.configFileType = fileType
       // Keep a copy of the original file contents
       this.originalString = fileContents
-      // Keep a copy
-      this.originalConfig = cloneDeep(configObject)
       // Set configPath for file references
       this.configPath = fileDirectory
+      // Initialize config as null - will be populated in init
+      this.config = null
+      this.originalConfig = null
     }
 
     // Track promise resolution
@@ -718,14 +710,28 @@ class Configorama {
    * @param cliOpts An options hive to use for ${opt:...} variables.
    * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
    */
-  init(cliOpts) {
+  async init(cliOpts) {
     this.options = cliOpts || {}
     const configoramaOpts = this.opts
+
+    // If we have a file path but no config yet, parse it now
+    if (this.configFilePath && !this.config) {
+      const configObject = await parseFileContents(
+        this.originalString,
+        this.configFileType,
+        this.configFilePath,
+        this.variableSyntax,
+        this.opts
+      )
+      this.config = configObject
+      this.originalConfig = cloneDeep(configObject)
+    }
+
     const originalConfig = this.originalConfig
 
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
-      return Promise.resolve(originalConfig)
+      return Promise.resolve(this.originalConfig)
     }
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
@@ -2031,6 +2037,12 @@ Check if your javascript is returning the correct data.`
       })
     }
 
+
+    if (fileExtension === 'ts') {
+      // Resolve the values
+      return Promise.resolve('LOL')
+    }
+
     // Process everything except JS
     if (fileExtension !== 'js') {
       /* Read initial file */
@@ -2079,6 +2091,7 @@ Please use ":" to reference sub properties`
         return Promise.resolve(valueToPopulate)
       }
     }
+    console.log('fall thru', valueToPopulate)
     return Promise.resolve(valueToPopulate)
   }
   getVariableFromDeep(variableString) {
