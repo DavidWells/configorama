@@ -2046,8 +2046,8 @@ Check if your javascript is returning the correct data.`
 
       try {
         const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
-        console.log('fullFilePath', fullFilePath)
-        console.log('tsFile', tsFile)
+        // console.log('fullFilePath', fullFilePath)
+        // console.log('tsFile', tsFile)
         returnValueFunction = tsFile.config || tsFile.default || tsFile
 
         if (variableArray[1]) {
