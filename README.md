@@ -178,7 +178,7 @@ database: ${file(./config.ts):database}
 **TypeScript Object Export:**
 
 ```typescript
-/* config.ts */
+/* typescript-config.ts */
 interface DatabaseConfig {
   host: string;
   port: number;
@@ -186,12 +186,19 @@ interface DatabaseConfig {
   ssl: boolean;
 }
 
+interface ApiConfig {
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+}
+
 interface ConfigObject {
   environment: string;
   database: DatabaseConfig;
-  api: {
-    baseUrl: string;
-    timeout: number;
+  api: ApiConfig;
+  features: {
+    enableNewFeature: boolean;
+    debugMode: boolean;
   };
 }
 
@@ -206,7 +213,12 @@ function createConfig(): ConfigObject {
     },
     api: {
       baseUrl: '${env:API_BASE_URL, "http://localhost:3000"}',
-      timeout: 5000
+      timeout: 5000,
+      retries: 3
+    },
+    features: {
+      enableNewFeature: '${opt:stage}' === 'production',
+      debugMode: '${env:DEBUG, "false"}' === 'true'
     }
   }
 }
@@ -217,23 +229,72 @@ export = createConfig
 **TypeScript Async Function:**
 
 ```typescript
-/* async-secrets.ts */
-interface Secrets {
+/* typescript-async.ts */
+interface SecretStore {
   apiKey: string;
   dbPassword: string;
+  jwtSecret: string;
 }
 
-async function fetchSecrets(): Promise<Secrets> {
-  // Simulate async secret fetching
-  await new Promise(resolve => setTimeout(resolve, 100))
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function fetchSecretsFromVault(): Promise<SecretStore> {
+  console.log('Fetching secrets from vault...')
+  
+  // Simulate async operations like fetching from AWS Secrets Manager, HashiCorp Vault, etc.
+  await delay(100)
   
   return {
-    apiKey: process.env.SECRET_API_KEY || 'default-key',
-    dbPassword: process.env.DB_PASSWORD || 'default-password'
+    apiKey: process.env.API_KEY || 'dev-api-key',
+    dbPassword: process.env.DB_PASSWORD || 'dev-password',
+    jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret'
   }
 }
 
-export = fetchSecrets
+export = fetchSecretsFromVault
+```
+
+**Complete Example Configuration:**
+
+```yml
+# config-with-typescript.yml
+service: my-awesome-app
+
+# Load configuration from TypeScript file
+provider: ${file(./typescript-config.ts)}
+
+# Load secrets asynchronously from TypeScript file
+secrets: ${file(./typescript-async.ts)}
+
+# Mix TypeScript with other configuration
+custom:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-east-1"}
+  
+  # You can also use TypeScript files for specific sections
+  databaseConfig: ${file(./typescript-config.ts):database}
+  
+  # Environment-specific overrides
+  stageVariables:
+    dev:
+      logLevel: debug
+    prod:
+      logLevel: info
+
+# Regular configuration values
+resources:
+  description: "Configuration loaded with TypeScript support"
+  timestamp: ${timestamp}
+  
+functions:
+  hello:
+    handler: handler.hello
+    environment:
+      LOG_LEVEL: ${self:custom.stageVariables.${self:custom.stage}.logLevel}
+      DB_HOST: ${self:provider.database.host}
+      API_KEY: ${self:secrets.apiKey}
 ```
 
 **Installation Requirements:**
