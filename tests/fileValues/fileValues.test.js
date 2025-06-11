@@ -147,4 +147,20 @@ test('doubleQuotes', () => {
   })
 })
 
+test('tsAsyncValue', () => {
+  assert.equal(config.tsAsyncValue, 'async-ts-value')
+})
+
+test('tsSyncValue', () => {
+  assert.equal(config.tsSyncValue, {
+    syncValue: 'sync-ts-value',
+    computedValue: config.tsSyncValue.computedValue // Just verify it exists
+  })
+  assert.ok(config.tsSyncValue.computedValue > 0)
+})
+
+test('tsWithArgs', () => {
+  assert.equal(config.tsWithArgs, 'async-ts-value')
+})
+
 test.run()

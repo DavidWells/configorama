@@ -76,3 +76,15 @@ additionalValues: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
 
 # TODO fix file path refs
 additionalValuesTWO: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+
+########################
+# TypeScript file references
+########################
+# Import TypeScript async function
+tsAsyncValue: ${file(./async-value.ts)}
+
+# Import TypeScript sync function
+tsSyncValue: ${file(./sync-value.ts)}
+
+# Import TypeScript function with args
+tsWithArgs: ${file(./async-value.ts, ${env:MY_SECRET}, ${self:normalKey})}

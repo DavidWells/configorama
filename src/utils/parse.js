@@ -1,6 +1,7 @@
 const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
 const INI = require('../parsers/ini')
+const { executeTypeScriptFileSync } = require('../parsers/typescript')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 /**
@@ -54,6 +55,12 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
       }
     } catch (err) {
       throw new Error(err)
+    }
+  } else if (fileType.match(/\.(ts)/)) {
+    try {
+      configObject = executeTypeScriptFileSync(filePath, opts)
+    } catch (err) {
+      throw new Error(`Failed to execute TypeScript file ${filePath}: ${err.message}`)
     }
   }
 
