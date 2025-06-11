@@ -56,7 +56,33 @@ function createBeginResolution(config: ResolvedConfig): ResolvedConfig {
   return config
 }
 
+function createOtherResolution(config: any): ConfigObject {
+  return config
+}
+
 // --- Usage and Final Error Example ---
+
+const inlineConfig: ConfigObject = {
+  environment: 'development',
+  lol: {
+    cool: 'beans',
+  },
+  database: {
+    host: 'localhost',
+    port: 5432,
+    database: 'myapp',
+    ssl: false
+  },
+  api: {
+    baseUrl: 'http://localhost:3000',
+    timeout: 5000,
+    retries: 3
+  },
+  features: {
+    enableNewFeature: true,
+    debugMode: false
+  }
+}
 
 function configFinal(): ConfigObject {
   return {
@@ -128,6 +154,49 @@ const myConfig = createBeginResolution({
   features: { enableNewFeature: '${env:NEW_FEATURE, true}', debugMode: false },
 })
 
+// ───────────────────────────────
+// Works with as ConfigObject
+const x = myConfig as ConfigObject
+const num = x.database.port - 100
+// Broken
+const x2 = /** @type {ConfigObject} */ (myConfig)
+const num2 = x2.database.port - 100
+// Works with Number() wrapper
+const x2b = /** @type {ConfigObject} */ (myConfig)
+const num2b = Number(x2b.database.port) - 100
+// ───────────────────────────────
+// Broken
+const x30 = myConfig as ResolvedConfig
+const num30 = x30.database.port - 100
+// Broken
+const x3 = /** @type {ResolvedConfig} */ (myConfig)
+const num3 = x3.database.port - 100
+// Works with Number() wrapper
+const x3a = /** @type {ResolvedConfig} */ (myConfig)
+const num3a = Number(x3a.database.port) - 100
+// Works with Number() wrapper
+const x4 = inlineConfig as ConfigObject
+const num4 = Number(x3.database.port) - 100
+// Works with as ConfigObject
+const x4a = inlineConfig as ConfigObject
+const num4a = x4a.database.port - 100
+// ───────────────────────────────
+
+// Broken
+/**
+* @type {ConfigObject}
+*/
+const y = myConfig
+const numY4 = y.database.port - 100
+
+// Broken
+const y1 = /** @type {typeof inlineConfig} */ (myConfig)
+const num44 = y1.database.port - 100
+
+// Works
+const z = myConfig as typeof inlineConfig
+const num5 = z.database.port - 100
+
 // This config is entirely valid and will now have ZERO errors.
 const myValidConfig = createBeginResolution({
   environment: '${opt:stage, "development"}',
@@ -144,3 +213,5 @@ const myValidConfig = createBeginResolution({
   api: { baseUrl: '${env:API_BASE_URL, "http://localhost:3000"}', timeout: 5000, retries: 3 },
   features: { enableNewFeature: '${env:NEW_FEATURE, true}', debugMode: false },
 })
+
+console.log(myValidConfig.environment + ' ' + myValidConfig.database.port)
