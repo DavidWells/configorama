@@ -1,4 +1,3 @@
-# .github/workflows/claude.yml
 name: Claude PR Assistant
 
 on:
@@ -30,12 +29,19 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Setup Env
+        id: setup-env
+        uses: DavidWells/actions/get-claude-tokens@master
+        with:
+          api-key: ${{ secrets.CLAUDE_CREDS_API_KEY }}
+          api-endpoint: ${{ secrets.CLAUDE_CREDS_API }}
+
       - name: Run Claude PR Action
         uses: davidwells/claude-code-action@main
         with:
           use_oauth: true
-          claude_access_token: ${{ secrets.CLAUDE_ACCESS_TOKEN }}
-          claude_refresh_token: ${{ secrets.CLAUDE_REFRESH_TOKEN }}
-          claude_expires_at: ${{ secrets.CLAUDE_EXPIRES_AT }}
-          model: 'claude-sonnet-4-20250514'
+          claude_access_token: ${{ steps.setup-env.outputs.access-token }}
+          claude_refresh_token: ${{ steps.setup-env.outputs.refresh-token }}
+          claude_expires_at: ${{ steps.setup-env.outputs.expires-at }}
+          model: ${{ steps.setup-env.outputs.model || 'claude-sonnet-4-20250514' }}
           timeout_minutes: "60"
