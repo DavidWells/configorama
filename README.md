@@ -30,6 +30,7 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [Self references](#self-references)
   - [File references](#file-references)
   - [Sync/Async file references](#syncasync-file-references)
+  - [TypeScript file references](#typescript-file-references)
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
   - [Filters (experimental)](#filters-experimental)
@@ -158,6 +159,101 @@ async function fetchSecretsFromRemoteStore(config) {
 
 module.exports = fetchSecretsFromRemoteStore
 ```
+
+### TypeScript file references
+
+Configure with full TypeScript support using modern tsx execution engine with ts-node fallback.
+
+```yml
+# TypeScript configuration object
+config: ${file(./config.ts)}
+
+# TypeScript async function
+secrets: ${file(./async-secrets.ts)}
+
+# Specific property from TypeScript export
+database: ${file(./config.ts):database}
+```
+
+**TypeScript Object Export:**
+
+```typescript
+/* config.ts */
+interface DatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  ssl: boolean;
+}
+
+interface ConfigObject {
+  environment: string;
+  database: DatabaseConfig;
+  api: {
+    baseUrl: string;
+    timeout: number;
+  };
+}
+
+function createConfig(): ConfigObject {
+  return {
+    environment: '${opt:stage, "development"}',
+    database: {
+      host: '${env:DB_HOST, "localhost"}',
+      port: parseInt('${env:DB_PORT, "5432"}'),
+      database: '${env:DB_NAME, "myapp"}',
+      ssl: '${env:NODE_ENV}' === 'production'
+    },
+    api: {
+      baseUrl: '${env:API_BASE_URL, "http://localhost:3000"}',
+      timeout: 5000
+    }
+  }
+}
+
+export = createConfig
+```
+
+**TypeScript Async Function:**
+
+```typescript
+/* async-secrets.ts */
+interface Secrets {
+  apiKey: string;
+  dbPassword: string;
+}
+
+async function fetchSecrets(): Promise<Secrets> {
+  // Simulate async secret fetching
+  await new Promise(resolve => setTimeout(resolve, 100))
+  
+  return {
+    apiKey: process.env.SECRET_API_KEY || 'default-key',
+    dbPassword: process.env.DB_PASSWORD || 'default-password'
+  }
+}
+
+export = fetchSecrets
+```
+
+**Installation Requirements:**
+
+TypeScript support requires either `tsx` (recommended) or `ts-node`:
+
+```bash
+# Recommended: Modern, fast TypeScript execution
+npm install tsx --save-dev
+
+# Alternative: Traditional ts-node approach
+npm install ts-node typescript --save-dev
+```
+
+**Features:**
+- Modern tsx execution (fast, no compilation) with ts-node fallback
+- Support for both sync and async TypeScript functions
+- Function argument passing via `dynamicArgs`
+- Full TypeScript interface support
+- Comprehensive error handling with helpful dependency messages
 
 ### Git references
 
