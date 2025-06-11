@@ -32,7 +32,7 @@ const setup = async () => {
     deepLog('config', config)
     console.log(`-------------`)
   } catch (err) {
-    console.log('err', err)
+    console.log(`TEST ERROR ${__dirname}\n`, err)
     process.exit(1)
   }
 }
@@ -147,11 +147,15 @@ test('doubleQuotes', () => {
   })
 })
 
-test('tsAsyncValue', () => {
+test('[typescript] AsyncValue', () => {
   assert.equal(config.tsAsyncValue, 'async-ts-value')
 })
 
-test('tsSyncValue', () => {
+test.skip('[typescript] AsyncValueDotProp', () => {
+  assert.equal(config.tsAsyncValueDotProp, 'async-ts-value-dot-prop')
+})
+
+test('[typescript] SyncValue', () => {
   assert.equal(config.tsSyncValue, {
     syncValue: 'sync-ts-value',
     computedValue: config.tsSyncValue.computedValue // Just verify it exists
@@ -159,7 +163,7 @@ test('tsSyncValue', () => {
   assert.ok(config.tsSyncValue.computedValue > 0)
 })
 
-test('tsWithArgs', () => {
+test('[typescript] WithArgs', () => {
   assert.equal(config.tsWithArgs, 'async-ts-value')
 })
 

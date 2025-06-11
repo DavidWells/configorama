@@ -3,7 +3,7 @@ interface ConfigArgs {
   key?: string;
 }
 
-function delay(ms: number): Promise<string> {
+function delayWithValue(ms: number): Promise<string> {
   return new Promise((resolve) => {
     setTimeout(() => resolve('async-ts-value'), ms)
   })
@@ -11,8 +11,7 @@ function delay(ms: number): Promise<string> {
 
 async function fetchSecretsFromRemoteStore(config?: ConfigArgs): Promise<string> {
   console.log('TypeScript async function called with:', config)
-  await delay(100)
-  return 'async-ts-value'
+  return delayWithValue(100)
 }
 
-export = fetchSecretsFromRemoteStore
+export default fetchSecretsFromRemoteStore

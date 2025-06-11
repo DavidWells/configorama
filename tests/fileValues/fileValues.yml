@@ -5,7 +5,7 @@
 normalKey: full
 
 # Import full yml file object via relative path
-yamlFullFile: ${file(./_ymlfull.yml)}
+yamlFullFile: ${file("./_ymlfull.yml")}
 
 # Import full yml file object via absolute path
 yamlFullFileNoPath: ${file(_ymlfull.yml)}
@@ -72,16 +72,19 @@ doubleQuotes: ${file("./config.${opt:otherFlag}.json")}
 ###############
 # Pass args into file
 ###############
-additionalValues: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+additionalValues: ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}
 
 # TODO fix file path refs
-additionalValuesTWO: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+additionalValuesTWO: ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}
 
 ########################
 # TypeScript file references
 ########################
 # Import TypeScript async function
 tsAsyncValue: ${file(./async-value.ts)}
+
+# Import TypeScript async function
+tsAsyncValueDotProp: ${file(./async-value-dot-prop.ts)}
 
 # Import TypeScript sync function
 tsSyncValue: ${file(./sync-value.ts)}

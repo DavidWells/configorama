@@ -7,7 +7,7 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function config(args: any): Promise<ConfigObject> {
+export default async function fetchAsyncConfig(args: any): Promise<ConfigObject> {
   console.log('args', args)
   await delay(100)
   return {

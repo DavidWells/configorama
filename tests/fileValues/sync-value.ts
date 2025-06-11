@@ -10,4 +10,4 @@ function createSyncConfig(): ConfigObject {
   }
 }
 
-export = createSyncConfig
+export default createSyncConfig

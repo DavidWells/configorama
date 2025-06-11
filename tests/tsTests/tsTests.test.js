@@ -21,6 +21,15 @@ test('TS config file returning object resolves correctly', async () => {
   assert.is(config.flag, 'dev')
 })
 
+test('TS default file returning object resolves correctly', async () => {
+  const configFile = path.join(__dirname, 'ts-object-default.ts')
+  const config = await configorama(configFile, {
+    options: args
+  })
+  assert.is(config.my, 'config')
+  assert.is(config.flag, 'dev')
+})
+
 test('TS config file returning function resolves correctly', async () => {
   const configFile = path.join(__dirname, 'ts-function-config.ts')
   const config = await configorama(configFile, {
@@ -35,11 +44,11 @@ test('TS config file with dynamicArgs object', async () => {
   const config = await configorama(configFile, {
     options: args,
     dynamicArgs: {
-      foo: 'one',
+      foo: 'lol',
       bar: 'two'
     }
   })
-  assert.is(config.one, 'one')
+  assert.is(config.one, 'lol')
   assert.is(config.two, 'two')
 })
 
@@ -56,6 +65,15 @@ test('TS config file with dynamicArgs function', async () => {
   })
   assert.is(config.one, 'one')
   assert.is(config.two, 'two')
+})
+
+test('TS async default file resolves correctly', async () => {
+  const configFile = path.join(__dirname, 'ts-async-default.ts')
+  const config = await configorama(configFile, {
+    options: args
+  })
+  assert.is(config.asyncValue, 'async-typescript-value')
+  assert.ok(config.timestamp > 0)
 })
 
 test('TS async config file resolves correctly', async () => {
