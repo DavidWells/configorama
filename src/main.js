@@ -1915,7 +1915,7 @@ Unable to resolve configuration variable
       return res
     })
   }
-  getValueFromFile(variableString) {
+  async getValueFromFile(variableString) {
     // console.log('From file', `"${variableString}"`)
     let matchedFileString = variableString.match(fileRefSyntax)[0]
     // console.log('matchedFileString', matchedFileString)
@@ -1948,7 +1948,7 @@ Unable to resolve configuration variable
 
     // Resolve alias if the path contains alias syntax
     const resolvedPath = resolveAlias(relativePath, this.configPath)
-    console.log('resolvedPath', resolvedPath)
+    // console.log('resolvedPath', resolvedPath)
 
     let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(this.configPath, resolvedPath)
 
@@ -2015,6 +2015,7 @@ Check if your javascript is exporting a function that returns a value.`
         config: this.config,
         opts: this.opts,
       }
+      
 
       valueToPopulate = returnValueFunction.call(jsFile, valueForFunction, ...argsToPass)
 
@@ -2039,8 +2040,56 @@ Check if your javascript is returning the correct data.`
 
 
     if (fileExtension === 'ts') {
-      // Resolve the values
-      return Promise.resolve('LOL')
+      const { executeTypeScriptFile } = require('./parsers/typescript')
+      let returnValueFunction
+      const variableArray = variableString.split(':')
+
+      try {
+        const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
+        console.log('fullFilePath', fullFilePath)
+        console.log('tsFile', tsFile)
+        returnValueFunction = tsFile.config || tsFile.default || tsFile
+
+        if (variableArray[1]) {
+          let tsModule = variableArray[1]
+          tsModule = tsModule.split('.')[0]
+          returnValueFunction = tsFile[tsModule]
+        }
+
+        if (typeof returnValueFunction !== 'function') {
+          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your TypeScript is exporting a function that returns a value.`
+          return Promise.reject(new Error(errorMessage))
+        }
+
+        const valueForFunction = {
+          originalConfig: this.originalConfig,
+          config: this.config,
+          opts: this.opts,
+        }
+
+        valueToPopulate = returnValueFunction.call(tsFile, valueForFunction, ...argsToPass)
+
+        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
+          let deepProperties = variableString.replace(matchedFileString, '')
+          deepProperties = deepProperties.slice(1).split('.')
+          deepProperties.splice(0, 1)
+          // Trim prop keys for starting/trailing spaces
+          deepProperties = deepProperties.map((prop) => {
+            return trim(prop)
+          })
+          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
+            if (typeof deepValueToPopulateResolved === 'undefined') {
+              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your TypeScript is returning the correct data.`
+              return Promise.reject(new Error(errorMessage))
+            }
+            return Promise.resolve(deepValueToPopulateResolved)
+          })
+        })
+      } catch (err) {
+        return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
+      }
     }
 
     // Process everything except JS

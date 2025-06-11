@@ -95,7 +95,7 @@ function resolveAlias(filePath, configDir) {
     }
 
     // Fall back to original path if no alias matched
-    console.warn(`Warning: No alias mapping found for ${filePath}`)
+    // console.warn(`Warning: No alias mapping found for ${filePath}`)
     return filePath
 
   } catch (error) {

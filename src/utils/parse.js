@@ -51,14 +51,25 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
         if (jsArgs && typeof jsArgs === 'function') {
           jsArgs = jsArgs()
         }
+        // console.log('jsArgs', jsArgs)
         configObject = jsFile(jsArgs)
       }
     } catch (err) {
       throw new Error(err)
     }
-  } else if (fileType.match(/\.(ts)/)) {
+  } else if (fileType.match(/\.(ts|tsx)/)) {
     try {
+      let jsArgs = opts.dynamicArgs || {}
+      if (jsArgs && typeof jsArgs === 'function') {
+        jsArgs = jsArgs()
+      }
       configObject = executeTypeScriptFileSync(filePath, opts)
+      if (configObject.config) {
+        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
+      } else if (configObject.default) {
+        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+      }
+      // console.log('parseFileContents configObject', configObject, opts)
     } catch (err) {
       throw new Error(`Failed to execute TypeScript file ${filePath}: ${err.message}`)
     }
