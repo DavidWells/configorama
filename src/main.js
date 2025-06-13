@@ -21,6 +21,7 @@ const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
 const getValueFromCron = require('./resolvers/valueFromCron')
+const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
@@ -199,6 +200,13 @@ class Configorama {
        * ${cron(at 9:30)}
        */
       getValueFromCron,
+
+      /**
+       * Eval expressions
+       * Usage:
+       * ${eval(${self:valueTwo} > ${self:valueOne})}
+       */
+      getValueFromEval,
 
       /**
        * Self references
@@ -834,7 +842,7 @@ class Configorama {
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
     // console.log('hasFunc', hasFunc)
-    if (!hasFunc || hasFunc && hasFunc[1] === 'cron') {
+    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
       return variableString
     }
     // test for object
