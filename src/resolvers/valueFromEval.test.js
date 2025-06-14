@@ -22,6 +22,11 @@ test('String comparison', async () => {
   assert.is(result, true)
 })
 
+test('String comparison - strict', async () => {
+  const result = await resolver('eval("hello" === "hello")')
+  assert.is(result, true)
+})
+
 test('Complex boolean expression', async () => {
   const result = await resolver('eval(100 > 50)')
   assert.is(result, true)
