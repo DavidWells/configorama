@@ -66,6 +66,7 @@
     "minimist": "^1.2.8",
     "promise.prototype.finally": "^3.1.8",
     "safe-chalk": "^1.0.0",
+    "subscript": "^9.1.0",
     "sync-rpc": "^1.3.6",
     "traverse": "^0.6.8"
   },

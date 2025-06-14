@@ -1,0 +1,43 @@
+# Basic values to reference
+one: 200
+two: 500
+three: 999
+four: 1111
+five: 200
+
+# Simple boolean evaluations
+boolean: ${eval(100 > 500)}
+booleanTrue: ${eval(500 > 100)}
+
+# Inner variable references with self
+booleanValue: ${eval(${self:three} > ${self:four})}
+booleanValue2: ${eval(${self:one} > ${self:two})}
+booleanValue3: ${eval(${one} === ${five})}
+
+# Arithmetic operations
+addition: ${eval(10 + 5)}
+subtraction: ${eval(20 - 8)}
+multiplication: ${eval(6 * 7)}
+division: ${eval(20 / 4)}
+
+# Arithmetic with inner variables
+additionWithVars: ${eval(${self:one} + ${self:two})}
+subtractionWithVars: ${eval(${self:four} - ${self:three})}
+multiplicationWithVars: ${eval(${self:one} * 2)}
+divisionWithVars: ${eval(${self:four} / ${self:five})}
+
+# Comparison operations
+greaterThan: ${eval(${self:two} > ${self:one})}
+lessThan: ${eval(${self:one} < ${self:two})}
+equality: ${eval(${self:one} == ${self:five})}
+inequality: ${eval(${self:three} != ${self:four})}
+
+# Complex expressions
+complexExpression: ${eval((${self:one} + ${self:two}) > ${self:three})}
+complexExpression2: ${eval(${self:one} * 2 == ${self:two} - 100)}
+complexExpression3: ${eval((${self:four} - ${self:three}) > 100)}
+
+# Edge cases
+zeroComparison: ${eval(0 == 0)}
+negativeNumbers: ${eval(-5 < 0)}
+stringEquality: ${eval("hello" == "hello")}
