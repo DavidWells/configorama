@@ -2,16 +2,16 @@
 const evalRefSyntax = RegExp(/^eval\((.*)?\)/g)
 
 async function getValueFromEval(variableString) {
-  console.log('getValueFromEval variableString', variableString)
+  // console.log('getValueFromEval variableString', variableString)
   // Extract the expression inside eval()
   const match = variableString.match(/^eval\((.+)\)$/)
-  console.log('match', match)
+  // console.log('match', match)
   if (!match) {
     throw new Error(`Invalid eval syntax: ${variableString}. Expected format: eval(expression)`)
   }
   
   const expression = match[1].trim()
-  console.log('expression', expression)
+  // console.log('expression', expression)
   
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
