@@ -107,8 +107,6 @@ class Configorama {
     if (opts && !opts.sync) {
       handleSignalEvents()
     }
-
-    const showFoundVariables = opts && opts.dynamicArgs && (opts.dynamicArgs.list || opts.dynamicArgs.info)
   
     const options = opts || {}
     // Set opts to pass into JS file calls
@@ -416,6 +414,44 @@ class Configorama {
       this.functions = Object.assign({}, this.functions, options.functions)
     }
 
+    this.deep = []
+    this.callCount = 0
+  }
+
+  initialCall(func) {
+    this.deep = []
+    this.tracker.start()
+    return func().finally(() => {
+      this.tracker.stop()
+      this.deep = []
+    })
+  }
+
+  /**
+   * Populate all variables in the service, conveniently remove and restore the service attributes
+   * that confuse the population methods.
+   * @param cliOpts An options hive to use for ${opt:...} variables.
+   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
+   */
+  async init(cliOpts) {
+    this.options = cliOpts || {}
+    const configoramaOpts = this.opts
+
+    const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
+
+    // If we have a file path but no config yet, parse it now
+    if (this.configFilePath && !this.config) {
+      const configObject = await parseFileContents(
+        this.originalString,
+        this.configFileType,
+        this.configFilePath,
+        this.variableSyntax,
+        this.opts
+      )
+      this.config = configObject
+      this.originalConfig = cloneDeep(configObject)
+    }
+
     if (VERBOSE) {
       logHeader('Config Input before processing')
       console.log()
@@ -423,10 +459,14 @@ class Configorama {
       console.log()
     }
 
+    const variableSyntax = this.variableSyntax
+    const variablesKnownTypes = this.variablesKnownTypes
+
     if (VERBOSE || showFoundVariables) {
       const foundVariables = []
       const variableData = {}
       let matchCount = 1
+      // console.log('this.originalConfig', this.originalConfig)
       traverse(this.originalConfig).forEach(function (rawValue) {
         if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
           const configValuePath = this.path.join('.')
@@ -689,42 +729,6 @@ class Configorama {
       if (showFoundVariables) {
         process.exit(0)
       }
-    }
-
-    this.deep = []
-    this.callCount = 0
-  }
-
-  initialCall(func) {
-    this.deep = []
-    this.tracker.start()
-    return func().finally(() => {
-      this.tracker.stop()
-      this.deep = []
-    })
-  }
-
-  /**
-   * Populate all variables in the service, conveniently remove and restore the service attributes
-   * that confuse the population methods.
-   * @param cliOpts An options hive to use for ${opt:...} variables.
-   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
-   */
-  async init(cliOpts) {
-    this.options = cliOpts || {}
-    const configoramaOpts = this.opts
-
-    // If we have a file path but no config yet, parse it now
-    if (this.configFilePath && !this.config) {
-      const configObject = await parseFileContents(
-        this.originalString,
-        this.configFileType,
-        this.configFilePath,
-        this.variableSyntax,
-        this.opts
-      )
-      this.config = configObject
-      this.originalConfig = cloneDeep(configObject)
     }
 
     const originalConfig = this.originalConfig
