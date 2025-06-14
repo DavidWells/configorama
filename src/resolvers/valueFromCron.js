@@ -150,7 +150,7 @@ function parseCronExpression(input) {
 function getValueFromCron(variableString) {
   // Get value from cron(expression)
   const cronExpression = variableString.match(/cron\((.*)\)/)[1]
-  console.log('cronExpression', cronExpression)
+  // console.log('cronExpression', cronExpression)
   
   if (!cronExpression || cronExpression.trim() === '') {
     throw new Error(`Invalid variable syntax for cron reference "${variableString}". 

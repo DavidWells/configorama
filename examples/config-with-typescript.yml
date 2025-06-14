@@ -1,0 +1,37 @@
+# Example configuration file using TypeScript file references
+
+service: my-awesome-app
+
+# Load configuration from TypeScript file
+provider: ${file(./typescript-config.ts)}
+
+# Load secrets asynchronously from TypeScript file
+secrets: ${file(./typescript-async.ts)}
+
+# Mix TypeScript with other configuration
+custom:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-east-1"}
+  
+  # You can also use TypeScript files for specific sections
+  databaseConfig: ${file(./typescript-config.ts):database}
+  
+  # Environment-specific overrides
+  stageVariables:
+    dev:
+      logLevel: debug
+    prod:
+      logLevel: info
+
+# Regular configuration values
+resources:
+  description: "Configuration loaded with TypeScript support"
+  timestamp: ${timestamp}
+  
+functions:
+  hello:
+    handler: handler.hello
+    environment:
+      LOG_LEVEL: ${self:custom.stageVariables.${self:custom.stage}.logLevel}
+      DB_HOST: ${self:provider.database.host}
+      API_KEY: ${self:secrets.apiKey}

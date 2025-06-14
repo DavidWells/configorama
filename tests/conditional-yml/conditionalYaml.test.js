@@ -22,7 +22,7 @@ const setup = async () => {
     console.log(config)
     console.log(`-------------`)
   } catch (err) {
-    console.log('err', err)
+    console.log(`TEST ERROR ${__dirname}\n`, err)
     process.exit(1)
   }
 }
