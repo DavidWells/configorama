@@ -1,0 +1,25 @@
+# ESM file references test configuration
+service: esm-test-service
+
+# Basic ESM object reference
+esmObjectConfig: ${file(./esm-object-config.mjs)}
+
+# ESM function reference
+esmFunctionConfig: ${file(./esm-function-config.mjs)}
+
+# ESM async function reference
+esmAsyncConfig: ${file(./esm-async-config.mjs)}
+
+# ESM named export reference
+esmNamedConfig: ${file(./esm-named-exports.mjs):config}
+esmNamedFunction: ${file(./esm-named-exports.mjs):getConfig}
+
+# Nested property access
+stage: ${opt:stage, 'dev'}
+envNumber: ${env:envNumber, 42}
+
+# Compose with other config
+combined:
+  fromESM: ${file(./esm-object-config.mjs)}
+  stage: ${self:stage}
+  env: ${self:envNumber}

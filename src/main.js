@@ -2096,8 +2096,61 @@ Check if your TypeScript is returning the correct data.`
       }
     }
 
-    // Process everything except JS
-    if (fileExtension !== 'js') {
+    if (fileExtension === 'mjs' || fileExtension === 'esm') {
+      const { executeESMFile } = require('./parsers/esm')
+      let returnValueFunction
+      const variableArray = variableString.split(':')
+
+      try {
+        const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
+        // console.log('ESM fullFilePath', fullFilePath)
+        // console.log('ESM esmFile', esmFile, 'type:', typeof esmFile)
+        returnValueFunction = esmFile.config || esmFile.default || esmFile
+
+        if (variableArray[1]) {
+          let esmModule = variableArray[1]
+          esmModule = esmModule.split('.')[0]
+          returnValueFunction = esmFile[esmModule]
+        }
+
+        if (typeof returnValueFunction !== 'function') {
+          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ESM is exporting a function that returns a value.`
+          return Promise.reject(new Error(errorMessage))
+        }
+
+        const valueForFunction = {
+          originalConfig: this.originalConfig,
+          config: this.config,
+          opts: this.opts,
+        }
+
+        valueToPopulate = returnValueFunction.call(esmFile, valueForFunction, ...argsToPass)
+
+        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
+          let deepProperties = variableString.replace(matchedFileString, '')
+          deepProperties = deepProperties.slice(1).split('.')
+          deepProperties.splice(0, 1)
+          // Trim prop keys for starting/trailing spaces
+          deepProperties = deepProperties.map((prop) => {
+            return trim(prop)
+          })
+          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
+            if (typeof deepValueToPopulateResolved === 'undefined') {
+              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ESM is returning the correct data.`
+              return Promise.reject(new Error(errorMessage))
+            }
+            return Promise.resolve(deepValueToPopulateResolved)
+          })
+        })
+      } catch (err) {
+        return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
+      }
+    }
+
+    // Process everything except JS, TS, and ESM
+    if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
       /* Read initial file */
       valueToPopulate = fs.readFileSync(fullFilePath, 'utf-8')
 

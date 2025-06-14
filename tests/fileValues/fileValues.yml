@@ -91,3 +91,18 @@ tsSyncValue: ${file(./sync-value.ts)}
 
 # Import TypeScript function with args
 tsWithArgs: ${file(./async-value.ts, ${env:MY_SECRET}, ${self:normalKey})}
+
+########################
+# ESM file references
+########################
+# Import ESM async function
+esmAsyncValue: ${file(./async-value.mjs)}
+
+# Import ESM async function with dot property
+esmAsyncValueDotProp: ${file(./async-value-dot-prop.mjs)}
+
+# Import ESM sync function
+esmSyncValue: ${file(./sync-value.mjs)}
+
+# Import ESM function with args
+esmWithArgs: ${file(./async-value.mjs, ${env:MY_SECRET}, ${self:normalKey})}

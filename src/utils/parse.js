@@ -2,6 +2,7 @@ const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
 const INI = require('../parsers/ini')
 const { executeTypeScriptFileSync } = require('../parsers/typescript')
+const { executeESMFileSync } = require('../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 /**
@@ -72,6 +73,22 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
       // console.log('parseFileContents configObject', configObject, opts)
     } catch (err) {
       throw new Error(`Failed to execute TypeScript file ${filePath}: ${err.message}`)
+    }
+  } else if (fileType.match(/\.(mjs|esm)/)) {
+    try {
+      let jsArgs = opts.dynamicArgs || {}
+      if (jsArgs && typeof jsArgs === 'function') {
+        jsArgs = jsArgs()
+      }
+      configObject = executeESMFileSync(filePath, opts)
+      if (configObject.config) {
+        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
+      } else if (configObject.default) {
+        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+      }
+      // console.log('parseFileContents ESM configObject', configObject, opts)
+    } catch (err) {
+      throw new Error(`Failed to execute ESM file ${filePath}: ${err.message}`)
     }
   }
 
