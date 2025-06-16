@@ -852,7 +852,7 @@ class Configorama {
     // console.log('runFunction', variableString)
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
-    console.log('hasFunc', hasFunc)
+    // console.log('hasFunc', hasFunc)
     if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
       return variableString
     }

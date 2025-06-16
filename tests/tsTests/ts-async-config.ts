@@ -8,8 +8,8 @@ function delay(ms: number): Promise<void> {
 }
 
 export async function config(args: any): Promise<ConfigObject> {
-  console.log('args', args)
-  await delay(100)
+  console.log('ts args', args)
+  await delay(10)
   return {
     asyncValue: 'async-typescript-value',
     timestamp: Date.now()
