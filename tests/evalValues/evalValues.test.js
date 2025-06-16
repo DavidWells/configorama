@@ -3,9 +3,22 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
 
+const args = {
+  testFlag: 'testValue',
+  testFlagTwo: 150,
+  otherFlag: 'prod',
+  count: 25,
+  numberFlag: 50
+}
+
+process.env.TEST_ENV_VAR = '150'
+process.env.TEST_STRING_VAR = 'test'
+
 test('eval() basic boolean operations', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   // Simple boolean evaluations
   assert.equal(config.boolean, false)
@@ -14,7 +27,9 @@ test('eval() basic boolean operations', async () => {
 
 test('eval() with inner variable references using self', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   // ${eval(${self:three} > ${self:four})} -> ${eval(999 > 1111)} -> false
   assert.equal(config.booleanValue, false)
@@ -28,7 +43,9 @@ test('eval() with inner variable references using self', async () => {
 
 test('eval() arithmetic operations', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   assert.equal(config.addition, 15)
   assert.equal(config.subtraction, 12)
@@ -38,7 +55,9 @@ test('eval() arithmetic operations', async () => {
 
 test('eval() arithmetic with inner variables', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   // ${eval(${self:one} + ${self:two})} -> ${eval(200 + 500)} -> 700
   assert.equal(config.additionWithVars, 700)
@@ -55,7 +74,9 @@ test('eval() arithmetic with inner variables', async () => {
 
 test('eval() comparison operations with variables', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   // ${eval(${self:two} > ${self:one})} -> ${eval(500 > 200)} -> true
   assert.equal(config.greaterThan, true)
@@ -72,7 +93,9 @@ test('eval() comparison operations with variables', async () => {
 
 test('eval() complex expressions', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
   // ${eval((${self:one} + ${self:two}) > ${self:three})} -> ${eval((200 + 500) > 999)} -> false
   assert.equal(config.complexExpression, false)
@@ -86,11 +109,120 @@ test('eval() complex expressions', async () => {
 
 test('eval() edge cases', async () => {
   const configFilePath = path.join(__dirname, 'evalValues.yml')
-  const config = await configorama(configFilePath)
+  const config = await configorama(configFilePath, {
+    options: args
+  })
   
-  assert.equal(config.zeroComparison, true)
-  assert.equal(config.negativeNumbers, true)
-  assert.equal(config.stringEquality, true)
+  assert.equal(config.zeroComparison, true, 'zeroComparison')
+  assert.equal(config.negativeNumbers, true, 'negativeNumbers')
+  assert.equal(config.stringEquality, true, 'stringEquality')
+})
+
+test('eval() environment variables', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+
+  console.log('config', config)
+  
+  assert.equal(config.envVarTest, 150)
+  assert.equal(config.envVarWithDefault, 'defaultValue')
+  assert.equal(config.envVarEval, true)
+})
+
+test('eval() CLI options', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+  
+  assert.equal(config.cliOptTest, 'testValue')
+  assert.equal(config.cliOptWithDefault, 'defaultFlagValue')
+})
+
+test('eval() file references', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+  
+  // These will fail if testFile.yml doesn't exist, but that's expected
+  // as we're testing the variable resolution syntax
+  assert.equal(config.fileRefTest, {
+    value: 100,
+    string: 'test',
+    nested: {
+      value: 100,
+      string: 'test'
+    }
+  }, 'fileRefTest')
+  assert.equal(config.fileValueTest, 100, 'fileValueTest')
+  assert.equal(config.fileWithDefault, 'defaultFileValue', 'fileWithDefault')
+})
+
+test('eval() with environment variables inside', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+
+  console.log('config', config)
+  
+  // ${eval(${env:TEST_ENV_VAR} > 100)} -> ${eval(150 > 100)} -> true
+  assert.equal(config.envVarEval, true, 'envVarEval')
+  
+  // ${eval(${env:MISSING_ENV_VAR, 50} < 100)} -> ${eval(50 < 100)} -> true
+  assert.equal(config.envVarEvalWithDefault, true, 'envVarEvalWithDefault')
+  
+  // ${eval(${env:TEST_STRING_VAR} == 'test')} -> ${eval('test' == 'test')} -> true
+  assert.equal(config.envVarStringEval, true, 'envVarStringEval')
+})
+
+test('eval() with CLI options inside', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+  
+  // ${eval(${opt:testFlag} == 'testValue')} -> ${eval('testValue' == 'testValue')} -> true
+  assert.equal(config.cliOptEval, true)
+  
+  // ${eval(${opt:missingFlag, 200} > 100)} -> ${eval(200 > 100)} -> true
+  assert.equal(config.cliOptEvalWithDefault, true)
+  
+  // ${eval(${opt:numberFlag, 50} * 2 == 100)} -> ${eval(50 * 2 == 100)} -> true
+  assert.equal(config.cliOptMathEval, true)
+})
+
+test('eval() with file references inside', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+  
+  // These will be undefined/false since testFile.yml doesn't exist
+  assert.equal(config.fileRefEval, false, 'fileRefEval')
+  assert.equal(config.fileRefEvalWithDefault, true, 'fileRefEvalWithDefault') // true because 75 < 100
+  assert.equal(config.fileRefStringEval, true, 'fileRefStringEval')
+})
+
+test('eval() with complex variable combinations', async () => {
+  const configFilePath = path.join(__dirname, 'evalValues.yml')
+  const config = await configorama(configFilePath, {
+    options: args
+  })
+  
+  // ${eval(${env:TEST_ENV_VAR} == ${opt:testFlag})} -> ${eval('testValue' == 'testValue')} -> true
+  assert.equal(config.envAndOptEval, true, 'envAndOptEval')
+  
+  // ${eval(${env:TEST_ENV_VAR} > ${file(./testFile.yml):value, 0})} -> ${eval('testValue' > 0)} -> false
+  // 150 > 27 -> true
+  assert.equal(config.envAndFileEval, true, 'envAndFileEval')
+  
+  // ${eval(${opt:testFlag} != ${file(./testFile.yml):string, 'default'})} -> ${eval('testValue' != 'default')} -> true
+  assert.equal(config.optAndFileEval, true, 'optAndFileEval')
 })
 
 test.run()
