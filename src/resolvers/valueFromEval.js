@@ -3,6 +3,7 @@ const evalRefSyntax = RegExp(/^eval\((.*)?\)/g)
 
 async function getValueFromEval(variableString) {
   // console.log('getValueFromEval variableString', variableString)
+  // console.log('getValueFromEval variableString', variableString)
   // Extract the expression inside eval()
   const match = variableString.match(/^eval\((.+)\)$/)
   // console.log('match', match)
@@ -16,7 +17,12 @@ async function getValueFromEval(variableString) {
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
     const { default: subscript } = await import('subscript/justin')
-    const fn = subscript(expression)
+    
+    // Handle string comparisons by ensuring both sides are quoted
+    const processedExpression = expression.replace(/([a-zA-Z0-9_]+)\s*([=!<>]=?)\s*['"]([^'"]+)['"]/g, '"$1"$2"$3"')
+    
+    // console.log('processedExpression', processedExpression)
+    const fn = subscript(processedExpression)
     const result = fn()
     return result
   } catch (error) {

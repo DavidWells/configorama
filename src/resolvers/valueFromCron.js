@@ -91,10 +91,10 @@ function parseCronExpression(input) {
   }
 
   // Parse "every X minutes/hours/days" patterns
-  const everyMatch = normalizedInput.match(/^every (\d+) (minute|hour|day|week|month)s?$/i)
+  const everyMatch = normalizedInput.match(/^every (\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
   if (everyMatch) {
     const interval = parseInt(everyMatch[1])
-    const unit = everyMatch[2].toLowerCase()
+    const unit = everyMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
     
     switch (unit) {
       case 'minute':
@@ -112,14 +112,57 @@ function parseCronExpression(input) {
     }
   }
 
+  // Parse "X minute(s)/hour(s)/day(s)" patterns (e.g., "1 minute", "5 minutes", "1 hour")
+  const intervalMatch = normalizedInput.match(/^(\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
+  if (intervalMatch) {
+    const interval = parseInt(intervalMatch[1])
+    const unit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
+    
+    switch (unit) {
+      case 'minute':
+        return `*/${interval} * * * *`
+      case 'hour':
+        return `0 */${interval} * * *`
+      case 'day':
+        return `0 0 */${interval} * *`
+      case 'week':
+        return `0 0 * * 0/${interval}`
+      case 'month':
+        return `0 0 1 */${interval} *`
+      default:
+        throw new Error(`Unsupported interval unit: ${unit}`)
+    }
+  }
+
+  // Parse "on Xst/nd/rd/th of month at time" patterns (e.g., "on 1st of month at 00:00")
+  const ordinalDateMatch = normalizedInput.match(/^on (\d+)(?:st|nd|rd|th) of month at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  if (ordinalDateMatch) {
+    const dayOfMonth = parseInt(ordinalDateMatch[1])
+    let hour = parseInt(ordinalDateMatch[2])
+    const minute = parseInt(ordinalDateMatch[3])
+    const amPm = ordinalDateMatch[5]
+    
+    if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
+      hour += 12
+    } else if (amPm && amPm.toLowerCase() === 'am' && hour === 12) {
+      hour = 0
+    }
+    
+    return `${minute} ${hour} ${dayOfMonth} * *`
+  }
+
   // Parse "on weekday at time" patterns (e.g., "on monday at 9:00")
-  const weekdayTimeMatch = normalizedInput.match(/^on (monday|tuesday|wednesday|thursday|friday|saturday|sunday) at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  const weekdayTimeMatch = normalizedInput.match(/^on ((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))*?) at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
   if (weekdayTimeMatch) {
     const dayMap = {
       'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
       'thursday': 4, 'friday': 5, 'saturday': 6
     }
-    const dayOfWeek = dayMap[weekdayTimeMatch[1].toLowerCase()]
+    
+    // Extract all days from the match
+    const days = weekdayTimeMatch[1].split(',').map(day => day.trim())
+    const dayOfWeek = days.map(day => dayMap[day.toLowerCase()]).join(',')
+    
     let hour = parseInt(weekdayTimeMatch[2])
     const minute = parseInt(weekdayTimeMatch[3])
     const amPm = weekdayTimeMatch[5]
@@ -131,6 +174,23 @@ function parseCronExpression(input) {
     }
     
     return `${minute} ${hour} * * ${dayOfWeek}`
+  }
+
+  // Parse "on weekdays/weekends at time" patterns (e.g., "on weekdays at 9:00")
+  const weekdaysTimeMatch = normalizedInput.match(/^on (weekdays|weekends) at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  if (weekdaysTimeMatch) {
+    const dayRange = weekdaysTimeMatch[1].toLowerCase() === 'weekdays' ? '1-5' : '0,6'
+    let hour = parseInt(weekdaysTimeMatch[2])
+    const minute = parseInt(weekdaysTimeMatch[3])
+    const amPm = weekdaysTimeMatch[5]
+    
+    if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
+      hour += 12
+    } else if (amPm && amPm.toLowerCase() === 'am' && hour === 12) {
+      hour = 0
+    }
+    
+    return `${minute} ${hour} * * ${dayRange}`
   }
 
   // Check if it's already a valid cron expression (5 or 6 parts)
