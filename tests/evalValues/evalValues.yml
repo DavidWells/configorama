@@ -1,0 +1,76 @@
+# Basic values to reference
+one: 200
+two: 500
+three: 999
+four: 1111
+five: 200
+
+# Environment variable tests
+envVarTest: ${env:TEST_ENV_VAR | toNumber}
+envVarWithDefault: ${env:MISSING_ENV_VAR, 'defaultValue'}
+
+# CLI option tests
+cliOptTest: ${opt:testFlag}
+cliOptWithDefault: ${opt:missingFlag, 'defaultFlagValue'}
+
+# File reference tests
+fileRefTest: ${file(./testFile.yml)}
+fileValueTest: ${file(./testFile.yml):nested.value}
+fileWithDefault: ${file(./missing.yml), 'defaultFileValue'}
+
+# Simple boolean evaluations
+boolean: ${eval(100 > 500)}
+booleanTrue: ${eval(500 > 100)}
+
+# Inner variable references with self
+booleanValue: ${eval(${self:three} > ${self:four})}
+booleanValue2: ${eval(${self:one} > ${self:two})}
+booleanValue3: ${eval(${one} === ${five})}
+
+# Arithmetic operations
+addition: ${eval(10 + 5)}
+subtraction: ${eval(20 - 8)}
+multiplication: ${eval(6 * 7)}
+division: ${eval(20 / 4)}
+
+# Arithmetic with inner variables
+additionWithVars: ${eval(${self:one} + ${self:two})}
+subtractionWithVars: ${eval(${self:four} - ${self:three})}
+multiplicationWithVars: ${eval(${self:one} * 2)}
+divisionWithVars: ${eval(${self:four} / ${self:five})}
+
+# Comparison operations
+greaterThan: ${eval(${self:two} > ${self:one})}
+lessThan: ${eval(${self:one} < ${self:two})}
+equality: ${eval(${self:one} == ${self:five})}
+inequality: ${eval(${self:three} != ${self:four})}
+
+# Complex expressions
+complexExpression: ${eval((${self:one} + ${self:two}) > ${self:three})}
+complexExpression2: ${eval(${self:one} * 2 == ${self:two} - 100)}
+complexExpression3: ${eval((${self:four} - ${self:three}) > 100)}
+
+# Edge cases
+zeroComparison: ${eval(0 == 0)}
+negativeNumbers: ${eval(-5 < 0)}
+stringEquality: ${eval("hello" == "hello")}
+
+# Environment variables inside eval
+envVarEval: ${eval(${env:TEST_ENV_VAR} > 100)}
+envVarEvalWithDefault: ${eval(${env:MISSING_ENV_VAR, 50} < 100)}
+envVarStringEval: ${eval(${env:TEST_STRING_VAR} == 'test')}
+
+# # CLI options inside eval
+cliOptEval: ${eval(${opt:testFlag} == 'testValue')}
+cliOptEvalWithDefault: ${eval(${opt:missingFlag, 200} > 100)}
+cliOptMathEval: ${eval(${opt:numberFlag, 50} * 2 == 100)}
+
+# File references inside eval
+fileRefEval: ${eval(${file(./testFile.yml):value} > 100)}
+fileRefEvalWithDefault: ${eval(${file(./missing.yml):value, 75} < 100)}
+fileRefStringEval: ${eval(${file(./testFile.yml):string} == 'test')}
+
+# Complex combinations
+envAndOptEval: ${eval(${env:TEST_ENV_VAR} == ${opt:testFlagTwo})}
+envAndFileEval: ${eval(${env:TEST_ENV_VAR} > ${file(./testFile.yml):value, 0})}
+optAndFileEval: ${eval(${opt:testFlagTwo} != ${file(./testFile.yml):string, 'default'})}

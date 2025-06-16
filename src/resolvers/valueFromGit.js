@@ -227,8 +227,9 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
     // console.log('cwd', cwd)
     const output = await _exec(cmd, { cwd })
     const date = new Date(output)
-    cache.set(file, date)
-    return date.toISOString()
+    const dateString = date.toISOString()
+    cache.set(file, dateString)
+    return dateString
   } catch (err) {
     const projectRoot = findProjectRoot(cwd)
     if (!projectRoot) {
@@ -242,8 +243,9 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
       const backupFile = path.join(projectRoot, _file)
       const output = await _exec(`git log -1 --pretty="%ai" ${backupFile}`, { cwd: projectRoot })
       const date = new Date(output)
-      cache.set(file, date)
-      return date.toISOString()
+      const dateString = date.toISOString()
+      cache.set(file, dateString)
+      return dateString
     } catch (err) {
       if (throwOnMissing) {
         throw new Error(`File ${file} does not exist in Git`)

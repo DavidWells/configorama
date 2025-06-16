@@ -21,6 +21,7 @@ const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
 const getValueFromCron = require('./resolvers/valueFromCron')
+const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
@@ -191,6 +192,13 @@ class Configorama {
       getValueFromCron,
 
       /**
+       * Eval expressions
+       * Usage:
+       * ${eval(${self:valueTwo} > ${self:valueOne})}
+       */
+      getValueFromEval,
+
+      /**
        * Self references
        * Usage:
        * ${otherKeyInConfig}
@@ -267,6 +275,7 @@ class Configorama {
             return deeperExists
           }
         }
+        // console.log('fallthrough fullObject', fullObject)
         /* is simple ${whatever} reference in same file */
         const startOf = varString.split('.')
         return fullObject[startOf[0]]
@@ -843,8 +852,8 @@ class Configorama {
     // console.log('runFunction', variableString)
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
-    // console.log('hasFunc', hasFunc)
-    if (!hasFunc || hasFunc && hasFunc[1] === 'cron') {
+    console.log('hasFunc', hasFunc)
+    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
       return variableString
     }
     // test for object
@@ -1376,7 +1385,19 @@ Missing Value ${missingValue} - ${matchedString}
 
     if (property && typeof property === 'string') {
       // console.log('property', property)
-      const prop = cleanVariable(property, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
+      let prop = cleanVariable(
+        property, 
+        this.variableSyntax, 
+        true, 
+        `populateVariable string ${this.callCount}`,
+        // true // recursive
+      )
+      
+      // Double processing needed for `${eval(${self:three} > ${self:four})}`
+      if (prop.startsWith('${')) {
+        prop = cleanVariable(prop, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
+      }
+      
       // console.log('prop', prop)
       if (property.match(/^> function /g) && prop) {
         // console.log('func prop', property)
@@ -1415,7 +1436,10 @@ Missing Value ${missingValue} - ${matchedString}
       }
       */
       // Does not match file refs with nested vars + args
-      if (!prop.match(/file\((~?[a-zA-Z0-9._\-\/,'"\{\}\.$: ]+?)\)/) && func) {
+      // @TODO fix this for eval refs
+      // console.log('prop', prop)
+      // console.log('func', func)
+      if (!prop.match(fileRefSyntax) && !prop.match(getValueFromEval.match) && func) {
         // console.log('IS FUNCTION')
         /* if matches function signature like ${merge('foo', 'bar')}
           rewrite the variable to run the function after inputs resolved

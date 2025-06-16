@@ -1,0 +1,50 @@
+########################
+# Advanced Variables
+########################
+
+# Filters
+toUpperCaseString: ${'hello world' | toUpperCase}
+toKebabCaseString: ${'helloWorld' | toKebabCase}
+toCamelCaseString: ${'hello-world' | toCamelCase}
+
+# Functions
+objectOne:
+  name: 'John'
+  age: 30
+
+objectTwo:
+  city: 'New York'
+  country: 'USA'
+
+mergedObjects: ${merge(${objectOne}, ${objectTwo})}
+
+# Complex Cron Expressions
+everyWeekdayMorning: ${cron('on weekdays at 9:00')}
+everyWeekendNoon: ${cron('on saturday,sunday at 12:00')}
+everyMonthFirstDay: ${cron('on 1st of month at 00:00')}
+everyQuarter: ${cron('every 3 months')}
+everyYear: ${cron('every year')}
+
+# Complex Git References
+gitInfo:
+  repo: ${git:repo}
+  owner: ${git:owner}
+  branch: ${git:branch}
+  commit: ${git:commit}
+  sha1: ${git:sha1}
+  message: ${git:message}
+  remote: ${git:remote}
+  tag: ${git:tag}
+  describe: ${git:describe}
+  timestamp: ${git:timestamp('package.json')}
+
+# Complex Self References
+config:
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  domain: ${opt:domain, 'example.com'}
+
+resolvedConfig:
+  apiUrl: https://api-${config.stage}.${config.domain}
+  region: ${config.region}
+  stage: ${config.stage} 
