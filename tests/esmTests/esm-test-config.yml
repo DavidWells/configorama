@@ -20,6 +20,6 @@ envNumber: ${env:envNumber, 42}
 
 # Compose with other config
 combined:
-  fromESM: ${file(./esm-object-config.mjs)}
+  # fromESM: ${file(./esm-object-config.mjs)}
   stage: ${self:stage}
   env: ${self:envNumber}

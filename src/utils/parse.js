@@ -85,6 +85,8 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
         configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
       } else if (configObject.default) {
         configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+      } else if (typeof configObject === 'function') {
+        configObject = configObject(jsArgs)
       }
       // console.log('parseFileContents ESM configObject', configObject, opts)
     } catch (err) {
