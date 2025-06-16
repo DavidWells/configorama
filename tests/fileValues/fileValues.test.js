@@ -167,4 +167,25 @@ test('[typescript] WithArgs', () => {
   assert.equal(config.tsWithArgs, 'async-ts-value')
 })
 
+test('[esm] AsyncValue', () => {
+  assert.equal(config.esmAsyncValue, 'esmAsyncVal')
+})
+
+test('[esm] AsyncValueDotProp', () => {
+  assert.equal(config.esmAsyncValueDotProp, {
+    nested: {
+      value: 'esmNestedValue'
+    },
+    another: 'esmAnotherValue'
+  })
+})
+
+test('[esm] SyncValue', () => {
+  assert.equal(config.esmSyncValue, 'esmSyncVal')
+})
+
+test('[esm] WithArgs', () => {
+  assert.equal(config.esmWithArgs, 'esmAsyncVal')
+})
+
 test.run()
