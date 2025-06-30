@@ -21,6 +21,7 @@ const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
 const getValueFromCron = require('./resolvers/valueFromCron')
+const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
 /* Default File Parsers */
 const YAML = require('./parsers/yaml')
@@ -107,8 +108,6 @@ class Configorama {
     if (opts && !opts.sync) {
       handleSignalEvents()
     }
-
-    const showFoundVariables = opts && opts.dynamicArgs && (opts.dynamicArgs.list || opts.dynamicArgs.info)
   
     const options = opts || {}
     // Set opts to pass into JS file calls
@@ -151,24 +150,16 @@ class Configorama {
       const fileDirectory = path.dirname(path.resolve(fileOrObject))
       const fileType = path.extname(fileOrObject)
 
-      // Parse file contents using extracted function
-      const configObject = parseFileContents(
-        fileContents, 
-        fileType, 
-        fileOrObject, 
-        varRegex, 
-        this.opts
-      )
-
       this.configFilePath = fileOrObject
-      // set config objects
-      this.config = configObject
+      // Set configFileType
+      this.configFileType = fileType
       // Keep a copy of the original file contents
       this.originalString = fileContents
-      // Keep a copy
-      this.originalConfig = cloneDeep(configObject)
       // Set configPath for file references
       this.configPath = fileDirectory
+      // Initialize config as null - will be populated in init
+      this.config = null
+      this.originalConfig = null
     }
 
     // Track promise resolution
@@ -199,6 +190,13 @@ class Configorama {
        * ${cron(at 9:30)}
        */
       getValueFromCron,
+
+      /**
+       * Eval expressions
+       * Usage:
+       * ${eval(${self:valueTwo} > ${self:valueOne})}
+       */
+      getValueFromEval,
 
       /**
        * Self references
@@ -277,6 +275,7 @@ class Configorama {
             return deeperExists
           }
         }
+        // console.log('fallthrough fullObject', fullObject)
         /* is simple ${whatever} reference in same file */
         const startOf = varString.split('.')
         return fullObject[startOf[0]]
@@ -424,6 +423,44 @@ class Configorama {
       this.functions = Object.assign({}, this.functions, options.functions)
     }
 
+    this.deep = []
+    this.callCount = 0
+  }
+
+  initialCall(func) {
+    this.deep = []
+    this.tracker.start()
+    return func().finally(() => {
+      this.tracker.stop()
+      this.deep = []
+    })
+  }
+
+  /**
+   * Populate all variables in the service, conveniently remove and restore the service attributes
+   * that confuse the population methods.
+   * @param cliOpts An options hive to use for ${opt:...} variables.
+   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
+   */
+  async init(cliOpts) {
+    this.options = cliOpts || {}
+    const configoramaOpts = this.opts
+
+    const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
+
+    // If we have a file path but no config yet, parse it now
+    if (this.configFilePath && !this.config) {
+      const configObject = await parseFileContents(
+        this.originalString,
+        this.configFileType,
+        this.configFilePath,
+        this.variableSyntax,
+        this.opts
+      )
+      this.config = configObject
+      this.originalConfig = cloneDeep(configObject)
+    }
+
     if (VERBOSE) {
       logHeader('Config Input before processing')
       console.log()
@@ -431,10 +468,14 @@ class Configorama {
       console.log()
     }
 
+    const variableSyntax = this.variableSyntax
+    const variablesKnownTypes = this.variablesKnownTypes
+
     if (VERBOSE || showFoundVariables) {
       const foundVariables = []
       const variableData = {}
       let matchCount = 1
+      // console.log('this.originalConfig', this.originalConfig)
       traverse(this.originalConfig).forEach(function (rawValue) {
         if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
           const configValuePath = this.path.join('.')
@@ -699,33 +740,11 @@ class Configorama {
       }
     }
 
-    this.deep = []
-    this.callCount = 0
-  }
-
-  initialCall(func) {
-    this.deep = []
-    this.tracker.start()
-    return func().finally(() => {
-      this.tracker.stop()
-      this.deep = []
-    })
-  }
-
-  /**
-   * Populate all variables in the service, conveniently remove and restore the service attributes
-   * that confuse the population methods.
-   * @param cliOpts An options hive to use for ${opt:...} variables.
-   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
-   */
-  init(cliOpts) {
-    this.options = cliOpts || {}
-    const configoramaOpts = this.opts
     const originalConfig = this.originalConfig
 
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
-      return Promise.resolve(originalConfig)
+      return Promise.resolve(this.originalConfig)
     }
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
@@ -834,7 +853,7 @@ class Configorama {
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
     // console.log('hasFunc', hasFunc)
-    if (!hasFunc || hasFunc && hasFunc[1] === 'cron') {
+    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
       return variableString
     }
     // test for object
@@ -1366,7 +1385,19 @@ Missing Value ${missingValue} - ${matchedString}
 
     if (property && typeof property === 'string') {
       // console.log('property', property)
-      const prop = cleanVariable(property, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
+      let prop = cleanVariable(
+        property, 
+        this.variableSyntax, 
+        true, 
+        `populateVariable string ${this.callCount}`,
+        // true // recursive
+      )
+      
+      // Double processing needed for `${eval(${self:three} > ${self:four})}`
+      if (prop.startsWith('${')) {
+        prop = cleanVariable(prop, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
+      }
+      
       // console.log('prop', prop)
       if (property.match(/^> function /g) && prop) {
         // console.log('func prop', property)
@@ -1405,7 +1436,10 @@ Missing Value ${missingValue} - ${matchedString}
       }
       */
       // Does not match file refs with nested vars + args
-      if (!prop.match(/file\((~?[a-zA-Z0-9._\-\/,'"\{\}\.$: ]+?)\)/) && func) {
+      // @TODO fix this for eval refs
+      // console.log('prop', prop)
+      // console.log('func', func)
+      if (!prop.match(fileRefSyntax) && !prop.match(getValueFromEval.match) && func) {
         // console.log('IS FUNCTION')
         /* if matches function signature like ${merge('foo', 'bar')}
           rewrite the variable to run the function after inputs resolved
@@ -1909,7 +1943,7 @@ Unable to resolve configuration variable
       return res
     })
   }
-  getValueFromFile(variableString) {
+  async getValueFromFile(variableString) {
     // console.log('From file', `"${variableString}"`)
     let matchedFileString = variableString.match(fileRefSyntax)[0]
     // console.log('matchedFileString', matchedFileString)
@@ -1942,7 +1976,7 @@ Unable to resolve configuration variable
 
     // Resolve alias if the path contains alias syntax
     const resolvedPath = resolveAlias(relativePath, this.configPath)
-    console.log('resolvedPath', resolvedPath)
+    // console.log('resolvedPath', resolvedPath)
 
     let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(this.configPath, resolvedPath)
 
@@ -2009,6 +2043,7 @@ Check if your javascript is exporting a function that returns a value.`
         config: this.config,
         opts: this.opts,
       }
+      
 
       valueToPopulate = returnValueFunction.call(jsFile, valueForFunction, ...argsToPass)
 
@@ -2031,8 +2066,115 @@ Check if your javascript is returning the correct data.`
       })
     }
 
-    // Process everything except JS
-    if (fileExtension !== 'js') {
+
+    if (fileExtension === 'ts') {
+      const { executeTypeScriptFile } = require('./parsers/typescript')
+      let returnValueFunction
+      const variableArray = variableString.split(':')
+
+      try {
+        const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
+        // console.log('fullFilePath', fullFilePath)
+        // console.log('tsFile', tsFile)
+        returnValueFunction = tsFile.config || tsFile.default || tsFile
+
+        if (variableArray[1]) {
+          let tsModule = variableArray[1]
+          tsModule = tsModule.split('.')[0]
+          returnValueFunction = tsFile[tsModule]
+        }
+
+        if (typeof returnValueFunction !== 'function') {
+          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your TypeScript is exporting a function that returns a value.`
+          return Promise.reject(new Error(errorMessage))
+        }
+
+        const valueForFunction = {
+          originalConfig: this.originalConfig,
+          config: this.config,
+          opts: this.opts,
+        }
+
+        valueToPopulate = returnValueFunction.call(tsFile, valueForFunction, ...argsToPass)
+
+        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
+          let deepProperties = variableString.replace(matchedFileString, '')
+          deepProperties = deepProperties.slice(1).split('.')
+          deepProperties.splice(0, 1)
+          // Trim prop keys for starting/trailing spaces
+          deepProperties = deepProperties.map((prop) => {
+            return trim(prop)
+          })
+          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
+            if (typeof deepValueToPopulateResolved === 'undefined') {
+              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your TypeScript is returning the correct data.`
+              return Promise.reject(new Error(errorMessage))
+            }
+            return Promise.resolve(deepValueToPopulateResolved)
+          })
+        })
+      } catch (err) {
+        return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
+      }
+    }
+
+    if (fileExtension === 'mjs' || fileExtension === 'esm') {
+      const { executeESMFile } = require('./parsers/esm')
+      let returnValueFunction
+      const variableArray = variableString.split(':')
+
+      try {
+        const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
+        // console.log('ESM fullFilePath', fullFilePath)
+        // console.log('ESM esmFile', esmFile, 'type:', typeof esmFile)
+        returnValueFunction = esmFile.config || esmFile.default || esmFile
+
+        if (variableArray[1]) {
+          let esmModule = variableArray[1]
+          esmModule = esmModule.split('.')[0]
+          returnValueFunction = esmFile[esmModule]
+        }
+
+        if (typeof returnValueFunction !== 'function') {
+          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ESM is exporting a function that returns a value.`
+          return Promise.reject(new Error(errorMessage))
+        }
+
+        const valueForFunction = {
+          originalConfig: this.originalConfig,
+          config: this.config,
+          opts: this.opts,
+        }
+
+        valueToPopulate = returnValueFunction.call(esmFile, valueForFunction, ...argsToPass)
+
+        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
+          let deepProperties = variableString.replace(matchedFileString, '')
+          deepProperties = deepProperties.slice(1).split('.')
+          deepProperties.splice(0, 1)
+          // Trim prop keys for starting/trailing spaces
+          deepProperties = deepProperties.map((prop) => {
+            return trim(prop)
+          })
+          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
+            if (typeof deepValueToPopulateResolved === 'undefined') {
+              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ESM is returning the correct data.`
+              return Promise.reject(new Error(errorMessage))
+            }
+            return Promise.resolve(deepValueToPopulateResolved)
+          })
+        })
+      } catch (err) {
+        return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
+      }
+    }
+
+    // Process everything except JS, TS, and ESM
+    if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
       /* Read initial file */
       valueToPopulate = fs.readFileSync(fullFilePath, 'utf-8')
 
@@ -2079,6 +2221,7 @@ Please use ":" to reference sub properties`
         return Promise.resolve(valueToPopulate)
       }
     }
+    console.log('fall thru', valueToPopulate)
     return Promise.resolve(valueToPopulate)
   }
   getVariableFromDeep(variableString) {

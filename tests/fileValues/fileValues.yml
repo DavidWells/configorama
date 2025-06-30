@@ -5,7 +5,7 @@
 normalKey: full
 
 # Import full yml file object via relative path
-yamlFullFile: ${file(./_ymlfull.yml)}
+yamlFullFile: ${file("./_ymlfull.yml")}
 
 # Import full yml file object via absolute path
 yamlFullFileNoPath: ${file(_ymlfull.yml)}
@@ -72,7 +72,37 @@ doubleQuotes: ${file("./config.${opt:otherFlag}.json")}
 ###############
 # Pass args into file
 ###############
-additionalValues: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+additionalValues: ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}
 
 # TODO fix file path refs
-additionalValuesTWO: ${file(../async.js, ${env:MY_SECRET}, ${self:normalKey})}
+additionalValuesTWO: ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}
+
+########################
+# TypeScript file references
+########################
+# Import TypeScript async function
+tsAsyncValue: ${file(./async-value.ts)}
+
+# Import TypeScript async function
+tsAsyncValueDotProp: ${file(./async-value-dot-prop.ts)}
+
+# Import TypeScript sync function
+tsSyncValue: ${file(./sync-value.ts)}
+
+# Import TypeScript function with args
+tsWithArgs: ${file(./async-value.ts, ${env:MY_SECRET}, ${self:normalKey})}
+
+########################
+# ESM file references
+########################
+# Import ESM async function
+esmAsyncValue: ${file(./async-value.mjs)}
+
+# Import ESM async function with dot property
+esmAsyncValueDotProp: ${file(./async-value-dot-prop.mjs)}
+
+# Import ESM sync function
+esmSyncValue: ${file(./sync-value.mjs)}
+
+# Import ESM function with args
+esmWithArgs: ${file(./async-value.mjs, ${env:MY_SECRET}, ${self:normalKey})}

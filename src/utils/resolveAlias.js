@@ -8,6 +8,10 @@ const DEBUG_LOG = (message) => {
     DEBUG_LOG(message)
   }
 }
+
+// Maximum number of parent directories to search through
+const MAX_PARENT_DIRS = 5
+
 /**
  * Finds the nearest config file (tsconfig.json or jsconfig.json) in the directory tree
  * @param {string} configDir - The directory to start searching from
@@ -15,13 +19,19 @@ const DEBUG_LOG = (message) => {
  */
 function findConfigFile(configDir) {
   // Try tsconfig.json first
-  const tsconfigPath = findUp.sync('tsconfig.json', { cwd: configDir })
+  const tsconfigPath = findUp.sync('tsconfig.json', { 
+    cwd: configDir,
+    stopAt: path.resolve(configDir, Array(MAX_PARENT_DIRS).fill('..').join('/'))
+  })
   if (tsconfigPath) {
     return tsconfigPath
   }
 
   // Fall back to jsconfig.json
-  const jsconfigPath = findUp.sync('jsconfig.json', { cwd: configDir })
+  const jsconfigPath = findUp.sync('jsconfig.json', { 
+    cwd: configDir,
+    stopAt: path.resolve(configDir, Array(MAX_PARENT_DIRS).fill('..').join('/'))
+  })
   if (jsconfigPath) {
     return jsconfigPath
   }
@@ -40,9 +50,9 @@ function resolveAlias(filePath, configDir) {
     // Find and load config file
     const configPath = findConfigFile(configDir)
     if (!configPath) {
-      console.warn(
-        `Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`
-      )
+      // console.warn(
+      //   `Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`
+      // )
       return filePath
     }
 
@@ -95,7 +105,7 @@ function resolveAlias(filePath, configDir) {
     }
 
     // Fall back to original path if no alias matched
-    console.warn(`Warning: No alias mapping found for ${filePath}`)
+    // console.warn(`Warning: No alias mapping found for ${filePath}`)
     return filePath
 
   } catch (error) {
@@ -114,7 +124,7 @@ function getAliases(configDir) {
   try {
     const configPath = findConfigFile(configDir)
     if (!configPath) {
-      console.warn(`Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`)
+      // console.warn(`Warning: No tsconfig.json or jsconfig.json found in directory tree starting from ${configDir}`)
       return { names: [], lookup: [] }
     }
 

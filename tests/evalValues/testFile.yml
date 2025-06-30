@@ -1,0 +1,6 @@
+value: 100
+string: 'test'
+
+nested:
+  value: 100
+  string: 'test'

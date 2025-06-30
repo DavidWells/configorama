@@ -32,7 +32,7 @@ const setup = async () => {
     deepLog('config', config)
     console.log(`-------------`)
   } catch (err) {
-    console.log('err', err)
+    console.log(`TEST ERROR ${__dirname}\n`, err)
     process.exit(1)
   }
 }
@@ -145,6 +145,47 @@ test('doubleQuotes', () => {
   assert.equal(config.doubleQuotes, {
     'CREDS': 'prod creds here'
   })
+})
+
+test('[typescript] AsyncValue', () => {
+  assert.equal(config.tsAsyncValue, 'async-ts-value')
+})
+
+test.skip('[typescript] AsyncValueDotProp', () => {
+  assert.equal(config.tsAsyncValueDotProp, 'async-ts-value-dot-prop')
+})
+
+test('[typescript] SyncValue', () => {
+  assert.equal(config.tsSyncValue, {
+    syncValue: 'sync-ts-value',
+    computedValue: config.tsSyncValue.computedValue // Just verify it exists
+  })
+  assert.ok(config.tsSyncValue.computedValue > 0)
+})
+
+test('[typescript] WithArgs', () => {
+  assert.equal(config.tsWithArgs, 'async-ts-value')
+})
+
+test('[esm] AsyncValue', () => {
+  assert.equal(config.esmAsyncValue, 'esmAsyncVal')
+})
+
+test('[esm] AsyncValueDotProp', () => {
+  assert.equal(config.esmAsyncValueDotProp, {
+    nested: {
+      value: 'esmNestedValue'
+    },
+    another: 'esmAnotherValue'
+  })
+})
+
+test('[esm] SyncValue', () => {
+  assert.equal(config.esmSyncValue, 'esmSyncVal')
+})
+
+test('[esm] WithArgs', () => {
+  assert.equal(config.esmWithArgs, 'esmAsyncVal')
 })
 
 test.run()

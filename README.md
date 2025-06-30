@@ -30,6 +30,7 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [Self references](#self-references)
   - [File references](#file-references)
   - [Sync/Async file references](#syncasync-file-references)
+  - [TypeScript file references](#typescript-file-references)
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
   - [Filters (experimental)](#filters-experimental)
@@ -158,6 +159,162 @@ async function fetchSecretsFromRemoteStore(config) {
 
 module.exports = fetchSecretsFromRemoteStore
 ```
+
+### TypeScript file references
+
+Configure with full TypeScript support using modern tsx execution engine with ts-node fallback.
+
+```yml
+# TypeScript configuration object
+config: ${file(./config.ts)}
+
+# TypeScript async function
+secrets: ${file(./async-secrets.ts)}
+
+# Specific property from TypeScript export
+database: ${file(./config.ts):database}
+```
+
+**TypeScript Object Export:**
+
+```typescript
+/* typescript-config.ts */
+interface DatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  ssl: boolean;
+}
+
+interface ApiConfig {
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+}
+
+interface ConfigObject {
+  environment: string;
+  database: DatabaseConfig;
+  api: ApiConfig;
+  features: {
+    enableNewFeature: boolean;
+    debugMode: boolean;
+  };
+}
+
+function createConfig(): ConfigObject {
+  return {
+    environment: '${opt:stage, "development"}',
+    database: {
+      host: '${env:DB_HOST, "localhost"}',
+      port: parseInt('${env:DB_PORT, "5432"}'),
+      database: '${env:DB_NAME, "myapp"}',
+      ssl: '${env:NODE_ENV}' === 'production'
+    },
+    api: {
+      baseUrl: '${env:API_BASE_URL, "http://localhost:3000"}',
+      timeout: 5000,
+      retries: 3
+    },
+    features: {
+      enableNewFeature: '${opt:stage}' === 'production',
+      debugMode: '${env:DEBUG, "false"}' === 'true'
+    }
+  }
+}
+
+export = createConfig
+```
+
+**TypeScript Async Function:**
+
+```typescript
+/* typescript-async.ts */
+interface SecretStore {
+  apiKey: string;
+  dbPassword: string;
+  jwtSecret: string;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function fetchSecretsFromVault(): Promise<SecretStore> {
+  console.log('Fetching secrets from vault...')
+  
+  // Simulate async operations like fetching from AWS Secrets Manager, HashiCorp Vault, etc.
+  await delay(100)
+  
+  return {
+    apiKey: process.env.API_KEY || 'dev-api-key',
+    dbPassword: process.env.DB_PASSWORD || 'dev-password',
+    jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret'
+  }
+}
+
+export = fetchSecretsFromVault
+```
+
+**Complete Example Configuration:**
+
+```yml
+# config-with-typescript.yml
+service: my-awesome-app
+
+# Load configuration from TypeScript file
+provider: ${file(./typescript-config.ts)}
+
+# Load secrets asynchronously from TypeScript file
+secrets: ${file(./typescript-async.ts)}
+
+# Mix TypeScript with other configuration
+custom:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-east-1"}
+  
+  # You can also use TypeScript files for specific sections
+  databaseConfig: ${file(./typescript-config.ts):database}
+  
+  # Environment-specific overrides
+  stageVariables:
+    dev:
+      logLevel: debug
+    prod:
+      logLevel: info
+
+# Regular configuration values
+resources:
+  description: "Configuration loaded with TypeScript support"
+  timestamp: ${timestamp}
+  
+functions:
+  hello:
+    handler: handler.hello
+    environment:
+      LOG_LEVEL: ${self:custom.stageVariables.${self:custom.stage}.logLevel}
+      DB_HOST: ${self:provider.database.host}
+      API_KEY: ${self:secrets.apiKey}
+```
+
+**Installation Requirements:**
+
+TypeScript support requires either `tsx` (recommended) or `ts-node`:
+
+```bash
+# Recommended: Modern, fast TypeScript execution
+npm install tsx --save-dev
+
+# Alternative: Traditional ts-node approach
+npm install ts-node typescript --save-dev
+```
+
+**Features:**
+- Modern tsx execution (fast, no compilation) with ts-node fallback
+- Support for both sync and async TypeScript functions
+- Function argument passing via `dynamicArgs`
+- Full TypeScript interface support
+- Comprehensive error handling with helpful dependency messages
 
 ### Git references
 
