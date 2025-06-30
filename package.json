@@ -3,9 +3,11 @@
   "version": "0.6.4",
   "description": "Variable support for configuration files",
   "main": "src/index.js",
+  "types": "index.d.ts",
   "files": [
     "cli.js",
     "src",
+    "index.d.ts",
     "package.json",
     "package-lock.json",
     "README.md"
@@ -73,8 +75,8 @@
   },
   "devDependencies": {
     "markdown-magic": "^3.4.0",
+    "typescript": "^5.8.3",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
     "uvu": "^0.5.6",
     "watchlist": "^0.3.1"
   }
