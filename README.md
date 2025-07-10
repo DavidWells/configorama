@@ -11,8 +11,13 @@ Configorama extends your configuration with a powerful variable system. It resol
 - CLI options
 - ENV variables
 - File references
-- Other Key/values in config
+- TypeScript file references
+- Self references (other keys/values in config)
+- Git references
+- Cron values
 - Async/sync JS functions
+- Filters (experimental)
+- Functions (experimental)
 - Any source you'd like...
 
 See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for more examples.
