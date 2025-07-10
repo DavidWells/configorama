@@ -424,6 +424,7 @@ class Configorama {
     }
 
     this.deep = []
+    this.leaves = []
     this.callCount = 0
   }
 
@@ -777,18 +778,28 @@ class Configorama {
             // console.log('Final Config', this.config)
             const transform = this.runFunction.bind(this)
             const varSyntax = this.variableSyntax
+            const leaves = this.leaves
+            // console.log('leaves two', leaves)
             // Traverse resolved object and run functions
             // console.log('this.config', this.config)
             traverse(this.config).forEach(function (rawValue) {
               /* Pass through unknown variables */
               if (!configoramaOpts.allowUndefinedValues && typeof rawValue === 'undefined') {
                 const configValuePath = this.path.join('.')
+                console.log(this.path)
                 const ogValue = dotProp.get(originalConfig, configValuePath)
                 const varDisplay = ogValue ? `"${ogValue}" variable` : 'variable'
+
+                const leaf = leaves.find((l) => l.path.join('.') === configValuePath)
+                // if (leaf) {
+                //   deepLog('leaf', leaf)
+                // }
                 const errorMessage = `
- Config error:
- "${configValuePath}" resolved to "undefined"
- Verify the ${varDisplay} in config at "${configValuePath}"`
+  Config error:\n
+  Path "${configValuePath}" resolved to "undefined".\n
+  Verify the ${varDisplay} in config at "${configValuePath}".\n
+  ${leaf ? `See:\n  ${leaf.originalValuePath}: ${leaf.originalSource} ` : ''}
+  ${leaf && leaf.isFileRef ? `\n  The error could be deeper in the referenced file at ${configValuePath.replace(leaf.originalValuePath, '').replace(/^\./, '')} key.\n` : ''}`
                 throw new Error(errorMessage)
               }
               if (typeof rawValue === 'string') {
@@ -951,12 +962,23 @@ class Configorama {
         value: current,
       }
       const thePath = leaf.path.length > 1 ? leaf.path.join('.') : leaf.path[0]
+      // console.log('thePath', thePath)
+      // console.log('this.originalConfig', this.originalConfig)
       let originalValue = dotProp.get(this.originalConfig, thePath)
       // TODO @DWELLS make recursive
       if (!originalValue) {
-        const parentArray = leaf.path.slice(0, -1)
-        const parentPath = parentArray > 1 ? parentArray.join('.') : parentArray[0]
-        originalValue = dotProp.get(this.originalConfig, parentPath)
+        // Recurse up the tree until we find a value
+        let currentPathArray = leaf.path.slice(0, -1)
+        while (currentPathArray.length > 0 && !originalValue) {
+          const currentPath = currentPathArray.length > 1 ? currentPathArray.join('.') : currentPathArray[0]
+          // console.log('checking parent path:', currentPath)
+          originalValue = dotProp.get(this.originalConfig, currentPath)
+          if (typeof originalValue !== 'undefined') {
+            leaf.originalValuePath = currentPath
+            leaf.currentConfig = this.config
+          }
+          currentPathArray = currentPathArray.slice(0, -1)
+        }
       }
       leaf.originalSource = originalValue
       if (originalValue && isString(originalValue)) {
@@ -989,7 +1011,7 @@ class Configorama {
     })
 
     /*
-    console.log(`variables ${this.callCount}`, variables)
+    console.log(`variables at call count ${this.callCount}`, variables)
     /** */
 
     /* Exclude git messages from being processed */
@@ -997,7 +1019,10 @@ class Configorama {
     if (this.callCount > 1) {
       // filter out git vars
       variables = variables.filter(property => {
-        return !property.originalSource?.startsWith('${git:')
+        if (property.originalSource && typeof property.originalSource === 'string') {
+          return !property.originalSource.startsWith('${git:')
+        }
+        return true
       })
     }
 
@@ -1042,6 +1067,7 @@ class Configorama {
     }
 
     const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
+    this.leaves = leaves
     // console.log('leaves', leaves)
     const populations = this.populateVariables(leaves)
     // console.log("FILL LEAVES", populations)

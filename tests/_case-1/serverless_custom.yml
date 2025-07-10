@@ -1,0 +1,17 @@
+ssm:
+  firehoseStreamName:
+    prod: yaz
+    dev: fire
+    staging: baz
+  s3UploadBucket:
+    prod: yaz
+    dev: s3
+    staging: baz
+  openaiApiKey:
+    prod: yaz
+    dev: ${opt:openAiApiKey, 'yolo'}
+    staging: baz
+  momentoApiKey:
+    prod: yaz
+    dev: choco
+    staging: baz

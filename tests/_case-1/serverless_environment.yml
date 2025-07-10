@@ -1,0 +1,4 @@
+OPENAI_API_KEY: ${self:custom.ssm.openaiApiKey.${self:provider.stage}}
+MOMENTO_API_KEY: ${self:custom.ssm.momentoApiKey.${self:provider.stage}}
+S3_UPLOAD_BUCKET: ${self:custom.ssm.s3UploadBucket.${self:provider.stage}}
+FIREHOSE_STREAM_NAME: ${self:custom.ssm.firehoseStreamName.${self:provider.stage}}

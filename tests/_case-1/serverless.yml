@@ -1,0 +1,8 @@
+custom: ${file(serverless_custom.yml)}
+provider:
+  name: aws
+  profile: ${env:my-aws-profile, 'default-profile'}
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment: ${file(serverless_environment.yml)} 
