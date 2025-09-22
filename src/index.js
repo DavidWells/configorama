@@ -6,11 +6,15 @@ module.exports.Configorama = Configorama
 /**
  * Configorama async API
  * @param  {string|object} configPathOrObject - Path to config file or raw javascript config object
- * @param {object} [settings] Information about the user.
- * @param {object} [settings.options] - options to populate for ${opt:xyz}. These could be CLI flags
- * @param {string} [settings.syntax] - Regex of variable syntax
- * @param {string} [settings.configDir] - cwd of config. Needed if raw object passed in instead of file path
- * @param {array}  [settings.variableSources] - array of custom variable sources
+ * @param {object}  [settings] Information about the user.
+ * @param {object}  [settings.options] - options to populate for ${opt:xyz}. These could be CLI flags
+ * @param {string}  [settings.syntax] - Regex of variable syntax
+ * @param {string}  [settings.configDir] - cwd of config. Needed if raw object passed in instead of file path
+ * @param {array}   [settings.variableSources] - array of custom variable sources
+ * @param {object}  [settings.filters] - Object of of custom filters
+ * @param {object}  [settings.functions] - Object of of custom functions
+ * @param {boolean} [settings.allowUnknownVars] - allow unknown variables to pass through without throwing errors
+ * @param {boolean} [settings.allowUndefinedValues] - allow undefined values to pass through without throwing errors
  * @param {object|function} [settings.dynamicArgs] - values passed into .js config files if user using javascript config.
  * @return {Promise} resolved configuration
  */

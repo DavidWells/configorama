@@ -9,10 +9,10 @@ const { logHeader } = require('./src/utils/logs')
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f'],
-  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info'],
+  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify'],
   alias: {
     h: 'help',
-    v: 'version',
+    v: 'verify',
     o: 'output',
     f: 'format',
     l: 'list',
@@ -38,6 +38,7 @@ Options:
   -f, --format <format>     Output format: json, yaml, or js (default: json)
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
+  -v, --verify              Verify the config
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
 
@@ -85,7 +86,8 @@ if (options.dynamicArgs.verbose) {
   const { 
     _, 
     verbose, 
-    v, 
+    v,
+    verify,
     debug, 
     d, 
     help, 
@@ -109,6 +111,11 @@ if (options.dynamicArgs.verbose) {
     console.log('No flag options provided. Set flags like --flag value')
   }
   console.log()
+}
+
+let isSetupMode = false
+if (argv._.length) {
+  isSetupMode = argv._.includes('setup')
 }
 
 // Create Configorama instance
