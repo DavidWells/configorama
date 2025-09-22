@@ -28,7 +28,7 @@ function createConfig(): ConfigObject {
       host: '${env:DB_HOST, "localhost"}',
       port: parseInt('${env:DB_PORT, "5432"}'),
       database: '${env:DB_NAME, "myapp"}',
-      ssl: '${env:NODE_ENV}' === 'production'
+      ssl: ('${env:NODE_ENV}' as any) === 'production'
     },
     api: {
       baseUrl: '${env:API_BASE_URL, "http://localhost:3000"}',
@@ -36,8 +36,8 @@ function createConfig(): ConfigObject {
       retries: 3
     },
     features: {
-      enableNewFeature: '${opt:stage}' === 'production',
-      debugMode: '${env:DEBUG, "false"}' === 'true'
+      enableNewFeature: ('${opt:stage}' as any) === 'production',
+      debugMode: ('${env:DEBUG, "false"}' as any) === 'true'
     }
   }
 }
