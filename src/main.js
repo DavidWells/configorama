@@ -56,6 +56,7 @@ const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
 const { findNestedVariables } = require('./utils/find-nested-variables')
 const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 const { logHeader } = require('./utils/logs')
+const { createEditorLink } = require('./utils/createEditorLink')
 /**
  * Maintainer's notes:
  *
@@ -458,6 +459,10 @@ class Configorama {
         this.variableSyntax,
         this.opts
       )
+      this.configFileContents = ''
+      if (VERBOSE || showFoundVariables) {
+        this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
+      }
       this.config = configObject
       this.originalConfig = cloneDeep(configObject)
     }
@@ -618,6 +623,9 @@ class Configorama {
         }
 
         logHeader('Variable Details')
+
+        const lines = this.configFileContents.split('\n')
+        // console.log('lines', lines)
     
         const indent = ''
         const boxes = varKeys.map((key, i) => {
@@ -720,11 +728,18 @@ class Configorama {
           }
 
           varMsg += `\n${locationLabel} ${locationRender}`
+
+          // find the match in our lines
+          const line = lines.findIndex((line) => line.includes(key))
+          const lineNumber = line + 1
     
           // console.log(` ${chalk.bold(key)}`)
           return {
             text: varMsg,
-            title: `▶ ${key}`,
+            title: {
+              left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
+              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `Line: ${lineNumber}`, 'gray') : '',
+            },
           }
         })
 
