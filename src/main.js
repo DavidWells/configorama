@@ -829,6 +829,7 @@ class Configorama {
                 throw new Error(errorMessage)
               }
               if (typeof rawValue === 'string') {
+                // console.log('rawValue', rawValue)
                 /* Process inline functions like merge() */
                 if (ENABLE_FUNCTIONS && rawValue.match(/> function /)) {
                   // console.log('RAW FUNCTION', rawFunction)
@@ -889,6 +890,7 @@ class Configorama {
     })
   }
   runFunction(variableString) {
+    // console.log('runFunction', variableString)
     /* If json object value return it */
     if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
       return variableString
@@ -1498,7 +1500,12 @@ Missing Value ${missingValue} - ${matchedString}
       // @TODO fix this for eval refs
       // console.log('prop', prop)
       // console.log('func', func)
-      if (!prop.match(fileRefSyntax) && !prop.match(getValueFromEval.match) && func) {
+
+      if (
+        !prop.match(fileRefSyntax) 
+        && !prop.match(getValueFromEval.match) 
+        // AND is not multiline value
+        && (func && prop.split('\n').length < 3)) {
         // console.log('IS FUNCTION')
         /* if matches function signature like ${merge('foo', 'bar')}
           rewrite the variable to run the function after inputs resolved
