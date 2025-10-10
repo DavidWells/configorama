@@ -76,6 +76,7 @@ const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
 const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const envRefSyntax = RegExp(/^env:/g)
@@ -227,6 +228,16 @@ class Configorama {
         resolver: (varString, o, x, pathValue) => {
           // console.log('pathValue getValueFromFile', pathValue)
           return this.getValueFromFile(varString)
+        },
+      },
+
+
+      {
+        type: 'text',
+        prefix: 'text',
+        match: textRefSyntax,
+        resolver: (varString, o, x, pathValue) => {
+          return this.getValueFromFile(varString, { asRawText: true })
         },
       },
 
@@ -836,6 +847,13 @@ class Configorama {
                   } else {
                     this.update(funcVal)
                   }
+                }
+
+                /* fix for file(JS-ref.js, raw) to keep parens and inline code */
+                const OPEN_PAREN_PLACEHOLDER_PATTERN = /__PH_PAREN_OPEN__/g
+                if (rawValue.match(OPEN_PAREN_PLACEHOLDER_PATTERN)) {
+                  rawValue = rawValue.replace(OPEN_PAREN_PLACEHOLDER_PATTERN, '(')
+                  this.update(rawValue)
                 }
 
                 /* Allow for unknown variables to pass through */
@@ -1984,15 +2002,19 @@ Unable to resolve configuration variable
       return res
     })
   }
-  async getValueFromFile(variableString) {
+  async getValueFromFile(variableString, options) {
+    const opts = options || {}
+    const syntax = opts.asRawText ? textRefSyntax : fileRefSyntax
     // console.log('From file', `"${variableString}"`)
-    let matchedFileString = variableString.match(fileRefSyntax)[0]
+    let matchedFileString = variableString.match(syntax)[0]
     // console.log('matchedFileString', matchedFileString)
 
-    // Get function input params if any supplied
-    var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
+    // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
+  // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
+    var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)/g
+    // tighter (?<![.\w-])\b(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*
     var hasParams = funcParamsRegex.exec(matchedFileString)
-    // console.log('args', hasParams)
+
     let argsToPass = []
     if (hasParams) {
       const splitter = splitCsv(hasParams[2])
@@ -2000,6 +2022,7 @@ Unable to resolve configuration variable
         const cleanArg = trim(arg).replace(/^'|"/, '').replace(/'|"$/, '')
         return cleanArg
       })
+      // console.log('argsFound', argsFound)
 
       // If function has more arguments than file path
       if (argsFound.length && argsFound.length > 1) {
@@ -2012,7 +2035,7 @@ Unable to resolve configuration variable
     // console.log('argsToPass', argsToPass)
 
     const relativePath = trimSurroundingQuotes(
-      matchedFileString.replace(fileRefSyntax, (match, varName) => varName.trim()).replace('~', os.homedir()),
+      matchedFileString.replace(syntax, (match, varName) => varName.trim()).replace('~', os.homedir()),
     )
 
     // Resolve alias if the path contains alias syntax
@@ -2059,8 +2082,16 @@ ${logLines}
 
     let valueToPopulate
 
+    const variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
+
+    /* handle case for referencing raw JS files to inline them */
+    if (argsToPass.length && (argsToPass && argsToPass[0]  && argsToPass[0].toLowerCase() === 'raw') || opts.asRawText) {
+      valueToPopulate = variableFileContents.replace(/\(/g, '__PH_PAREN_OPEN__')
+      return Promise.resolve(valueToPopulate)
+    }
+
     // Process JS files
-    if (fileExtension === 'js') {
+    if (fileExtension === 'js' || fileExtension === 'cjs') {
       const jsFile = require(fullFilePath)
       let returnValueFunction = jsFile
       // TODO change how exported functions are referenced
@@ -2084,8 +2115,7 @@ Check if your javascript is exporting a function that returns a value.`
         config: this.config,
         opts: this.opts,
       }
-      
-
+    
       valueToPopulate = returnValueFunction.call(jsFile, valueForFunction, ...argsToPass)
 
       return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
@@ -2106,7 +2136,6 @@ Check if your javascript is returning the correct data.`
         })
       })
     }
-
 
     if (fileExtension === 'ts') {
       const { executeTypeScriptFile } = require('./parsers/typescript')
@@ -2217,7 +2246,7 @@ Check if your ESM is returning the correct data.`
     // Process everything except JS, TS, and ESM
     if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
       /* Read initial file */
-      valueToPopulate = fs.readFileSync(fullFilePath, 'utf-8')
+      valueToPopulate = variableFileContents
 
       // File reference has :subKey lookup. Must dig deeper
       if (matchedFileString !== variableString) {
@@ -2400,6 +2429,8 @@ Please use ":" to reference sub properties`
       varType = 'file'
     } else if (variableString.match(deepRefSyntax)) {
       varType = 'deep'
+    } else if (variableString.match(textRefSyntax)) {
+      varType = 'text'
     }
     if (!isValidValue(valueToPopulate)) {
       // console.log("MISSING", variableString)
