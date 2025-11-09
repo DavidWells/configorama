@@ -889,6 +889,143 @@ class Configorama {
         })
     })
   }
+
+  /**
+   * Collect metadata about all variables found in the configuration
+   * @returns {object} Metadata object containing variables, fileRefs, and summary
+   */
+  collectVariableMetadata() {
+    const variableSyntax = this.variableSyntax
+    const variablesKnownTypes = this.variablesKnownTypes
+    const foundVariables = []
+    const variableData = {}
+    const fileRefs = []
+    let matchCount = 1
+
+    traverse(this.originalConfig).forEach(function (rawValue) {
+      if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
+        const configValuePath = this.path.join('.')
+        if (configValuePath.endsWith('Fn::Sub')) {
+          return
+        }
+
+        const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
+
+        const lastItem = nested[nested.length - 1]
+        const lastKeyPath = this.path[this.path.length - 1]
+        const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
+        const key = lastItem.fullMatch
+        const varData = {
+          path: configValuePath,
+          key: itemKey,
+          value: rawValue,
+          variable: lastItem.fullMatch,
+          isRequired: false,
+          defaultValue: undefined,
+          matchIndex: matchCount++,
+          resolveOrder: [],
+          resolveDetails: nested,
+        }
+        let defaultValueIsVar = false
+
+        function calculateResolveOrder(item) {
+          if (item && item.fallbackValues) {
+            let hasResolvedFallback
+            const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
+              if (f.fallbackValues) {
+                const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                if (!hasResolvedFallback && nestedResolvedFallback) {
+                  hasResolvedFallback = nestedResolvedFallback
+                }
+                return nestedOrder
+              }
+
+              if (!hasResolvedFallback && f.isResolvedFallback) {
+                hasResolvedFallback = f.stringValue
+              }
+              if (f.isResolvedFallback) {
+                hasResolvedFallback = f.stringValue
+              }
+
+              if (!hasResolvedFallback && f.isVariable) {
+                defaultValueIsVar = f
+              }
+              return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+            })).flat()
+
+            return [order, hasResolvedFallback]
+          }
+          return [[item.variable], undefined]
+        }
+
+        const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
+        varData.resolveOrder = resolveOrder
+
+        if (defaultValueIsVar) {
+          varData.defaultValueIsVar = defaultValueIsVar
+        }
+
+        if (typeof hasResolvedFallback !== 'undefined') {
+          varData.defaultValue = hasResolvedFallback
+        }
+
+        if (typeof varData.defaultValue === 'undefined') {
+          varData.isRequired = true
+        }
+
+        if (varData.resolveOrder.length > 1) {
+          varData.hasFallback = true
+        }
+
+        // Extract file references
+        nested.forEach((detail) => {
+          if (detail.varType && (detail.varType.startsWith('file(') || detail.varType.startsWith('text('))) {
+            const fileMatch = detail.varType.match(/^(?:file|text)\((.*?)\)/)
+            if (fileMatch && fileMatch[1]) {
+              let filePath = fileMatch[1].trim()
+              // Remove quotes if present
+              filePath = filePath.replace(/^['"]|['"]$/g, '')
+              // Handle variables in file paths - just record the pattern
+              if (!fileRefs.includes(filePath)) {
+                fileRefs.push(filePath)
+              }
+            }
+          }
+        })
+
+        variableData[key] = (variableData[key] || []).concat(varData)
+        foundVariables.push(rawValue)
+      }
+    })
+
+    // Make foundVariables array unique
+    const finalFoundVariables = [...new Set(foundVariables)]
+    const varKeys = Object.keys(variableData)
+
+    // Calculate summary
+    let requiredCount = 0
+    let withDefaultsCount = 0
+    varKeys.forEach((key) => {
+      const instances = variableData[key]
+      const firstInstance = instances[0]
+      if (firstInstance.isRequired) {
+        requiredCount++
+      } else {
+        withDefaultsCount++
+      }
+    })
+
+    return {
+      variables: variableData,
+      fileRefs: fileRefs,
+      summary: {
+        totalVariables: varKeys.length,
+        requiredVariables: requiredCount,
+        variablesWithDefaults: withDefaultsCount
+      }
+    }
+  }
+
   runFunction(variableString) {
     // console.log('runFunction', variableString)
     /* If json object value return it */

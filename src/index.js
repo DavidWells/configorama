@@ -16,12 +16,22 @@ module.exports.Configorama = Configorama
  * @param {boolean} [settings.allowUnknownVars] - allow unknown variables to pass through without throwing errors
  * @param {boolean} [settings.allowUndefinedValues] - allow undefined values to pass through without throwing errors
  * @param {object|function} [settings.dynamicArgs] - values passed into .js config files if user using javascript config.
- * @return {Promise} resolved configuration
+ * @param {boolean} [settings.returnMetadata] - return both config and metadata about variables found
+ * @return {Promise} resolved configuration or {config, metadata} if returnMetadata is true
  */
 module.exports = async (configPathOrObject, settings = {}) => {
   const instance = new Configorama(configPathOrObject, settings)
   const options = settings.options || {}
   const config = await instance.init(options)
+
+  if (settings.returnMetadata) {
+    const metadata = instance.collectVariableMetadata()
+    return {
+      config,
+      metadata
+    }
+  }
+
   return config
 }
 
