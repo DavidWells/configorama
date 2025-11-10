@@ -492,106 +492,12 @@ class Configorama {
     const variablesKnownTypes = this.variablesKnownTypes
 
     if (VERBOSE || showFoundVariables) {
-      const foundVariables = []
-      const variableData = {}
-      let matchCount = 1
-      // console.log('this.originalConfig', this.originalConfig)
-      traverse(this.originalConfig).forEach(function (rawValue) {
-        if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
-          const configValuePath = this.path.join('.')
-          if (configValuePath.endsWith('Fn::Sub')) {
-            return
-          }
-      
-          const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
-          /*
-          console.log('traverse nested result', nested)
-          /** */
-          
-          // console.log(`▷ Path: ${configValuePath}`)
-          // console.log('\n  Key/value:')
-          // console.log(`  ${configValuePath}: ${rawValue}`)
-          const lastItem = nested[nested.length - 1]
-          const lastKeyPath = this.path[this.path.length - 1]
-          const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
-          const key = lastItem.fullMatch
-          const varData = {
-            path: configValuePath,
-            key: itemKey,
-            value: rawValue,
-            variable: lastItem.fullMatch,
-            isRequired: false,
-            defaultValue: undefined,
-            matchIndex: matchCount++,
-            // hasFallback: false,
-            resolveOrder: [],
-            resolveDetails: nested,
-          }
-          let defaultValueIsVar = false
-          function calculateResolveOrder(item) {
-            if (item && item.fallbackValues) {
-              let hasResolvedFallback
-              // console.log('item.fallbackValues', item.fallbackValues)
-              const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
-                // console.log('f', f)
-                if (f.fallbackValues) {
-                  const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
-                  // console.log('nestedOrder', nestedOrder)
-                  // console.log('nestedResolvedFallback', nestedResolvedFallback)
-                  if (!hasResolvedFallback && nestedResolvedFallback) {
-                    hasResolvedFallback = nestedResolvedFallback
-                  }
-                  return nestedOrder // Return just the order part
-                }
-        
-                if (!hasResolvedFallback && f.isResolvedFallback) {
-                  hasResolvedFallback = f.stringValue
-                }
-                if (f.isResolvedFallback) {
-                  hasResolvedFallback = f.stringValue
-                }
+      // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
+      const metadata = this.collectVariableMetadata()
+      const variableData = metadata.variables
+      const varKeys = Object.keys(variableData)
 
-                if (!hasResolvedFallback && f.isVariable) {
-                  defaultValueIsVar = f
-                }
-                // console.log('hasResolvedFallback', hasResolvedFallback)
-                return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
-              })).flat()
-              
-              return [order, hasResolvedFallback]
-            }
-            return [[item.variable], undefined] // Return array instead of just the value
-          }
-
-          const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
-          varData.resolveOrder = resolveOrder
-          
-          if (defaultValueIsVar) {
-            varData.defaultValueIsVar = defaultValueIsVar
-          }
-
-          // console.log('hasResolvedFallback', hasResolvedFallback)
-          if (typeof hasResolvedFallback !== 'undefined') {
-            varData.defaultValue = hasResolvedFallback
-          }
-
-          // console.log('varData.defaultValue', varData.defaultValue)
-          if (typeof varData.defaultValue === 'undefined') {
-            varData.isRequired = true
-          }
-      
-          if (varData.resolveOrder.length > 1) {
-            varData.hasFallback = true
-          }
-          //console.log('varData', varData)
-
-          variableData[key] = (variableData[key] || []).concat(varData)
-
-          foundVariables.push(rawValue)
-        }
-      })
-
-      if (!foundVariables.length) {
+      if (!varKeys.length) {
         logHeader('No Variables Found in Config')
         if (this.configFilePath) {
           console.log(`File: ${this.configFilePath}`)
@@ -614,10 +520,7 @@ class Configorama {
         console.log()
       }
 
-      // make foundVariables array unique
-      const finalFoundVariables = [...new Set(foundVariables)]
-      if (finalFoundVariables.length > 0) {
-        const varKeys = Object.keys(variableData)
+      if (varKeys.length > 0) {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
 
         logHeader(`Found ${varKeys.length} Variables${fileName}`)
@@ -908,6 +811,7 @@ class Configorama {
     traverse(this.originalConfig).forEach(function (rawValue) {
       if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
         const configValuePath = this.path.join('.')
+        /* Skip Fn::Sub variables */
         if (configValuePath.endsWith('Fn::Sub')) {
           return
         }
