@@ -1,7 +1,7 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-/*
+/* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
@@ -743,7 +743,9 @@ class Configorama {
               /* Pass through unknown variables */
               if (!configoramaOpts.allowUndefinedValues && typeof rawValue === 'undefined') {
                 const configValuePath = this.path.join('.')
+                /*
                 console.log(this.path)
+                /** */
                 const ogValue = dotProp.get(originalConfig, configValuePath)
                 const varDisplay = ogValue ? `"${ogValue}" variable` : 'variable'
 
@@ -1519,7 +1521,12 @@ class Configorama {
         missingValue = this.deep[i]
       }
 
-      const cleanVar = cleanVariable(property, this.variableSyntax, true, `populateVariable fallback ${this.callCount}`)
+      const cleanVar = cleanVariable(
+        property,
+        this.variableSyntax,
+        true,
+        `populateVariable fallback ${this.callCount}`
+      )
       const cleanVarNoFilters = cleanVar.split('|')[0]
       const splitVars = splitByComma(cleanVarNoFilters)
       const nestedVar = findNestedVariable(splitVars, valueObject.originalSource)
@@ -1708,7 +1715,7 @@ Missing Value ${missingValue} - ${matchedString}
       // This runs on nested variable resolution
       return this.getValueFromSource(variableString, valueObject, 'overwrite')
     })
-    
+
     // console.log('variableValues', variableValues)
     return Promise.all(variableValues).then((values) => {
       let deepPropertyStr = propertyString
@@ -1907,7 +1914,7 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('valueCount', valueCount)
           // TODO throw on empty values?
           // No fallback value found AND this is undefined, throw error
-          const nestedVars = findNestedVariables(propertyString, this.variableSyntax)
+          const nestedVars = findNestedVariables(propertyString, this.variableSyntax, this.variablesKnownTypes)
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
           if (valueCount.length === 1 && noNestedVars) {
@@ -2076,7 +2083,9 @@ Unable to resolve configuration variable
     ]
 
     // Default value used for self variable
-    if (propertyString.match(/,/)) {
+    // Only show this error if the variable itself (not a parent fallback) is a self-reference with a fallback
+    const isSelfReference = !variableString.match(/^(env|opt|file|text|cron|eval|git):/)
+    if (isSelfReference && variableString.match(/,/)) {
       errorMessage.push('\n Default values for self referenced values are not allowed')
       errorMessage.push(`\n Fix the ${propertyString} variable`)
     }

@@ -33,6 +33,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
 
     return {
       config,
+      originalConfig: instance.originalConfig,
       metadata: enrichedMetadata
     }
   }

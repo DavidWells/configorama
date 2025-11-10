@@ -34,11 +34,13 @@ function splitByComma(string, regexPattern) {
   let current = ""
   let inQuote = false
   let quoteChar = ""
-  let bracketDepth = 0  // Includes both () and []
-  
+  let bracketDepth = 0  // Includes (), [], and {}
+  let dollarBraceDepth = 0  // Track ${ ... } depth separately (only when regexPattern is provided)
+
   for (let i = 0; i < protectedString.length; i++) {
     const char = protectedString[i]
-    
+    const prevChar = i > 0 ? protectedString[i-1] : ''
+
     // Handle quotes
     if ((char === "'" || char === '"') && (i === 0 || protectedString[i-1] !== "\\")) {
       if (!inQuote) {
@@ -48,13 +50,35 @@ function splitByComma(string, regexPattern) {
         inQuote = false
       }
     }
-    
-    // Handle parentheses and brackets
-    if ((char === "(" || char === "[") && !inQuote) bracketDepth++
-    if ((char === ")" || char === "]") && !inQuote) bracketDepth--
-    
+
+    // Handle parentheses, brackets, and curly braces
+    if (!inQuote) {
+      if (char === "(" || char === "[") {
+        bracketDepth++
+      } else if (char === ")" || char === "]") {
+        bracketDepth--
+      } else if (regexPattern) {
+        // Only track {} when we have regexPattern (i.e., when protecting variables)
+        // TODO this doesn't support custom variable syntax regexes.
+        if (char === "{" && prevChar === "$") {
+          // Track ${ as a special unit
+          dollarBraceDepth++
+        } else if (char === "{") {
+          // Standalone { (not part of ${)
+          bracketDepth++
+        } else if (char === "}") {
+          // Check if this closes a ${ or a standalone {
+          if (dollarBraceDepth > 0) {
+            dollarBraceDepth--
+          } else if (bracketDepth > 0) {
+            bracketDepth--
+          }
+        }
+      }
+    }
+
     // Process comma
-    if (char === "," && !inQuote && bracketDepth === 0) {
+    if (char === "," && !inQuote && bracketDepth === 0 && dollarBraceDepth === 0) {
       result.push(current.trim())
       current = ""
     } else {

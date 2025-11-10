@@ -22,6 +22,7 @@ const VAR_MATCH_REGEX = /__VAR_\d+__/
  * @returns {Array} Array of match objects with fullMatch, variable, varString and other properties
  */
 function findNestedVariables(input, regex, variablesKnownTypes, location, debug = false) {
+  // console.log('variablesKnownTypes', variablesKnownTypes)
   // Create a copy of the input for replacement tracking
   let current = input
   // console.log('current', current)
@@ -182,7 +183,9 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
         // remove first element from split
         matches[i].fallbackValues = split.slice(1).map((item) => {
           // console.log('item', item)
-          const isVariable = variablesKnownTypes.test(item) || VAR_MATCH_REGEX.test(item)
+          // Strip ${} wrapper if present to properly test against variablesKnownTypes
+          const innerContent = item.replace(/^\$\{(.*)\}$/, '$1')
+          const isVariable = variablesKnownTypes.test(innerContent) || VAR_MATCH_REGEX.test(item)
           const fallbackData = {
             isVariable,
             fullMatch: item,
@@ -195,7 +198,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
           }
 
           if (isVariable) {
-            const varType = item.match(variablesKnownTypes)[1]
+            const varType = innerContent.match(variablesKnownTypes)[1]
             fallbackData.varType = varType
             // if (varType === 'self:') {
             //   fallbackData.fullMatch = item.replace('self:', '')
@@ -290,13 +293,13 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
  * @param {boolean} debug - Whether to print debug information
  * @returns {Array} Array of match objects containing full match and captured group
  */
-function findNestedVariablesx(input, regex, variablesKnownTypes, debug = false) {
+function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false) {
   let str = input
   let matches = []
   let match
   let iteration = 0
 
-  console.log('input', input)
+  // console.log('input', input)
   
   if (debug) console.log(`Initial string: ${str}`)
 
