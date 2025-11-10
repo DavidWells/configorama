@@ -2093,18 +2093,23 @@ Unable to resolve configuration variable
     let allowSpecialCase = false
     /* handle special cases for cloudformation ${Sub} values */
     if (this.originalConfig && key.endsWith('Fn::Sub')) {
-      const params = this.originalConfig.Parameters || (this.originalConfig.parameters || {}).Parameters
-      const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
-      /* Cloudformation Resource References */
-      if (resources && resources[variableString]) {
-        allowSpecialCase = true
-      } else if (params && params[variableString]) {
-        allowSpecialCase = true
-      } else if (variableString === 'ApiGatewayRestApi') {
-        // Allow for "hidden" cloudformation variables, set by sls framework
-        allowSpecialCase = true
-      } else if (variableString === 'HttpApi') {
-        // Allow for "hidden" cloudformation variables, set by sls framework
+      if (this.opts.verifySubReferences) {
+        const params = this.originalConfig.Parameters || (this.originalConfig.resources || {}).Parameters
+        const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
+        /* Cloudformation Resource References */
+        if (resources && resources[variableString]) {
+          allowSpecialCase = true
+        } else if (params && params[variableString]) {
+          allowSpecialCase = true
+        } else if (variableString === 'ApiGatewayRestApi') {
+          // Allow for "hidden" cloudformation variables, set by sls framework
+          allowSpecialCase = true
+        } else if (variableString === 'HttpApi') {
+          // Allow for "hidden" cloudformation variables, set by sls framework
+          allowSpecialCase = true
+        }
+      } else {
+        // Default let any sub references pass through
         allowSpecialCase = true
       }
     }
