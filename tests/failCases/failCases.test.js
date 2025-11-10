@@ -38,7 +38,6 @@ test('throw if opt not found', async () => {
     })
     assert.unreachable('should have thrown')
   } catch (error) {
-    console.log('error', error)
     assert.match(error.message, /Unable to resolve/)
   }
 })
@@ -60,7 +59,7 @@ test('throw if value resolved is undefined', async () => {
   }
 
   try {
-    await configorama(object, {
+    const config =await configorama(object, {
       configDir: dirname
     })
     assert.unreachable('should have thrown')
@@ -115,10 +114,14 @@ test('env failConfig', async () => {
     const x = await configorama(envFailConfig, {
       configDir: dirname
     })
+    /*
     console.log('x', x)
+    /** */
     assert.unreachable('should have thrown')
   } catch (error) {
+    /*
     console.log('error', error)
+    /** */
     assert.match(error.message, /Invalid variable syntax/)
   }
 })
@@ -135,7 +138,9 @@ test('env ref is object', async () => {
     })
     assert.unreachable('should have thrown')
   } catch (error) {
+    /*
     console.log('error', error)
+    /** */
     assert.match(error.message, /Invalid variable syntax/)
   }
 })

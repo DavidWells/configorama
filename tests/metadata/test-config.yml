@@ -1,0 +1,21 @@
+service: my-service
+region: ${env:AWS_REGION, us-east-1}
+stage: ${opt:stage, dev}
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${self:region}
+  stage: ${self:stage}
+
+custom:
+  apiKey: ${env:API_KEY, default-api-key}
+  dbConfig: ${file(./database.json)}
+  optionalValue: ${env:OPTIONAL_VAR, "default-value"}
+
+functions:
+  hello:
+    handler: handler.hello
+    environment:
+      TABLE_NAME: ${self:custom.tableName, my-table}
+      API_ENDPOINT: ${env:API_ENDPOINT, https://api.example.com}

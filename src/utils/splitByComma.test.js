@@ -46,7 +46,7 @@ test('splitByComma - should handle input with extra whitespace', () => {
 
 test('splitByComma - should handle mixed scenarios', () => {
   const result = splitByComma("normal, 'quoted, string', function(param1, param2)")
-  console.log('result', result)
+  // console.log('result', result)
   assert.equal(result, ["normal", "'quoted, string'", "function(param1, param2)"])
 })
 
@@ -80,5 +80,50 @@ test('splitByComma - should handle backtick quotes', () => {
   assert.equal(result, ["normal", "`template ${with, commas} inside`"])
 })
 
-// Run all tests  
+test('splitByComma - should split ${} variables when NO regex provided', () => {
+  const result = splitByComma('${env:no, env:empty}')
+  assert.equal(result, ['${env:no', 'env:empty}'])
+})
+
+test('splitByComma - should protect ${} variables when regex provided', () => {
+  const result = splitByComma('opt:stage, ${opt:stageOne}, ${opt:stageTwo}', variableSyntax)
+  assert.equal(result, ['opt:stage', '${opt:stageOne}', '${opt:stageTwo}'])
+})
+
+test('splitByComma - should protect nested ${} variables when regex provided', () => {
+  const result = splitByComma('opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}', variableSyntax)
+  assert.equal(result, ['opt:stage', '${opt:stageOne, ${env:foo}}', '${opt:stageTwo}'])
+})
+
+test('splitByComma - should handle multiple nested levels with regex', () => {
+  const result = splitByComma('${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"', variableSyntax)
+  assert.equal(result, ['${opt:stageOne, ${env:foo}}', '${opt:stageTwo}', '"three"'])
+})
+
+test('splitByComma - should handle standalone {} objects with regex', () => {
+  const result = splitByComma('func(arg1, {key: value}, arg2)', variableSyntax)
+  assert.equal(result, ['func(arg1, {key: value}, arg2)'])
+})
+
+test('splitByComma - should handle mixed ${} variables and {} objects with regex', () => {
+  const result = splitByComma('${self:config}, {key: "value"}, ${env:var}', variableSyntax)
+  assert.equal(result, ['${self:config}', '{key: "value"}', '${env:var}'])
+})
+
+test('splitByComma - should handle complex nested case from failCases', () => {
+  const result = splitByComma('${env:no, env:empty}')
+  assert.equal(result, ['${env:no', 'env:empty}'])
+})
+
+test('splitByComma - should handle deeply nested variables with regex', () => {
+  const input = 'opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"'
+  const result = splitByComma(input, variableSyntax)
+  assert.equal(result.length, 4)
+  assert.equal(result[0], 'opt:stage')
+  assert.equal(result[1], '${opt:stageOne, ${env:foo}}')
+  assert.equal(result[2], '${opt:stageTwo}')
+  assert.equal(result[3], '"three"')
+})
+
+// Run all tests
 test.run() 

@@ -1,7 +1,7 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-/*
+/* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
@@ -123,6 +123,9 @@ class Configorama {
     this.filterCache = {}
 
     this.foundVariables = []
+
+    // Track variable resolutions for metadata (keyed by path)
+    this.resolutionTracking = {}
 
     const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
   
@@ -489,106 +492,12 @@ class Configorama {
     const variablesKnownTypes = this.variablesKnownTypes
 
     if (VERBOSE || showFoundVariables) {
-      const foundVariables = []
-      const variableData = {}
-      let matchCount = 1
-      // console.log('this.originalConfig', this.originalConfig)
-      traverse(this.originalConfig).forEach(function (rawValue) {
-        if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
-          const configValuePath = this.path.join('.')
-          if (configValuePath.endsWith('Fn::Sub')) {
-            return
-          }
-      
-          const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
-          /*
-          console.log('traverse nested result', nested)
-          /** */
-          
-          // console.log(`▷ Path: ${configValuePath}`)
-          // console.log('\n  Key/value:')
-          // console.log(`  ${configValuePath}: ${rawValue}`)
-          const lastItem = nested[nested.length - 1]
-          const lastKeyPath = this.path[this.path.length - 1]
-          const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
-          const key = lastItem.fullMatch
-          const varData = {
-            path: configValuePath,
-            key: itemKey,
-            value: rawValue,
-            variable: lastItem.fullMatch,
-            isRequired: false,
-            defaultValue: undefined,
-            matchIndex: matchCount++,
-            // hasFallback: false,
-            resolveOrder: [],
-            resolveDetails: nested,
-          }
-          let defaultValueIsVar = false
-          function calculateResolveOrder(item) {
-            if (item && item.fallbackValues) {
-              let hasResolvedFallback
-              // console.log('item.fallbackValues', item.fallbackValues)
-              const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
-                // console.log('f', f)
-                if (f.fallbackValues) {
-                  const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
-                  // console.log('nestedOrder', nestedOrder)
-                  // console.log('nestedResolvedFallback', nestedResolvedFallback)
-                  if (!hasResolvedFallback && nestedResolvedFallback) {
-                    hasResolvedFallback = nestedResolvedFallback
-                  }
-                  return nestedOrder // Return just the order part
-                }
-        
-                if (!hasResolvedFallback && f.isResolvedFallback) {
-                  hasResolvedFallback = f.stringValue
-                }
-                if (f.isResolvedFallback) {
-                  hasResolvedFallback = f.stringValue
-                }
+      // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
+      const metadata = this.collectVariableMetadata()
+      const variableData = metadata.variables
+      const varKeys = Object.keys(variableData)
 
-                if (!hasResolvedFallback && f.isVariable) {
-                  defaultValueIsVar = f
-                }
-                // console.log('hasResolvedFallback', hasResolvedFallback)
-                return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
-              })).flat()
-              
-              return [order, hasResolvedFallback]
-            }
-            return [[item.variable], undefined] // Return array instead of just the value
-          }
-
-          const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
-          varData.resolveOrder = resolveOrder
-          
-          if (defaultValueIsVar) {
-            varData.defaultValueIsVar = defaultValueIsVar
-          }
-
-          // console.log('hasResolvedFallback', hasResolvedFallback)
-          if (typeof hasResolvedFallback !== 'undefined') {
-            varData.defaultValue = hasResolvedFallback
-          }
-
-          // console.log('varData.defaultValue', varData.defaultValue)
-          if (typeof varData.defaultValue === 'undefined') {
-            varData.isRequired = true
-          }
-      
-          if (varData.resolveOrder.length > 1) {
-            varData.hasFallback = true
-          }
-          //console.log('varData', varData)
-
-          variableData[key] = (variableData[key] || []).concat(varData)
-
-          foundVariables.push(rawValue)
-        }
-      })
-
-      if (!foundVariables.length) {
+      if (!varKeys.length) {
         logHeader('No Variables Found in Config')
         if (this.configFilePath) {
           console.log(`File: ${this.configFilePath}`)
@@ -611,10 +520,7 @@ class Configorama {
         console.log()
       }
 
-      // make foundVariables array unique
-      const finalFoundVariables = [...new Set(foundVariables)]
-      if (finalFoundVariables.length > 0) {
-        const varKeys = Object.keys(variableData)
+      if (varKeys.length > 0) {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
 
         logHeader(`Found ${varKeys.length} Variables${fileName}`)
@@ -626,9 +532,34 @@ class Configorama {
           const longestKey = varKeys.reduce((acc, k) => {
             return Math.max(acc, k.length)
           }, 0)
+          // Count all references including nested ones within other variables
+          const countAllReferences = (targetVariable) => {
+            // Start with direct references
+            let count = variableData[targetVariable].length
+
+            // Check all other variables for nested references to this variable
+            varKeys.forEach((otherKey) => {
+              if (otherKey === targetVariable) return
+
+              variableData[otherKey].forEach((instance) => {
+                if (instance.resolveDetails) {
+                  instance.resolveDetails.forEach((detail) => {
+                    // Check if this resolveDetail references our target variable
+                    if (detail.fullMatch === targetVariable) {
+                      count++
+                    }
+                  })
+                }
+              })
+            })
+
+            return count
+          }
+
           console.log(varKeys.map((k) => {
-            const placesWord = variableData[k].length > 1 ? 'places' : 'place'
-            return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${variableData[k].length} ${placesWord}`
+            const refCount = countAllReferences(k)
+            const placesWord = refCount > 1 ? 'places' : 'place'
+            return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${refCount} ${placesWord}`
           }).join('\n'))
           console.log()
         }
@@ -812,7 +743,9 @@ class Configorama {
               /* Pass through unknown variables */
               if (!configoramaOpts.allowUndefinedValues && typeof rawValue === 'undefined') {
                 const configValuePath = this.path.join('.')
+                /*
                 console.log(this.path)
+                /** */
                 const ogValue = dotProp.get(originalConfig, configValuePath)
                 const varDisplay = ogValue ? `"${ogValue}" variable` : 'variable'
 
@@ -889,6 +822,182 @@ class Configorama {
         })
     })
   }
+
+  /**
+   * Collect metadata about all variables found in the configuration
+   * @returns {object} Metadata object containing variables, fileRefs, and summary
+   */
+  collectVariableMetadata() {
+    const variableSyntax = this.variableSyntax
+    const variablesKnownTypes = this.variablesKnownTypes
+    const foundVariables = []
+    const variableData = {}
+    const fileRefs = []
+    let matchCount = 1
+
+    traverse(this.originalConfig).forEach(function (rawValue) {
+      if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
+        const configValuePath = this.path.join('.')
+        /* Skip Fn::Sub variables */
+        if (configValuePath.endsWith('Fn::Sub')) {
+          return
+        }
+
+        const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
+
+        const lastItem = nested[nested.length - 1]
+        const lastKeyPath = this.path[this.path.length - 1]
+        const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
+        const key = lastItem.fullMatch
+        const varData = {
+          path: configValuePath,
+          key: itemKey,
+          value: rawValue,
+          variable: lastItem.fullMatch,
+          isRequired: false,
+          defaultValue: undefined,
+          matchIndex: matchCount++,
+          resolveOrder: [],
+          resolveDetails: nested,
+        }
+        let defaultValueIsVar = false
+
+        function calculateResolveOrder(item) {
+          if (item && item.fallbackValues) {
+            let hasResolvedFallback
+            const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
+              if (f.fallbackValues) {
+                const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                if (!hasResolvedFallback && nestedResolvedFallback) {
+                  hasResolvedFallback = nestedResolvedFallback
+                }
+                return nestedOrder
+              }
+
+              if (!hasResolvedFallback && f.isResolvedFallback) {
+                hasResolvedFallback = f.stringValue
+              }
+              if (f.isResolvedFallback) {
+                hasResolvedFallback = f.stringValue
+              }
+
+              if (!hasResolvedFallback && f.isVariable) {
+                defaultValueIsVar = f
+              }
+              return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+            })).flat()
+
+            return [order, hasResolvedFallback]
+          }
+          return [[item.variable], undefined]
+        }
+
+        const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
+        varData.resolveOrder = resolveOrder
+
+        if (defaultValueIsVar) {
+          varData.defaultValueIsVar = defaultValueIsVar
+        }
+
+        if (typeof hasResolvedFallback !== 'undefined') {
+          varData.defaultValue = hasResolvedFallback
+        }
+
+        if (typeof varData.defaultValue === 'undefined') {
+          varData.isRequired = true
+        }
+
+        if (varData.resolveOrder.length > 1) {
+          varData.hasFallback = true
+        }
+
+        // Extract file references
+        nested.forEach((detail) => {
+          if (detail.varType && 
+             (detail.varType.startsWith('file(') || detail.varType.startsWith('text('))
+          ) {
+            const fileMatch = detail.varType.match(/^(?:file|text)\((.*?)\)/)
+            if (fileMatch && fileMatch[1]) {
+              let filePath = fileMatch[1].trim()
+              // Remove quotes if present
+              filePath = filePath.replace(/^['"]|['"]$/g, '')
+              // Handle variables in file paths - just record the pattern
+              if (!fileRefs.includes(filePath)) {
+                fileRefs.push(filePath)
+              }
+            }
+          }
+        })
+
+        variableData[key] = (variableData[key] || []).concat(varData)
+        foundVariables.push(rawValue)
+      }
+    })
+
+    // Make foundVariables array unique
+    const finalFoundVariables = [...new Set(foundVariables)]
+    const varKeys = Object.keys(variableData)
+
+    // Calculate summary using same logic as CLI display
+    let requiredCount = 0
+    let withDefaultsCount = 0
+    varKeys.forEach((key) => {
+      const instances = variableData[key]
+      const firstInstance = instances[0]
+
+      // Check if truly required using same logic as display code
+      let isTrulyRequired = false
+      if (typeof firstInstance.defaultValue === 'undefined') {
+        // Check for self-references that resolve to config values
+        let dotPropArr = []
+        if (firstInstance.defaultValueIsVar && (
+          firstInstance.defaultValueIsVar.varType === 'self:' ||
+          firstInstance.defaultValueIsVar.varType === 'dot.prop'
+        )) {
+          dotPropArr = [firstInstance.defaultValueIsVar]
+        }
+
+        const hasDotPropOrSelf = instances.reduce((acc, v) => {
+          const dotProp = v.resolveDetails.find((d) => d.varType === 'dot.prop')
+          if (dotProp) {
+            acc.push(dotProp)
+          }
+          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].varType === 'self:') {
+            acc.push(v.resolveDetails[0])
+          }
+          return acc
+        }, dotPropArr)
+
+        if (!hasDotPropOrSelf.length) {
+          isTrulyRequired = true
+        } else {
+          // Check if the self-reference resolves to a value
+          const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
+          const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
+          if (typeof dotPropValue === 'undefined') {
+            isTrulyRequired = true
+          }
+        }
+      }
+
+      if (isTrulyRequired) {
+        requiredCount++
+      } else {
+        withDefaultsCount++
+      }
+    })
+
+    return {
+      variables: variableData,
+      summary: {
+        totalVariables: varKeys.length,
+        requiredVariables: requiredCount,
+        variablesWithDefaults: withDefaultsCount
+      },
+      fileRefs: fileRefs,
+    }
+  }
+
   runFunction(variableString) {
     // console.log('runFunction', variableString)
     /* If json object value return it */
@@ -1412,7 +1521,12 @@ class Configorama {
         missingValue = this.deep[i]
       }
 
-      const cleanVar = cleanVariable(property, this.variableSyntax, true, `populateVariable fallback ${this.callCount}`)
+      const cleanVar = cleanVariable(
+        property,
+        this.variableSyntax,
+        true,
+        `populateVariable fallback ${this.callCount}`
+      )
       const cleanVarNoFilters = cleanVar.split('|')[0]
       const splitVars = splitByComma(cleanVarNoFilters)
       const nestedVar = findNestedVariable(splitVars, valueObject.originalSource)
@@ -1502,7 +1616,10 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('func', func)
 
       if (
+        /* Not file or text refs */
         !prop.match(fileRefSyntax) 
+        && !prop.match(textRefSyntax)
+        /* Not eval refs */
         && !prop.match(getValueFromEval.match) 
         // AND is not multiline value
         && (func && prop.split('\n').length < 3)) {
@@ -1598,7 +1715,7 @@ Missing Value ${missingValue} - ${matchedString}
       // This runs on nested variable resolution
       return this.getValueFromSource(variableString, valueObject, 'overwrite')
     })
-    
+
     // console.log('variableValues', variableValues)
     return Promise.all(variableValues).then((values) => {
       let deepPropertyStr = propertyString
@@ -1632,6 +1749,25 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
+
+    // Track every call to getValueFromSource for metadata
+    if (pathValue && pathValue.length) {
+      const pathKey = pathValue.join('.')
+      if (!this.resolutionTracking[pathKey]) {
+        this.resolutionTracking[pathKey] = {
+          path: pathKey,
+          originalPropertyString: propertyString,
+          calls: []
+        }
+      }
+
+      this.resolutionTracking[pathKey].calls.push({
+        variableString: variableString,
+        propertyString: propertyString,
+        caller: caller
+      })
+    }
+
     // console.log('getValueFromSrc propertyString', propertyString)
     // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
     if (this.tracker.contains(variableString)) {
@@ -1730,6 +1866,21 @@ Missing Value ${missingValue} - ${matchedString}
         valueObject,
 
       ).then((val) => {
+        // Update the last call with the resolved value
+        if (pathValue && pathValue.length) {
+          const pathKey = pathValue.join('.')
+          if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].calls.length) {
+            // Find the most recent call for this variableString
+            for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
+              if (this.resolutionTracking[pathKey].calls[i].variableString === variableString) {
+                this.resolutionTracking[pathKey].calls[i].resolvedValue = val
+                this.resolutionTracking[pathKey].calls[i].resolverType = resolverType
+                break
+              }
+            }
+          }
+        }
+
         // console.log('VALUE', val)
         if (
           val === null ||
@@ -1763,7 +1914,7 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('valueCount', valueCount)
           // TODO throw on empty values?
           // No fallback value found AND this is undefined, throw error
-          const nestedVars = findNestedVariables(propertyString, this.variableSyntax)
+          const nestedVars = findNestedVariables(propertyString, this.variableSyntax, this.variablesKnownTypes)
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
           if (valueCount.length === 1 && noNestedVars) {
@@ -1932,7 +2083,9 @@ Unable to resolve configuration variable
     ]
 
     // Default value used for self variable
-    if (propertyString.match(/,/)) {
+    // Only show this error if the variable itself (not a parent fallback) is a self-reference with a fallback
+    const isSelfReference = !variableString.match(/^(env|opt|file|text|cron|eval|git):/)
+    if (isSelfReference && variableString.match(/,/)) {
       errorMessage.push('\n Default values for self referenced values are not allowed')
       errorMessage.push(`\n Fix the ${propertyString} variable`)
     }

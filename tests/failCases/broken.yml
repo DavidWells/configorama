@@ -1,0 +1,4 @@
+stage: ${opt:stage, dev}
+
+# broken this hangs forever
+fallback: ${file(./config.${self:stage, ${opt:stageOne, ${env:foo, "dev"} } }.json)}

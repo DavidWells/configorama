@@ -1,5 +1,6 @@
 const Configorama = require('./main')
 const parsers = require('./parsers')
+const enrichMetadata = require('./utils/enrichMetadata')
 
 module.exports.Configorama = Configorama
 
@@ -16,12 +17,27 @@ module.exports.Configorama = Configorama
  * @param {boolean} [settings.allowUnknownVars] - allow unknown variables to pass through without throwing errors
  * @param {boolean} [settings.allowUndefinedValues] - allow undefined values to pass through without throwing errors
  * @param {object|function} [settings.dynamicArgs] - values passed into .js config files if user using javascript config.
- * @return {Promise} resolved configuration
+ * @param {boolean} [settings.returnMetadata] - return both config and metadata about variables found
+ * @return {Promise} resolved configuration or {config, metadata} if returnMetadata is true
  */
 module.exports = async (configPathOrObject, settings = {}) => {
   const instance = new Configorama(configPathOrObject, settings)
   const options = settings.options || {}
   const config = await instance.init(options)
+
+  if (settings.returnMetadata) {
+    const metadata = instance.collectVariableMetadata()
+
+    // Enrich metadata with resolution tracking data collected during execution
+    const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking)
+
+    return {
+      config,
+      originalConfig: instance.originalConfig,
+      metadata: enrichedMetadata
+    }
+  }
+
   return config
 }
 

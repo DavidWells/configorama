@@ -106,12 +106,51 @@ test('findNestedVariables - mutliple fallback items', () => {
   assert.equal(result[result.length - 1].variable, 'file(./config.${opt:stage, ${opt:stageOne}, ${opt:stageTwo}, "three"}.json)');
 });
 
-test.skip('findNestedVariables - deep', () => {
-  const input = '${file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)}';
+test('findNestedVariables - deep', () => {
+  const input =
+  '${file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)}';
   const result = findNestedVariables(input, regex, variablesKnownTypes, 'xyz');
   deepLog('result', result)
-  // Check varString property for the outermost variable
-  assert.equal(result[result.length - 1].variable, 'file(./config.${opt:stage, ${opt:stageOne}, ${opt:stageTwo}, "three"}.json)');
+
+  // Should have 5 variables total
+  assert.equal(result.length, 5);
+
+  // Check the innermost variable
+  assert.equal(result[0].fullMatch, '${env:foo}');
+  assert.equal(result[0].variable, 'env:foo');
+  assert.equal(result[0].varType, 'env:');
+
+  // Check opt:stageOne with env:foo fallback
+  assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
+  assert.equal(result[1].varType, 'opt:');
+  assert.equal(result[1].hasFallback, true);
+  assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
+  assert.equal(result[1].fallbackValues.length, 1);
+  assert.equal(result[1].fallbackValues[0].isVariable, true);
+  assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
+  assert.equal(result[1].fallbackValues[0].varType, 'env:');
+
+  // Check opt:stageTwo
+  assert.equal(result[2].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[2].variable, 'opt:stageTwo');
+
+  // Check opt:stage with multiple fallbacks
+  assert.equal(result[3].fullMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
+  assert.equal(result[3].variable, 'opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"');
+  assert.equal(result[3].hasFallback, true);
+  assert.equal(result[3].valueBeforeFallback, 'opt:stage');
+  assert.equal(result[3].fallbackValues.length, 3);
+  assert.equal(result[3].fallbackValues[0].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[3].fallbackValues[0].isVariable, true);
+  assert.equal(result[3].fallbackValues[1].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[3].fallbackValues[1].isVariable, true);
+  assert.equal(result[3].fallbackValues[2].fullMatch, '"three"');
+  assert.equal(result[3].fallbackValues[2].isVariable, false);
+  assert.equal(result[3].fallbackValues[2].stringValue, 'three');
+
+  // Check outermost file variable
+  assert.equal(result[4].variable, 'file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)');
 });
 
 
