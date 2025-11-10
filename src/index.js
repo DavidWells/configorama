@@ -26,62 +26,57 @@ module.exports = async (configPathOrObject, settings = {}) => {
 
   if (settings.returnMetadata) {
     const metadata = instance.collectVariableMetadata()
-    const varKeys = Object.keys(metadata.variables)
 
-    if (varKeys.length) {
-      // Resolve each variable's details to populate afterInnerResolution
+    // Enrich metadata with resolution tracking data collected during execution
+    if (instance.resolutionTracking) {
+      const varKeys = Object.keys(metadata.variables)
+
       for (const key of varKeys) {
-        const variables = metadata.variables[key][0]
+        const varInstances = metadata.variables[key]
 
-        if (variables.resolveDetails && variables.resolveDetails.length > 0) {
-          for (const detail of variables.resolveDetails) {
-            try {
-              // Create a temp config with the variable and merge in resolved config for self: lookups
-              const tempConfig = {
-                ...config,
-                _temp: detail.fullMatch
-              }
+        for (const varData of varInstances) {
+          const pathKey = varData.path
+          const trackingData = instance.resolutionTracking[pathKey]
 
-              // Create a new instance with the same settings
-              const tempInstance = new Configorama(tempConfig, {
-                ...settings,
-                configDir: instance.configDir,
-              })
+          if (trackingData && trackingData.calls && varData.resolveDetails) {
+            // The last call represents the final state (all inner vars resolved)
+            const lastCall = trackingData.calls[trackingData.calls.length - 1]
 
-              // Resolve the variable
-              const resolved = await tempInstance.init(options)
+            // For each resolveDetail, find the matching call and set afterInnerResolution
+            for (let i = 0; i < varData.resolveDetails.length; i++) {
+              const detail = varData.resolveDetails[i]
+              const isOutermost = i === varData.resolveDetails.length - 1
 
-              // Store the resolved value as afterInnerResolution
-              detail.afterInnerResolution = resolved._temp
-            } catch (error) {
-              // If resolution fails, check if we can extract intermediate resolution from error
-              // Error messages often contain the intermediate resolved value
-              // Extract it from patterns like: Value  "${file(./database-prod.json)}"
-              const valueMatch = error.message.match(/Value\s+"([^"]+)"/)
-              if (valueMatch && valueMatch[1]) {
-                detail.afterInnerResolution = valueMatch[1]
-              }
-            }
-          }
-        }
-      }
+              if (isOutermost) {
+                // For the outermost variable, use the last call's propertyString
+                // This shows the state after all inner variables have been resolved
+                let afterResolution = lastCall.propertyString
+                if (afterResolution.startsWith('${') && afterResolution.endsWith('}')) {
+                  afterResolution = afterResolution.slice(2, -1)
+                }
+                detail.afterInnerResolution = afterResolution
 
-      // Build resolvedFileRefs array from afterInnerResolution values
-      const resolvedFileRefs = []
-      for (const key of varKeys) {
-        const variables = metadata.variables[key][0]
-        if (variables.resolveDetails && variables.resolveDetails.length > 0) {
-          for (const detail of variables.resolveDetails) {
-            if (detail.afterInnerResolution && typeof detail.afterInnerResolution === 'string') {
-              // Check if this is a file() or text() reference
-              const fileMatch = detail.afterInnerResolution.match(/^\$\{(?:file|text)\((.*?)\)/)
-              if (fileMatch && fileMatch[1]) {
-                let filePath = fileMatch[1].trim()
-                // Remove quotes if present
-                filePath = filePath.replace(/^['"]|['"]$/g, '')
-                // Add to array if not already present
-                if (!resolvedFileRefs.includes(filePath)) {
-                  resolvedFileRefs.push(filePath)
+                if (lastCall.resolvedValue !== undefined) {
+                  detail.resolvedValue = lastCall.resolvedValue
+                }
+              } else {
+                // For inner variables, try to find a matching call
+                for (const call of trackingData.calls) {
+                  const callVar = call.variableString
+                  const detailVar = detail.variable
+
+                  if (callVar === detailVar || callVar.includes(detail.varString)) {
+                    let afterResolution = call.propertyString
+                    if (afterResolution.startsWith('${') && afterResolution.endsWith('}')) {
+                      afterResolution = afterResolution.slice(2, -1)
+                    }
+                    detail.afterInnerResolution = afterResolution
+
+                    if (call.resolvedValue !== undefined) {
+                      detail.resolvedValue = call.resolvedValue
+                    }
+                    break
+                  }
                 }
               }
             }
@@ -89,7 +84,27 @@ module.exports = async (configPathOrObject, settings = {}) => {
         }
       }
 
-      // Add resolvedFileRefs to metadata
+      // Build resolvedFileRefs array from tracking data
+      // Only use the LAST call for each path (final resolved state)
+      const resolvedFileRefs = []
+      for (const pathKey in instance.resolutionTracking) {
+        const tracking = instance.resolutionTracking[pathKey]
+        if (tracking.calls && tracking.calls.length) {
+          const lastCall = tracking.calls[tracking.calls.length - 1]
+          // Check if this is a file() or text() reference
+          const fileMatch = lastCall.propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
+          if (fileMatch && fileMatch[1]) {
+            let filePath = fileMatch[1].trim()
+            // Remove quotes if present
+            filePath = filePath.replace(/^['"]|['"]$/g, '')
+            // Skip deep references
+            if (!filePath.includes('deep:') && !resolvedFileRefs.includes(filePath)) {
+              resolvedFileRefs.push(filePath)
+            }
+          }
+        }
+      }
+
       metadata.resolvedFileRefs = resolvedFileRefs
     }
 

@@ -124,6 +124,9 @@ class Configorama {
 
     this.foundVariables = []
 
+    // Track variable resolutions for metadata (keyed by path)
+    this.resolutionTracking = {}
+
     const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
   
     const varSyntax = options.syntax || defaultSyntax
@@ -1769,6 +1772,25 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
+
+    // Track every call to getValueFromSource for metadata
+    if (pathValue && pathValue.length) {
+      const pathKey = pathValue.join('.')
+      if (!this.resolutionTracking[pathKey]) {
+        this.resolutionTracking[pathKey] = {
+          path: pathKey,
+          originalPropertyString: propertyString,
+          calls: []
+        }
+      }
+
+      this.resolutionTracking[pathKey].calls.push({
+        variableString: variableString,
+        propertyString: propertyString,
+        caller: caller
+      })
+    }
+
     // console.log('getValueFromSrc propertyString', propertyString)
     // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
     if (this.tracker.contains(variableString)) {
@@ -1867,6 +1889,21 @@ Missing Value ${missingValue} - ${matchedString}
         valueObject,
 
       ).then((val) => {
+        // Update the last call with the resolved value
+        if (pathValue && pathValue.length) {
+          const pathKey = pathValue.join('.')
+          if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].calls.length) {
+            // Find the most recent call for this variableString
+            for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
+              if (this.resolutionTracking[pathKey].calls[i].variableString === variableString) {
+                this.resolutionTracking[pathKey].calls[i].resolvedValue = val
+                this.resolutionTracking[pathKey].calls[i].resolverType = resolverType
+                break
+              }
+            }
+          }
+        }
+
         // console.log('VALUE', val)
         if (
           val === null ||
