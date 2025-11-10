@@ -532,9 +532,34 @@ class Configorama {
           const longestKey = varKeys.reduce((acc, k) => {
             return Math.max(acc, k.length)
           }, 0)
+          // Count all references including nested ones within other variables
+          const countAllReferences = (targetVariable) => {
+            // Start with direct references
+            let count = variableData[targetVariable].length
+
+            // Check all other variables for nested references to this variable
+            varKeys.forEach((otherKey) => {
+              if (otherKey === targetVariable) return
+
+              variableData[otherKey].forEach((instance) => {
+                if (instance.resolveDetails) {
+                  instance.resolveDetails.forEach((detail) => {
+                    // Check if this resolveDetail references our target variable
+                    if (detail.fullMatch === targetVariable) {
+                      count++
+                    }
+                  })
+                }
+              })
+            })
+
+            return count
+          }
+
           console.log(varKeys.map((k) => {
-            const placesWord = variableData[k].length > 1 ? 'places' : 'place'
-            return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${variableData[k].length} ${placesWord}`
+            const refCount = countAllReferences(k)
+            const placesWord = refCount > 1 ? 'places' : 'place'
+            return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${refCount} ${placesWord}`
           }).join('\n'))
           console.log()
         }
@@ -1546,7 +1571,10 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('func', func)
 
       if (
+        /* Not file or text refs */
         !prop.match(fileRefSyntax) 
+        && !prop.match(textRefSyntax)
+        /* Not eval refs */
         && !prop.match(getValueFromEval.match) 
         // AND is not multiline value
         && (func && prop.split('\n').length < 3)) {
