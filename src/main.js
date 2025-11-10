@@ -911,7 +911,9 @@ class Configorama {
 
         // Extract file references
         nested.forEach((detail) => {
-          if (detail.varType && (detail.varType.startsWith('file(') || detail.varType.startsWith('text('))) {
+          if (detail.varType && 
+             (detail.varType.startsWith('file(') || detail.varType.startsWith('text('))
+          ) {
             const fileMatch = detail.varType.match(/^(?:file|text)\((.*?)\)/)
             if (fileMatch && fileMatch[1]) {
               let filePath = fileMatch[1].trim()
@@ -934,13 +936,49 @@ class Configorama {
     const finalFoundVariables = [...new Set(foundVariables)]
     const varKeys = Object.keys(variableData)
 
-    // Calculate summary
+    // Calculate summary using same logic as CLI display
     let requiredCount = 0
     let withDefaultsCount = 0
     varKeys.forEach((key) => {
       const instances = variableData[key]
       const firstInstance = instances[0]
-      if (firstInstance.isRequired) {
+
+      // Check if truly required using same logic as display code
+      let isTrulyRequired = false
+      if (typeof firstInstance.defaultValue === 'undefined') {
+        // Check for self-references that resolve to config values
+        let dotPropArr = []
+        if (firstInstance.defaultValueIsVar && (
+          firstInstance.defaultValueIsVar.varType === 'self:' ||
+          firstInstance.defaultValueIsVar.varType === 'dot.prop'
+        )) {
+          dotPropArr = [firstInstance.defaultValueIsVar]
+        }
+
+        const hasDotPropOrSelf = instances.reduce((acc, v) => {
+          const dotProp = v.resolveDetails.find((d) => d.varType === 'dot.prop')
+          if (dotProp) {
+            acc.push(dotProp)
+          }
+          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].varType === 'self:') {
+            acc.push(v.resolveDetails[0])
+          }
+          return acc
+        }, dotPropArr)
+
+        if (!hasDotPropOrSelf.length) {
+          isTrulyRequired = true
+        } else {
+          // Check if the self-reference resolves to a value
+          const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
+          const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
+          if (typeof dotPropValue === 'undefined') {
+            isTrulyRequired = true
+          }
+        }
+      }
+
+      if (isTrulyRequired) {
         requiredCount++
       } else {
         withDefaultsCount++
@@ -949,12 +987,12 @@ class Configorama {
 
     return {
       variables: variableData,
-      fileRefs: fileRefs,
       summary: {
         totalVariables: varKeys.length,
         requiredVariables: requiredCount,
         variablesWithDefaults: withDefaultsCount
-      }
+      },
+      fileRefs: fileRefs,
     }
   }
 
