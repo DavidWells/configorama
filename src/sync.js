@@ -2,6 +2,7 @@ const path = require('path')
 const fs = require('fs')
 const Configorama = require('./main')
 const getFullPath = require('./utils/getFullFilePath')
+const enrichMetadata = require('./utils/enrichMetadata')
 
 /**
  * Force syncronous invocation of async API
@@ -37,7 +38,7 @@ module.exports = function configoramaSync(varSrcs = []) {
       resolver: resolverFunction
     }
   })
-  return (args) => {
+  return async (args) => {
     const { filePath, settings = {} } = args
     const syncSettings = { sync: true }
     if (customVariableSources && customVariableSources.length) {
@@ -45,7 +46,21 @@ module.exports = function configoramaSync(varSrcs = []) {
     }
     const finalSettings = Object.assign({}, settings, syncSettings)
     const options = finalSettings.options || {}
-    const config = new Configorama(filePath, finalSettings)
-    return config.init(options)
+    const instance = new Configorama(filePath, finalSettings)
+    const result = await instance.init(options)
+
+    if (finalSettings.returnMetadata) {
+      const metadata = instance.collectVariableMetadata()
+
+      // Enrich metadata with resolution tracking data collected during execution
+      const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking)
+
+      return {
+        config: result,
+        metadata: enrichedMetadata
+      }
+    }
+
+    return result
   }
 }
