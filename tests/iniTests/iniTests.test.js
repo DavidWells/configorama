@@ -81,7 +81,19 @@ test('ini valueWithEqualSign', () => {
 })
 
 test('ini valueWithTwoFallbackValues', () => {
-  assert.is(config.valueWithTwoFallbackValues, '1')
+  assert.is(config.valueWithTwoFallbackValues, 1)
+})
+
+test('ini valueWithTwoFallbackValuesTwo', () => {
+  assert.is(config.valueWithTwoFallbackValuesTwo, 1)
+})
+
+test('ini valueWithTwoFallbackValuesThree', () => {
+  assert.is(config.valueWithTwoFallbackValuesThree, 1)
+})
+
+test('ini valueWithTwoFallbackValuesFour', () => {
+  assert.is(config.valueWithTwoFallbackValuesFour, 2)
 })
 
 test('ini valueAsBoolean', () => {

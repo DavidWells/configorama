@@ -1,7 +1,7 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-/* // disable logs to find broken tests
+//* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
@@ -102,6 +102,136 @@ function combineRegexes(regexes) {
   }).filter(Boolean)
   // Join patterns with the OR operator and create new RegExp
   return new RegExp(`(${patterns.join('|')})`)
+}
+
+/**
+ * Preprocess config to fix malformed fallback references
+ * @param {Object} configObject - The parsed configuration object
+ * @param {RegExp} variableSyntax - The variable syntax regex to use
+ * @returns {Object} The preprocessed configuration object
+ */
+function preProcess(configObject, variableSyntax) {
+  // Known reference prefixes that should be wrapped in ${}
+  const refPrefixes = ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
+
+  /**
+   * Fix malformed fallback references in a string
+   * @param {string} str - String potentially containing variables
+   * @returns {string} String with fixed fallback references
+   */
+  function fixFallbacksInString(str) {
+    if (typeof str !== 'string') return str
+
+    let result = str
+    let changed = true
+
+    // Keep iterating until no more changes (to handle nested variables)
+    while (changed) {
+      changed = false
+
+      // Find innermost ${...} blocks (ones that don't contain other ${)
+      let i = 0
+      while (i < result.length) {
+        if (result[i] === '$' && result[i + 1] === '{') {
+          const start = i
+          let braceCount = 1
+          let j = i + 2
+
+          // Find the matching closing brace by counting { and }
+          while (j < result.length && braceCount > 0) {
+            if (result[j] === '{') {
+              braceCount++
+            } else if (result[j] === '}') {
+              braceCount--
+            }
+            j++
+          }
+
+          if (braceCount === 0) {
+            const end = j
+            const match = result.substring(start, end)
+            const content = result.substring(start + 2, end - 1)
+
+            // Only process if there's a comma (indicating fallback syntax)
+            if (content.includes(',')) {
+              // Split by comma
+              const parts = splitByComma(content, variableSyntax)
+
+              if (parts.length > 1) {
+                // Check if the first part has nested ${} - if so, skip this (process inner ones first)
+                const firstPart = parts[0]
+                if (firstPart.includes('${')) {
+                  i = start + 2 // Move past ${ to find inner variables
+                  continue
+                }
+
+                // Check each part after the first (these are fallback values)
+                const fixed = parts.map((part, index) => {
+                  if (index === 0) {
+                    return part // Keep the main reference as-is
+                  }
+
+                  const trimmed = part.trim()
+
+                  // Check if this looks like a reference but is not wrapped
+                  const looksLikeRef = refPrefixes.some(prefix => trimmed.startsWith(prefix))
+                  const alreadyWrapped = trimmed.startsWith('${') && trimmed.endsWith('}')
+
+                  if (looksLikeRef && !alreadyWrapped) {
+                    return ` \${${trimmed}}`
+                  }
+
+                  return ` ${trimmed}`
+                })
+
+                const replacement = `\${${fixed.join(',')}}`
+                if (replacement !== match) {
+                  result = result.substring(0, start) + replacement + result.substring(end)
+                  changed = true
+                  break // Restart search from beginning
+                }
+              }
+            }
+
+            i = start + 2 // Move past ${ to continue searching for nested variables
+          } else {
+            i++
+          }
+        } else {
+          i++
+        }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Recursively traverse and fix the config object
+   */
+  function traverseAndFix(obj) {
+    if (typeof obj === 'string') {
+      return fixFallbacksInString(obj)
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => traverseAndFix(item))
+    }
+
+    if (obj !== null && typeof obj === 'object') {
+      const result = {}
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          result[key] = traverseAndFix(obj[key])
+        }
+      }
+      return result
+    }
+
+    return obj
+  }
+
+  return traverseAndFix(configObject)
 }
 
 class Configorama {
@@ -466,7 +596,7 @@ class Configorama {
 
     // If we have a file path but no config yet, parse it now
     if (this.configFilePath && !this.config) {
-      const configObject = await parseFileContents(
+      let configObject = await parseFileContents(
         this.originalString,
         this.configFileType,
         this.configFilePath,
@@ -477,6 +607,12 @@ class Configorama {
       if (VERBOSE || showFoundVariables) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
+      console.log('before preprocess', configObject)
+      /* Preprocess step here */
+      configObject = preProcess(configObject, this.variableSyntax)
+      console.log('after preprocess', configObject)
+      //process.exit(1)
+
       this.config = configObject
       this.originalConfig = cloneDeep(configObject)
     }
@@ -732,7 +868,8 @@ class Configorama {
         .then(() => {
           return this.populateObjectImpl(this.config).finally(() => {
             // TODO populate function values here?
-            // console.log('Final Config', this.config)
+            console.log('Final Config', this.config)
+            console.log(this.deep)
             const transform = this.runFunction.bind(this)
             const varSyntax = this.variableSyntax
             const leaves = this.leaves
@@ -1027,7 +1164,8 @@ class Configorama {
       argsToPass = formatFunctionArgs(splitter)
     }
     // console.log('argsToPass runFunction', argsToPass)
-
+    console.log('functionName', functionName)
+    console.log('variableString', variableString)
     // TODO check for camelCase version. | toUpperCase messes with function name
     const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
 
@@ -1616,6 +1754,9 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('func', func)
 
       if (
+        /* Not another variable reference */
+        !prop.match(this.variableSyntax)
+        &&
         /* Not file or text refs */
         !prop.match(fileRefSyntax) 
         && !prop.match(textRefSyntax)
@@ -2115,6 +2256,8 @@ Unable to resolve configuration variable
     }
     /* Todo handle stage variables */
 
+
+
     /* Pass through unknown variables */
     if (this.opts.allowUnknownVars || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
@@ -2473,7 +2616,7 @@ Please use ":" to reference sub properties`
     const deepRef = variableString.replace(deepPrefixReplacePattern, '')
     /*
     console.log("GET getValueFromDeep", variableString)
-    console.log('deepRef', deepRef)
+    console.log('deepRef', (deepRef) ? deepRef : '- no deepRef')
     console.log('getValueFromDeep variable', variable)
     /** */
     let ret = this.populateValue({ value: variable }, undefined, 'getValueFromDeep')
@@ -2500,9 +2643,14 @@ Please use ":" to reference sub properties`
     }
     // console.log("makeDeepVariable SET INDEX", index)
     const variableContainer = variable.match(this.variableSyntax)[0]
-    const variableString = cleanVariable(variableContainer, this.variableSyntax, true, `makeDeepVariable ${this.callCount}`)
+    const variableString = cleanVariable(
+      variableContainer, 
+      this.variableSyntax, 
+      true, 
+      `makeDeepVariable ${this.callCount}`
+    )
     const deepVar = variableContainer.replace(variableString, `deep:${index}`)
-    /*
+    //*
     console.log('MAKE DEEP', variable, caller)
     console.log('this.deep', this.deep)
     console.log('variableContainer', variable)
