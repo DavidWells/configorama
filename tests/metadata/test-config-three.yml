@@ -1,0 +1,17 @@
+service: my-service
+region: ${env:AWS_REGION, us-east-1}
+stage: ${opt:stage, dev}
+number: ${env:AWS_REGION, 'one'}
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${self:region}
+  stage: ${self:stage}
+
+custom:
+  apiKey: ${env:API_KEY, default-api-key}
+  dbConfig: ${file(./database.json)}
+  stageDbConfig: ${file(./database-${self:stage}.json)}
+  optionalValue: ${env:OPTIONAL_VAR, "default-value"}
+  jsDevOne: ${text(./js-${self:stage}-${self:number}.js)}

@@ -49,7 +49,7 @@ test('simple', () => {
   assert.is(config.envVarNumberAsStringFallbackTwo, '300', 'envVarNumberAsStringFallbackTwo')
 })
 
-test.only('numberAsNumber', () => {
+test('numberAsNumber', () => {
   assert.is(config.envVarNumberAsStringFallback, '200', '200')
 })
 

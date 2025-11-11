@@ -4,5 +4,7 @@
 
 envVarToNumber: ${empty, env:envNumber | toNumber }
 envVarNumberAsString: ${env:envNumberTwo}
-envVarNumberAsStringFallback: ${empty, env:envNumberTwo}
+
+envVarNumberAsStringFallback: ${emptyHERE, env:envNumberTwo | toString}
 envVarNumberAsNumberToString: ${env:envNumberTwo | toNumber | toString}
+envVarNumberAsStringFallbackTwo: ${empty, ${env:envNumberThree}}
