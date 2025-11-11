@@ -32,7 +32,7 @@ const setup = async () => {
     deepLog('config', config)
     console.log(`-------------`)
   } catch (err) {
-    console.log(`TEST ERROR ${__dirname}\n`, err)
+    console.error(`TEST ERROR ${__dirname}\n`, err)
     process.exit(1)
   }
 }

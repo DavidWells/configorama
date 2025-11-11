@@ -21,7 +21,7 @@ const setup = async () => {
       options: args
     })
   } catch (err) {
-    console.log(`TEST ERROR ${__dirname}\n`, err)
+    console.error(`TEST ERROR ${__dirname}\n`, err)
     process.exit(1)
   }
   console.log(`-------------`)

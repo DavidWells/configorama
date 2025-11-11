@@ -8,6 +8,10 @@ let config
 
 process.env.envNumber = 100
 process.env.envNumberTwo = 200
+process.env.envNumberThree = 300
+
+console.log(typeof process.env.envNumber)
+console.log(typeof process.env.envNumberTwo)
 
 // Setup function
 const setup = async () => {
@@ -28,7 +32,7 @@ const setup = async () => {
     console.log(config)
     console.log(`-------------`)
   } catch (err) {
-    console.log(`TEST ERROR ${__dirname}\n`, err)
+    console.error(`TEST ERROR ${__dirname}\n`, err)
     throw err
   }
 }
@@ -41,10 +45,20 @@ const teardown = () => {
 test.before(setup)
 test.after(teardown)
 
+test('simple', () => {
+  assert.is(config.envVarNumberAsStringFallbackTwo, '300', 'envVarNumberAsStringFallbackTwo')
+})
+
+test.only('numberAsNumber', () => {
+  assert.is(config.envVarNumberAsStringFallback, '200', '200')
+})
+
 test('numberAsZero', () => {
-  assert.is(config.envVarToNumber, 100)
-  assert.is(config.envVarNumberAsString, '200')
-  assert.is(config.envVarNumberAsStringFallback, '200')
+  assert.is(config.envVarToNumber, 100, 'envVarToNumber')
+  assert.is(config.envVarNumberAsString, '200', 'envVarNumberAsString')
+  assert.is(config.envVarNumberAsStringFallback, '200', 'envVarNumberAsStringFallback')
+  assert.is(config.envVarNumberAsNumberToString, '200', 'envVarNumberAsNumberToString')
+  assert.is(config.envVarNumberAsStringFallbackTwo, '300', 'envVarNumberAsStringFallbackTwo')
 })
 
 test('Multiple filters', () => {
