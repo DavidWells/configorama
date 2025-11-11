@@ -10,8 +10,8 @@ process.env.envNumber = 100
 process.env.envNumberTwo = 200
 process.env.envNumberThree = 300
 
-console.log(typeof process.env.envNumber)
-console.log(typeof process.env.envNumberTwo)
+console.log('typeof process.env.envNumber', typeof process.env.envNumber)
+console.log('typeof process.env.envNumberTwo', typeof process.env.envNumberTwo)
 
 // Setup function
 const setup = async () => {
