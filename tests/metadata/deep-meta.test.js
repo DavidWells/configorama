@@ -23,7 +23,7 @@ test('Nested file references', async () => {
   })
 
   deepLog('result.metadata', result.metadata)
-  deepLog('result.resolutionHistory', result.resolutionHistory)
+  // deepLog('result.resolutionHistory', result.resolutionHistory)
 
   
 })

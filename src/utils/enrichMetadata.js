@@ -69,6 +69,8 @@ function enrichMetadata(metadata, resolutionTracking) {
   // Build resolvedFileRefs array from tracking data
   // Only use the LAST call for each path (final resolved state)
   const resolvedFileRefs = []
+  const normalizedPaths = new Set()
+  
   for (const pathKey in resolutionTracking) {
     const tracking = resolutionTracking[pathKey]
     if (tracking.calls && tracking.calls.length) {
@@ -86,8 +88,22 @@ function enrichMetadata(metadata, resolutionTracking) {
         filePath = filePath.replace(/^['"]|['"]$/g, '')
         
         // Skip deep references
-        if (!filePath.includes('deep:') && !resolvedFileRefs.includes(filePath)) {
-          resolvedFileRefs.push(filePath)
+        if (!filePath.includes('deep:')) {
+          // Normalize path: ensure relative paths start with ./
+          let normalizedPath = filePath
+          if (!filePath.startsWith('./') && !filePath.startsWith('../') && !filePath.startsWith('/') && !filePath.startsWith('~')) {
+            normalizedPath = './' + filePath
+          }
+
+          if (normalizedPath.startsWith('.//')) {
+            normalizedPath = normalizedPath.replace('.//', './')
+          }
+          
+          // Only add if not already present (normalized)
+          if (!normalizedPaths.has(normalizedPath)) {
+            normalizedPaths.add(normalizedPath)
+            resolvedFileRefs.push(normalizedPath)
+          }
         }
       }
     }

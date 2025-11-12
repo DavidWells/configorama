@@ -634,6 +634,8 @@ class Configorama {
     if (VERBOSE || showFoundVariables) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
+      deepLog('metadata', metadata)
+      process.exit(1)
       const variableData = metadata.variables
       const varKeys = Object.keys(variableData)
 
@@ -974,6 +976,7 @@ class Configorama {
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
+    const fileGlobPatterns = []
     let matchCount = 1
 
     traverse(this.originalConfig).forEach(function (rawValue) {
@@ -1068,9 +1071,34 @@ class Configorama {
               // Remove quotes if present
               filePath = filePath.replace(/^['"]|['"]$/g, '')
               
+              // Normalize path: ensure relative paths start with ./
+              let normalizedPath = filePath
+              if (
+                !filePath.startsWith('./') && 
+                !filePath.startsWith('../') && 
+                !filePath.startsWith('/') && 
+                !filePath.startsWith('~')
+              ) {
+                normalizedPath = './' + filePath
+              }
+
+              // file .// 
+              if (normalizedPath.startsWith('.//')) {
+                normalizedPath = normalizedPath.replace('.//', './')
+              }
+              
               // Handle variables in file paths - just record the pattern
-              if (!fileRefs.includes(filePath)) {
-                fileRefs.push(filePath)
+              if (!fileRefs.includes(normalizedPath)) {
+                fileRefs.push(normalizedPath)
+              }
+              
+              // Check if path contains variables and create glob pattern
+              if (normalizedPath.match(variableSyntax)) {
+                // Replace variable syntax ${...} with * for glob pattern
+                const globPattern = normalizedPath.replace(variableSyntax, '*')
+                if (!fileGlobPatterns.includes(globPattern)) {
+                  fileGlobPatterns.push(globPattern)
+                }
               }
             }
           }
@@ -1142,6 +1170,7 @@ class Configorama {
         variablesWithDefaults: withDefaultsCount
       },
       fileRefs: fileRefs,
+      fileGlobPatterns: fileGlobPatterns,
     }
   }
   runFunction(variableString) {

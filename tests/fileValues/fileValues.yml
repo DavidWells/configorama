@@ -112,3 +112,22 @@ esmSyncValue: ${file(./sync-value.mjs)}
 
 # Import ESM function with args
 esmWithArgs: ${file(./async-value.mjs, ${env:MY_SECRET}, ${self:normalKey})}
+
+
+########################
+# Double variable in file path
+########################
+dash: -cool
+ext: json
+twoVariablesInFilePath: ${file(./config.${env:MY_ENV_VAR}.${ext})}
+multipleVariablesInFilePath: ${file(./config.${env:MY_ENV_VAR}${dash}.${ext})}
+
+
+########################
+# Nested file path
+########################
+subFolder: sub
+subSubFolder: subsub
+subSubSubFolder: subsubsub
+nestedFilePath: ${file(.//sub/subsub/subsubsub/foo.json)}
+nestedFilePathWithVar: ${file(.//${subFolder}/subsub/subsubsub/foo.json)}
