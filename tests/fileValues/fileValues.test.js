@@ -55,55 +55,55 @@ const ymlContents = {
   }
 }
 
-test('full yaml file reference > ${file(./_ymlfull.yml)}', () => {
+test('yamlFullFile -> ${file("./_ymlfull.yml")}', () => {
   assert.equal(config.yamlFullFile, ymlContents)
 })
 
-test('full yaml file no path > ${file(_ymlfull.yml)}', () => {
+test('yamlFullFileNoPath -> ${file(_ymlfull.yml)}', () => {
   assert.equal(config.yamlFullFileNoPath, ymlContents)
 })
 
-test('yamlFullFileNestedRef > ${file(./_yml${self:normalKey}.yml)}', () => {
+test('yamlFullFileNestedRef -> ${file(./_yml${self:normalKey}.yml)}', () => {
   assert.equal(config.yamlFullFileNestedRef, ymlContents)
 })
 
-test("yamlFullFileMissing > ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}", () => {
+test("yamlFullFileMissing -> ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}", () => {
   assert.equal(config.yamlFullFileMissing, 'yamlFullFileMissingDefaultValue')
 })
 
-test('yamlPartialTopLevelKey', () => {
+test('yamlPartialTopLevelKey -> ${file(./_ymlpartial.yml):topLevel}', () => {
   assert.equal(config.yamlPartialTopLevelKey, 'topLevelValue')
 })
 
-test('yamlPartialTopLevelKeyNoPath', () => {
+test('yamlPartialTopLevelKeyNoPath -> ${file(_ymlpartial.yml):topLevel}', () => {
   assert.equal(config.yamlPartialTopLevelKeyNoPath, 'topLevelValue')
 })
 
-test('yamlPartialSecondLevelKey', () => {
+test('yamlPartialSecondLevelKey -> ${file(./_ymlpartial.yml):nested.value}', () => {
   assert.equal(config.yamlPartialSecondLevelKey, '1leveldown')
 })
 
-test('yamlPartialThirdLevelKey', () => {
+test('yamlPartialThirdLevelKey -> ${file(./_ymlpartial.yml):nested.again.value}', () => {
   assert.equal(config.yamlPartialThirdLevelKey, '2levelsdown')
 })
 
-test('yamlPartialThirdLevelKeyNoPath', () => {
+test('yamlPartialThirdLevelKeyNoPath -> ${file(_ymlpartial.yml):nested.again.value}', () => {
   assert.equal(config.yamlPartialThirdLevelKeyNoPath, '2levelsdown')
 })
 
-test('yamlPartialArrayRef', () => {
+test('yamlPartialArrayRef -> ${file(./_ymlpartial.yml):array.1}', () => {
   assert.equal(config.yamlPartialArrayRef, 'one')
 })
 
-test('yamlPartialArrayObjectRef', () => {
+test('yamlPartialArrayObjectRef -> ${file(./_ymlpartial.yml):arrayTwo.1.object}', () => {
   assert.equal(config.yamlPartialArrayObjectRef, { key: 'helloTwo' })
 })
 
-test('yamlPartialArrayObjectRefValue', () => {
+test('yamlPartialArrayObjectRefValue -> ${file(./_ymlpartial.yml):arrayTwo.1.object.key}', () => {
   assert.equal(config.yamlPartialArrayObjectRefValue, 'helloTwo')
 })
 
-test('jsonFullFile', () => {
+test('jsonFullFile -> ${file(./_jsonfull.json)}', () => {
   assert.equal(config.jsonFullFile, {
     fullJson: 'fullJsonValue',
     fullJsonObject: {
@@ -117,45 +117,95 @@ test('jsonFullFile', () => {
   })
 })
 
-test('stageSpecificViaFlag', () => {
+test("jsonFullFileMissing -> ${file(./_madeup-file.json), 'jsonFullFileMissingDefaultValue'}", () => {
+  assert.equal(config.jsonFullFileMissing, 'jsonFullFileMissingDefaultValue')
+})
+
+test('jsonPartialTopLevelKey -> ${file(./_jsonpartial.json):topLevel}', () => {
+  assert.equal(config.jsonPartialTopLevelKey, 'topLevelValueJson')
+})
+
+test('jsonPartialSecondLevelKey -> ${file(./_jsonpartial.json):nested.value}', () => {
+  assert.equal(config.jsonPartialSecondLevelKey, '1leveldownJson')
+})
+
+test('jsonPartialThirdLevelKey -> ${file(./_jsonpartial.json):nested.again.value}', () => {
+  assert.equal(config.jsonPartialThirdLevelKey, '2levelsdownJson')
+})
+
+test('jsonPartialArrayRef -> ${file(./_jsonpartial.json):array.0}', () => {
+  assert.equal(config.jsonPartialArrayRef, 'zero')
+})
+
+test('stageSpecificViaFlag -> ${file(./config.${opt:stage}.json)}', () => {
   assert.equal(config.stageSpecificViaFlag, {
     'CREDS': 'dev creds here'
   })
 })
 
-test('stageSpecificViaEnvVar', () => {
+test('stageSpecificViaEnvVar -> ${file(./config.${env:MY_ENV_VAR}.json)}', () => {
   assert.equal(config.stageSpecificViaEnvVar, {
     'CREDS': 'prod creds here'
   })
 })
 
-test('stageSpecificViaFlagTwo', () => {
+test('stageSpecificViaFlagTwo -> ${file(./config.${opt:otherFlag}.json)}', () => {
   assert.equal(config.stageSpecificViaFlagTwo, {
     'CREDS': 'prod creds here'
   })
 })
 
-test('singleQuotes', () => {
+test('stageSpecificViaInlineStage -> ${file(./config.${self:inlineStage}.json)}', () => {
+  assert.equal(config.stageSpecificViaInlineStage, {
+    'CREDS': 'other creds here'
+  })
+})
+
+test('stageSpecificViaInlineStageShortHand -> ${file(./config.${inlineStage}.json)}', () => {
+  assert.equal(config.stageSpecificViaInlineStageShortHand, {
+    'CREDS': 'other creds here'
+  })
+})
+
+test("singleQuotes -> ${file('./config.${opt:stage}.json')}", () => {
   assert.equal(config.singleQuotes, {
     'CREDS': 'dev creds here'
   })
 })
 
-test('doubleQuotes', () => {
+test('doubleQuotes -> ${file("./config.${opt:otherFlag}.json")}', () => {
   assert.equal(config.doubleQuotes, {
     'CREDS': 'prod creds here'
   })
 })
 
-test('[typescript] AsyncValue', () => {
+test('noQuotes -> ${file(./config.${opt:stage}.json)}', () => {
+  assert.equal(config.noQuotes, {
+    'CREDS': 'dev creds here'
+  })
+})
+
+test('additionalValues -> ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}', () => {
+  assert.equal(config.additionalValues, 'asyncval')
+})
+
+test('additionalValuesTWO -> ${file(./async.js, ${env:MY_SECRET}, ${self:normalKey})}', () => {
+  assert.equal(config.additionalValuesTWO, 'asyncval')
+})
+
+test('tsAsyncValue -> ${file(./async-value.ts)}', () => {
   assert.equal(config.tsAsyncValue, 'async-ts-value')
 })
 
-test.skip('[typescript] AsyncValueDotProp', () => {
-  assert.equal(config.tsAsyncValueDotProp, 'async-ts-value-dot-prop')
+test('tsAsyncValueDotProp -> ${file(./async-value-dot-prop.ts)}', () => {
+  assert.equal(config.tsAsyncValueDotProp, {
+    my: {
+      value: 'async-ts-value-dot-prop'
+    }
+  })
 })
 
-test('[typescript] SyncValue', () => {
+test('tsSyncValue -> ${file(./sync-value.ts)}', () => {
   assert.equal(config.tsSyncValue, {
     syncValue: 'sync-ts-value',
     computedValue: config.tsSyncValue.computedValue // Just verify it exists
@@ -163,15 +213,15 @@ test('[typescript] SyncValue', () => {
   assert.ok(config.tsSyncValue.computedValue > 0)
 })
 
-test('[typescript] WithArgs', () => {
+test('tsWithArgs -> ${file(./async-value.ts, ${env:MY_SECRET}, ${self:normalKey})}', () => {
   assert.equal(config.tsWithArgs, 'async-ts-value')
 })
 
-test('[esm] AsyncValue', () => {
+test('esmAsyncValue -> ${file(./async-value.mjs)}', () => {
   assert.equal(config.esmAsyncValue, 'esmAsyncVal')
 })
 
-test('[esm] AsyncValueDotProp', () => {
+test('esmAsyncValueDotProp -> ${file(./async-value-dot-prop.mjs)}', () => {
   assert.equal(config.esmAsyncValueDotProp, {
     nested: {
       value: 'esmNestedValue'
@@ -180,11 +230,11 @@ test('[esm] AsyncValueDotProp', () => {
   })
 })
 
-test('[esm] SyncValue', () => {
+test('esmSyncValue -> ${file(./sync-value.mjs)}', () => {
   assert.equal(config.esmSyncValue, 'esmSyncVal')
 })
 
-test('[esm] WithArgs', () => {
+test('esmWithArgs -> ${file(./async-value.mjs, ${env:MY_SECRET}, ${self:normalKey})}', () => {
   assert.equal(config.esmWithArgs, 'esmAsyncVal')
 })
 

@@ -4,6 +4,8 @@
 
 normalKey: full
 
+inlineStage: other
+
 # Import full yml file object via relative path
 yamlFullFile: ${file("./_ymlfull.yml")}
 
@@ -61,6 +63,10 @@ stageSpecificViaFlag: ${file(./config.${opt:stage}.json)}
 stageSpecificViaEnvVar: ${file(./config.${env:MY_ENV_VAR}.json)}
 # With --otherFlag, this will resolve to config.otherFlag.json
 stageSpecificViaFlagTwo: ${file(./config.${opt:otherFlag}.json)}
+# With self:inlineStage, this will resolve to config.dev.json
+stageSpecificViaInlineStage: ${file(./config.${self:inlineStage}.json)}
+# With dot prop inlineStage, this will resolve to config.dev.json
+stageSpecificViaInlineStageShortHand: ${file(./config.${inlineStage}.json)}
 
 ###############
 # Allow for single or double quote around file path
