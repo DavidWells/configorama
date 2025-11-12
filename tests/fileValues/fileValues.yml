@@ -16,6 +16,10 @@ yamlFullFileNoPath: ${file(_ymlfull.yml)}
 # normalKey === 'full' so this will resolve to _ymlfull.yml
 yamlFullFileNestedRef: ${file(./_yml${self:normalKey}.yml)}
 
+yamlFullFileNestedRefParent: 
+  child: 
+    grandchild: ${file(./_yml${self:normalKey}.yml)}
+
 # fallback to default value if file not found
 yamlFullFileMissing: ${file(./_madeup-file.yml), 'yamlFullFileMissingDefaultValue'}
 
