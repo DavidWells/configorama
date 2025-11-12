@@ -1,3 +1,5 @@
+const { splitCsv } = require('./splitCsv')
+
 // Enriches variable metadata with resolution tracking data
 /**
  * @param {object} metadata - The metadata object from collectVariableMetadata
@@ -74,9 +76,15 @@ function enrichMetadata(metadata, resolutionTracking) {
       // Check if this is a file() or text() reference
       const fileMatch = lastCall.propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
       if (fileMatch && fileMatch[1]) {
-        let filePath = fileMatch[1].trim()
+        let fileContent = fileMatch[1].trim()
+        
+        // Split by comma to separate file path from parameters/fallback values
+        const parts = splitCsv(fileContent)
+        let filePath = parts[0].trim()
+        
         // Remove quotes if present
         filePath = filePath.replace(/^['"]|['"]$/g, '')
+        
         // Skip deep references
         if (!filePath.includes('deep:') && !resolvedFileRefs.includes(filePath)) {
           resolvedFileRefs.push(filePath)

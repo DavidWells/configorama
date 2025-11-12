@@ -1059,9 +1059,15 @@ class Configorama {
           ) {
             const fileMatch = detail.varType.match(/^(?:file|text)\((.*?)\)/)
             if (fileMatch && fileMatch[1]) {
-              let filePath = fileMatch[1].trim()
+              let fileContent = fileMatch[1].trim()
+              
+              // Split by comma to separate file path from parameters/fallback values
+              const parts = splitCsv(fileContent)
+              let filePath = parts[0].trim()
+              
               // Remove quotes if present
               filePath = filePath.replace(/^['"]|['"]$/g, '')
+              
               // Handle variables in file paths - just record the pattern
               if (!fileRefs.includes(filePath)) {
                 fileRefs.push(filePath)
