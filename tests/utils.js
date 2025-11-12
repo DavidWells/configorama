@@ -21,7 +21,7 @@ function checkUnusedConfigValues(config = {}) {
   const unusedKeys = new Set([...allKeys].filter(x => !accessedKeys.has(x)))
   
   if (unusedKeys.size > 0) {
-    console.log('Untested config values:', [...unusedKeys])
+    console.log('\n\x1b[31mNotice: Untested config values:\x1b[0m\n', [...unusedKeys])
   }
   // Reset accessed keys for next test run
   accessedKeys = new Set()
