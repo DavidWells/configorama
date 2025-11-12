@@ -34,7 +34,9 @@ module.exports = async (configPathOrObject, settings = {}) => {
     return {
       config,
       originalConfig: instance.originalConfig,
-      metadata: enrichedMetadata
+      metadata: enrichedMetadata,
+      // Include resolution history per path for debugging and advanced use cases
+      resolutionHistory: instance.resolutionTracking
     }
   }
 
