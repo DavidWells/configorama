@@ -391,7 +391,7 @@ class Configorama {
         match: deepRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           // console.log('>>>>>getValueFromDeep', varString)
-          return this.getValueFromDeep(varString)
+          return this.getValueFromDeep(varString, pathValue)
         },
       },
       // Numbers
@@ -1445,11 +1445,20 @@ class Configorama {
       if (!valueObject.resolutionHistory) {
         valueObject.resolutionHistory = []
       }
+      
+      // Extract clean result to avoid circular references
+      // For __internal_only_flag objects (like deep resolver results), extract the value
+      // For real data objects (like file contents), keep them as-is
+      let cleanResult = actualResult
+      if (actualResult && typeof actualResult === 'object' && actualResult.__internal_only_flag) {
+        cleanResult = actualResult.value
+      }
+      
       const historyEntry = {
         match: matches[0].match,
         variable: matches[0].variable,
-        result: actualResult,
-        resultType: typeof actualResult,
+        result: cleanResult,
+        resultType: typeof cleanResult,
         valueBeforeResolution: valueObject.value,
       }
       if (resolverType) {
@@ -1497,7 +1506,15 @@ class Configorama {
         })
       }
 
-      valueObject.resolutionHistory.push(historyEntry)
+      // Only add to history if not a duplicate (same match + variable)
+      const isDuplicate = valueObject.resolutionHistory.some(entry => 
+        entry.match === historyEntry.match && 
+        entry.variable === historyEntry.variable
+      )
+      
+      if (!isDuplicate) {
+        valueObject.resolutionHistory.push(historyEntry)
+      }
 
       // Save resolution history to tracking map for persistence across iterations
       if (valueObject.path && valueObject.path.length) {
@@ -1630,7 +1647,7 @@ class Configorama {
     let property = valueObject.value
     // console.log('init property', property)
 
-    if (DEBUG) {
+    if (false) {
       console.log('────────START populateVar──────────────')
       console.log('populateVariable: valueObject', valueObject)
       console.log('populateVariable: valueToPopulate', valueToPopulate)
@@ -2769,9 +2786,10 @@ Check if your ESM is returning the correct data.`
         // console.log('deep', variableString)
         // console.log('matchedFileString', matchedFileString)
         let deepProperties = variableString.replace(matchedFileString, '')
+        // TODO 2025-11-12 add file.path.support instead of just : 
         if (deepProperties.substring(0, 1) !== ':') {
           const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" to reference sub properties`
+Please use ":" to reference sub properties. ${deepProperties}`
           return Promise.reject(new Error(errorMessage))
         }
         deepProperties = deepProperties.slice(1).split('.')
@@ -2810,7 +2828,7 @@ Please use ":" to reference sub properties`
     /** */
     return this.deep[index]
   }
-  getValueFromDeep(variableString) {
+  getValueFromDeep(variableString, pathValue) {
     const variable = this.getVariableFromDeep(variableString)
     const deepRef = variableString.replace(deepPrefixReplacePattern, '')
     /*
@@ -2818,7 +2836,14 @@ Please use ":" to reference sub properties`
     console.log('deepRef', (deepRef) ? deepRef : '- no deepRef')
     console.log('getValueFromDeep variable', variable)
     /** */
-    let ret = this.populateValue({ value: variable }, undefined, 'getValueFromDeep')
+    // Preserve path and originalSource information from pathValue
+    const valueObject = {
+      value: variable,
+      path: pathValue ? pathValue.path : undefined,
+      originalSource: pathValue ? pathValue.originalSource : undefined,
+      resolutionHistory: pathValue ? pathValue.resolutionHistory : []
+    }
+    let ret = this.populateValue(valueObject, undefined, 'getValueFromDeep')
     if (deepRef.length) {
       // if there is a deep reference remaining
       ret = ret.then((result) => {
