@@ -4,9 +4,10 @@ const { splitCsv } = require('./splitCsv')
 /**
  * @param {object} metadata - The metadata object from collectVariableMetadata
  * @param {object} resolutionTracking - The resolution tracking data from Configorama instance
+ * @param {RegExp} variableSyntax - The variable syntax regex to detect variables in file paths
  * @returns {object} Enriched metadata with afterInnerResolution and resolvedFileRefs
  */
-function enrichMetadata(metadata, resolutionTracking) {
+function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
   if (!resolutionTracking) {
     return metadata
   }
@@ -110,6 +111,100 @@ function enrichMetadata(metadata, resolutionTracking) {
   }
 
   metadata.resolvedFileRefs = resolvedFileRefs
+
+  // Build resolvedFileRefsData array - maps resolved paths to their variable strings and glob patterns
+  const resolvedFileRefsDataMap = new Map()
+  
+  // First pass: collect all resolved paths and their original variable strings
+  for (const pathKey in resolutionTracking) {
+    const tracking = resolutionTracking[pathKey]
+    if (tracking.calls && tracking.calls.length) {
+      const lastCall = tracking.calls[tracking.calls.length - 1]
+      const fileMatch = lastCall.propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
+      
+      if (fileMatch && fileMatch[1]) {
+        let fileContent = fileMatch[1].trim()
+        const parts = splitCsv(fileContent)
+        let resolvedPath = parts[0].trim()
+        resolvedPath = resolvedPath.replace(/^['"]|['"]$/g, '')
+        
+        // Skip deep references
+        if (!resolvedPath.includes('deep:')) {
+          // Normalize resolved path
+          if (!resolvedPath.startsWith('./') && !resolvedPath.startsWith('../') && !resolvedPath.startsWith('/') && !resolvedPath.startsWith('~')) {
+            resolvedPath = './' + resolvedPath
+          }
+          if (resolvedPath.startsWith('.//')) {
+            resolvedPath = resolvedPath.replace('.//', './')
+          }
+          
+          // Find the original variable string from fileRefs
+          // Match this path with the original variable pattern
+          const originalPropertyString = tracking.originalPropertyString
+          if (originalPropertyString) {
+            const origMatch = originalPropertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
+            if (origMatch && origMatch[1]) {
+              let origFileContent = origMatch[1].trim()
+              const origParts = splitCsv(origFileContent)
+              let origPath = origParts[0].trim()
+              origPath = origPath.replace(/^['"]|['"]$/g, '')
+              
+              // Normalize original path
+              if (!origPath.startsWith('./') && !origPath.startsWith('../') && !origPath.startsWith('/') && !origPath.startsWith('~')) {
+                origPath = './' + origPath
+              }
+              if (origPath.startsWith('.//')) {
+                origPath = origPath.replace('.//', './')
+              }
+              
+              // Initialize map entry if needed
+              if (!resolvedFileRefsDataMap.has(resolvedPath)) {
+                resolvedFileRefsDataMap.set(resolvedPath, {
+                  resolvedPath: resolvedPath,
+                  refs: [],
+                })
+              }
+              
+              const entry = resolvedFileRefsDataMap.get(resolvedPath)
+              
+              // Add original variable string with config path if not already present
+              const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
+              if (!alreadyExists) {
+                const refEntry = { path: pathKey, value: origPath }
+                // Check if the value contains variables
+                if (variableSyntax && origPath.match(variableSyntax)) {
+                  refEntry.hasVariable = true
+                }
+                entry.refs.push(refEntry)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Second pass: generate glob patterns for each resolved path
+  for (const [resolvedPath, data] of resolvedFileRefsDataMap) {
+    const globPatternSet = new Set()
+    
+    for (const ref of data.refs) {
+      // Check if variable path contains variables
+      if (ref.value.match(variableSyntax)) {
+        const globPattern = ref.value.replace(variableSyntax, '*')
+        globPatternSet.add(globPattern)
+      }
+    }
+    const patterns = Array.from(globPatternSet)
+    if (patterns.length > 0) {
+      data.globPatterns = patterns
+    }
+  }
+  
+  // Convert map to array
+  const resolvedFileRefsData = Array.from(resolvedFileRefsDataMap.values())
+  
+  metadata.resolvedFileRefsData = resolvedFileRefsData
 
   return metadata
 }

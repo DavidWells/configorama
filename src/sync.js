@@ -53,7 +53,7 @@ module.exports = function configoramaSync(varSrcs = []) {
       const metadata = instance.collectVariableMetadata()
 
       // Enrich metadata with resolution tracking data collected during execution
-      const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking)
+      const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking, instance.variableSyntax)
 
       return {
         config: result,
