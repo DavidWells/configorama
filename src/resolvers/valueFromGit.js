@@ -21,11 +21,31 @@ async function _exec(cmd, options = { timeout: 1000 }) {
   })
 }
 
+// TODO denote computed fields in metadata
+/*
+{
+  variables: {
+    repo: {
+      value: '${git:repo}',
+      type: 'string',
+      description: 'The repository owner and name',
+    }
+  },
+  computedVariables : {
+    hash: {
+      value: '${git:sha1}',
+      type: 'string',
+      description: 'The current commit hash',
+    }
+  }
+}
+*/
+
 function createResolver(cwd) {
   async function _getValueFromGit(variableString) {
     const variable = variableString.split(`${GIT_PREFIX}:`)[1]
     let value = null
-    // console.log('variableStringvariableString', variableString)
+    // console.log('createResolver variableString', variableString)
     if (variable.match(/^remote/i)) {
       const hasParams = functionRegex.exec(variableString)
       const remoteName = (hasParams && hasParams[2]) ? formatFunctionArgs(hasParams[2]) : 'origin'

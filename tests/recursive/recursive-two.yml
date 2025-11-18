@@ -1,0 +1,14 @@
+########################
+# recursive-two https://github.com/serverless/serverless/issues/4687
+########################
+service: test
+
+custom: ${file(./custom-properties-${opt:stage, self:provider.stage}.yml)}
+
+provider:
+  name: aws
+  region: ${self:custom.region}
+  stage: ${opt:stage, dev}
+
+  environment:
+    TEST: foo

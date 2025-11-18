@@ -42,7 +42,10 @@ test('returnMetadata returns both config and metadata', async () => {
       stage: 'prod'
     }
   })
+  deepLog('result.metadata', result.metadata)
+  deepLog('result.resolutionHistory', result.resolutionHistory)
 
+  // deepLog('result.resolutionHistory[provider.stage]', result.resolutionHistory['provider.stage'])
   // Should return object with config and metadata
   assert.ok(result.config, 'Should have config property')
   assert.ok(result.metadata, 'Should have metadata property')
@@ -56,6 +59,26 @@ test('returnMetadata returns both config and metadata', async () => {
   assert.ok(result.metadata.variables, 'Should have variables')
   assert.ok(result.metadata.fileRefs, 'Should have fileRefs')
   assert.ok(result.metadata.summary, 'Should have summary')
+
+  // Should have resolutionHistory for debugging
+  assert.ok(result.resolutionHistory, 'Should have resolutionHistory property')
+  assert.is(typeof result.resolutionHistory, 'object', 'resolutionHistory should be an object')
+  
+  // resolutionHistory should be keyed by path
+  const historyKeys = Object.keys(result.resolutionHistory)
+  assert.ok(historyKeys.length > 0, 'Should have resolution history for at least one path')
+  
+  // Check structure of a history entry
+  const firstKey = historyKeys[0]
+  const firstHistory = result.resolutionHistory[firstKey]
+  assert.ok(firstHistory.path, 'History entry should have path')
+  
+  // Log one example for inspection
+  console.log('\n📝 Example Resolution History:')
+  console.log(`Path: ${firstHistory.path}`)
+  if (firstHistory.resolutionHistory) {
+    console.log('Resolution steps:', JSON.stringify(firstHistory.resolutionHistory, null, 2))
+  }
 })
 
 test('metadata contains variable information', async () => {

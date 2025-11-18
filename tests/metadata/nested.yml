@@ -1,0 +1,16 @@
+service: my-service
+region: ${env:AWS_REGION, us-east-1}
+stage: ${opt:stage, dev}
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${self:region}
+  stage: ${self:stage}
+
+custom:
+  apiKey: ${file(./nested/apiKey.json).apiKey}
+  dbConfig: ${file(./database.json)}
+  nestedValue: ${file(./nested/nestedJson.json)}
+
+functions: ${file(./nested/functions.yml)}

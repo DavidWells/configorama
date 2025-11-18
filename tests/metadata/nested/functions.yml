@@ -1,0 +1,10 @@
+
+custom:
+  tableName: 'foobar'
+
+functions:
+  hello:
+    handler: handler.hello
+    environment:
+      TABLE_NAME: ${self:custom.tableName, my-table}
+      API_ENDPOINT: ${env:API_ENDPOINT, https://api.example.com}

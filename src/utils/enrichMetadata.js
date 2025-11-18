@@ -1,5 +1,55 @@
 const { splitCsv } = require('./splitCsv')
 
+/**
+ * Extract file path from a file() or text() reference string
+ * @param {string} propertyString - The property string containing file/text reference
+ * @returns {object|null} Object with filePath, or null if no match
+ */
+function extractFilePath(propertyString) {
+  const fileMatch = propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
+  if (!fileMatch || !fileMatch[1]) {
+    return null
+  }
+  
+  const fileContent = fileMatch[1].trim()
+  const parts = splitCsv(fileContent)
+  let filePath = parts[0].trim()
+  
+  // Remove quotes if present
+  filePath = filePath.replace(/^['"]|['"]$/g, '')
+  
+  return { filePath }
+}
+
+/**
+ * Normalize a file path (add ./ prefix, fix .//, skip deep refs)
+ * @param {string} filePath - The file path to normalize
+ * @returns {string|null} Normalized path, or null if should be skipped
+ */
+function normalizePath(filePath) {
+  // Skip deep references
+  if (filePath.includes('deep:')) {
+    return null
+  }
+  
+  let normalized = filePath
+  
+  // Add ./ prefix for relative paths
+  if (!filePath.startsWith('./') && 
+      !filePath.startsWith('../') && 
+      !filePath.startsWith('/') && 
+      !filePath.startsWith('~')) {
+    normalized = './' + filePath
+  }
+  
+  // Fix double slashes
+  if (normalized.startsWith('.//')) {
+    normalized = normalized.replace('.//', './')
+  }
+  
+  return normalized
+}
+
 // Enriches variable metadata with resolution tracking data
 /**
  * @param {object} metadata - The metadata object from collectVariableMetadata
@@ -76,35 +126,14 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
     const tracking = resolutionTracking[pathKey]
     if (tracking.calls && tracking.calls.length) {
       const lastCall = tracking.calls[tracking.calls.length - 1]
-      // Check if this is a file() or text() reference
-      const fileMatch = lastCall.propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
-      if (fileMatch && fileMatch[1]) {
-        let fileContent = fileMatch[1].trim()
+      
+      const extracted = extractFilePath(lastCall.propertyString)
+      if (extracted) {
+        const normalizedPath = normalizePath(extracted.filePath)
         
-        // Split by comma to separate file path from parameters/fallback values
-        const parts = splitCsv(fileContent)
-        let filePath = parts[0].trim()
-        
-        // Remove quotes if present
-        filePath = filePath.replace(/^['"]|['"]$/g, '')
-        
-        // Skip deep references
-        if (!filePath.includes('deep:')) {
-          // Normalize path: ensure relative paths start with ./
-          let normalizedPath = filePath
-          if (!filePath.startsWith('./') && !filePath.startsWith('../') && !filePath.startsWith('/') && !filePath.startsWith('~')) {
-            normalizedPath = './' + filePath
-          }
-
-          if (normalizedPath.startsWith('.//')) {
-            normalizedPath = normalizedPath.replace('.//', './')
-          }
-          
-          // Only add if not already present (normalized)
-          if (!normalizedPaths.has(normalizedPath)) {
-            normalizedPaths.add(normalizedPath)
-            resolvedFileRefs.push(normalizedPath)
-          }
+        if (normalizedPath && !normalizedPaths.has(normalizedPath)) {
+          normalizedPaths.add(normalizedPath)
+          resolvedFileRefs.push(normalizedPath)
         }
       }
     }
@@ -118,69 +147,57 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
   // First pass: collect all resolved paths and their original variable strings
   for (const pathKey in resolutionTracking) {
     const tracking = resolutionTracking[pathKey]
-    if (tracking.calls && tracking.calls.length) {
-      const lastCall = tracking.calls[tracking.calls.length - 1]
-      const fileMatch = lastCall.propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
-      
-      if (fileMatch && fileMatch[1]) {
-        let fileContent = fileMatch[1].trim()
-        const parts = splitCsv(fileContent)
-        let resolvedPath = parts[0].trim()
-        resolvedPath = resolvedPath.replace(/^['"]|['"]$/g, '')
-        
-        // Skip deep references
-        if (!resolvedPath.includes('deep:')) {
-          // Normalize resolved path
-          if (!resolvedPath.startsWith('./') && !resolvedPath.startsWith('../') && !resolvedPath.startsWith('/') && !resolvedPath.startsWith('~')) {
-            resolvedPath = './' + resolvedPath
-          }
-          if (resolvedPath.startsWith('.//')) {
-            resolvedPath = resolvedPath.replace('.//', './')
-          }
-          
-          // Find the original variable string from fileRefs
-          // Match this path with the original variable pattern
-          const originalPropertyString = tracking.originalPropertyString
-          if (originalPropertyString) {
-            const origMatch = originalPropertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
-            if (origMatch && origMatch[1]) {
-              let origFileContent = origMatch[1].trim()
-              const origParts = splitCsv(origFileContent)
-              let origPath = origParts[0].trim()
-              origPath = origPath.replace(/^['"]|['"]$/g, '')
-              
-              // Normalize original path
-              if (!origPath.startsWith('./') && !origPath.startsWith('../') && !origPath.startsWith('/') && !origPath.startsWith('~')) {
-                origPath = './' + origPath
-              }
-              if (origPath.startsWith('.//')) {
-                origPath = origPath.replace('.//', './')
-              }
-              
-              // Initialize map entry if needed
-              if (!resolvedFileRefsDataMap.has(resolvedPath)) {
-                resolvedFileRefsDataMap.set(resolvedPath, {
-                  resolvedPath: resolvedPath,
-                  refs: [],
-                })
-              }
-              
-              const entry = resolvedFileRefsDataMap.get(resolvedPath)
-              
-              // Add original variable string with config path if not already present
-              const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
-              if (!alreadyExists) {
-                const refEntry = { path: pathKey, value: origPath }
-                // Check if the value contains variables
-                if (variableSyntax && origPath.match(variableSyntax)) {
-                  refEntry.hasVariable = true
-                }
-                entry.refs.push(refEntry)
-              }
-            }
-          }
-        }
+    if (!tracking.calls || !tracking.calls.length) {
+      continue
+    }
+    
+    const lastCall = tracking.calls[tracking.calls.length - 1]
+    const extracted = extractFilePath(lastCall.propertyString)
+    
+    if (!extracted) {
+      continue
+    }
+    
+    const resolvedPath = normalizePath(extracted.filePath)
+    if (!resolvedPath) {
+      continue
+    }
+    
+    // Get original variable string from tracking
+    const originalPropertyString = tracking.originalPropertyString
+    if (!originalPropertyString) {
+      continue
+    }
+    
+    const origExtracted = extractFilePath(originalPropertyString)
+    if (!origExtracted) {
+      continue
+    }
+    
+    const origPath = normalizePath(origExtracted.filePath)
+    if (!origPath) {
+      continue
+    }
+    
+    // Initialize map entry if needed
+    if (!resolvedFileRefsDataMap.has(resolvedPath)) {
+      resolvedFileRefsDataMap.set(resolvedPath, {
+        resolvedPath: resolvedPath,
+        refs: [],
+      })
+    }
+    
+    const entry = resolvedFileRefsDataMap.get(resolvedPath)
+    
+    // Add original variable string with config path if not already present
+    const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
+    if (!alreadyExists) {
+      const refEntry = { path: pathKey, value: origPath }
+      // Check if the value contains variables
+      if (variableSyntax && origPath.match(variableSyntax)) {
+        refEntry.hasVariable = true
       }
+      entry.refs.push(refEntry)
     }
   }
   

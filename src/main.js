@@ -359,8 +359,7 @@ class Configorama {
         prefix: 'file',
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
-          // console.log('pathValue getValueFromFile', pathValue)
-          return this.getValueFromFile(varString)
+          return this.getValueFromFile(varString, { context: pathValue })
         },
       },
 
@@ -370,7 +369,7 @@ class Configorama {
         prefix: 'text',
         match: textRefSyntax,
         resolver: (varString, o, x, pathValue) => {
-          return this.getValueFromFile(varString, { asRawText: true })
+          return this.getValueFromFile(varString, { asRawText: true, context: pathValue })
         },
       },
 
@@ -1682,7 +1681,7 @@ class Configorama {
     let property = valueObject.value
     // console.log('init property', property)
 
-    if (false) {
+    if (DEBUG) {
       console.log('────────START populateVar──────────────')
       console.log('populateVariable: valueObject', valueObject)
       console.log('populateVariable: valueToPopulate', valueToPopulate)
@@ -2613,7 +2612,10 @@ Unable to resolve configuration variable
     } else if (resolvedPath.match(/\.\//)) {
       // TODO test higher parent refs
       const cleanName = path.basename(resolvedPath)
-      fullFilePath = findUp.sync(cleanName, { cwd: this.configPath })
+      const findUpResult = findUp.sync(cleanName, { cwd: this.configPath })
+      if (findUpResult) {
+        fullFilePath = findUpResult
+      }
     }
 
     let fileExtension = resolvedPath.split('.')
@@ -2622,18 +2624,39 @@ Unable to resolve configuration variable
 
     // Validate file exists
     if (!fs.existsSync(fullFilePath)) {
+      const originalVar = options.context && options.context.originalSource
+
+      const findNestedResult = findNestedVariables(
+        originalVar, 
+        this.variableSyntax, 
+        this.variablesKnownTypes, 
+        options.context.path
+      )
+      // console.log('findNestedResult', findNestedResult)
+      let hasFallback = false
+      if (findNestedResult) {
+        const varDetails = findNestedResult[0]
+        // console.log('varDetails', varDetails)
+        hasFallback = varDetails.hasFallback
+      }
+
+      // check if original var has fallback value
       // console.log('NO FILE FOUND', fullFilePath)
       // console.log('variableString', variableString)
-      const errorMsg = `${logLines}
-Variable ${variableString} cannot resolve due to missing file.
+
+      if (!hasFallback) {
+        const errorMsg = makeBox({
+          title: `File Not Found in ${originalVar}`,
+          text: `Variable ${variableString} cannot resolve due to missing file.
 
 File not found ${fullFilePath}
 
 Default fallback value will be used if provided.
-${logLines}
-`
 
-      console.log(errorMsg)
+${JSON.stringify(options.context, null, 2)}`,
+    })
+        console.log(errorMsg)
+      }
       // TODO maybe reject. YAML does not allow for null/undefined values
       // return Promise.reject(new Error(errorMsg))
       return Promise.resolve(undefined)
@@ -2651,6 +2674,7 @@ ${logLines}
 
     // Process JS files
     if (fileExtension === 'js' || fileExtension === 'cjs') {
+      // Possible alt importer tool https://github.com/humanwhocodes/module-importer
       const jsFile = require(fullFilePath)
       let returnValueFunction = jsFile
       // TODO change how exported functions are referenced
@@ -2750,6 +2774,7 @@ Check if your TypeScript is returning the correct data.`
     }
 
     if (fileExtension === 'mjs' || fileExtension === 'esm') {
+      // Possible alt importer tool https://github.com/humanwhocodes/module-importer
       const { executeESMFile } = require('./parsers/esm')
       let returnValueFunction
       const variableArray = variableString.split(':')

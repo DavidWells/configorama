@@ -1,0 +1,5 @@
+service: test
+provider:
+  name: aws
+custom:
+  project: ${file(./project.yml)}
