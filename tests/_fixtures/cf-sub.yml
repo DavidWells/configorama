@@ -1,0 +1,52 @@
+Resources:
+  word: ${env:POOL}
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    chill: ${opt:cool, xxxxx}
+    Properties:
+      UserPoolName: ${env:POOL, user-pool}
+      MfaConfiguration: 'OPTIONAL'
+      EnabledMfas: [ SOFTWARE_TOKEN_MFA ]
+      # EnabledMfas: [ SOFTWARE_TOKEN_MFA, SMS_MFA, EMAIL_OTP ]
+      AutoVerifiedAttributes:
+        - ${env:POOL, ${env:NICE, opt:foo, 'zaz'}, 'bar'}
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: ${env:POOL}
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: fooo
+      UserPoolId: !Ref CognitoUserPool
+  # CloudFront Distribution          
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: API Gateway Distribution with Key Transformation
+        PriceClass: PriceClass_100  # Use only US, Canada, Europe
+        HttpVersion: http2
+        IPV6Enabled: true
+        # WebACLId: !If [ApplyCloudfrontWaf, !Ref CloudFrontWafACL, !Ref "AWS::NoValue"]
+        Origins:
+          - Id: JWKSOrigin
+            DomainName: !Sub "cognito-idp.${AWS::Region}.amazonaws.com"
+            OriginPath: !Sub "/${CognitoUserPool}"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+          - Id: OAuthOrigin
+            DomainName: !Sub "${CognitoUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+            OriginPath: "/oauth2"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]

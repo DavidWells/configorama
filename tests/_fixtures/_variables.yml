@@ -1,0 +1,7 @@
+# variables.yml
+dev:
+  profile: test-nonprod
+  region: eu-central-1
+prod:
+  profile: test-prod
+  region: us-east-1

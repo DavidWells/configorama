@@ -1,0 +1,14 @@
+# serverless.yml
+service: test
+
+licenseKey: 1234
+
+provider:
+  name: aws
+  stage: ${self:custom.stage}
+  profile: ${self:custom.variables.profile}
+  region: ${self:custom.variables.region}
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  variables: ${file(./_variables.yml):${self:custom.stage}}
