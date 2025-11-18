@@ -633,8 +633,11 @@ class Configorama {
     if (VERBOSE || showFoundVariables) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
+      /*
       deepLog('metadata', metadata)
       process.exit(1)
+      /** */
+    
       const variableData = metadata.variables
       const varKeys = Object.keys(variableData)
 
@@ -769,7 +772,9 @@ class Configorama {
                 firstInstance.defaultValue = truncatedString
               } else {
                 deepLog('Missing default var', firstInstance)
-                throw new Error(`Variable misconfiguration at ${firstInstance.variable}\n\n"${hasDotPropOrSelf[0].variable}" resolves to undefined value.\n`)
+                throw new Error(
+                  `Variable misconfiguration at ${firstInstance.variable}\n\n"${hasDotPropOrSelf[0].variable}" resolves to undefined value.\n`
+                )
               }
             }
             //this.originalConfig[key] = undefined
