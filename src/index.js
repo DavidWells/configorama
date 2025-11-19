@@ -32,11 +32,13 @@ module.exports = async (configPathOrObject, settings = {}) => {
     const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking, instance.variableSyntax)
 
     return {
+      variableSyntax: instance.variableSyntax,
       config,
       originalConfig: instance.originalConfig,
       metadata: enrichedMetadata,
       // Include resolution history per path for debugging and advanced use cases
-      resolutionHistory: instance.resolutionTracking
+      resolutionHistory: instance.resolutionTracking,
+      fileRefsFound: instance.fileRefsFound,
     }
   }
 

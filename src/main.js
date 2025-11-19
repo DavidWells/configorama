@@ -249,11 +249,14 @@ class Configorama {
       allowUnknownVars: false,
       // Allow undefined to be an end result.
       allowUndefinedValues: false,
+      // Allow unknown file refs to pass through without throwing errors
+      allowUnknownFileRefs: true,
     }, options)
 
     this.filterCache = {}
 
     this.foundVariables = []
+    this.fileRefsFound = []
 
     // Track variable resolutions for metadata (keyed by path)
     this.resolutionTracking = {}
@@ -2212,7 +2215,6 @@ Missing Value ${missingValue} - ${matchedString}
         this.options,
         this.config,
         valueObject,
-
       ).then((val) => {
         // Update the last call with the resolved value
         if (pathValue && pathValue.length) {
@@ -2265,6 +2267,27 @@ Missing Value ${missingValue} - ${matchedString}
           const nestedVars = findNestedVariables(propertyString, this.variableSyntax, this.variablesKnownTypes)
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
+
+          if (this.opts.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
+
+            console.log('valueObject', valueObject)
+            process.exit(1)
+
+            this.fileRefsFound.push({
+              location: valueObject.path.join('.'),
+              filePath: fullFilePath,
+              relativePath,
+              resolvedVariableString: options.context.value,
+              originalVariableString: options.context.originalSource,
+              containsVariables: options.context.value !== options.context.originalSource,
+            })
+
+            console.log('allowUnknownFileRefs', propertyString)
+            console.log('variableString', variableString)
+            console.log('encodeUnknown', encodeUnknown(propertyString))
+            return Promise.resolve(encodeUnknown(propertyString))
+          }
+
           if (valueCount.length === 1 && noNestedVars) {
             const configFilePath = (this.configFilePath) ? ` in ${this.configFilePath}` : ''
             throw new Error(`
@@ -2572,7 +2595,7 @@ Unable to resolve configuration variable
     const syntax = opts.asRawText ? textRefSyntax : fileRefSyntax
     // console.log('From file', `"${variableString}"`)
     let matchedFileString = variableString.match(syntax)[0]
-    // console.log('matchedFileString', matchedFileString)
+    console.log('matchedFileString', matchedFileString)
 
     // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
   // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
@@ -2651,7 +2674,7 @@ Unable to resolve configuration variable
       // console.log('NO FILE FOUND', fullFilePath)
       // console.log('variableString', variableString)
 
-      if (!hasFallback) {
+      if (!hasFallback && !this.opts.allowUnknownFileRefs) {
         const errorMsg = makeBox({
           title: `File Not Found in ${originalVar}`,
           text: `Variable ${variableString} cannot resolve due to missing file.
@@ -2668,6 +2691,15 @@ ${JSON.stringify(options.context, null, 2)}`,
       // return Promise.reject(new Error(errorMsg))
       return Promise.resolve(undefined)
     }
+
+    this.fileRefsFound.push({
+      location: options.context.path.join('.'),
+      filePath: fullFilePath,
+      relativePath,
+      resolvedVariableString: options.context.value,
+      originalVariableString: options.context.originalSource,
+      containsVariables: options.context.value !== options.context.originalSource,
+    })
 
     let valueToPopulate
 
