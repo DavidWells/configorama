@@ -5,6 +5,7 @@ const minimist = require('minimist')
 const Configorama = require('./src/main')
 const deepLog = require('./src/utils/deep-log')
 const { logHeader } = require('./src/utils/logs')
+const configorama = require('./src')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
@@ -77,32 +78,38 @@ if (!fs.existsSync(inputFile)) {
 const options = {
   allowUnknownVars: argv['allow-unknown'] || false,
   allowUndefinedValues: argv['allow-undefined'] || false,
+  allowUnknownFileRefs: argv['allow-unknown-file-refs'] || false,
+  returnMetadata: argv['return-metadata'] || false,
   dynamicArgs: argv
 }
 
+const dynamicArgs = options.dynamicArgs || {}
+const { 
+  _, 
+  verbose, 
+  v,
+  verify,
+  debug, 
+  d, 
+  help, 
+  h, 
+  version,
+  f,
+  format,
+  list,
+  l,
+  info,
+  i,
+  'allow-unknown': allowUnknown, 
+  'allow-undefined': allowUndefined,
+  'allow-unknown-file-refs': allowUnknownFileRefs,
+  'return-metadata': returnMetadata,
+  ...rest 
+} = dynamicArgs
+
+
 if (options.dynamicArgs.verbose) {
   logHeader('Config Input Options')
-  const dynamicArgs = options.dynamicArgs || {}
-  const { 
-    _, 
-    verbose, 
-    v,
-    verify,
-    debug, 
-    d, 
-    help, 
-    h, 
-    version,
-    f,
-    format,
-    list,
-    l,
-    info,
-    i,
-    'allow-unknown': allowUnknown, 
-    'allow-undefined': allowUndefined, 
-    ...rest 
-  } = dynamicArgs
 
   console.log()
   if (Object.keys(rest).length) {
@@ -118,12 +125,11 @@ if (argv._.length) {
   isSetupMode = argv._.includes('setup')
 }
 
-// Create Configorama instance
-const configorama = new Configorama(inputFile, options)
-// console.log('configorama', configorama)
+// Set -- flags as options
+options.options = rest
 
 // Process the configuration
-configorama.init(argv)
+configorama(inputFile, options)
   .then((config) => {
     let output
 
@@ -131,15 +137,26 @@ configorama.init(argv)
     switch (argv.format.toLowerCase()) {
       case 'yaml':
       case 'yml':
-        const YAML = require('./lib/parsers/yaml')
+        const YAML = require('./src/parsers/yaml')
         output = YAML.dump(config)
         break
+      case 'esm':
+      case 'module':
+        output = `export default ${JSON.stringify(config, null, 2)}`
+        break
       case 'js':
+      case 'cjs':
+      case 'mjs':
+      case 'commonjs':
       case 'javascript':
         output = `module.exports = ${JSON.stringify(config, null, 2)}`
         break
       case 'json':
       default:
+        if (returnMetadata) {
+          // turn regex into string
+          config.variableSyntax = config.variableSyntax ? config.variableSyntax.source : undefined
+        }
         output = JSON.stringify(config, null, 2)
     }
 
@@ -149,6 +166,10 @@ configorama.init(argv)
       console.log(`Configuration written to ${argv.output}`)
     } else {
       if (!argv.verbose) {
+        console.log(output)
+      }
+      if (argv.format && argv.verbose) {
+        console.log('Output Format:', argv.format)
         console.log(output)
       }
     }

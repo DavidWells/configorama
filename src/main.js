@@ -14,6 +14,7 @@ const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const chalk = require('./utils/chalk')
 const { resolveAlias } = require('./utils/resolveAlias')
+const { resolveFilePathFromMatch } = require('./utils/getFullFilePath')
 
 /* Default Value resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
@@ -250,7 +251,7 @@ class Configorama {
       // Allow undefined to be an end result.
       allowUndefinedValues: false,
       // Allow unknown file refs to pass through without throwing errors
-      allowUnknownFileRefs: true,
+      allowUnknownFileRefs: false,
     }, options)
 
     this.filterCache = {}
@@ -2269,22 +2270,7 @@ Missing Value ${missingValue} - ${matchedString}
           const noNestedVars = nestedVars.length < 2
 
           if (this.opts.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
-
-            console.log('valueObject', valueObject)
-            process.exit(1)
-
-            this.fileRefsFound.push({
-              location: valueObject.path.join('.'),
-              filePath: fullFilePath,
-              relativePath,
-              resolvedVariableString: options.context.value,
-              originalVariableString: options.context.originalSource,
-              containsVariables: options.context.value !== options.context.originalSource,
-            })
-
-            console.log('allowUnknownFileRefs', propertyString)
-            console.log('variableString', variableString)
-            console.log('encodeUnknown', encodeUnknown(propertyString))
+            // Encode the unknown file variable to pass through resolution
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
@@ -2595,10 +2581,10 @@ Unable to resolve configuration variable
     const syntax = opts.asRawText ? textRefSyntax : fileRefSyntax
     // console.log('From file', `"${variableString}"`)
     let matchedFileString = variableString.match(syntax)[0]
-    console.log('matchedFileString', matchedFileString)
+    // console.log('matchedFileString', matchedFileString)
 
     // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
-  // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
+    // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
     var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)/g
     // tighter (?<![.\w-])\b(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*
     var hasParams = funcParamsRegex.exec(matchedFileString)
@@ -2622,38 +2608,29 @@ Unable to resolve configuration variable
     }
     // console.log('argsToPass', argsToPass)
 
-    const relativePath = trimSurroundingQuotes(
-      matchedFileString.replace(syntax, (match, varName) => varName.trim()).replace('~', os.homedir()),
-    )
+    const fileDetails = resolveFilePathFromMatch(matchedFileString, syntax, this.configPath)
+    // console.log('fileDetails', fileDetails)
 
-    // Resolve alias if the path contains alias syntax
-    const resolvedPath = resolveAlias(relativePath, this.configPath)
-    // console.log('resolvedPath', resolvedPath)
+    const { fullFilePath, resolvedPath, relativePath } = fileDetails
 
-    let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(this.configPath, resolvedPath)
+    const exists = fs.existsSync(fullFilePath)
 
-    // console.log('fullFilePath', fullFilePath)
-
-    if (fs.existsSync(fullFilePath)) {
-      // Get real path to handle potential symlinks (but don't fatal error)
-      fullFilePath = fs.realpathSync(fullFilePath)
-
-      // Only match files that are relative
-    } else if (resolvedPath.match(/\.\//)) {
-      // TODO test higher parent refs
-      const cleanName = path.basename(resolvedPath)
-      const findUpResult = findUp.sync(cleanName, { cwd: this.configPath })
-      if (findUpResult) {
-        fullFilePath = findUpResult
-      }
-    }
+    this.fileRefsFound.push({
+      // location: options.context.path.join('.'),
+      filePath: fullFilePath,
+      relativePath,
+      resolvedVariableString: options.context.value,
+      originalVariableString: options.context.originalSource,
+      containsVariables: options.context.value !== options.context.originalSource,
+      exists,
+    })
 
     let fileExtension = resolvedPath.split('.')
 
     fileExtension = fileExtension[fileExtension.length - 1]
 
     // Validate file exists
-    if (!fs.existsSync(fullFilePath)) {
+    if (!exists) {
       const originalVar = options.context && options.context.originalSource
 
       const findNestedResult = findNestedVariables(
@@ -2692,14 +2669,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       return Promise.resolve(undefined)
     }
 
-    this.fileRefsFound.push({
-      location: options.context.path.join('.'),
-      filePath: fullFilePath,
-      relativePath,
-      resolvedVariableString: options.context.value,
-      originalVariableString: options.context.originalSource,
-      containsVariables: options.context.value !== options.context.originalSource,
-    })
+  
 
     let valueToPopulate
 

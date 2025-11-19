@@ -50,14 +50,15 @@ function normalizePath(filePath) {
   return normalized
 }
 
-// Enriches variable metadata with resolution tracking data
 /**
- * @param {object} metadata - The metadata object from collectVariableMetadata
- * @param {object} resolutionTracking - The resolution tracking data from Configorama instance
- * @param {RegExp} variableSyntax - The variable syntax regex to detect variables in file paths
- * @returns {object} Enriched metadata with afterInnerResolution and resolvedFileRefs
+ * Enriches variable metadata with resolution tracking data.
+ * @param {object} metadata - The metadata object from collectVariableMetadata.
+ * @param {object} resolutionTracking - The resolution tracking data from Configorama instance.
+ * @param {RegExp} variableSyntax - The variable syntax regex.
+ * @param {Array} fileRefsFound - The (incomplete) list of file refs found during resolution.
+ * @returns {object} Enriched metadata with resolution details and a complete file reference list.
  */
-function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
+function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFound = []) {
   if (!resolutionTracking) {
     return metadata
   }
@@ -82,7 +83,6 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
 
           if (isOutermost) {
             // For the outermost variable, use the last call's propertyString
-            // This shows the state after all inner variables have been resolved
             let afterResolution = lastCall.propertyString
             if (afterResolution.startsWith('${') && afterResolution.endsWith('}')) {
               afterResolution = afterResolution.slice(2, -1)
@@ -118,7 +118,6 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
   }
 
   // Build resolvedFileRefs array from tracking data
-  // Only use the LAST call for each path (final resolved state)
   const resolvedFileRefs = []
   const normalizedPaths = new Set()
   
@@ -141,43 +140,29 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
 
   metadata.resolvedFileRefs = resolvedFileRefs
 
-  // Build resolvedFileRefsData array - maps resolved paths to their variable strings and glob patterns
+  // Build fileRefsByRelativePath array
   const resolvedFileRefsDataMap = new Map()
   
-  // First pass: collect all resolved paths and their original variable strings
+  // First Pass: Collect all refs and attach glob patterns directly to each ref.
   for (const pathKey in resolutionTracking) {
     const tracking = resolutionTracking[pathKey]
-    if (!tracking.calls || !tracking.calls.length) {
-      continue
-    }
+    if (!tracking.calls || !tracking.calls.length) continue
     
     const lastCall = tracking.calls[tracking.calls.length - 1]
     const extracted = extractFilePath(lastCall.propertyString)
-    
-    if (!extracted) {
-      continue
-    }
+    if (!extracted) continue
     
     const resolvedPath = normalizePath(extracted.filePath)
-    if (!resolvedPath) {
-      continue
-    }
+    if (!resolvedPath) continue
     
-    // Get original variable string from tracking
     const originalPropertyString = tracking.originalPropertyString
-    if (!originalPropertyString) {
-      continue
-    }
+    if (!originalPropertyString) continue
     
     const origExtracted = extractFilePath(originalPropertyString)
-    if (!origExtracted) {
-      continue
-    }
+    if (!origExtracted) continue
     
     const origPath = normalizePath(origExtracted.filePath)
-    if (!origPath) {
-      continue
-    }
+    if (!origPath) continue
     
     // Initialize map entry if needed
     if (!resolvedFileRefsDataMap.has(resolvedPath)) {
@@ -189,39 +174,72 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax) {
     
     const entry = resolvedFileRefsDataMap.get(resolvedPath)
     
-    // Add original variable string with config path if not already present
     const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
     if (!alreadyExists) {
-      const refEntry = { path: pathKey, value: origPath }
-      // Check if the value contains variables
-      if (variableSyntax && origPath.match(variableSyntax)) {
-        refEntry.hasVariable = true
+      const refEntry = { 
+        path: pathKey, 
+        value: origPath,
+        originalVariableString: originalPropertyString,
       }
+      
+      // Check for inner variables and generate glob pattern for this specific ref
+      if (variableSyntax && origPath.match(variableSyntax)) {
+        refEntry.hasInnerVariable = true
+        refEntry.globPatterns = [ origPath.replace(variableSyntax, '*') ]
+      }
+      
       entry.refs.push(refEntry)
     }
   }
   
-  // Second pass: generate glob patterns for each resolved path
-  for (const [resolvedPath, data] of resolvedFileRefsDataMap) {
-    const globPatternSet = new Set()
-    
+  // Second Pass: Aggregate glob patterns for the top-level 'allGlobPatterns' summary.
+  for (const data of resolvedFileRefsDataMap.values()) {
+    const allGlobs = new Set()
     for (const ref of data.refs) {
-      // Check if variable path contains variables
-      if (ref.value.match(variableSyntax)) {
-        const globPattern = ref.value.replace(variableSyntax, '*')
-        globPatternSet.add(globPattern)
+      if (ref.globPatterns) {
+        ref.globPatterns.forEach(pattern => allGlobs.add(pattern))
       }
     }
-    const patterns = Array.from(globPatternSet)
-    if (patterns.length > 0) {
-      data.globPatterns = patterns
+    if (allGlobs.size > 0) {
+      data.allGlobPatterns = Array.from(allGlobs)
     }
   }
   
-  // Convert map to array
-  const resolvedFileRefsData = Array.from(resolvedFileRefsDataMap.values())
-  
-  metadata.resolvedFileRefsData = resolvedFileRefsData
+  // Convert map to array for the final metadata object.
+  const fileRefsByRelativePath = Array.from(resolvedFileRefsDataMap.values())
+  metadata.fileRefsByRelativePath = fileRefsByRelativePath
+
+  // Build the complete, flat list of all file references
+  const fileDetailsMap = new Map()
+  for (const fileRef of fileRefsFound) {
+    if (!fileDetailsMap.has(fileRef.relativePath)) {
+      fileDetailsMap.set(fileRef.relativePath, fileRef)
+    }
+  }
+
+  const fileRefsByConfigPath = []
+  if (metadata.fileRefsByRelativePath) {
+    for (const resolvedFileData of metadata.fileRefsByRelativePath) {
+      const details = fileDetailsMap.get(resolvedFileData.resolvedPath)
+      if (details) {
+        for (const ref of resolvedFileData.refs) {
+          fileRefsByConfigPath.push({
+            location: ref.path,
+            relativePath: details.relativePath,
+            filePath: details.filePath,
+            resolvedVariableString: details.resolvedVariableString,
+            originalVariableString: ref.originalVariableString,
+            containsVariables: !!ref.hasInnerVariable,
+            exists: details.exists,
+            // Get glob patterns from the individual ref, default to empty array
+            globPatterns: ref.globPatterns || [], 
+          })
+        }
+      }
+    }
+  }
+
+  metadata.fileRefsByConfigPath = fileRefsByConfigPath
 
   return metadata
 }

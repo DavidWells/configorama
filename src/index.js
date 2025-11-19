@@ -29,7 +29,12 @@ module.exports = async (configPathOrObject, settings = {}) => {
     const metadata = instance.collectVariableMetadata()
 
     // Enrich metadata with resolution tracking data collected during execution
-    const enrichedMetadata = enrichMetadata(metadata, instance.resolutionTracking, instance.variableSyntax)
+    const enrichedMetadata = enrichMetadata(
+      metadata, 
+      instance.resolutionTracking, 
+      instance.variableSyntax,
+      instance.fileRefsFound
+    )
 
     return {
       variableSyntax: instance.variableSyntax,
@@ -38,7 +43,6 @@ module.exports = async (configPathOrObject, settings = {}) => {
       metadata: enrichedMetadata,
       // Include resolution history per path for debugging and advanced use cases
       resolutionHistory: instance.resolutionTracking,
-      fileRefsFound: instance.fileRefsFound,
     }
   }
 

@@ -17,6 +17,7 @@
     "configorama": "./cli.js"
   },
   "scripts": {
+    "info": "repomix --include \"cli.js,src/**/*.js\" --ignore \"**/*.test.js\" --copy",
     "docs": "node ./scripts/docs.js",
     "t": "./scripts/run-tests.sh",
     "test": "npm run test:lib && uvu tests \".*\\.test.js$\" ",
