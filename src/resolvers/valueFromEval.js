@@ -32,6 +32,7 @@ async function getValueFromEval(variableString) {
 
 module.exports = {
   type: 'eval',
+  description: '${eval(expression)} - Evaluates mathematical expressions',
   match: evalRefSyntax,
   resolver: getValueFromEval
 }

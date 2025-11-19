@@ -245,6 +245,8 @@ Examples:
 module.exports = {
   type: 'cron',
   prefix: 'cron',
+  syntax: '${cron(expression)}',
+  description: 'Resolves cron expressions. Examples: ${cron("every 5 minutes"}, ${cron("weekdays")}, ${cron("at 9:30")}',
   match: cronRefSyntax,
   resolver: getValueFromCron,
   // Export the parser for testing

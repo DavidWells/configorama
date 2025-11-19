@@ -15,6 +15,8 @@ function getValueFromOptions(variableString, options) {
 module.exports = {
   type: 'options',
   prefix: 'opt',
+  syntax: '${opt:flagName}',
+  description: 'Resolves CLI option flags. Examples: ${opt:stage}, ${opt:other, "fallbackValue"}',
   match: optRefSyntax,
   resolver: getValueFromOptions
 }

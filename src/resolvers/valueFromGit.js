@@ -41,6 +41,19 @@ async function _exec(cmd, options = { timeout: 1000 }) {
 }
 */
 
+const GIT_KEYS = {
+  repo: 'repo',
+  name: 'name',
+  org: 'org',
+  dir: 'dir',
+  url: 'url',
+  sha: 'sha',
+  commit: 'commit',
+  branch: 'branch',
+  message: 'message',
+  tag: 'tag',
+}
+
 function createResolver(cwd) {
   async function _getValueFromGit(variableString) {
     const variable = variableString.split(`${GIT_PREFIX}:`)[1]
@@ -69,7 +82,7 @@ function createResolver(cwd) {
 
     switch (normalizedVar) {
       // Repo owner/name
-      case 'repo':
+      case GIT_KEYS.repo:
       case 'repository':
       case 'reposlug':
       case 'repo-slug':
@@ -78,13 +91,13 @@ function createResolver(cwd) {
         value = parseda.full_name
         break;
       // Repo name
-      case 'name':
+      case GIT_KEYS.name:
       case 'reponame': // repoName
       case 'repo-name':
         value = await _exec('basename `git rev-parse --show-toplevel`')
         break;
       // Repo org or owner
-      case 'org':
+      case GIT_KEYS.org:
       case 'owner':
       case 'organization':
       case 'repoowner': // repoOwner
@@ -94,7 +107,7 @@ function createResolver(cwd) {
         value = parsed.organization || parsed.owner
         break;
       // Repo name
-      case 'dir':
+      case GIT_KEYS.dir:
       case 'directory':
       case 'dirpath': // dirPath
       case 'dir-path':
@@ -108,7 +121,7 @@ function createResolver(cwd) {
         }
         break;
       // Repo url
-      case 'url':
+      case GIT_KEYS.url:
       case 'repourl': // repoUrl
       case 'repo-url':
         value = await getGitRemote()
@@ -123,7 +136,7 @@ function createResolver(cwd) {
         }
         break
       // Current commit full sha
-      case 'commit':
+      case GIT_KEYS.commit:
       case 'commitsha':
       case 'commit-sha':
       case 'commithash':
@@ -135,7 +148,7 @@ function createResolver(cwd) {
         }
         break
       // Branches
-      case 'branch':
+      case GIT_KEYS.branch:
       case 'branchname':
       case 'branch-name':
       case 'currentbranch': // currentBranch
@@ -147,8 +160,8 @@ function createResolver(cwd) {
         }
         break
       // Commit msg
+      case GIT_KEYS.message:
       case 'msg':
-      case 'message':
       case 'commitmessage': // commitMessage
       case 'commit-message':
       case 'commitmsg': // commitMsg
@@ -160,7 +173,7 @@ function createResolver(cwd) {
         }
         break;
       // Git tags
-      case 'tag':
+      case GIT_KEYS.tag:
       case 'describe':
         try {
           value = await _exec('git describe --always')
@@ -318,6 +331,8 @@ module.exports = function createGitResolver(cwd) {
   return {
     type: 'git',
     prefix: 'git',
+    syntax: '${git:valueType}',
+    description: `Resolves Git variables. Available valueTypes: ${Object.values(GIT_KEYS).join(', ')}`,
     match: gitVariableSyntax,
     resolver: createResolver(cwd)
   }
