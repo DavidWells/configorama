@@ -27,6 +27,7 @@ const createGitResolver = require('./resolvers/valueFromGit')
 const YAML = require('./parsers/yaml')
 const TOML = require('./parsers/toml')
 const INI = require('./parsers/ini')
+const JSON5 = require('./parsers/json5')
 /* functions */
 const md5Function = require('./functions/md5')
 
@@ -497,7 +498,7 @@ class Configorama {
         return JSON.stringify(val)
       },
       toObject: (val) => {
-        return JSON.parse(val)
+        return JSON5.parse(val)
       },
     }
 
@@ -1198,6 +1199,7 @@ class Configorama {
     let argsToPass
     if (rawArgs && rawArgs.match(/^{([^}]+)}$/)) {
       // console.log('OBJECT', hasFunc[2])
+      // TODO use JSON5
       argsToPass = [JSON.parse(rawArgs)]
     } else {
       // TODO fix how commas + spaces are ned

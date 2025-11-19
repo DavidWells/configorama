@@ -1,6 +1,7 @@
 const path = require('path')
 const fs = require('fs')
 const findUp = require('find-up')
+const JSON5 = require('../parsers/json5')
 
 const DEBUG = false
 const DEBUG_LOG = (message) => {
@@ -57,7 +58,7 @@ function resolveAlias(filePath, configDir) {
     }
 
     // Read and parse config file
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const config = JSON5.parse(fs.readFileSync(configPath, 'utf8'))
     const { paths = {}, baseUrl = '.' } = config.compilerOptions || {}
 
     // Extract the alias prefix and path
@@ -128,7 +129,7 @@ function getAliases(configDir) {
       return { names: [], lookup: [] }
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const config = JSON5.parse(fs.readFileSync(configPath, 'utf8'))
     const { paths = {}, baseUrl = '.' } = config.compilerOptions || {}
 
     const names = Object.keys(paths).map(key => key.replace('/*', ''))
