@@ -7,7 +7,7 @@ node_modules
 misc
 coverage
 .netlify
-
+repomix-output.xml
 # node sdk
 vendor
 
