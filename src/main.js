@@ -638,7 +638,7 @@ class Configorama {
     if (VERBOSE || showFoundVariables) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
-      //*
+      /*
       deepLog('metadata', metadata)
       process.exit(1)
       /** */
@@ -705,12 +705,13 @@ class Configorama {
             return count
           }
 
-          console.log(varKeys.map((k) => {
+          const referenceData = varKeys.map((k) => {
             const refCount = countAllReferences(k)
             const placesWord = refCount > 1 ? 'places' : 'place'
             return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${refCount} ${placesWord}`
-          }).join('\n'))
-          console.log()
+          }).join('\n')
+
+          console.log(`${referenceData}\n`)
         }
 
         logHeader('Variable Details')
@@ -982,6 +983,7 @@ class Configorama {
   collectVariableMetadata() {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
+    const variableTypes = this.variableTypes
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
@@ -996,7 +998,13 @@ class Configorama {
           return
         }
 
-        const nested = findNestedVariables(rawValue, variableSyntax, variablesKnownTypes, configValuePath)
+        const nested = findNestedVariables(
+          rawValue, 
+          variableSyntax, 
+          variablesKnownTypes, 
+          configValuePath, 
+          variableTypes
+        )
 
         const lastItem = nested[nested.length - 1]
         const lastKeyPath = this.path[this.path.length - 1]
@@ -1066,10 +1074,9 @@ class Configorama {
 
         // Extract file references
         nested.forEach((detail) => {
-          if (detail.varType && 
-             (detail.varType.startsWith('file(') || detail.varType.startsWith('text('))
-          ) {
-            const fileMatch = detail.varType.match(/^(?:file|text)\((.*?)\)/)
+          // console.log('detail', detail)
+          if (detail.varType && (detail.varType === 'file' || detail.varType === 'text')) {
+            const fileMatch = detail.variable.match(/^(?:file|text)\((.*?)\)/)
             if (fileMatch && fileMatch[1]) {
               let fileContent = fileMatch[1].trim()
               
@@ -1104,7 +1111,6 @@ class Configorama {
               // Check if path contains variables and create glob pattern
               if (normalizedPath.match(variableSyntax)) {
                 // Replace variable syntax ${...} with * for glob pattern
-                console.log('normalizedPath', normalizedPath)
                 const globPattern = normalizedPath.replace(variableSyntax, '*')
                 if (!fileGlobPatterns.includes(globPattern)) {
                   fileGlobPatterns.push(globPattern)
@@ -2292,7 +2298,7 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('valueCount', valueCount)
           // TODO throw on empty values?
           // No fallback value found AND this is undefined, throw error
-          const nestedVars = findNestedVariables(propertyString, this.variableSyntax, this.variablesKnownTypes)
+          const nestedVars = findNestedVariables(propertyString, this.variableSyntax, this.variablesKnownTypes, undefined, this.variableTypes)
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
 
@@ -2302,13 +2308,10 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           if (valueCount.length === 1 && noNestedVars) {
-            const configFilePath = (this.configFilePath) ? ` in ${this.configFilePath}` : ''
-            throw new Error(`
-Unable to resolve configuration variable
+            const configFilePath = (this.configFilePath) ? `\nin file ${this.configFilePath}` : ''
+            const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
 
-  Value  "${propertyString}" 
-  From   "${valueObject.originalSource}" 
-  At location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'na'}${configFilePath}
+            throw new Error(`Unable to resolve configuration "${propertyString}" variable at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${configFilePath}${fromLine}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
@@ -2661,10 +2664,11 @@ Unable to resolve configuration variable
       const originalVar = options.context && options.context.originalSource
 
       const findNestedResult = findNestedVariables(
-        originalVar, 
-        this.variableSyntax, 
-        this.variablesKnownTypes, 
-        options.context.path
+        originalVar,
+        this.variableSyntax,
+        this.variablesKnownTypes,
+        options.context.path,
+        this.variableTypes
       )
       // console.log('findNestedResult', findNestedResult)
       let hasFallback = false
@@ -2681,6 +2685,7 @@ Unable to resolve configuration variable
       if (!hasFallback && !this.opts.allowUnknownFileRefs) {
         const errorMsg = makeBox({
           title: `File Not Found in ${originalVar}`,
+          minWidth: '100%',
           text: `Variable ${variableString} cannot resolve due to missing file.
 
 File not found ${fullFilePath}

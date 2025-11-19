@@ -1,27 +1,31 @@
 const { splitByComma } = require('./splitByComma')
 const trimQuotes = require('./trimSurroundingQuotes')
+const { getVariableType } = require('./getVariableType')
 const FALLBACK_REGEX = /,\s*/
 const VAR_MATCH_REGEX = /__VAR_\d+__/
 
 /**
  * Finds all nested variable interpolations in a string while preserving original syntax
- * 
+ *
  * This function handles complex nested variables like:
  * ${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}
- * 
+ *
  * The returned matches will include:
  * 1. innermost variables first (e.g., ${defaultStage})
  * 2. middle variables next (e.g., ${opt:stage, ${defaultStage}})
  * 3. outermost variables last (e.g., the entire expression)
- * 
+ *
  * Each variable retains its original syntax even in nested form.
- * 
+ *
  * @param {string} input - The input string containing variable interpolations
  * @param {RegExp} regex - The regex pattern to match variables
+ * @param {RegExp} variablesKnownTypes - Combined regex of all known variable types
+ * @param {string} location - The location in config where this variable appears
+ * @param {Array} variableTypes - Array of variable type definitions from resolvers
  * @param {boolean} debug - Whether to print debug information
  * @returns {Array} Array of match objects with fullMatch, variable, varString and other properties
  */
-function findNestedVariables(input, regex, variablesKnownTypes, location, debug = false) {
+function findNestedVariables(input, regex, variablesKnownTypes, location, variableTypes, debug = false) {
   // console.log('variablesKnownTypes', variablesKnownTypes)
   // Create a copy of the input for replacement tracking
   let current = input
@@ -174,7 +178,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
     // console.log('matches[i].varString', matches[i].varString)
 
     if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-      matches[i].varType = matches[i].varString.match(variablesKnownTypes)[1] 
+      matches[i].varType = getVariableType(matches[i].varString, variableTypes)
       if (FALLBACK_REGEX.test(matches[i].varString)) {
         const split = splitByComma(matches[i].varString, regex)
         matches[i].hasFallback = true
@@ -198,8 +202,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, debug 
           }
 
           if (isVariable) {
-            const varType = innerContent.match(variablesKnownTypes)[1]
-            fallbackData.varType = varType
+            fallbackData.varType = getVariableType(innerContent, variableTypes)
             // if (varType === 'self:') {
             //   fallbackData.fullMatch = item.replace('self:', '')
             //   fallbackData.variable = item.replace('self:', '')

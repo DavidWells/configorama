@@ -50,8 +50,8 @@ test('sync API metadata includes afterInnerResolution for nested variables', () 
   assert.ok(fileVar.resolveDetails.length > 1, 'Should have multiple resolveDetails for nested variable')
 
   // Check that outer variable has afterInnerResolution showing the path after inner vars resolved
-  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType.startsWith('file('))
-  assert.ok(fileDetail, 'Should find file() detail')
+  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
+  assert.ok(fileDetail, 'Should find file varType detail')
   assert.ok(fileDetail.afterInnerResolution, 'Should have afterInnerResolution for file reference')
   assert.is(
     fileDetail.afterInnerResolution,

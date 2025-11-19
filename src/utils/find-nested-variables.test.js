@@ -3,13 +3,50 @@ const assert = require('uvu/assert');
 const { findNestedVariables } = require('./find-nested-variables');
 const deepLog = require('./deep-log')
 
+// Import resolvers to build variableTypes array
+const getValueFromEnv = require('../resolvers/valueFromEnv')
+const getValueFromOptions = require('../resolvers/valueFromOptions')
+const getValueFromGit = require('../resolvers/valueFromGit')
+
 // Define the regex pattern as used in the main function
 const regex = /\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g;
 const variablesKnownTypes = /(^env:|^opt:|^self:|^file\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)|^git:|(\${)?deep:\d+(\.[^}]+)*()}?)/
 
+const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const selfRefSyntax = RegExp(/^self:/g)
+const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
+
+// Build variableTypes array similar to main.js
+const variableTypes = [
+  getValueFromEnv,
+  getValueFromOptions,
+  getValueFromGit,
+  {
+    type: 'self',
+    prefix: 'self',
+    match: selfRefSyntax,
+  },
+  {
+    type: 'file',
+    prefix: 'file',
+    match: fileRefSyntax,
+  },
+  {
+    type: 'text',
+    prefix: 'text',
+    match: textRefSyntax,
+  },
+  {
+    type: 'deep',
+    prefix: 'deep',
+    match: deepRefSyntax,
+  },
+]
+
 test('findNestedVariables - simple variables', () => {
   const input = '${simple}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes, 'key');
+  const result = findNestedVariables(input, regex, variablesKnownTypes, 'key', variableTypes);
   deepLog('result', result)
   
   assert.equal(result.length, 1);
@@ -20,7 +57,7 @@ test('findNestedVariables - simple variables', () => {
 
 test('findNestedVariables - complex variable with colon syntax', () => {
   const input = '${opt:stage, dev}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 1);
   assert.equal(result[0].fullMatch, '${opt:stage, dev}');
@@ -29,7 +66,7 @@ test('findNestedVariables - complex variable with colon syntax', () => {
 
 test('findNestedVariables - one level nesting', () => {
   const input = '${file(./config.${stage}.json)}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 2);
   // The innermost variable should be found first
@@ -42,7 +79,7 @@ test('findNestedVariables - one level nesting', () => {
 
 test('findNestedVariables - two levels of nesting', () => {
   const input = '${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 3);
   // Innermost first
@@ -58,7 +95,7 @@ test('findNestedVariables - two levels of nesting', () => {
 
 test('findNestedVariables - multiple separate variables', () => {
   const input = 'Hello ${name}, welcome to ${service}!';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 2);
   assert.equal(result[0].fullMatch, '${name}');
@@ -67,7 +104,7 @@ test('findNestedVariables - multiple separate variables', () => {
 
 test('findNestedVariables - complex mixed case', () => {
   const input = '${db.${envOne}.host}:${db.${envTwo}.port} using ${credentials.${user.role}}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   console.log('result', result)
   assert.equal(result.length, 6);
   // Check the correct nesting order
@@ -80,19 +117,19 @@ test('findNestedVariables - complex mixed case', () => {
 
 test('findNestedVariables - empty string', () => {
   const input = '';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   assert.equal(result.length, 0);
 });
 
 test('findNestedVariables - string with no variables', () => {
   const input = 'This is a string with no variables';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   assert.equal(result.length, 0);
 });
 
 test('findNestedVariables - varString property for nested variables', () => {
   const input = '${file(./config.${opt:stage, ${defaultStage}}.json)}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   deepLog('result', result)
   // Check varString property for the outermost variable
   assert.equal(result[2].variable, 'file(./config.${opt:stage, ${defaultStage}}.json)');
@@ -100,13 +137,60 @@ test('findNestedVariables - varString property for nested variables', () => {
 
 test('findNestedVariables - mutliple fallback items', () => {
   const input = '${file(./config.${opt:stage, ${opt:stageOne}, ${opt:stageTwo}, "three"}.json)}';
-  const result = findNestedVariables(input, regex, variablesKnownTypes);
+  const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   deepLog('result', result)
   // Check varString property for the outermost variable
   assert.equal(result[result.length - 1].variable, 'file(./config.${opt:stage, ${opt:stageOne}, ${opt:stageTwo}, "three"}.json)');
 });
 
 test('findNestedVariables - deep', () => {
+  const input =
+  '${file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)}';
+  const result = findNestedVariables(input, regex, variablesKnownTypes, 'xyz', variableTypes);
+  deepLog('result', result)
+
+  // Should have 5 variables total
+  assert.equal(result.length, 5);
+
+  // Check the innermost variable
+  assert.equal(result[0].fullMatch, '${env:foo}');
+  assert.equal(result[0].variable, 'env:foo');
+  assert.equal(result[0].varType, 'env');
+
+  // Check opt:stageOne with env:foo fallback
+  assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
+  assert.equal(result[1].varType, 'options');
+  assert.equal(result[1].hasFallback, true);
+  assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
+  assert.equal(result[1].fallbackValues.length, 1);
+  assert.equal(result[1].fallbackValues[0].isVariable, true);
+  assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
+  assert.equal(result[1].fallbackValues[0].varType, 'env');
+
+  // Check opt:stageTwo
+  assert.equal(result[2].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[2].variable, 'opt:stageTwo');
+
+  // Check opt:stage with multiple fallbacks
+  assert.equal(result[3].fullMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
+  assert.equal(result[3].variable, 'opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"');
+  assert.equal(result[3].hasFallback, true);
+  assert.equal(result[3].valueBeforeFallback, 'opt:stage');
+  assert.equal(result[3].fallbackValues.length, 3);
+  assert.equal(result[3].fallbackValues[0].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[3].fallbackValues[0].isVariable, true);
+  assert.equal(result[3].fallbackValues[1].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[3].fallbackValues[1].isVariable, true);
+  assert.equal(result[3].fallbackValues[2].fullMatch, '"three"');
+  assert.equal(result[3].fallbackValues[2].isVariable, false);
+  assert.equal(result[3].fallbackValues[2].stringValue, 'three');
+
+  // Check outermost file variable
+  assert.equal(result[4].variable, 'file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)');
+});
+
+test('findNestedVariables - deep - no var types passed', () => {
   const input =
   '${file(./config.${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }.json)}';
   const result = findNestedVariables(input, regex, variablesKnownTypes, 'xyz');
@@ -118,18 +202,18 @@ test('findNestedVariables - deep', () => {
   // Check the innermost variable
   assert.equal(result[0].fullMatch, '${env:foo}');
   assert.equal(result[0].variable, 'env:foo');
-  assert.equal(result[0].varType, 'env:');
+  assert.equal(result[0].varType, 'env');
 
   // Check opt:stageOne with env:foo fallback
   assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
-  assert.equal(result[1].varType, 'opt:');
+  assert.equal(result[1].varType, 'options');
   assert.equal(result[1].hasFallback, true);
   assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
   assert.equal(result[1].fallbackValues.length, 1);
   assert.equal(result[1].fallbackValues[0].isVariable, true);
   assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
-  assert.equal(result[1].fallbackValues[0].varType, 'env:');
+  assert.equal(result[1].fallbackValues[0].varType, 'env');
 
   // Check opt:stageTwo
   assert.equal(result[2].fullMatch, '${opt:stageTwo}');

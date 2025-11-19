@@ -229,7 +229,7 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(envVarKey, 'Should find env variable')
   const envVar = variables[envVarKey]
   assert.ok(
-    envVar[0].resolveDetails.some(d => d.varType === 'env:'),
+    envVar[0].resolveDetails.some(d => d.varType === 'env'),
     'Should have env: varType'
   )
 
@@ -238,7 +238,7 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(optVarKey, 'Should find opt variable')
   const optVar = variables[optVarKey]
   assert.ok(
-    optVar[0].resolveDetails.some(d => d.varType === 'opt:'),
+    optVar[0].resolveDetails.some(d => d.varType === 'options'),
     'Should have opt: varType'
   )
 
@@ -247,7 +247,7 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(selfVarKey, 'Should find self variable')
   const selfVar = variables[selfVarKey]
   assert.ok(
-    selfVar[0].resolveDetails.some(d => d.varType === 'self:' || d.varType === 'dot.prop'),
+    selfVar[0].resolveDetails.some(d => d.varType === 'self' || d.varType === 'dot.prop'),
     'Should have self: or dot.prop varType'
   )
 })
@@ -283,7 +283,7 @@ test('metadata resolveDetails includes afterInnerResolution for nested variables
   )
 
   // Check that outer variable has afterInnerResolution showing the path after inner vars resolved
-  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType.startsWith('file('))
+  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
   assert.ok(fileDetail, 'Should find file() detail')
   assert.ok(fileDetail.afterInnerResolution, 'Should have afterInnerResolution for file reference')
   assert.is(
@@ -304,6 +304,8 @@ test('metadata.resolvedFileRefs contains actual file paths after variable resolu
   })
 
   const { metadata } = result
+
+  console.log('metadata', metadata)
 
   // Should have both fileRefs (patterns) and resolvedFileRefs (actual paths)
   assert.ok(Array.isArray(metadata.fileRefs), 'Should have fileRefs array')

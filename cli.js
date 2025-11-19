@@ -6,6 +6,7 @@ const Configorama = require('./src/main')
 const deepLog = require('./src/utils/deep-log')
 const { logHeader } = require('./src/utils/logs')
 const configorama = require('./src')
+const { makeBox } = require('@davidwells/box-logger')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
@@ -176,8 +177,13 @@ configorama(inputFile, options)
     }
   })
   .catch((error) => {
-    console.error(`Error processing configuration: ${inputFile}`)
-    console.error(error.message)
+    const errorMsg = makeBox({
+      title: `Error Processing Configuration: ${inputFile}`,
+      minWidth: '100%',
+      text: error.message,
+      type: 'error',
+    })
+    console.log(errorMsg)
     if (argv.debug) {
       console.error(error.stack)
     }
