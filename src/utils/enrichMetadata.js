@@ -177,7 +177,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
     if (!alreadyExists) {
       const refEntry = { 
-        path: pathKey, 
+        location: pathKey, 
         value: origPath,
         originalVariableString: originalPropertyString,
       }
@@ -224,11 +224,11 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
       if (details) {
         for (const ref of resolvedFileData.refs) {
           fileRefsByConfigPath.push({
-            location: ref.path,
+            location: ref.location,
             relativePath: details.relativePath,
             filePath: details.filePath,
-            resolvedVariableString: details.resolvedVariableString,
             originalVariableString: ref.originalVariableString,
+            resolvedVariableString: details.resolvedVariableString,
             containsVariables: !!ref.hasInnerVariable,
             exists: details.exists,
             // Get glob patterns from the individual ref, default to empty array

@@ -28,6 +28,10 @@ module.exports = async (configPathOrObject, settings = {}) => {
   if (settings.returnMetadata) {
     const metadata = instance.collectVariableMetadata()
 
+    // console.log('instance.fileRefsFound', instance.fileRefsFound)
+    // console.log('instance.resolutionTracking', instance.resolutionTracking)
+    // process.exit(1)
+
     // Enrich metadata with resolution tracking data collected during execution
     const enrichedMetadata = enrichMetadata(
       metadata, 
@@ -38,6 +42,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
 
     return {
       variableSyntax: instance.variableSyntax,
+      variableTypes: instance.variableTypes,
       config,
       originalConfig: instance.originalConfig,
       metadata: enrichedMetadata,

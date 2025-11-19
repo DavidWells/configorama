@@ -404,23 +404,23 @@ class Configorama {
 
     /* Nicer self: references. Match key in object */
     const fallThroughSelfMatcher = {
-      type: 'fallthrough',
+      type: 'dot.prop',
       match: (varString, fullObject, valueObject) => {
         /*
-        console.log('fallthrough varString', varString)
-        console.log('fallthrough valueObject', valueObject)
+        console.log('fallThroughSelfMatcher varString', varString)
+        console.log('fallThroughSelfMatcher valueObject', valueObject)
         console.log('fullObject', fullObject)
         /** */
         /* its file ref so we need to shift lookup for self in nested files */
         if (valueObject.isFileRef) {
           const exists = dotProp.get(fullObject, varString)
-          // console.log('fallthrough exists', exists)
+          // console.log('fallThroughSelfMatcher exists', exists)
           if (!exists) {
             // @ Todo make recursive
             const deepProperties = [valueObject.path[0]].concat(varString)
             const dotPropPath = deepProperties.join('.')
             const deeperExists = dotProp.get(fullObject, dotPropPath)
-            // console.log('fallthrough deeper', deeperExists)
+            // console.log('fallThroughSelfMatcher deeper', deeperExists)
             return deeperExists
           }
         }
@@ -431,10 +431,10 @@ class Configorama {
       },
       resolver: (varString, options, config, pathValue) => {
         /*
-        console.log('fallthrough resolver', varString)
-        console.log('fallthrough options', options)
-        console.log('fallthrough config', config)
-        console.log('fallthrough pathValue', pathValue)
+        console.log('fallThroughSelfMatcher resolver', varString)
+        console.log('fallThroughSelfMatcher options', options)
+        console.log('fallThroughSelfMatcher config', config)
+        console.log('fallThroughSelfMatcher pathValue', pathValue)
         /** */
         return this.getValueFromSelf(varString, options, config, pathValue)
       },
@@ -638,7 +638,7 @@ class Configorama {
     if (VERBOSE || showFoundVariables) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
-      /*
+      //*
       deepLog('metadata', metadata)
       process.exit(1)
       /** */
@@ -656,9 +656,9 @@ class Configorama {
 
         const varTypes = Object.keys(this.variableTypes)
         if (varTypes.length) {
-          const exclude = ['fallthrough', 'deep']
+          const exclude = ['dot.prop', 'deep']
           console.log('\nAllowed variable types:')
-          varTypes.filter((v) => v.type !== 'fallthrough').forEach((v) => {
+          varTypes.filter((v) => v.type !== 'dot.prop').forEach((v) => {
             const vData = this.variableTypes[v]
             if (exclude.includes(vData.type)) {
               return
@@ -1104,6 +1104,7 @@ class Configorama {
               // Check if path contains variables and create glob pattern
               if (normalizedPath.match(variableSyntax)) {
                 // Replace variable syntax ${...} with * for glob pattern
+                console.log('normalizedPath', normalizedPath)
                 const globPattern = normalizedPath.replace(variableSyntax, '*')
                 if (!fileGlobPatterns.includes(globPattern)) {
                   fileGlobPatterns.push(globPattern)
@@ -1173,13 +1174,13 @@ class Configorama {
 
     return {
       variables: variableData,
+      fileRefs: fileRefs,
+      fileGlobPatterns: fileGlobPatterns,
       summary: {
         totalVariables: varKeys.length,
         requiredVariables: requiredCount,
         variablesWithDefaults: withDefaultsCount
       },
-      fileRefs: fileRefs,
-      fileGlobPatterns: fileGlobPatterns,
     }
   }
   runFunction(variableString) {
@@ -1470,48 +1471,61 @@ class Configorama {
     if (matches.length === 1) {
       valueObject.currentVarDetails = matches[0]
       valueObject.currentVarDetails.result = results[0]
+    }
+
+    // Initialize resolution history if needed
+    if (!valueObject.resolutionHistory) {
+      valueObject.resolutionHistory = []
+    }
+
+    let result = valueObject.value
+    for (let i = 0; i < matches.length; i += 1) {
+      this.warnIfNotFound(matches[i].variable, results[i])
 
       // Extract metadata from result if present
-      let actualResult = results[0]
+      let actualResult = results[i]
       let resolverType = undefined
-      if (results[0] && typeof results[0] === 'object') {
-        if (results[0].__internal_metadata) {
-          actualResult = results[0].value
-          resolverType = results[0].__resolverType
-        } else if (results[0].__internal_only_flag) {
-          // Don't extract value from __internal_only_flag objects, but grab resolverType if present
-          actualResult = results[0]
-          resolverType = results[0].__resolverType
+      if (results[i] && typeof results[i] === 'object') {
+        if (results[i].__internal_metadata) {
+          actualResult = results[i].value
+          resolverType = results[i].__resolverType
+        } else if (results[i].__internal_only_flag) {
+          actualResult = results[i]
+          resolverType = results[i].__resolverType
         }
       }
-      // valueObject.currentVarDetails.varType = results[0].__resolverType
 
-      // Track resolution history
-      if (!valueObject.resolutionHistory) {
-        valueObject.resolutionHistory = []
-      }
-      
       // Extract clean result to avoid circular references
-      // For __internal_only_flag objects (like deep resolver results), extract the value
-      // For real data objects (like file contents), keep them as-is
       let cleanResult = actualResult
       if (actualResult && typeof actualResult === 'object' && actualResult.__internal_only_flag) {
         cleanResult = actualResult.value
       }
-      
+
+      let valueBeforeResolution = result
+
+      if (typeof valueBeforeResolution === 'object' && valueBeforeResolution.__internal_only_flag) {
+        valueBeforeResolution = valueBeforeResolution.value
+      }
+
+      // Track this resolution step in history
       const historyEntry = {
-        match: matches[0].match,
-        variable: matches[0].variable,
+        match: matches[i].match,
+        variable: matches[i].variable,
         result: cleanResult,
         resultType: typeof cleanResult,
-        valueBeforeResolution: valueObject.value,
+        valueBeforeResolution: valueBeforeResolution,
+        from: 'renderMatches',
       }
       if (resolverType) {
         historyEntry.varType = resolverType
       }
 
+      if (historyEntry.resultType === 'string' && historyEntry.result.match(/^>passthrough\[/)) {
+        historyEntry.varType = 'encodedUnknown'
+      }
+
       // Check if variable has fallback values (comma-separated)
-      const variableParts = splitByComma(matches[0].variable)
+      const variableParts = splitByComma(matches[i].variable)
       if (variableParts.length > 1) {
         historyEntry.hasFallback = true
         historyEntry.valueBeforeFallback = variableParts[0]
@@ -1552,33 +1566,16 @@ class Configorama {
       }
 
       // Only add to history if not a duplicate (same match + variable)
-      const isDuplicate = valueObject.resolutionHistory.some(entry => 
-        entry.match === historyEntry.match && 
+      const isDuplicate = valueObject.resolutionHistory.some(entry =>
+        entry.match === historyEntry.match &&
         entry.variable === historyEntry.variable
       )
-      
+
       if (!isDuplicate) {
         valueObject.resolutionHistory.push(historyEntry)
       }
 
-      // Save resolution history to tracking map for persistence across iterations
-      if (valueObject.path && valueObject.path.length) {
-        const pathKey = valueObject.path.join('.')
-        if (!this.resolutionTracking[pathKey]) {
-          this.resolutionTracking[pathKey] = {
-            path: pathKey,
-            originalPropertyString: valueObject.originalSource,
-            calls: []
-          }
-        }
-        this.resolutionTracking[pathKey].resolutionHistory = valueObject.resolutionHistory
-      }
-    }
-
-    let result = valueObject.value
-    for (let i = 0; i < matches.length; i += 1) {
-      this.warnIfNotFound(matches[i].variable, results[i])
-      // console.log('Render MATCHES', results[i])
+      // Process the match
       let valueToPop = results[i]
       // TODO refactor this. __internal_only_flag needed to stop clash with sync/async file resolution
       if (results[i] && typeof results[i] === 'object' && (results[i].__internal_only_flag || results[i].__internal_metadata)) {
@@ -1592,6 +1589,20 @@ class Configorama {
       console.log(this.deep)
       /** */
     }
+
+    // Save resolution history to tracking map for persistence across iterations
+    if (valueObject.path && valueObject.path.length) {
+      const pathKey = valueObject.path.join('.')
+      if (!this.resolutionTracking[pathKey]) {
+        this.resolutionTracking[pathKey] = {
+          path: pathKey,
+          originalPropertyString: valueObject.originalSource,
+          calls: []
+        }
+      }
+      this.resolutionTracking[pathKey].resolutionHistory = valueObject.resolutionHistory
+    }
+
     return result
   }
   /**
@@ -2109,6 +2120,22 @@ Missing Value ${missingValue} - ${matchedString}
           calls: []
         }
       }
+
+      // this.resolutionTracking[pathKey].resolutionHistory = this.resolutionTracking[pathKey].resolutionHistory || []
+
+      // const isDuplicate = this.resolutionTracking[pathKey].resolutionHistory.some(entry => 
+      //   entry.variableString === variableString
+      // )
+
+      // if (!isDuplicate) {
+      //   this.resolutionTracking[pathKey].resolutionHistory.push({
+      //     variableString: variableString,
+      //     propertyString: propertyString,
+      //     caller: caller,
+      //     lol: 'what'
+      //   })
+      // }
+
 
       this.resolutionTracking[pathKey].calls.push({
         variableString: variableString,
@@ -3024,25 +3051,25 @@ Please use ":" to reference sub properties. ${deepProperties}`
   }
 
   warnIfNotFound(variableString, valueToPopulate) {
-    let varType
+    let variableTypeText
     if (variableString.match(envRefSyntax)) {
-      varType = 'environment variable'
+      variableTypeText = 'environment variable'
     } else if (variableString.match(optRefSyntax)) {
-      varType = 'option'
+      variableTypeText = 'option'
     } else if (variableString.match(selfRefSyntax)) {
-      varType = 'config attribute'
+      variableTypeText = 'config attribute'
     } else if (variableString.match(fileRefSyntax)) {
-      varType = 'file'
+      variableTypeText = 'file'
     } else if (variableString.match(deepRefSyntax)) {
-      varType = 'deep'
+      variableTypeText = 'deep'
     } else if (variableString.match(textRefSyntax)) {
-      varType = 'text'
+      variableTypeText = 'text'
     }
     if (!isValidValue(valueToPopulate)) {
       // console.log("MISSING", variableString)
       // console.log(this.deep)
       // console.log(valueToPopulate)
-      const notFoundMsg = `No ${varType} found to satisfy the '\${${variableString}}' variable. Attempting fallback value`
+      const notFoundMsg = `No ${variableTypeText} found to satisfy the '\${${variableString}}' variable. Attempting fallback value`
       if (DEBUG) {
         console.log(notFoundMsg)
       }

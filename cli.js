@@ -141,17 +141,18 @@ configorama(inputFile, options)
         output = YAML.dump(config)
         break
       case 'esm':
+      case 'mjs':
       case 'module':
         output = `export default ${JSON.stringify(config, null, 2)}`
         break
       case 'js':
       case 'cjs':
-      case 'mjs':
       case 'commonjs':
       case 'javascript':
         output = `module.exports = ${JSON.stringify(config, null, 2)}`
         break
       case 'json':
+      case 'json5':
       default:
         if (returnMetadata) {
           // turn regex into string

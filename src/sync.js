@@ -5,10 +5,10 @@ const getFullPath = require('./utils/getFullFilePath')
 const enrichMetadata = require('./utils/enrichMetadata')
 
 /**
- * Force syncronous invocation of async API
+ * Force synchronous invocation of async API
  */
-module.exports = function configoramaSync(varSrcs = []) {
-  const customVariableSources = varSrcs.map((varSrc) => {
+module.exports = function configoramaSync(variableSources = []) {
+  const customVariableSources = variableSources.map((varSrc) => {
     if (!varSrc.match || typeof varSrc.match !== 'string') {
       throw new Error('Variable source must be string for .sync usage')
     }
