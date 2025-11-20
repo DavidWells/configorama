@@ -1197,8 +1197,6 @@ class Configorama {
         // Set in enrichMetadata
         fileRefsByRelativePath: undefined,
       },
-      fileRefs: fileRefs,
-      fileGlobPatterns: fileGlobPatterns,
       summary: {
         totalVariables: varKeys.length,
         requiredVariables: requiredCount,

@@ -104,6 +104,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
                   afterResolution = afterResolution.slice(2, -1)
                 }
                 detail.afterInnerResolution = afterResolution
+                detail.WHAT = 'nice'
 
                 if (call.resolvedValue !== undefined) {
                   detail.resolvedValue = call.resolvedValue
@@ -120,16 +121,16 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   // Build resolvedFileRefs array from tracking data
   const resolvedFileRefs = []
   const normalizedPaths = new Set()
-  
+
   for (const pathKey in resolutionTracking) {
     const tracking = resolutionTracking[pathKey]
     if (tracking.calls && tracking.calls.length) {
       const lastCall = tracking.calls[tracking.calls.length - 1]
-      
+
       const extracted = extractFilePath(lastCall.propertyString)
       if (extracted) {
         const normalizedPath = normalizePath(extracted.filePath)
-        
+
         if (normalizedPath && !normalizedPaths.has(normalizedPath)) {
           normalizedPaths.add(normalizedPath)
           resolvedFileRefs.push(normalizedPath)
@@ -138,11 +139,14 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     }
   }
 
-  metadata.resolvedFileRefs = resolvedFileRefs
+  // Update fileDependencies.resolved with the resolved file refs
+  if (metadata.fileDependencies) {
+    metadata.fileDependencies.resolved = resolvedFileRefs
+  }
 
   // Build fileRefsByRelativePath array
   const resolvedFileRefsDataMap = new Map()
-  
+
   // First Pass: Collect all refs and attach glob patterns directly to each ref.
   for (const pathKey in resolutionTracking) {
     const tracking = resolutionTracking[pathKey]
@@ -207,7 +211,6 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   
   // Convert map to array for the final metadata object.
   const fileRefsByRelativePath = Array.from(resolvedFileRefsDataMap.values())
-  metadata.fileRefsByRelativePath = fileRefsByRelativePath
 
   // Build the complete, flat list of all file references
   const fileDetailsMap = new Map()
@@ -218,8 +221,8 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   }
 
   const fileRefsByConfigPath = []
-  if (metadata.fileRefsByRelativePath) {
-    for (const resolvedFileData of metadata.fileRefsByRelativePath) {
+  if (fileRefsByRelativePath.length > 0) {
+    for (const resolvedFileData of fileRefsByRelativePath) {
       const details = fileDetailsMap.get(resolvedFileData.resolvedPath)
       if (details) {
         for (const ref of resolvedFileData.refs) {
@@ -232,14 +235,18 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
             containsVariables: !!ref.hasInnerVariable,
             exists: details.exists,
             // Get glob patterns from the individual ref, default to empty array
-            globPatterns: ref.globPatterns || [], 
+            globPatterns: ref.globPatterns || [],
           })
         }
       }
     }
   }
 
-  metadata.fileRefsByConfigPath = fileRefsByConfigPath
+  // Update fileDependencies with the enriched data
+  if (metadata.fileDependencies) {
+    metadata.fileDependencies.fileRefsByConfigPath = fileRefsByConfigPath
+    metadata.fileDependencies.fileRefsByRelativePath = fileRefsByRelativePath
+  }
 
   return metadata
 }
