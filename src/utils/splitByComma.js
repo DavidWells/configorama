@@ -13,6 +13,7 @@ const stringRefSyntax = stringResolver.match
 
 // https://regex101.com/r/4uPmpt/1
 const commasOutsideOfParens = /(?!<(?:\(|\[)[^)\]]+),(?![^(\[]+(?:\)|\]))/
+const PLACEHOLDER_REGEX = /__PLACEHOLDER_(\d+)__/g
 // const commasOutOfParens = /(?!(?:\()[^)\]]+),(?![^(\[]+(?:\)))/g
 function splitByComma(string, regexPattern) {
   // Handle empty or undefined input
@@ -96,7 +97,7 @@ function splitByComma(string, regexPattern) {
   
   // Restore placeholders in the result
   return result.map(item => {
-    return item.replace(/__PLACEHOLDER_(\d+)__/g, (match, index) => {
+    return item.replace(PLACEHOLDER_REGEX, (match, index) => {
       return placeholders[parseInt(index)]
     })
   })

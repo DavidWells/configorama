@@ -1,4 +1,5 @@
 const { findNestedVariables } = require('./find-nested-variables')
+const { functionRegex } = require('./regex')
 
 const DEBUG = false
 /**
@@ -9,7 +10,6 @@ const DEBUG = false
  */
 
 const fileRefSyntax = RegExp(/^file\((~?[a-zA-Z0-9._\-\/,'" ]+?)\)/g)
-const funcRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
 module.exports = function cleanVariable(
   match, 
   variableSyntax, 
@@ -67,7 +67,7 @@ module.exports = function cleanVariable(
   }
 
   // Support for function matches that dont need space alterations
-  if (!clean.match(fileRefSyntax) && funcRegex.exec(clean)) {
+  if (!clean.match(fileRefSyntax) && functionRegex.exec(clean)) {
     return clean
   }
 

@@ -8,16 +8,16 @@ function splitCsv(str, splitter) {
   const splitSyntax = splitter || ','
   // Split at comma SPACE ", "
   return str.split(splitSyntax).reduce(
-    (accum, curr) => {
-      if (accum.isConcatting) {
-        accum.soFar[accum.soFar.length - 1] += ',' + curr
+    (acc, curr) => {
+      if (acc.isConcatting) {
+        acc.soFar[acc.soFar.length - 1] += ',' + curr
       } else {
-        accum.soFar.push(curr)
+        acc.soFar.push(curr)
       }
       if (curr.split('"').length % 2 == 0) {
-        accum.isConcatting = !accum.isConcatting
+        acc.isConcatting = !acc.isConcatting
       }
-      return accum
+      return acc
     },
     {
       soFar: [],

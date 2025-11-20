@@ -1,3 +1,6 @@
+const PASSTHROUGH_PREFIX = '>passthrough'
+const PASSTHROUGH_PATTERN = />passthrough/g
+
 /**
  * Encode unknown variable for passthrough
  */
@@ -5,12 +8,16 @@ function encodeUnknown(v) {
   return `>passthrough[_[${Buffer.from(v).toString('base64')}]_]`
 }
 
+function hasEncodedUnknown(value) {
+  return PASSTHROUGH_PATTERN.test(value)
+}
+
 /**
  * Decode unknown variable from passthrough
  */
 function decodeUnknown(rawValue) {
   const x = findUnknownValues(rawValue)
-  let val = rawValue.replace(/>passthrough/g, '')
+  let val = rawValue.replace(PASSTHROUGH_PATTERN, '')
   if (x.length) {
     x.forEach(({ match, value }) => {
       const decodedValue = Buffer.from(value, 'base64').toString('ascii')
@@ -40,6 +47,8 @@ function findUnknownValues(text) {
 }
 
 module.exports = {
+  PASSTHROUGH_PATTERN,
+  hasEncodedUnknown,
   encodeUnknown,
   decodeUnknown,
   findUnknownValues

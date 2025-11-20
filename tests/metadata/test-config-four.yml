@@ -1,0 +1,5 @@
+
+stage: prod
+number: two
+
+jsDevOne: ${text(./js-${self:stage}-${self:number}.js)} lololo

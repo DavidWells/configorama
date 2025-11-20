@@ -8,6 +8,7 @@ function getValueFromString(variableString) {
 
 module.exports = {
   type: 'string',
+  internal: true,
   match: stringRefSyntax,
   resolver: getValueFromString
 }

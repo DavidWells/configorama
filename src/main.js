@@ -52,7 +52,9 @@ const { splitCsv } = require('./utils/splitCsv')
 const { replaceAll } = require('./utils/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/textUtils')
 const { getFallbackString, verifyVariable } = require('./utils/variableUtils')
-const { encodeUnknown, decodeUnknown } = require('./utils/unknownValues')
+const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
+const { decodeEncodedValue } = require('./utils/encoders')
+const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
 const { mergeByKeys } = require('./utils/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
 const { findNestedVariables } = require('./utils/find-nested-variables')
@@ -348,6 +350,8 @@ class Configorama {
       {
         type: 'self',
         prefix: 'self',
+        syntax: '${self:pathToKeyInConfig}',
+        description: `Resolves values from the current config object. Supports sub-properties via :key lookup.`,
         match: selfRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           return this.getValueFromSelf(varString, o, x, pathValue)
@@ -362,6 +366,8 @@ class Configorama {
       {
         type: 'file',
         prefix: 'file',
+        syntax: '${file(pathToFile.json)}',
+        description: `Resolves values from files. Supports sub-properties via :key lookup.`,
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           return this.getValueFromFile(varString, { context: pathValue })
@@ -392,6 +398,7 @@ class Configorama {
       /* Resolve deep references */
       {
         type: 'deep',
+        internal: true,
         match: deepRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           // console.log('>>>>>getValueFromDeep', varString)
@@ -638,7 +645,7 @@ class Configorama {
     if (VERBOSE || showFoundVariables) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
-      /*
+      //*
       deepLog('metadata', metadata)
       process.exit(1)
       /** */
@@ -937,9 +944,8 @@ class Configorama {
                 }
 
                 /* fix for file(JS-ref.js, raw) to keep parens and inline code */
-                const OPEN_PAREN_PLACEHOLDER_PATTERN = /__PH_PAREN_OPEN__/g
-                if (rawValue.match(OPEN_PAREN_PLACEHOLDER_PATTERN)) {
-                  rawValue = rawValue.replace(OPEN_PAREN_PLACEHOLDER_PATTERN, '(')
+                if (hasParenthesesPlaceholder(rawValue)) {
+                  rawValue = decodeJsSyntax(rawValue)
                   this.update(rawValue)
                 }
 
@@ -1513,14 +1519,20 @@ class Configorama {
         valueBeforeResolution = valueBeforeResolution.value
       }
 
+      const finalResult = decodeEncodedValue(cleanResult)
+
       // Track this resolution step in history
       const historyEntry = {
         match: matches[i].match,
         variable: matches[i].variable,
-        result: cleanResult,
+        result: finalResult,
         resultType: typeof cleanResult,
         valueBeforeResolution: valueBeforeResolution,
         from: 'renderMatches',
+      }
+
+      if (finalResult !== cleanResult) {
+        historyEntry.resultEncoded = cleanResult
       }
       if (resolverType) {
         historyEntry.varType = resolverType
@@ -2708,8 +2720,12 @@ ${JSON.stringify(options.context, null, 2)}`,
     const variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
 
     /* handle case for referencing raw JS files to inline them */
-    if (argsToPass.length && (argsToPass && argsToPass[0]  && argsToPass[0].toLowerCase() === 'raw') || opts.asRawText) {
-      valueToPopulate = variableFileContents.replace(/\(/g, '__PH_PAREN_OPEN__')
+    if (argsToPass.length 
+      && (argsToPass && argsToPass[0] && argsToPass[0].toLowerCase() === 'raw') 
+      || opts.asRawText
+    ) {
+      // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
+      valueToPopulate = encodeJsSyntax(variableFileContents)
       return Promise.resolve(valueToPopulate)
     }
 

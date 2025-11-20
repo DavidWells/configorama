@@ -36,13 +36,14 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
         configObject = result.data
       }
     }
-  } else if (fileType.match(/\.(toml)/)) {
+  } else if (fileType.match(/\.(toml|tml)/)) {
     configObject = TOML.parse(fileContents)
   } else if (fileType.match(/\.(ini)/)) {
     configObject = INI.parse(fileContents)
   } else if (fileType.match(/\.(json|json5)/)) {
     configObject = JSON5.parse(fileContents)
-  } else if (fileType.match(/\.(js)/)) {
+  // TODO detect js syntax and use appropriate parser
+  } else if (fileType.match(/\.(js|cjs)/)) {
     let jsFile
     try {
       jsFile = require(filePath)
