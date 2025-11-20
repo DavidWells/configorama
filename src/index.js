@@ -40,6 +40,29 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.fileRefsFound
     )
 
+    // Add resolvedPropertyValue to resolutionTracking
+    const resolutionHistoryWithResolvedValues = {}
+    for (const pathKey in instance.resolutionTracking) {
+      const tracking = instance.resolutionTracking[pathKey]
+      const keys = pathKey.split('.')
+      let resolvedValue = config
+
+      // Navigate to the resolved value in the config
+      for (const key of keys) {
+        if (resolvedValue && typeof resolvedValue === 'object') {
+          resolvedValue = resolvedValue[key]
+        } else {
+          resolvedValue = undefined
+          break
+        }
+      }
+
+      resolutionHistoryWithResolvedValues[pathKey] = {
+        ...tracking,
+        resolvedPropertyValue: resolvedValue
+      }
+    }
+
     return {
       variableSyntax: instance.variableSyntax,
       variableTypes: instance.variableTypes,
@@ -47,7 +70,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
       originalConfig: instance.originalConfig,
       metadata: enrichedMetadata,
       // Include resolution history per path for debugging and advanced use cases
-      resolutionHistory: instance.resolutionTracking,
+      resolutionHistory: resolutionHistoryWithResolvedValues,
     }
   }
 

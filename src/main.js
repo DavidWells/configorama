@@ -1186,6 +1186,17 @@ class Configorama {
 
     return {
       variables: variableData,
+      fileDependencies: {
+        all: fileRefs,
+        unResolved: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
+        // resolve files are those that are paths with no * and no inner variables
+        resolved: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
+        globPatterns: fileGlobPatterns,
+        // Set in enrichMetadata
+        fileRefsByConfigPath: undefined,
+        // Set in enrichMetadata
+        fileRefsByRelativePath: undefined,
+      },
       fileRefs: fileRefs,
       fileGlobPatterns: fileGlobPatterns,
       summary: {
@@ -1615,6 +1626,7 @@ class Configorama {
         this.resolutionTracking[pathKey] = {
           path: pathKey,
           originalPropertyString: valueObject.originalSource,
+          resolvedPropertyValue: undefined,
           calls: []
         }
       }
@@ -2135,6 +2147,7 @@ Missing Value ${missingValue} - ${matchedString}
         this.resolutionTracking[pathKey] = {
           path: pathKey,
           originalPropertyString: propertyString,
+          resolvedPropertyValue: undefined,
           calls: []
         }
       }
@@ -2269,7 +2282,8 @@ Missing Value ${missingValue} - ${matchedString}
             // Find the most recent call for this variableString
             for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
               if (this.resolutionTracking[pathKey].calls[i].variableString === variableString) {
-                this.resolutionTracking[pathKey].calls[i].resolvedValue = val
+                const v = (typeof val === 'object' && val.__internal_only_flag) ? val.value : val
+                this.resolutionTracking[pathKey].calls[i].resolvedValue = v
                 this.resolutionTracking[pathKey].calls[i].resolverType = resolverType
                 break
               }
