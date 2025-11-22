@@ -33,6 +33,7 @@ module.exports = function configoramaSync(variableSources = []) {
     }
 
     return {
+      type: varSrc.type,
       /* Create regex in sync context */
       match: RegExp(varSrc.match, 'g'),
       resolver: resolverFunction

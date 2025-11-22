@@ -39,6 +39,7 @@ test('Custom variable source resolver', async () => {
     configDir: dirname, // needed for any file refs
     options: args,
     variableSources: [{
+      type: 'consul',
       match: RegExp(/^consul:/g),
       resolver: (varToProcess, opts, currentObject) => {
         return Promise.resolve(`fetch consul value ${varToProcess}`)
@@ -55,7 +56,9 @@ test('Custom variable source resolver match function', async () => {
 
   const config = await configorama(object, {
     configDir: dirname, // needed for any file refs
+    // returnMetadata: true,
     variableSources: [{
+      type: 'custom',
       match: (val) => {
         return val === 'REPLACE_ME'
       },
@@ -64,6 +67,8 @@ test('Custom variable source resolver match function', async () => {
       }
     }]
   })
+
+  console.log('config', config)
 
   assert.is(config.tester, 'its replaced')
 })

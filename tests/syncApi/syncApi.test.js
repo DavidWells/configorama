@@ -62,9 +62,11 @@ test('sync custom variable sources', () => {
   const other = configorama.sync(yamlFile, {
     options: args,
     variableSources: [{
+      type: 'context',
       match: '^context:',
       resolver: path.join(__dirname, 'custom-var-one.js')
     }, {
+      type: 'secrets',
       match: '^secrets:',
       resolver: path.join(__dirname, 'custom-var-two.js')
     }]
@@ -81,9 +83,11 @@ test('throw if match regex not strings', () => {
     configorama.sync(yamlFile, {
       options: args,
       variableSources: [{
+        type: 'context',
         match: RegExp('^context:', 'g'),
         resolver: path.join(__dirname, 'custom-var-one.js')
       }, {
+        type: 'secrets',
         match: /^secrets:/,
         resolver: path.join(__dirname, 'custom-var-two.js')
       }]
@@ -98,12 +102,14 @@ test('throw if match resolver not path', () => {
     configorama.sync(yamlFile, {
       options: args,
       variableSources: [{
+        type: 'context',
         match: '^context:',
         resolver: () => {
           return 'xyz'
         }
       }, 
       {
+        type: 'secrets',
         match: '^secrets:',
         resolver: () => {
           return 'xyz'

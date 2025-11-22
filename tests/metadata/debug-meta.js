@@ -6,12 +6,13 @@ const { deepLog } = require('../utils')
 const configorama = require('../../src')
 
 test('Nested file references', async () => {
-  const configFile = path.join(__dirname, 'test-config-three.yml')
-
+  // const configFile = path.join(__dirname, 'test-config-three.yml')
+  const configFile = path.join(__dirname, '../fileValues/fileValues.yml')
   const result = await configorama(configFile, {
     returnMetadata: true,
     options: {
-      stage: 'prod'
+      stage: 'prod',
+      otherFlag: 'prod',
     }
   })
 

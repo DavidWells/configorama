@@ -33,12 +33,17 @@ function getVariableType(varString, variableTypes) {
   for (const variableType of variableTypes) {
     if (!variableType.match) continue
 
-    // Reset regex lastIndex to ensure clean matching
-    variableType.match.lastIndex = 0
-
-    if (variableType.match.test(varString)) {
-      // console.log('varString', varString, 'matched type', variableType.type)
-      return variableType.type
+    // Handle both regex and function matchers
+    if (typeof variableType.match === 'function') {
+      if (variableType.match(varString)) {
+        return variableType.type
+      }
+    } else if (variableType.match.test) {
+      // Reset regex lastIndex to ensure clean matching
+      variableType.match.lastIndex = 0
+      if (variableType.match.test(varString)) {
+        return variableType.type
+      }
     }
   }
 

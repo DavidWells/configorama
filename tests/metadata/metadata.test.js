@@ -306,4 +306,52 @@ test('metadata.fileDependencies contains all and resolved file paths', async () 
   )
 })
 
+test('metadata.uniqueVariables groups variables by base name without fallbacks', async () => {
+  const object = {
+    regionA: '${env:AWS_REGION, us-east-1}',
+    regionB: '${env:AWS_REGION, us-west-2}',
+    stage: '${opt:stage, dev}',
+    stageRef: '${self:stage}'
+  }
+
+  const result = await configorama(object, {
+    returnMetadata: true,
+    options: {
+      stage: 'prod'
+    }
+  })
+
+  const { uniqueVariables } = result.metadata
+
+  // Should have uniqueVariables
+  assert.ok(uniqueVariables, 'Should have uniqueVariables')
+
+  // env:AWS_REGION should be rolled up with both occurrences
+  assert.ok(uniqueVariables['env:AWS_REGION'], 'Should have env:AWS_REGION entry')
+  assert.is(uniqueVariables['env:AWS_REGION'].variable, 'env:AWS_REGION')
+  assert.is(uniqueVariables['env:AWS_REGION'].variableType, 'env')
+  assert.is(uniqueVariables['env:AWS_REGION'].occurrences.length, 2, 'Should have 2 occurrences')
+
+  // Check occurrences have expected structure
+  const awsOccurrences = uniqueVariables['env:AWS_REGION'].occurrences
+  assert.ok(awsOccurrences.some(o => o.fullMatch === '${env:AWS_REGION, us-east-1}'), 'Should have us-east-1 occurrence')
+  assert.ok(awsOccurrences.some(o => o.fullMatch === '${env:AWS_REGION, us-west-2}'), 'Should have us-west-2 occurrence')
+
+  // Each occurrence should have expected fields
+  const firstOccurrence = awsOccurrences[0]
+  assert.ok('fullMatch' in firstOccurrence, 'Should have fullMatch')
+  assert.ok('path' in firstOccurrence, 'Should have path')
+  assert.ok('isRequired' in firstOccurrence, 'Should have isRequired')
+  assert.ok('defaultValue' in firstOccurrence, 'Should have defaultValue')
+  assert.ok('hasFallback' in firstOccurrence, 'Should have hasFallback')
+
+  // opt:stage should have 1 occurrence
+  assert.ok(uniqueVariables['opt:stage'], 'Should have opt:stage entry')
+  assert.is(uniqueVariables['opt:stage'].occurrences.length, 1)
+
+  // self:stage should have 1 occurrence with defaultValueSrc
+  assert.ok(uniqueVariables['self:stage'], 'Should have self:stage entry')
+  assert.is(uniqueVariables['self:stage'].variableType, 'self')
+})
+
 test.run()

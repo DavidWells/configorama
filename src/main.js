@@ -454,6 +454,19 @@ class Configorama {
 
     /* Apply user defined variable sources */
     if (options.variableSources) {
+      
+      // ensure each variable source has a type
+      options.variableSources.forEach((v) => {
+        if (!v.type) {
+          console.log('v', v)
+          throw new Error('Variable source must have a type')
+        }
+        if (!v.match || !v.resolver) {
+          console.log('v', v)
+          throw new Error('Variable source must have a match and resolver functions')
+        }
+      })
+
       this.variableTypes = this.variableTypes.concat(options.variableSources)
     }
 
@@ -1155,6 +1168,7 @@ class Configorama {
 
     return {
       variables: variableData,
+      uniqueVariables: {},
       fileDependencies: {
         globPatterns: fileGlobPatterns,
         // all: fileRefs,

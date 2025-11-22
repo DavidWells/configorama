@@ -248,6 +248,44 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     metadata.fileDependencies.references = references
   }
 
+  // Build uniqueVariables rollup - group by base variable (without fallbacks)
+  const uniqueVariablesMap = new Map()
+
+  for (const key of varKeys) {
+    const varInstances = metadata.variables[key]
+    const firstInstance = varInstances[0]
+    const lastResolveDetail = firstInstance.resolveDetails[firstInstance.resolveDetails.length - 1]
+
+    // Get the base variable name without fallback
+    // Use valueBeforeFallback if present, otherwise use the variable string
+    const baseVar = lastResolveDetail.valueBeforeFallback || lastResolveDetail.variable
+
+    if (!uniqueVariablesMap.has(baseVar)) {
+      uniqueVariablesMap.set(baseVar, {
+        variable: baseVar,
+        variableType: lastResolveDetail.variableType,
+        occurrences: [],
+      })
+    }
+
+    const entry = uniqueVariablesMap.get(baseVar)
+
+    // Add this occurrence with its full context
+    for (const instance of varInstances) {
+      entry.occurrences.push({
+        fullMatch: key,
+        path: instance.path,
+        isRequired: instance.isRequired,
+        defaultValue: instance.defaultValue,
+        defaultValueSrc: instance.defaultValueSrc,
+        hasFallback: instance.hasFallback || false,
+      })
+    }
+  }
+
+  // Convert map to object for metadata
+  metadata.uniqueVariables = Object.fromEntries(uniqueVariablesMap)
+
   return metadata
 }
 
