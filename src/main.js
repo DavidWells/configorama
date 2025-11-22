@@ -255,6 +255,10 @@ class Configorama {
       allowUndefinedValues: false,
       // Allow unknown file refs to pass through without throwing errors
       allowUnknownFileRefs: false,
+      // Return metadata
+      returnMetadata: false,
+      // Return preResolvedVariableDetails
+      returnPreResolvedVariableDetails: true,
     }, options)
 
     this.filterCache = {}
@@ -616,7 +620,7 @@ class Configorama {
         this.opts
       )
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables) {
+      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
@@ -643,16 +647,22 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables) {
+    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
-      //*
+
+  
+      /*
       deepLog('metadata', metadata)
       process.exit(1)
       /** */
     
       const variableData = metadata.variables
       const varKeys = Object.keys(variableData)
+
+      // if (this.opts.returnPreResolvedVariableDetails) {
+      //   return metadata
+      // }
 
       if (!varKeys.length) {
         logHeader('No Variables Found in Config')
@@ -724,132 +734,80 @@ class Configorama {
 
         logHeader('Variable Details')
 
-        const lines = this.configFileContents.split('\n')
-        // console.log('lines', lines)
+        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
     
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
-          // console.log('variableInstances', variableInstances)
-      
           const firstInstance = variableInstances[0]
 
-          let requiredText = ''
-          let defaultValueSrc = ''
-          if (typeof firstInstance.defaultValue === 'undefined') {
-            // console.log('no default value', firstInstance)
-
-            let dotPropArr = []
-            if (firstInstance.defaultValueIsVar && (
-              firstInstance.defaultValueIsVar.variableType === 'self:' ||
-              firstInstance.defaultValueIsVar.variableType === 'dot.prop'
-            )) {
-              dotPropArr = [firstInstance.defaultValueIsVar]
-            }
-            /* Check if the fallback variable is a self reference */
-            const hasDotPropOrSelf = variableInstances.reduce((acc, v) => {
-              const dotProp = v.resolveDetails.find((d) => {
-                // console.log('d', d)
-                return d.variableType === 'dot.prop'
-              })
-              if (dotProp) {
-                acc.push(dotProp)
-              }
-              if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self:') {
-                // console.log('dot.prop', v.resolveDetails)
-                acc.push(v.resolveDetails[0])
-              }
-              return acc
-            }, dotPropArr)
-            // console.log('hasDotPropOrSelf', hasDotPropOrSelf)
-            
-            if (!hasDotPropOrSelf.length) {
-              const debug = (false) ? JSON.stringify(firstInstance, null, 2) : ''
-              requiredText = `[Required Variable] ${debug}`
-            } else {
-              const fallBackValues = variableInstances.filter((v) => v.resolveDetails.find((d) => d.hasFallback)).map((v) => v.resolveDetails)
-              // console.log('fallBackValues', fallBackValues)
-              if (fallBackValues.length) {
-                // console.log('fallBackValues.resolveDetails', fallBackValues)
-              }
-
-              const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
-              defaultValueSrc = cleanPath
-              // Find the dot prop value in the original config
-              const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
-              // console.log('dotPropValue', dotPropValue)
-              if (typeof dotPropValue !== 'undefined') {
-                requiredText = ''
-                const niceString = typeof dotPropValue === 'object' ? JSON.stringify(dotPropValue) : dotPropValue
-                // truncate niceString to 100 characters
-                const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
-                firstInstance.defaultValue = truncatedString
-              } else {
-                deepLog('Missing default var', firstInstance)
-                throw new Error(
-                  `Variable misconfiguration at ${firstInstance.variable}\n\n"${hasDotPropOrSelf[0].variable}" resolves to undefined value.\n`
-                )
-              }
-            }
-            //this.originalConfig[key] = undefined
-          }
+          // Build display message from enriched metadata
           const spacing = '           '
           const titleText = `Variable:${spacing}`
-          const reqText = (requiredText) ? `${chalk.red.bold(requiredText)}\n` : ''
-          let varMsg = `${reqText}`
-          const VALUE_HEX = '#899499' // '#708090'
+          const VALUE_HEX = '#899499'
           const keyChalk = chalk.whiteBright
           const valueChalk = chalk.hex(VALUE_HEX)
 
+          let varMsg = ''
+          let requiredMessage = ''
+
+          // Show required status from metadata
+          if (firstInstance.isRequired) {
+            requiredMessage = `${chalk.red.bold('[Required]')}`
+          }
+
+          // Show default value from metadata
           if (typeof firstInstance.defaultValue !== 'undefined') {
-            // console.log('firstInstance.defaultValue', firstInstance.defaultValue)
             const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
             const defaultValueText = `${indent}${keyChalk(`Default value:`.padEnd(titleText.length, ' '))}`
-            // ensure padding is even 
             varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}`
           }
 
-          if (defaultValueSrc) {
+          // Show default value source path from metadata
+          if (firstInstance.defaultValueSrc) {
             varMsg += `\n${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
-            varMsg += `${valueChalk(defaultValueSrc)}`
+            varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
           }
 
+          // Show resolve order from metadata
           if (firstInstance.resolveOrder.length > 1) {
             varMsg += `\n${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
             const resolveOrder = firstInstance.resolveOrder.join(', ')
-            varMsg += ` ${valueChalk(resolveOrder)}`
+            varMsg += ` ${valueChalk(resolveOrder)}\n`
           }
 
+          // Show path(s) from metadata
           let locationRender = valueChalk(variableInstances[0].path)
-  
           let locationLabel = `${indent}${keyChalk('Path:'.padEnd(titleText.length, ' '))}`
           if (variableInstances.length > 1) {
             locationRender = `\n${variableInstances.map((v) => valueChalk(`${indent}- ${v.path}`)).join('\n')}`
-            const locationLabelText = `${indent}${keyChalk('Paths:')}`
-            locationLabel = locationLabelText
+            locationLabel = `${indent}${keyChalk('Paths:')}`
           }
+          varMsg += `${locationLabel} ${locationRender}`
 
-          varMsg += `\n${locationLabel} ${locationRender}`
-
-          // find the match in our lines
+          // Find line number in config file
           const line = lines.findIndex((line) => line.includes(key))
           const lineNumber = line + 1
-    
-          // console.log(` ${chalk.bold(key)}`)
+          
+
           return {
             text: varMsg,
             title: {
               left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
-              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `Line: ${lineNumber}`, 'gray') : '',
+              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : 'x',
             },
           }
         })
 
+        // console.log('boxes', boxes)
+        // process.exit(1)
+
         console.log(makeStackedBoxes(boxes, {
           borderColor: 'gray',
-          minWidth: 120,
+          minWidth: '90%',
           borderStyle: 'bold',
         }))
+        // process.exit(1)
       }
     
       /* Exit early if list or info flag is set */
@@ -1160,7 +1118,7 @@ class Configorama {
           if (dotProp) {
             acc.push(dotProp)
           }
-          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self:') {
+          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self') {
             acc.push(v.resolveDetails[0])
           }
           return acc
@@ -1174,9 +1132,19 @@ class Configorama {
           const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
           if (typeof dotPropValue === 'undefined') {
             isTrulyRequired = true
+          } else {
+            // Enrich with default value from self-reference
+            firstInstance.defaultValueSrc = cleanPath
+            const niceString = typeof dotPropValue === 'object' ? JSON.stringify(dotPropValue) : dotPropValue
+            const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
+            firstInstance.defaultValue = truncatedString
+            firstInstance.isRequired = false
           }
         }
       }
+
+      // Update isRequired based on computed isTrulyRequired
+      firstInstance.isRequired = isTrulyRequired
 
       if (isTrulyRequired) {
         requiredCount++
