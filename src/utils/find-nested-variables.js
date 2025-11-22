@@ -56,7 +56,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     
     // Store match details
     const matchInfo = {
-      varType: undefined,
+      variableType: undefined,
       location,
       value: input,
       fullMatch: match[0],
@@ -99,7 +99,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     // console.log('matches[i].varString', matches[i].varString)
 
     // if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-    //   matches[i].varType = matches[i].varString.match(variablesKnownTypes)[1] 
+    //   matches[i].variableType = matches[i].varString.match(variablesKnownTypes)[1] 
     //   if (FALLBACK_REGEX.test(matches[i].varString)) {
     //     const split = splitByComma(matches[i].varString, regex)
     //     matches[i].hasFallback = true
@@ -178,7 +178,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     // console.log('matches[i].varString', matches[i].varString)
 
     if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-      matches[i].varType = getVariableType(matches[i].varString, variableTypes)
+      matches[i].variableType = getVariableType(matches[i].varString, variableTypes)
       if (FALLBACK_REGEX.test(matches[i].varString)) {
         const split = splitByComma(matches[i].varString, regex)
         matches[i].hasFallback = true
@@ -202,27 +202,27 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
           }
 
           if (isVariable) {
-            fallbackData.varType = getVariableType(innerContent, variableTypes)
-            // if (varType === 'self:') {
+            fallbackData.variableType = getVariableType(innerContent, variableTypes)
+            // if (variableType === 'self:') {
             //   fallbackData.fullMatch = item.replace('self:', '')
             //   fallbackData.variable = item.replace('self:', '')
-            //   fallbackData.varType = 'dot.prop'
+            //   fallbackData.variableType = 'dot.prop'
             // }
           }
           return fallbackData
         })
       }
-    } else if (typeof matches[i].varType === 'undefined') {
-      matches[i].varType = 'dot.prop'
+    } else if (typeof matches[i].variableType === 'undefined') {
+      matches[i].variableType = 'dot.prop'
     }
   }
 
   const finalMatches = matches.map((m) => {
     delete m.placeholder
-    if (typeof m.varType === 'undefined') {
+    if (typeof m.variableType === 'undefined') {
       /*
       {
-        varType: 'dot.prop',
+        variableType: 'dot.prop',
         location: 'resolvedDomainName',
         value: '${domainByStage.${opt:stage, ${defaultStage}}}',
         fullMatch: '${domainByStage.${opt:stage, ${defaultStage}}}',
@@ -233,7 +233,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
         end: 26
       }
       {
-        varType: 'dot.prop',
+        variableType: 'dot.prop',
         location: 'resolvedDomainName',
         value: '${domainByStage.${opt:stage, ${defaultStage}}}',
         fullMatch: '${defaultStage}',
@@ -258,7 +258,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
       }, m.fallbackValues)
       m.fallbackValues = combinedFallbacks
     }
-    if (m.varType === 'dot.prop') {
+    if (m.variableType === 'dot.prop') {
       // const reversedMatches = matches.reverse()
       // const test = reversedMatches.reduce((acc, f) => {
       //   console.log('f', f)

@@ -14,4 +14,4 @@ custom:
   dbConfig: ${file(./database.json)}
   stageDbConfig: ${file(./database-${self:stage}.json)}
   optionalValue: ${env:OPTIONAL_VAR, "default-value"}
-  jsDevOne: ${text(./js-${self:stage}-${self:number}.js)}
+  jsDevOne: ${text(./js-${self:stage}-${self:number}.js)} lololo

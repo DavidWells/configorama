@@ -100,7 +100,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
                     const deepEntry = trackingData.resolutionHistory.find(e => e.variable === deepVar)
                     if (deepEntry && deepEntry.result !== undefined) {
                       resolvedValue = deepEntry.result
-                      historyEntry.deepResult = resolvedValue
+                      historyEntry.resultAfterDeep = resolvedValue
                     }
                   }
                   detail.resolvedValue = resolvedValue
@@ -135,12 +135,12 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     }
   }
 
-  // Update fileDependencies.resolved with the resolved file refs
+  // Update fileDependencies.resolvedPaths with the resolved file refs
   if (metadata.fileDependencies) {
-    metadata.fileDependencies.resolved = resolvedFileRefs
+    metadata.fileDependencies.resolvedPaths = resolvedFileRefs
   }
 
-  // Build byRelativePath array
+  // Build references array
   const resolvedFileRefsDataMap = new Map()
 
   // First Pass: Collect all refs and attach glob patterns directly to each ref.
@@ -185,7 +185,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
       // Check for inner variables and generate glob pattern for this specific ref
       if (variableSyntax && origPath.match(variableSyntax)) {
         refEntry.hasInnerVariable = true
-        refEntry.globPatterns = [ origPath.replace(variableSyntax, '*') ]
+        refEntry.pattern = origPath.replace(variableSyntax, '*')
       }
       
       entry.refs.push(refEntry)
@@ -196,17 +196,17 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   for (const data of resolvedFileRefsDataMap.values()) {
     const allGlobs = new Set()
     for (const ref of data.refs) {
-      if (ref.globPatterns) {
-        ref.globPatterns.forEach(pattern => allGlobs.add(pattern))
+      if (ref.pattern) {
+        allGlobs.add(ref.pattern)
       }
     }
     if (allGlobs.size > 0) {
-      data.allGlobPatterns = Array.from(allGlobs)
+      data.globPatterns = Array.from(allGlobs)
     }
   }
   
   // Convert map to array for the final metadata object.
-  const byRelativePath = Array.from(resolvedFileRefsDataMap.values())
+  const references = Array.from(resolvedFileRefsDataMap.values())
 
   // Build the complete, flat list of all file references
   const fileDetailsMap = new Map()
@@ -217,22 +217,26 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   }
 
   const byConfigPath = []
-  if (byRelativePath.length > 0) {
-    for (const resolvedFileData of byRelativePath) {
+  if (references.length > 0) {
+    for (const resolvedFileData of references) {
       const details = fileDetailsMap.get(resolvedFileData.resolvedPath)
       if (details) {
         for (const ref of resolvedFileData.refs) {
-          byConfigPath.push({
+          const confDetails = {
             location: ref.location,
-            relativePath: details.relativePath,
             filePath: details.filePath,
+            relativePath: details.relativePath,
             originalVariableString: ref.originalVariableString,
             resolvedVariableString: details.resolvedVariableString,
             containsVariables: !!ref.hasInnerVariable,
             exists: details.exists,
             // Get glob patterns from the individual ref, default to empty array
-            globPatterns: ref.globPatterns || [],
-          })
+            
+          }
+          if (ref.pattern) {
+            confDetails.pattern = ref.pattern
+          }
+          byConfigPath.push(confDetails)
         }
       }
     }
@@ -241,7 +245,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   // Update fileDependencies with the enriched data
   if (metadata.fileDependencies) {
     metadata.fileDependencies.byConfigPath = byConfigPath
-    metadata.fileDependencies.byRelativePath = byRelativePath
+    metadata.fileDependencies.references = references
   }
 
   return metadata

@@ -133,5 +133,8 @@ multipleVariablesInFilePath: ${file(./config.${env:MY_ENV_VAR}${dash}.${ext})}
 subFolder: sub
 subSubFolder: subsub
 subSubSubFolder: subsubsub
-nestedFilePath: ${file(.//sub/subsub/subsubsub/foo.json)}
-nestedFilePathWithVar: ${file(.//${subFolder}/subsub/subsubsub/foo.json)}
+nestedFilePath: ${file(./sub/subsub/subsubsub/foo.json)}
+nestedFilePathWithVar: ${file(./${subFolder}/subsub/subsubsub/foo.json)}
+
+nestedFilePathTwo: ${file(.//sub/subsub/subsubsub/foo.json)}
+nestedFilePathWithVarTwo: ${file(.//${subFolder}/subsub/subsubsub/foo.json)}

@@ -741,8 +741,8 @@ class Configorama {
 
             let dotPropArr = []
             if (firstInstance.defaultValueIsVar && (
-              firstInstance.defaultValueIsVar.varType === 'self:' ||
-              firstInstance.defaultValueIsVar.varType === 'dot.prop'
+              firstInstance.defaultValueIsVar.variableType === 'self:' ||
+              firstInstance.defaultValueIsVar.variableType === 'dot.prop'
             )) {
               dotPropArr = [firstInstance.defaultValueIsVar]
             }
@@ -750,12 +750,12 @@ class Configorama {
             const hasDotPropOrSelf = variableInstances.reduce((acc, v) => {
               const dotProp = v.resolveDetails.find((d) => {
                 // console.log('d', d)
-                return d.varType === 'dot.prop'
+                return d.variableType === 'dot.prop'
               })
               if (dotProp) {
                 acc.push(dotProp)
               }
-              if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].varType === 'self:') {
+              if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self:') {
                 // console.log('dot.prop', v.resolveDetails)
                 acc.push(v.resolveDetails[0])
               }
@@ -1082,7 +1082,7 @@ class Configorama {
         // Extract file references
         nested.forEach((detail) => {
           // console.log('detail', detail)
-          if (detail.varType && (detail.varType === 'file' || detail.varType === 'text')) {
+          if (detail.variableType && (detail.variableType === 'file' || detail.variableType === 'text')) {
             const fileMatch = detail.variable.match(/^(?:file|text)\((.*?)\)/)
             if (fileMatch && fileMatch[1]) {
               let fileContent = fileMatch[1].trim()
@@ -1149,18 +1149,18 @@ class Configorama {
         // Check for self-references that resolve to config values
         let dotPropArr = []
         if (firstInstance.defaultValueIsVar && (
-          firstInstance.defaultValueIsVar.varType === 'self:' ||
-          firstInstance.defaultValueIsVar.varType === 'dot.prop'
+          firstInstance.defaultValueIsVar.variableType === 'self:' ||
+          firstInstance.defaultValueIsVar.variableType === 'dot.prop'
         )) {
           dotPropArr = [firstInstance.defaultValueIsVar]
         }
 
         const hasDotPropOrSelf = instances.reduce((acc, v) => {
-          const dotProp = v.resolveDetails.find((d) => d.varType === 'dot.prop')
+          const dotProp = v.resolveDetails.find((d) => d.variableType === 'dot.prop')
           if (dotProp) {
             acc.push(dotProp)
           }
-          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].varType === 'self:') {
+          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self:') {
             acc.push(v.resolveDetails[0])
           }
           return acc
@@ -1188,15 +1188,15 @@ class Configorama {
     return {
       variables: variableData,
       fileDependencies: {
-        all: fileRefs,
+        globPatterns: fileGlobPatterns,
+        // all: fileRefs,
         dynamicPaths: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
         // resolve files are those that are paths with no * and no inner variables
-        resolved: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
-        globPatterns: fileGlobPatterns,
+        resolvedPaths: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
         // Set in enrichMetadata
         byConfigPath: undefined,
         // Set in enrichMetadata
-        byRelativePath: undefined,
+        references: undefined,
       },
       summary: {
         totalVariables: varKeys.length,
@@ -1537,17 +1537,17 @@ class Configorama {
       historyEntry.match = matches[i].match
       historyEntry.variable = matches[i].variable
       if (historyEntry.resultType === 'string' && historyEntry.result.match(/^>passthrough\[/)) {
-        historyEntry.varType = 'encodedUnknown'
+        historyEntry.variableType = 'encodedUnknown'
       }
       if (resolverType) {
-        historyEntry.varType = resolverType
+        historyEntry.variableType = resolverType
       }
       historyEntry.result = finalResult
 
       const isDeepResult = typeof finalResult === 'string' && finalResult.match(/^\$\{deep:\d+\}$/)
 
       if (isDeepResult) {
-        historyEntry.resultDeep = 'TBD'
+        historyEntry.resultAfterDeep = 'TBD'
       }
 
       historyEntry.resultType = typeof finalResult
@@ -1594,10 +1594,10 @@ class Configorama {
               fallbackData.isResolvedFallback = true
             }
           } else {
-            // Extract varType from variable references
+            // Extract variableType from variable references
             const varTypeMatch = trimmedFallback.match(this.variablesKnownTypes)
             if (varTypeMatch && varTypeMatch[1]) {
-              fallbackData.varType = varTypeMatch[1]
+              fallbackData.variableType = varTypeMatch[1]
             }
           }
 
@@ -1792,7 +1792,7 @@ class Configorama {
         if (currentDetails && 
           currentDetails.resultType === 'number' && 
           parentDetails && parentDetails.resultType === 'string' && 
-          parentDetails.result.match(/^\d+$/) && parentDetails.varType === 'env'
+          parentDetails.result.match(/^\d+$/) && parentDetails.variableType === 'env'
         ) {
           if (Number(parentDetails.result) === currentDetails.result) {
             property = String(valueToPopulate)

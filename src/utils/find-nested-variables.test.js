@@ -155,18 +155,18 @@ test('findNestedVariables - deep', () => {
   // Check the innermost variable
   assert.equal(result[0].fullMatch, '${env:foo}');
   assert.equal(result[0].variable, 'env:foo');
-  assert.equal(result[0].varType, 'env');
+  assert.equal(result[0].variableType, 'env');
 
   // Check opt:stageOne with env:foo fallback
   assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
-  assert.equal(result[1].varType, 'options');
+  assert.equal(result[1].variableType, 'options');
   assert.equal(result[1].hasFallback, true);
   assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
   assert.equal(result[1].fallbackValues.length, 1);
   assert.equal(result[1].fallbackValues[0].isVariable, true);
   assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
-  assert.equal(result[1].fallbackValues[0].varType, 'env');
+  assert.equal(result[1].fallbackValues[0].variableType, 'env');
 
   // Check opt:stageTwo
   assert.equal(result[2].fullMatch, '${opt:stageTwo}');
@@ -202,18 +202,18 @@ test('findNestedVariables - deep - no var types passed', () => {
   // Check the innermost variable
   assert.equal(result[0].fullMatch, '${env:foo}');
   assert.equal(result[0].variable, 'env:foo');
-  assert.equal(result[0].varType, 'env');
+  assert.equal(result[0].variableType, 'env');
 
   // Check opt:stageOne with env:foo fallback
   assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
-  assert.equal(result[1].varType, 'options');
+  assert.equal(result[1].variableType, 'options');
   assert.equal(result[1].hasFallback, true);
   assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
   assert.equal(result[1].fallbackValues.length, 1);
   assert.equal(result[1].fallbackValues[0].isVariable, true);
   assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
-  assert.equal(result[1].fallbackValues[0].varType, 'env');
+  assert.equal(result[1].fallbackValues[0].variableType, 'env');
 
   // Check opt:stageTwo
   assert.equal(result[2].fullMatch, '${opt:stageTwo}');

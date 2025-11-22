@@ -1,6 +1,7 @@
 /* eslint-disable no-template-curly-in-string */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const fs = require('fs')
 const path = require('path')
 const { deepLog } = require('../utils')
 const configorama = require('../../src')
@@ -23,6 +24,8 @@ test('Nested file references', async () => {
   })
 
   deepLog('result', result)
+
+  fs.writeFileSync('_result.json', JSON.stringify(result, null, 2))
 
   // deepLog('result.metadata', result.metadata)
   // // deepLog('result.resolutionHistory', result.resolutionHistory)

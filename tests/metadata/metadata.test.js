@@ -109,27 +109,6 @@ test('metadata contains variable information', async () => {
   assert.ok(Array.isArray(firstVar.resolveDetails), 'Variable should have resolveDetails array')
 })
 
-test('metadata.fileDependencies.all contains file references', async () => {
-  const configFile = path.join(__dirname, 'test-config.yml')
-
-  const result = await configorama(configFile, {
-    returnMetadata: true,
-    options: {}
-  })
-
-  const { metadata } = result
-
-  // Check that file refs were extracted
-  assert.ok(Array.isArray(metadata.fileDependencies.all), 'fileDependencies.all should be an array')
-  assert.ok(metadata.fileDependencies.all.length > 0, 'Should find file references')
-
-  // Check that our test files are in the refs
-  assert.ok(
-    metadata.fileDependencies.all.includes('./database.json'),
-    'Should include database.json reference'
-  )
-})
-
 test('metadata.summary contains statistics', async () => {
   const configFile = path.join(__dirname, 'test-config.yml')
 
@@ -209,7 +188,7 @@ test('metadata works with inline config objects', async () => {
   assert.ok(result.metadata.summary, 'Should have summary')
 })
 
-test('metadata resolveDetails includes varType information', async () => {
+test('metadata resolveDetails includes variableType information', async () => {
   const object = {
     envVar: '${env:MY_VAR, default-env}',
     optVar: '${opt:myOption, default-opt}',
@@ -229,8 +208,8 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(envVarKey, 'Should find env variable')
   const envVar = variables[envVarKey]
   assert.ok(
-    envVar[0].resolveDetails.some(d => d.varType === 'env'),
-    'Should have env: varType'
+    envVar[0].resolveDetails.some(d => d.variableType === 'env'),
+    'Should have env: variableType'
   )
 
   // Check opt variable
@@ -238,8 +217,8 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(optVarKey, 'Should find opt variable')
   const optVar = variables[optVarKey]
   assert.ok(
-    optVar[0].resolveDetails.some(d => d.varType === 'options'),
-    'Should have opt: varType'
+    optVar[0].resolveDetails.some(d => d.variableType === 'options'),
+    'Should have opt: variableType'
   )
 
   // Check self variable
@@ -247,8 +226,8 @@ test('metadata resolveDetails includes varType information', async () => {
   assert.ok(selfVarKey, 'Should find self variable')
   const selfVar = variables[selfVarKey]
   assert.ok(
-    selfVar[0].resolveDetails.some(d => d.varType === 'self' || d.varType === 'dot.prop'),
-    'Should have self: or dot.prop varType'
+    selfVar[0].resolveDetails.some(d => d.variableType === 'self' || d.variableType === 'dot.prop'),
+    'Should have self: or dot.prop variableType'
   )
 })
 
@@ -281,7 +260,7 @@ test('metadata resolveDetails includes resolvedValue for nested variables', asyn
   assert.is(selfStageDetail.resolvedValue, 'prod', 'self:stage should resolve to prod')
 
   // Check that outer variable has resolvedValue showing the resolved content
-  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
+  const fileDetail = fileVar.resolveDetails.find(d => d.variableType && d.variableType === 'file')
   assert.ok(fileDetail, 'Should find file() detail')
   assert.ok(fileDetail.resolvedValue, 'Should have resolvedValue for file reference')
 })
@@ -301,29 +280,29 @@ test('metadata.fileDependencies contains all and resolved file paths', async () 
   console.log('metadata', metadata)
 
   // Should have fileDependencies with all (patterns) and resolved (actual paths)
-  assert.ok(Array.isArray(metadata.fileDependencies.all), 'Should have fileDependencies.all array')
-  assert.ok(Array.isArray(metadata.fileDependencies.resolved), 'Should have fileDependencies.resolved array')
+  assert.ok(Array.isArray(metadata.fileDependencies.dynamicPaths), 'Should have fileDependencies.dynamicPaths array')
+  assert.ok(Array.isArray(metadata.fileDependencies.resolvedPaths), 'Should have fileDependencies.resolvedPaths array')
 
-  // all should include the pattern with variable
-  assert.ok(
-    metadata.fileDependencies.all.includes('./database-${self:stage}.json'),
-    'fileDependencies.all should include pattern with variable'
-  )
 
   // resolved should include the resolved path
   assert.ok(
-    metadata.fileDependencies.resolved.includes('./database-prod.json'),
-    'fileDependencies.resolved should include resolved path ./database-prod.json'
+    metadata.fileDependencies.resolvedPaths.includes('./database-prod.json'),
+    'fileDependencies.resolvedPaths should include resolved path ./database-prod.json'
   )
+
+  const prodDbRef = metadata.fileDependencies.references.find((i) => i.resolvedPath === './database-prod.json')
+  assert.ok(prodDbRef, 'Should find prod db reference')
+  assert.ok(prodDbRef.refs.length > 0, 'Should have refs')
+  assert.is(prodDbRef.refs[0].value, './database-${self:stage}.json', 'Should have original path ./database-${self:stage}.json')
 
   // Both should include the simple file reference
   assert.ok(
-    metadata.fileDependencies.all.includes('./database.json'),
+    metadata.fileDependencies.references.find((i) => i.resolvedPath === './database.json'),
     'fileDependencies.all should include simple file reference'
   )
   assert.ok(
-    metadata.fileDependencies.resolved.includes('./database.json'),
-    'fileDependencies.resolved should include simple file reference'
+    metadata.fileDependencies.resolvedPaths.includes('./database.json'),
+    'fileDependencies.resolvedPaths should include simple file reference'
   )
 })
 

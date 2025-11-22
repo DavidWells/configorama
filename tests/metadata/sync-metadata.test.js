@@ -26,7 +26,7 @@ test('sync API returns metadata when returnMetadata is true', () => {
   assert.ok(result.metadata.variables, 'Should have variables')
   assert.ok(result.metadata.fileDependencies, 'Should have fileDependencies')
   assert.ok(result.metadata.summary, 'Should have summary')
-  assert.ok(result.metadata.fileDependencies.resolved, 'Should have fileDependencies.resolved')
+  assert.ok(result.metadata.fileDependencies.resolvedPaths, 'Should have fileDependencies.resolvedPaths')
 })
 
 test('sync API metadata includes resolvedValue for nested variables', () => {
@@ -56,12 +56,12 @@ test('sync API metadata includes resolvedValue for nested variables', () => {
   assert.is(selfStageDetail.resolvedValue, 'prod', 'self:stage should resolve to prod')
 
   // Check that outer variable has resolvedValue
-  const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
+  const fileDetail = fileVar.resolveDetails.find(d => d.variableType && d.variableType === 'file')
   assert.ok(fileDetail, 'Should find file varType detail')
   assert.ok(fileDetail.resolvedValue, 'Should have resolvedValue for file reference')
 })
 
-test('sync API fileDependencies.resolved contains actual file paths', () => {
+test('sync API fileDependencies.resolvedPaths contains actual file paths', () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')
 
   const result = configorama.sync(configFile, {
@@ -73,19 +73,19 @@ test('sync API fileDependencies.resolved contains actual file paths', () => {
 
   const { metadata } = result
 
-  // Should have fileDependencies.resolved
-  assert.ok(Array.isArray(metadata.fileDependencies.resolved), 'Should have fileDependencies.resolved array')
+  // Should have fileDependencies.resolvedPaths
+  assert.ok(Array.isArray(metadata.fileDependencies.resolvedPaths), 'Should have fileDependencies.resolvedPaths array')
 
   // resolved should include the resolved path
   assert.ok(
-    metadata.fileDependencies.resolved.includes('./database-prod.json'),
-    'fileDependencies.resolved should include resolved path ./database-prod.json'
+    metadata.fileDependencies.resolvedPaths.includes('./database-prod.json'),
+    'fileDependencies.resolvedPaths should include resolved path ./database-prod.json'
   )
 
   // Should include the simple file reference
   assert.ok(
-    metadata.fileDependencies.resolved.includes('./database.json'),
-    'fileDependencies.resolved should include simple file reference'
+    metadata.fileDependencies.resolvedPaths.includes('./database.json'),
+    'fileDependencies.resolvedPaths should include simple file reference'
   )
 })
 
