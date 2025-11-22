@@ -28,7 +28,7 @@ test('Nested file references', async () => {
 
   // Metadata should have expected structure
   assert.ok(result.metadata.variables, 'Should have variables')
-  assert.ok(result.metadata.fileRefs, 'Should have fileRefs')
+  assert.ok(result.metadata.fileDependencies, 'Should have fileDependencies')
   assert.ok(result.metadata.summary, 'Should have summary')
 })
 
@@ -57,7 +57,7 @@ test('returnMetadata returns both config and metadata', async () => {
 
   // Metadata should have expected structure
   assert.ok(result.metadata.variables, 'Should have variables')
-  assert.ok(result.metadata.fileRefs, 'Should have fileRefs')
+  assert.ok(result.metadata.fileDependencies, 'Should have fileDependencies')
   assert.ok(result.metadata.summary, 'Should have summary')
 
   // Should have resolutionHistory for debugging
@@ -109,7 +109,7 @@ test('metadata contains variable information', async () => {
   assert.ok(Array.isArray(firstVar.resolveDetails), 'Variable should have resolveDetails array')
 })
 
-test('metadata.fileRefs contains file references', async () => {
+test('metadata.fileDependencies.all contains file references', async () => {
   const configFile = path.join(__dirname, 'test-config.yml')
 
   const result = await configorama(configFile, {
@@ -120,12 +120,12 @@ test('metadata.fileRefs contains file references', async () => {
   const { metadata } = result
 
   // Check that file refs were extracted
-  assert.ok(Array.isArray(metadata.fileRefs), 'fileRefs should be an array')
-  assert.ok(metadata.fileRefs.length > 0, 'Should find file references')
+  assert.ok(Array.isArray(metadata.fileDependencies.all), 'fileDependencies.all should be an array')
+  assert.ok(metadata.fileDependencies.all.length > 0, 'Should find file references')
 
   // Check that our test files are in the refs
   assert.ok(
-    metadata.fileRefs.includes('./database.json'),
+    metadata.fileDependencies.all.includes('./database.json'),
     'Should include database.json reference'
   )
 })
@@ -205,7 +205,7 @@ test('metadata works with inline config objects', async () => {
   assert.ok(result.config, 'Should have config')
   assert.ok(result.metadata, 'Should have metadata')
   assert.ok(result.metadata.variables, 'Should have variables')
-  assert.ok(result.metadata.fileRefs, 'Should have fileRefs')
+  assert.ok(result.metadata.fileDependencies, 'Should have fileDependencies')
   assert.ok(result.metadata.summary, 'Should have summary')
 })
 
@@ -252,7 +252,7 @@ test('metadata resolveDetails includes varType information', async () => {
   )
 })
 
-test('metadata resolveDetails includes afterInnerResolution for nested variables', async () => {
+test('metadata resolveDetails includes resolvedValue for nested variables', async () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')
 
   const result = await configorama(configFile, {
@@ -261,6 +261,8 @@ test('metadata resolveDetails includes afterInnerResolution for nested variables
       stage: 'prod'
     }
   })
+
+  deepLog('result', result)
 
   const { variables } = result.metadata
 
@@ -272,28 +274,19 @@ test('metadata resolveDetails includes afterInnerResolution for nested variables
   assert.ok(fileVar.resolveDetails, 'Should have resolveDetails')
   assert.ok(fileVar.resolveDetails.length > 1, 'Should have multiple resolveDetails for nested variable')
 
-  // Check that innermost variable (${self:stage}) has afterInnerResolution
+  // Check that innermost variable (${self:stage}) has resolvedValue
   const selfStageDetail = fileVar.resolveDetails.find(d => d.variable === 'self:stage')
   assert.ok(selfStageDetail, 'Should find self:stage detail')
-  assert.ok(selfStageDetail.afterInnerResolution, 'Should have afterInnerResolution')
-  // Inner variables show the context they were resolved in
-  assert.ok(
-    selfStageDetail.afterInnerResolution.includes('file(./database-'),
-    'Should show context of self:stage resolution'
-  )
+  assert.ok(selfStageDetail.resolvedValue, 'Should have resolvedValue')
+  assert.is(selfStageDetail.resolvedValue, 'prod', 'self:stage should resolve to prod')
 
-  // Check that outer variable has afterInnerResolution showing the path after inner vars resolved
+  // Check that outer variable has resolvedValue showing the resolved content
   const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
   assert.ok(fileDetail, 'Should find file() detail')
-  assert.ok(fileDetail.afterInnerResolution, 'Should have afterInnerResolution for file reference')
-  assert.is(
-    fileDetail.afterInnerResolution,
-    'file(./database-prod.json)',
-    'Should show file path after self:stage resolved to prod'
-  )
+  assert.ok(fileDetail.resolvedValue, 'Should have resolvedValue for file reference')
 })
 
-test('metadata.resolvedFileRefs contains actual file paths after variable resolution', async () => {
+test('metadata.fileDependencies contains all and resolved file paths', async () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')
 
   const result = await configorama(configFile, {
@@ -307,30 +300,30 @@ test('metadata.resolvedFileRefs contains actual file paths after variable resolu
 
   console.log('metadata', metadata)
 
-  // Should have both fileRefs (patterns) and resolvedFileRefs (actual paths)
-  assert.ok(Array.isArray(metadata.fileRefs), 'Should have fileRefs array')
-  assert.ok(Array.isArray(metadata.resolvedFileRefs), 'Should have resolvedFileRefs array')
+  // Should have fileDependencies with all (patterns) and resolved (actual paths)
+  assert.ok(Array.isArray(metadata.fileDependencies.all), 'Should have fileDependencies.all array')
+  assert.ok(Array.isArray(metadata.fileDependencies.resolved), 'Should have fileDependencies.resolved array')
 
-  // fileRefs should include the pattern with variable
+  // all should include the pattern with variable
   assert.ok(
-    metadata.fileRefs.includes('./database-${self:stage}.json'),
-    'fileRefs should include pattern with variable'
+    metadata.fileDependencies.all.includes('./database-${self:stage}.json'),
+    'fileDependencies.all should include pattern with variable'
   )
 
-  // resolvedFileRefs should include the resolved path
+  // resolved should include the resolved path
   assert.ok(
-    metadata.resolvedFileRefs.includes('./database-prod.json'),
-    'resolvedFileRefs should include resolved path ./database-prod.json'
+    metadata.fileDependencies.resolved.includes('./database-prod.json'),
+    'fileDependencies.resolved should include resolved path ./database-prod.json'
   )
 
   // Both should include the simple file reference
   assert.ok(
-    metadata.fileRefs.includes('./database.json'),
-    'fileRefs should include simple file reference'
+    metadata.fileDependencies.all.includes('./database.json'),
+    'fileDependencies.all should include simple file reference'
   )
   assert.ok(
-    metadata.resolvedFileRefs.includes('./database.json'),
-    'resolvedFileRefs should include simple file reference'
+    metadata.fileDependencies.resolved.includes('./database.json'),
+    'fileDependencies.resolved should include simple file reference'
   )
 })
 

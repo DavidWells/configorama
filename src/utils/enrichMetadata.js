@@ -72,42 +72,38 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
       const pathKey = varData.path
       const trackingData = resolutionTracking[pathKey]
 
-      if (trackingData && trackingData.calls && varData.resolveDetails) {
-        // The last call represents the final state (all inner vars resolved)
-        const lastCall = trackingData.calls[trackingData.calls.length - 1]
-
-        // For each resolveDetail, find the matching call and set afterInnerResolution
+      if (trackingData && trackingData.resolutionHistory && varData.resolveDetails) {
+        // For each resolveDetail, find the matching resolution history entry
         for (let i = 0; i < varData.resolveDetails.length; i++) {
           const detail = varData.resolveDetails[i]
           const isOutermost = i === varData.resolveDetails.length - 1
 
-          if (isOutermost) {
-            // For the outermost variable, use the last call's propertyString
-            let afterResolution = lastCall.propertyString
-            if (afterResolution.startsWith('${') && afterResolution.endsWith('}')) {
-              afterResolution = afterResolution.slice(2, -1)
-            }
-            detail.afterInnerResolution = afterResolution
-
-            if (lastCall.resolvedValue !== undefined) {
-              detail.resolvedValue = lastCall.resolvedValue
+          if (isOutermost && trackingData.resolutionHistory.length > 0) {
+            // For the outermost variable, use the last resolution history entry's result
+            const lastEntry = trackingData.resolutionHistory[trackingData.resolutionHistory.length - 1]
+            if (lastEntry.result !== undefined) {
+              detail.resolvedValue = lastEntry.result
             }
           } else {
-            // For inner variables, try to find a matching call
-            for (const call of trackingData.calls) {
-              const callVar = call.variableString
+            // For inner variables, try to find a matching resolution history entry
+            for (const historyEntry of trackingData.resolutionHistory) {
+              const historyVar = historyEntry.variable
               const detailVar = detail.variable
 
-              if (callVar === detailVar || callVar.includes(detail.varString)) {
-                let afterResolution = call.propertyString
-                if (afterResolution.startsWith('${') && afterResolution.endsWith('}')) {
-                  afterResolution = afterResolution.slice(2, -1)
-                }
-                detail.afterInnerResolution = afterResolution
-                detail.WHAT = 'nice'
-
-                if (call.resolvedValue !== undefined) {
-                  detail.resolvedValue = call.resolvedValue
+              if (historyVar === detailVar || historyVar.includes(detail.varString)) {
+                if (historyEntry.result !== undefined) {
+                  // detail.resolvedValue = historyEntry.result
+                  let resolvedValue = historyEntry.result
+                  // If result is a deep reference, look for the resolved value
+                  if (typeof resolvedValue === 'string' && resolvedValue.match(/^\$\{deep:\d+\}$/)) {
+                    const deepVar = resolvedValue.slice(2, -1) // e.g. "deep:1"
+                    const deepEntry = trackingData.resolutionHistory.find(e => e.variable === deepVar)
+                    if (deepEntry && deepEntry.result !== undefined) {
+                      resolvedValue = deepEntry.result
+                      historyEntry.deepResult = resolvedValue
+                    }
+                  }
+                  detail.resolvedValue = resolvedValue
                 }
                 break
               }
@@ -144,7 +140,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     metadata.fileDependencies.resolved = resolvedFileRefs
   }
 
-  // Build fileRefsByRelativePath array
+  // Build byRelativePath array
   const resolvedFileRefsDataMap = new Map()
 
   // First Pass: Collect all refs and attach glob patterns directly to each ref.
@@ -210,7 +206,7 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
   }
   
   // Convert map to array for the final metadata object.
-  const fileRefsByRelativePath = Array.from(resolvedFileRefsDataMap.values())
+  const byRelativePath = Array.from(resolvedFileRefsDataMap.values())
 
   // Build the complete, flat list of all file references
   const fileDetailsMap = new Map()
@@ -220,13 +216,13 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
     }
   }
 
-  const fileRefsByConfigPath = []
-  if (fileRefsByRelativePath.length > 0) {
-    for (const resolvedFileData of fileRefsByRelativePath) {
+  const byConfigPath = []
+  if (byRelativePath.length > 0) {
+    for (const resolvedFileData of byRelativePath) {
       const details = fileDetailsMap.get(resolvedFileData.resolvedPath)
       if (details) {
         for (const ref of resolvedFileData.refs) {
-          fileRefsByConfigPath.push({
+          byConfigPath.push({
             location: ref.location,
             relativePath: details.relativePath,
             filePath: details.filePath,
@@ -244,8 +240,8 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
 
   // Update fileDependencies with the enriched data
   if (metadata.fileDependencies) {
-    metadata.fileDependencies.fileRefsByConfigPath = fileRefsByConfigPath
-    metadata.fileDependencies.fileRefsByRelativePath = fileRefsByRelativePath
+    metadata.fileDependencies.byConfigPath = byConfigPath
+    metadata.fileDependencies.byRelativePath = byRelativePath
   }
 
   return metadata

@@ -127,6 +127,7 @@ function preProcess(configObject, variableSyntax) {
     if (typeof str !== 'string') return str
 
     let result = str
+    // result = result.replace(/\$\{self:/g, '${')
     let changed = true
 
     // Keep iterating until no more changes (to handle nested variables)
@@ -1188,14 +1189,14 @@ class Configorama {
       variables: variableData,
       fileDependencies: {
         all: fileRefs,
-        unResolved: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
+        dynamicPaths: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
         // resolve files are those that are paths with no * and no inner variables
         resolved: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
         globPatterns: fileGlobPatterns,
         // Set in enrichMetadata
-        fileRefsByConfigPath: undefined,
+        byConfigPath: undefined,
         // Set in enrichMetadata
-        fileRefsByRelativePath: undefined,
+        byRelativePath: undefined,
       },
       summary: {
         totalVariables: varKeys.length,
@@ -1531,25 +1532,37 @@ class Configorama {
       const finalResult = decodeEncodedValue(cleanResult)
 
       // Track this resolution step in history
-      const historyEntry = {
-        match: matches[i].match,
-        variable: matches[i].variable,
-        result: finalResult,
-        resultType: typeof cleanResult,
-        valueBeforeResolution: valueBeforeResolution,
-        from: 'renderMatches',
+      const historyEntry = {}
+
+      historyEntry.match = matches[i].match
+      historyEntry.variable = matches[i].variable
+      if (historyEntry.resultType === 'string' && historyEntry.result.match(/^>passthrough\[/)) {
+        historyEntry.varType = 'encodedUnknown'
+      }
+      if (resolverType) {
+        historyEntry.varType = resolverType
+      }
+      historyEntry.result = finalResult
+
+      const isDeepResult = typeof finalResult === 'string' && finalResult.match(/^\$\{deep:\d+\}$/)
+
+      if (isDeepResult) {
+        historyEntry.resultDeep = 'TBD'
+      }
+
+      historyEntry.resultType = typeof finalResult
+      historyEntry.valueBeforeResolution = valueBeforeResolution
+      historyEntry.from = 'renderMatches'
+      if (isDeepResult) {
+        historyEntry.resultIsDeep = true
       }
 
       if (finalResult !== cleanResult) {
         historyEntry.resultEncoded = cleanResult
       }
-      if (resolverType) {
-        historyEntry.varType = resolverType
-      }
+    
 
-      if (historyEntry.resultType === 'string' && historyEntry.result.match(/^>passthrough\[/)) {
-        historyEntry.varType = 'encodedUnknown'
-      }
+    
 
       // Check if variable has fallback values (comma-separated)
       const variableParts = splitByComma(matches[i].variable)

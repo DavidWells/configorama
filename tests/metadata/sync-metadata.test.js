@@ -24,12 +24,12 @@ test('sync API returns metadata when returnMetadata is true', () => {
 
   // Metadata should have expected structure
   assert.ok(result.metadata.variables, 'Should have variables')
-  assert.ok(result.metadata.fileRefs, 'Should have fileRefs')
+  assert.ok(result.metadata.fileDependencies, 'Should have fileDependencies')
   assert.ok(result.metadata.summary, 'Should have summary')
-  assert.ok(result.metadata.resolvedFileRefs, 'Should have resolvedFileRefs')
+  assert.ok(result.metadata.fileDependencies.resolved, 'Should have fileDependencies.resolved')
 })
 
-test('sync API metadata includes afterInnerResolution for nested variables', () => {
+test('sync API metadata includes resolvedValue for nested variables', () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')
 
   const result = configorama.sync(configFile, {
@@ -49,18 +49,19 @@ test('sync API metadata includes afterInnerResolution for nested variables', () 
   assert.ok(fileVar.resolveDetails, 'Should have resolveDetails')
   assert.ok(fileVar.resolveDetails.length > 1, 'Should have multiple resolveDetails for nested variable')
 
-  // Check that outer variable has afterInnerResolution showing the path after inner vars resolved
+  // Check that inner variable has resolvedValue
+  const selfStageDetail = fileVar.resolveDetails.find(d => d.variable === 'self:stage')
+  assert.ok(selfStageDetail, 'Should find self:stage detail')
+  assert.ok(selfStageDetail.resolvedValue, 'Should have resolvedValue')
+  assert.is(selfStageDetail.resolvedValue, 'prod', 'self:stage should resolve to prod')
+
+  // Check that outer variable has resolvedValue
   const fileDetail = fileVar.resolveDetails.find(d => d.varType && d.varType === 'file')
   assert.ok(fileDetail, 'Should find file varType detail')
-  assert.ok(fileDetail.afterInnerResolution, 'Should have afterInnerResolution for file reference')
-  assert.is(
-    fileDetail.afterInnerResolution,
-    'file(./database-prod.json)',
-    'Should show file path after self:stage resolved to prod'
-  )
+  assert.ok(fileDetail.resolvedValue, 'Should have resolvedValue for file reference')
 })
 
-test('sync API resolvedFileRefs contains actual file paths', () => {
+test('sync API fileDependencies.resolved contains actual file paths', () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')
 
   const result = configorama.sync(configFile, {
@@ -72,19 +73,19 @@ test('sync API resolvedFileRefs contains actual file paths', () => {
 
   const { metadata } = result
 
-  // Should have resolvedFileRefs
-  assert.ok(Array.isArray(metadata.resolvedFileRefs), 'Should have resolvedFileRefs array')
+  // Should have fileDependencies.resolved
+  assert.ok(Array.isArray(metadata.fileDependencies.resolved), 'Should have fileDependencies.resolved array')
 
-  // resolvedFileRefs should include the resolved path
+  // resolved should include the resolved path
   assert.ok(
-    metadata.resolvedFileRefs.includes('./database-prod.json'),
-    'resolvedFileRefs should include resolved path ./database-prod.json'
+    metadata.fileDependencies.resolved.includes('./database-prod.json'),
+    'fileDependencies.resolved should include resolved path ./database-prod.json'
   )
 
-  // Both should include the simple file reference
+  // Should include the simple file reference
   assert.ok(
-    metadata.resolvedFileRefs.includes('./database.json'),
-    'resolvedFileRefs should include simple file reference'
+    metadata.fileDependencies.resolved.includes('./database.json'),
+    'fileDependencies.resolved should include simple file reference'
   )
 })
 
