@@ -1,6 +1,7 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
+const enrichMetadata = require('./utils/enrichMetadata')
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
@@ -667,6 +668,8 @@ class Configorama {
   
       /*
       deepLog('metadata', metadata)
+      const enrich = enrichMetadata(metadata, this.resolutionTracking, this.variableSyntax, this.fileRefsFound, this.originalConfig)
+      deepLog('enrich', enrich)
       process.exit(1)
       /** */
     

@@ -15,8 +15,9 @@ test('Nested file references', async () => {
       otherFlag: 'prod',
     }
   })
-
-  deepLog('result', result)
+  
+  deepLog('variable information', result.metadata.variables)
+  deepLog('uniqueVariables', result.metadata.uniqueVariables)
 
 })
 

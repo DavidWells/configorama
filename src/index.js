@@ -34,10 +34,11 @@ module.exports = async (configPathOrObject, settings = {}) => {
 
     // Enrich metadata with resolution tracking data collected during execution
     const enrichedMetadata = enrichMetadata(
-      metadata, 
-      instance.resolutionTracking, 
+      metadata,
+      instance.resolutionTracking,
       instance.variableSyntax,
-      instance.fileRefsFound
+      instance.fileRefsFound,
+      instance.originalConfig
     )
 
     // Add resolvedPropertyValue to resolutionTracking

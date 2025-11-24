@@ -1,4 +1,5 @@
 const { splitCsv } = require('./splitCsv')
+const dotProp = require('dot-prop')
 
 /**
  * Extract file path from a file() or text() reference string
@@ -56,9 +57,10 @@ function normalizePath(filePath) {
  * @param {object} resolutionTracking - The resolution tracking data from Configorama instance.
  * @param {RegExp} variableSyntax - The variable syntax regex.
  * @param {Array} fileRefsFound - The (incomplete) list of file refs found during resolution.
+ * @param {object} originalConfig - The original config object (before resolution) for self/dot.prop lookups.
  * @returns {object} Enriched metadata with resolution details and a complete file reference list.
  */
-function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFound = []) {
+function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFound = [], originalConfig = {}) {
   if (!resolutionTracking) {
     return metadata
   }
@@ -258,20 +260,44 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
 
     // Get the base variable name without fallback
     // Use valueBeforeFallback if present, otherwise use the variable string
-    const baseVar = lastResolveDetail.valueBeforeFallback || lastResolveDetail.variable
+    let baseVar = lastResolveDetail.valueBeforeFallback || lastResolveDetail.variable
+
+    // Normalize file() and text() references
+    if (baseVar.match(/^(?:file|text)\(/)) {
+      // Strip sub-key accessors like :topLevel, :nested.value, etc.
+      baseVar = baseVar.replace(/:[\w.[\]]+$/, '')
+
+      // Normalize path - remove quotes and ensure it starts with ./
+      baseVar = baseVar.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
+        // Remove surrounding quotes (single or double)
+        let cleanPath = filePath.trim().replace(/^["']|["']$/g, '')
+
+        // Use normalizePath for consistent normalization (handles ./, .// etc)
+        const normalized = normalizePath(cleanPath)
+        if (normalized) {
+          return `${funcName}(${normalized})`
+        }
+
+        return match
+      })
+    }
 
     if (!uniqueVariablesMap.has(baseVar)) {
       uniqueVariablesMap.set(baseVar, {
         variable: baseVar,
         variableType: lastResolveDetail.variableType,
         occurrences: [],
+        innerVariables: [],
       })
     }
 
     const entry = uniqueVariablesMap.get(baseVar)
 
-    // Add this occurrence with its full context
+    // Collect inner variables from resolveDetails (variables nested inside this variable)
+    const innerVarsSet = new Set((entry.innerVariables || []).map(v => v.variable))
+
     for (const instance of varInstances) {
+      // Add this occurrence with its full context
       entry.occurrences.push({
         fullMatch: key,
         path: instance.path,
@@ -280,6 +306,114 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
         defaultValueSrc: instance.defaultValueSrc,
         hasFallback: instance.hasFallback || false,
       })
+
+      // Find inner variables in resolveDetails (excluding the outermost variable itself)
+      if (instance.resolveDetails && instance.resolveDetails.length > 1) {
+        for (let i = 0; i < instance.resolveDetails.length - 1; i++) {
+          const detail = instance.resolveDetails[i]
+
+          // Get base variable (without fallback)
+          const innerBaseVar = detail.valueBeforeFallback || detail.variable
+
+          if (innerBaseVar && !innerVarsSet.has(innerBaseVar)) {
+            innerVarsSet.add(innerBaseVar)
+
+            let isRequired = !detail.hasFallback
+            let defaultValue = detail.hasFallback ? (detail.fallbackValues?.[0]?.stringValue || detail.fallbackValues?.[0]?.variable) : undefined
+            let defaultValueSrc
+            let hasValue = false
+
+            // For self: and dot.prop, check if value exists in original config
+            if (detail.variableType === 'self' || detail.variableType === 'dot.prop') {
+              const cleanPath = innerBaseVar.replace(/^self:/, '')
+              const configValue = dotProp.get(originalConfig, cleanPath)
+
+              if (configValue !== undefined) {
+                // Check if the value contains variables
+                const hasVariables = variableSyntax && typeof configValue === 'string' && configValue.match(variableSyntax)
+
+                if (!hasVariables) {
+                  // Static value exists in config
+                  hasValue = true
+                  defaultValue = typeof configValue === 'object' ? JSON.stringify(configValue) : configValue
+                  defaultValueSrc = cleanPath
+                }
+              }
+            }
+
+            entry.innerVariables.push({
+              variable: innerBaseVar,
+              variableType: detail.variableType,
+              isRequired,
+              defaultValue,
+              defaultValueSrc,
+              hasValue,
+            })
+          }
+        }
+      }
+    }
+
+    // Remove innerVariables array if empty
+    if (entry.innerVariables && entry.innerVariables.length === 0) {
+      delete entry.innerVariables
+    }
+
+    // If all inner variables have values, resolve them in the variable string
+    if (entry.innerVariables && entry.innerVariables.length > 0) {
+      const allHaveValues = entry.innerVariables.every(v => v.hasValue)
+
+      if (allHaveValues) {
+        let resolvedVariable = entry.variable
+
+        // Replace each inner variable with its default value
+        for (const innerVar of entry.innerVariables) {
+          // Match ${varName} or just varName (for dot.prop shorthand)
+          const varPattern = innerVar.variableType === 'self'
+            ? `\\$\\{self:${innerVar.variable.replace('self:', '')}\\}`
+            : `\\$\\{${innerVar.variable}\\}`
+
+          const regex = new RegExp(varPattern, 'g')
+          resolvedVariable = resolvedVariable.replace(regex, innerVar.defaultValue)
+        }
+
+        // Normalize file paths after variable substitution
+        if (resolvedVariable.match(/^(?:file|text)\(/)) {
+          resolvedVariable = resolvedVariable.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
+            const normalized = normalizePath(filePath)
+            return normalized ? `${funcName}(${normalized})` : match
+          })
+        }
+
+        // Update the variable to the resolved version and update map key
+        if (resolvedVariable !== baseVar) {
+          entry.variable = resolvedVariable
+          uniqueVariablesMap.delete(baseVar)
+
+          // Check if the resolved variable already exists in the map (merge if so)
+          if (uniqueVariablesMap.has(resolvedVariable)) {
+            const existingEntry = uniqueVariablesMap.get(resolvedVariable)
+            // Merge occurrences from both entries
+            existingEntry.occurrences.push(...entry.occurrences)
+
+            // Merge innerVariables if both have them
+            if (entry.innerVariables && entry.innerVariables.length > 0) {
+              if (!existingEntry.innerVariables) {
+                existingEntry.innerVariables = []
+              }
+              // Add unique inner variables only
+              for (const innerVar of entry.innerVariables) {
+                const exists = existingEntry.innerVariables.some(v => v.variable === innerVar.variable)
+                if (!exists) {
+                  existingEntry.innerVariables.push(innerVar)
+                }
+              }
+            }
+          } else {
+            uniqueVariablesMap.set(resolvedVariable, entry)
+          }
+        }
+      }
     }
   }
 
