@@ -62,6 +62,7 @@ const { findNestedVariables } = require('./utils/find-nested-variables')
 const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 const { logHeader } = require('./utils/logs')
 const { createEditorLink } = require('./utils/createEditorLink')
+const { runConfigWizard } = require('./utils/configWizard')
 /**
  * Maintainer's notes:
  *
@@ -95,6 +96,7 @@ const logLines = '────────────────────�
 
 let DEBUG = process.argv.includes('--debug') ? true : false
 let VERBOSE = process.argv.includes('--verbose') ? true : false
+let SETUP_MODE = process.argv.includes('--setup') ? true : false
 // DEBUG = true
 let DEBUG_TYPE = false
 const ENABLE_FUNCTIONS = true
@@ -665,23 +667,38 @@ class Configorama {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
 
-      if(showFoundVariables) {
+      const enrich = enrichMetadata(
+        metadata, 
+        this.resolutionTracking, 
+        this.variableSyntax, 
+        this.fileRefsFound, 
+        this.originalConfig,
+        this.configFilePath
+      )
+
+      if (showFoundVariables) {
         //*
         deepLog('metadata', metadata)
-        const enrich = enrichMetadata(
-          metadata, 
-          this.resolutionTracking, 
-          this.variableSyntax, 
-          this.fileRefsFound, 
-          this.originalConfig,
-          this.configFilePath
-        )
+        fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
+
         deepLog('enrich', enrich)
         process.exit(1)
         /** */
       }
 
-    
+      // WALK through CLI prompt if --setup flag is set
+      if (SETUP_MODE) {
+        const userInputs = await runConfigWizard(enrich, this.originalConfig)
+
+        console.log('\n')
+        logHeader('User Inputs Summary')
+        console.log(JSON.stringify(userInputs, null, 2))
+        console.log()
+
+        process.exit(0)
+      }
+
+
       const variableData = metadata.variables
       const varKeys = Object.keys(variableData)
 
