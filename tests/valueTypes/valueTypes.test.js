@@ -92,8 +92,8 @@ test('cliFlag', (t) => {
   assert.is(config.cliFlag, 'dev')
 })
 
-test('cliFlagEmtpy', (t) => {
-  assert.is(config.cliFlagEmtpy, 'cliFlagEmtpyValue')
+test('cliFlagEmpty', (t) => {
+  assert.is(config.cliFlagEmpty, 'cliFlagEmptyValue')
 })
 
 test('cliFlagComposed', (t) => {

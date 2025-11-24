@@ -53,7 +53,7 @@ stages:
 
 cliFlag: ${opt:stage}
 
-cliFlagEmtpy: ${opt:empty, 'cliFlagEmtpyValue'}
+cliFlagEmpty: ${opt:empty, 'cliFlagEmptyValue'}
 
 cliFlagComposed: ${self:stages.${opt:stage}.SECRET}
 

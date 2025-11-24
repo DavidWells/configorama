@@ -59,7 +59,8 @@ module.exports = function configoramaSync(variableSources = []) {
         instance.resolutionTracking,
         instance.variableSyntax,
         instance.fileRefsFound,
-        instance.originalConfig
+        instance.originalConfig,
+        instance.configFilePath
       )
 
       return {

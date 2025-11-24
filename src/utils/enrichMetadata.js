@@ -1,5 +1,7 @@
 const { splitCsv } = require('./splitCsv')
 const dotProp = require('dot-prop')
+const fs = require('fs')
+const path = require('path')
 
 /**
  * Extract file path from a file() or text() reference string
@@ -60,7 +62,14 @@ function normalizePath(filePath) {
  * @param {object} originalConfig - The original config object (before resolution) for self/dot.prop lookups.
  * @returns {object} Enriched metadata with resolution details and a complete file reference list.
  */
-function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFound = [], originalConfig = {}) {
+function enrichMetadata(
+  metadata, 
+  resolutionTracking, 
+  variableSyntax, 
+  fileRefsFound = [], 
+  originalConfig = {},
+  configPath
+) {
   if (!resolutionTracking) {
     return metadata
   }
@@ -298,19 +307,83 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
 
     for (const instance of varInstances) {
       // Add this occurrence with its full context
-      entry.occurrences.push({
+      const occurrence = {
+        originalString: instance.value,
         fullMatch: key,
         path: instance.path,
         isRequired: instance.isRequired,
-        defaultValue: instance.defaultValue,
-        defaultValueSrc: instance.defaultValueSrc,
         hasFallback: instance.hasFallback || false,
-      })
+        defaultValue: instance.defaultValue,
+      }
+      if (instance.defaultValueSrc) {
+        occurrence.defaultValueSrc = instance.defaultValueSrc
+      }
+      entry.occurrences.push(occurrence)
 
       // Find inner variables in resolveDetails (excluding the outermost variable itself)
       if (instance.resolveDetails && instance.resolveDetails.length > 1) {
+        // The outermost variable is the last one in resolveDetails
+        const outermostDetail = instance.resolveDetails[instance.resolveDetails.length - 1]
+
         for (let i = 0; i < instance.resolveDetails.length - 1; i++) {
           const detail = instance.resolveDetails[i]
+
+          // Check if this variable is actually INSIDE the outermost variable's boundaries
+          // A variable is "inner" only if it's contained within the parent's start/end range
+          const isInnerVariable = detail.start >= outermostDetail.start && detail.end <= outermostDetail.end
+
+          if (!isInnerVariable) {
+            // This is a sibling variable at the same level, not an inner variable
+            // But we should still add it as its own uniqueVariables entry
+            const siblingBaseVar = detail.valueBeforeFallback || detail.variable
+
+            // Normalize file/text references for sibling too
+            let normalizedSiblingVar = siblingBaseVar
+            if (normalizedSiblingVar.match(/^(?:file|text)\(/)) {
+              // Strip sub-key accessor (e.g., :foo from file(./_inner.yml):foo)
+              normalizedSiblingVar = normalizedSiblingVar.replace(/:[\w.[\]]+$/, '')
+
+              normalizedSiblingVar = normalizedSiblingVar.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
+                let cleanPath = filePath.trim().replace(/^["']|["']$/g, '')
+                const normalized = normalizePath(cleanPath)
+                return normalized ? `${funcName}(${normalized})` : match
+              })
+            }
+
+            // Create or get entry for this sibling variable
+            if (!uniqueVariablesMap.has(normalizedSiblingVar)) {
+              uniqueVariablesMap.set(normalizedSiblingVar, {
+                variable: normalizedSiblingVar,
+                variableType: detail.variableType,
+                occurrences: [],
+                innerVariables: [],
+              })
+            }
+
+            const siblingEntry = uniqueVariablesMap.get(normalizedSiblingVar)
+
+            // Add occurrence for this sibling variable
+            const siblingOccurrence = {
+              fullMatch: detail.fullMatch,
+              path: instance.path,
+              value: instance.value,
+              isRequired: !detail.hasFallback,
+              hasFallback: !!detail.hasFallback,
+              defaultValue: detail.hasFallback ? (detail.fallbackValues?.[0]?.stringValue || detail.fallbackValues?.[0]?.variable) : undefined,
+            }
+
+            // Check if this exact occurrence already exists
+            const occurrenceExists = siblingEntry.occurrences.some(occ =>
+              occ.fullMatch === siblingOccurrence.fullMatch &&
+              occ.path === siblingOccurrence.path
+            )
+
+            if (!occurrenceExists) {
+              siblingEntry.occurrences.push(siblingOccurrence)
+            }
+
+            continue
+          }
 
           // Get base variable (without fallback)
           const innerBaseVar = detail.valueBeforeFallback || detail.variable
@@ -341,14 +414,19 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
               }
             }
 
-            entry.innerVariables.push({
+            const innerVariable = {
               variable: innerBaseVar,
               variableType: detail.variableType,
               isRequired,
-              defaultValue,
-              defaultValueSrc,
               hasValue,
-            })
+              defaultValue,
+            }
+
+            if (defaultValueSrc) {
+              innerVariable.defaultValueSrc = defaultValueSrc
+            }
+
+            entry.innerVariables.push(innerVariable)
           }
         }
       }
@@ -411,6 +489,32 @@ function enrichMetadata(metadata, resolutionTracking, variableSyntax, fileRefsFo
             }
           } else {
             uniqueVariablesMap.set(resolvedVariable, entry)
+          }
+        }
+      }
+    }
+  }
+
+  // Check file existence for file/text variables with fully resolved paths
+  for (const [varKey, entry] of uniqueVariablesMap) {
+    if (entry.variableType === 'file' || entry.variableType === 'text') {
+      // Extract file path from variable string like "file(./config.other.json)"
+      const filePathMatch = entry.variable.match(/^(?:file|text)\((.+?)\)/)
+      if (filePathMatch) {
+        const filePath = filePathMatch[1]
+
+        // Check if the path contains variables (if so, we can't check existence yet)
+        const hasVariables = variableSyntax && filePath.match(variableSyntax)
+
+        if (!hasVariables) {
+          // Look up in fileRefsFound to see if file exists
+          const fileRef = fileRefsFound.find(ref => ref.relativePath === filePath)
+          if (fileRef) {
+            entry.fileExists = fileRef.exists
+          } else {
+            const thePath = path.resolve(path.dirname(configPath), filePath)
+            const fileExists = fs.existsSync(thePath)
+            entry.fileExists = fileExists
           }
         }
       }

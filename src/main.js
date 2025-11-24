@@ -665,13 +665,22 @@ class Configorama {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
 
-  
-      /*
-      deepLog('metadata', metadata)
-      const enrich = enrichMetadata(metadata, this.resolutionTracking, this.variableSyntax, this.fileRefsFound, this.originalConfig)
-      deepLog('enrich', enrich)
-      process.exit(1)
-      /** */
+      if(showFoundVariables) {
+        //*
+        deepLog('metadata', metadata)
+        const enrich = enrichMetadata(
+          metadata, 
+          this.resolutionTracking, 
+          this.variableSyntax, 
+          this.fileRefsFound, 
+          this.originalConfig,
+          this.configFilePath
+        )
+        deepLog('enrich', enrich)
+        process.exit(1)
+        /** */
+      }
+
     
       const variableData = metadata.variables
       const varKeys = Object.keys(variableData)

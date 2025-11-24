@@ -38,7 +38,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.resolutionTracking,
       instance.variableSyntax,
       instance.fileRefsFound,
-      instance.originalConfig
+      instance.originalConfig,
+      instance.configFilePath
     )
 
     // Add resolvedPropertyValue to resolutionTracking
