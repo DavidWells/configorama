@@ -695,7 +695,23 @@ class Configorama {
         console.log(JSON.stringify(userInputs, null, 2))
         console.log()
 
-        process.exit(0)
+        // Apply user inputs to options and environment
+        if (userInputs.options) {
+          Object.assign(this.opts, userInputs.options)
+        }
+        if (userInputs.env) {
+          Object.assign(process.env, userInputs.env)
+        }
+        // Note: self references are in the config, so no need to apply them
+
+        console.log()
+        logHeader('Resolving Configuration')
+        console.log()
+
+        process.exit(1)
+
+        // Continue with normal resolution flow using the new values
+        // Don't exit - let it fall through to resolve the config
       }
 
 

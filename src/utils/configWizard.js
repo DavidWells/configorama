@@ -118,14 +118,30 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
           continue
         }
 
-        // Skip if already added
+        const cleanName = innerVar.variable.replace(/^(opt|env|self):/, '')
+
+        // If already added, append this occurrence to existing variable
+        const existingVarIndex = grouped[innerVar.variableType === 'options' ? 'options' : innerVar.variableType === 'env' ? 'env' : 'self']
+          .findIndex(v => v.variable === innerVar.variable)
+
+        if (existingVarIndex >= 0) {
+          // Add this occurrence to the existing variable
+          const varList = innerVar.variableType === 'options' ? grouped.options : innerVar.variableType === 'env' ? grouped.env : grouped.self
+          const existingVar = varList[existingVarIndex]
+
+          // Add occurrence from parent file variable
+          if (occurrences && occurrences.length > 0) {
+            existingVar.occurrences.push(...occurrences)
+          }
+          continue
+        }
+
+        // Skip if already added to the set
         if (addedVars.has(innerVar.variable)) {
           continue
         }
 
         addedVars.add(innerVar.variable)
-
-        const cleanName = innerVar.variable.replace(/^(opt|env|self):/, '')
 
         const varInfo = {
           key: innerVar.variable,
@@ -134,7 +150,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
           variableType: innerVar.variableType,
           isRequired: innerVar.isRequired,
           defaultValue: innerVar.defaultValue,
-          occurrences: [{ path: varKey }], // Reference the parent file variable
+          occurrences: occurrences ? [...occurrences] : [], // Use parent file variable occurrences
         }
 
         if (innerVar.variableType === 'options') {
@@ -187,18 +203,42 @@ function createPromptMessage(varInfo) {
     typeLabel = 'Value'
   }
 
-  // Get first occurrence for context
-  const firstOccurrence = occurrences[0]
+  // Build context from all occurrences
   let contextHint = ''
 
-  if (firstOccurrence) {
-    const keyPath = firstOccurrence.path
-    const originalValue = firstOccurrence.value || firstOccurrence.originalString || firstOccurrence.fullMatch
+  if (occurrences && occurrences.length > 0) {
+    // Parse occurrences into key-value pairs
+    const parsedOccurrences = occurrences.map(occ => {
+      const keyPath = occ.path
+      const originalValue = occ.value || occ.originalString || occ.fullMatch
 
-    if (keyPath && originalValue) {
-      contextHint = ` - ${keyPath}: ${originalValue}`
-    } else if (keyPath) {
-      contextHint = ` - ${keyPath}`
+      if (keyPath && originalValue) {
+        return { key: keyPath, value: originalValue }
+      } else if (keyPath) {
+        return { key: keyPath, value: '' }
+      }
+      return null
+    }).filter(Boolean)
+
+    if (parsedOccurrences.length > 0) {
+      // Get the variable reference syntax
+      const varPrefix = variableType === 'options' ? 'opt' : variableType === 'env' ? 'env' : 'self'
+      const varSyntax = `\${${varPrefix}:${cleanName}}`
+
+      // Show variable syntax and count
+      contextHint = ` - ${varSyntax} - Used in ${parsedOccurrences.length} ${parsedOccurrences.length === 1 ? 'place' : 'places'}`
+
+      // Find longest key for alignment
+      const maxKeyLength = Math.max(...parsedOccurrences.map(o => o.key.length))
+
+      // List all occurrences with bullets and aligned values (using invisible unicode for indentation)
+      const indent = '\u2800\u2800\u2800' // Braille blank pattern (invisible but not stripped)
+      const usageList = parsedOccurrences.map(({ key, value }, index) => {
+        const padding = ' '.repeat(maxKeyLength - key.length)
+        const leadingEmptyLine = index === 0 ? '│\n' : ''
+        return value ? `${leadingEmptyLine}│${indent}- ${key}:${padding}    ${value}` : `${leadingEmptyLine}│${indent}• ${key}`
+      })
+      contextHint += '\n' + usageList.join('\n') + '\n│'
     }
   }
 
