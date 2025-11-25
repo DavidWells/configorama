@@ -60,7 +60,8 @@ module.exports = function configoramaSync(variableSources = []) {
         instance.variableSyntax,
         instance.fileRefsFound,
         instance.originalConfig,
-        instance.configFilePath
+        instance.configFilePath,
+        Object.keys(instance.filters)
       )
 
       return {

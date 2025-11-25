@@ -129,7 +129,7 @@ multipleVariablesInFilePath: ${file(./config.${env:MY_ENV_VAR}${dash}.${ext})}
 ########################
 # file value as inner variable
 ########################
-fileValueAsInnerVariable: lol-${file(./_inner.yml):foo}-${env:FOO}-${opt:stage}
+fileValueAsInnerVariable: lol-${file(./_inner.yml):foo}-${env:FOO, 'dev'}-${opt:stage}
 
 ########################
 # Nested file path

@@ -556,6 +556,12 @@ class Configorama {
           throw new Error(`Configorama Error: Invalid JSON in variable`)
         }
       },
+      /* Help filter - identity function that preserves value but provides metadata for wizard */
+      help: (value, helpText) => {
+        // Identity function - returns value unchanged
+        // The helpText argument is extracted during metadata collection for the wizard
+        return value
+      },
     }
 
     // Apply user defined filters
@@ -564,7 +570,9 @@ class Configorama {
     }
 
     // (\|\s*(toUpperCase|toLowerCase|toCamelCase|toKebabCase|capitalize)\s*)+$
-    this.filterMatch = new RegExp(`(\\|\\s*(${Object.keys(this.filters).join('|')})\\s*)+}?$`)
+    // Updated to support function-style filters like help('text') with nested parens
+    // Use a more permissive pattern that matches anything between parens including nested parens
+    this.filterMatch = new RegExp(`(\\|\\s*(${Object.keys(this.filters).join('|')})(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?\\s*)+}?$`)
     // console.log('this.filterMatch', this.filterMatch)
 
     this.functions = {
@@ -692,12 +700,13 @@ class Configorama {
       const metadata = this.collectVariableMetadata()
 
       const enrich = enrichMetadata(
-        metadata, 
-        this.resolutionTracking, 
-        this.variableSyntax, 
-        this.fileRefsFound, 
+        metadata,
+        this.resolutionTracking,
+        this.variableSyntax,
+        this.fileRefsFound,
         this.originalConfig,
-        this.configFilePath
+        this.configFilePath,
+        Object.keys(this.filters)
       )
 
       if (showFoundVariables) {
@@ -713,12 +722,13 @@ class Configorama {
       // WALK through CLI prompt if --setup flag is set
       if (SETUP_MODE) {
         deepLog('enrich', enrich)
-        const userInputs = await runConfigWizard(enrich, this.originalConfig)
+        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
 
         console.log('\n')
         logHeader('User Inputs Summary')
         console.log(JSON.stringify(userInputs, null, 2))
-        console.log()
+
+        // TODO set values
 
         // Apply user inputs to options and environment
         if (userInputs.options) {
@@ -2184,7 +2194,23 @@ Missing Value ${missingValue} - ${matchedString}
         })
       }
       property = foundFilters.reduce((acc, filter) => {
-        const newVal = this.filters[filter](acc, 'from populateVariable')
+        // Check if filter has function-style arguments
+        const funcMatch = filter.match(/^(\w+)\((.*)\)$/)
+        let filterName = filter
+        let filterArgs = []
+
+        if (funcMatch) {
+          filterName = funcMatch[1]
+          const rawArgs = funcMatch[2]
+          if (rawArgs) {
+            const splitter = splitCsv(rawArgs, ', ')
+            filterArgs = formatFunctionArgs(splitter)
+          }
+        }
+
+        const newVal = filterArgs.length > 0
+          ? this.filters[filterName](acc, ...filterArgs, 'from populateVariable')
+          : this.filters[filterName](acc, 'from populateVariable')
         // console.log('PROPERTY', newVal)
         return newVal
       }, property)
@@ -2519,13 +2545,28 @@ Missing Value ${missingValue} - ${matchedString}
         }
 
         const newUse = newHasFilter.reduce((acc, currentFilter, i) => {
-          if (!this.filters[currentFilter]) {
-            throw new Error(`Filter "${currentFilter}" not found`)
+          // Check if filter has function-style arguments: filterName(arg1, arg2)
+          const funcMatch = currentFilter.match(/^(\w+)\((.*)\)$/)
+          let filterName = currentFilter
+          let filterArgs = null
+
+          if (funcMatch) {
+            filterName = funcMatch[1]
+            const rawArgs = funcMatch[2]
+            // Parse arguments using the same logic as functions
+            if (rawArgs) {
+              const splitter = splitCsv(rawArgs, ', ')
+              filterArgs = formatFunctionArgs(splitter)
+            }
+          }
+
+          if (!this.filters[filterName]) {
+            throw new Error(`Filter "${filterName}" not found`)
           }
           return acc.concat({
-            filter: this.filters[currentFilter],
-            filterName: currentFilter,
-            // args: argsToPass
+            filter: this.filters[filterName],
+            filterName: filterName,
+            args: filterArgs
           })
         }, [])
         // console.log('pathValue', pathValue)

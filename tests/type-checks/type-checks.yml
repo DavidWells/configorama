@@ -1,0 +1,71 @@
+# ======================
+# 1. Environment Variables (Typed)
+# ======================
+envVariables:
+  # Casts to string (Default behavior, but explicit)
+  apiKey: ${env:API_KEY | String}
+
+  # Casts to Integer. Throws if "localhost" is passed (NaN)
+  dbPort: ${env:DB_PORT, 5432 | Number}
+
+  # Validates that input is a non-empty string
+  nodeEnv: ${env:NODE_ENV, 'development' | String}
+
+# ======================
+# 2. CLI Option Flags (Typed)
+# ======================
+cliFlags:
+  # Boolean casting (handles --verbose without value as true)
+  verbose: ${opt:verbose, false | Boolean}
+
+  # Ensure strict types for composition
+  # Note: filters in composed strings not yet supported, testing individual refs
+  stageTyped: ${opt:stage | String}
+  regionTyped: ${opt:region | String}
+  composed: ${opt:stage}-${opt:region}
+
+  # Number from opt
+  port: ${opt:port, 3000 | Number}
+
+# ======================
+# 3. Self references (Typed)
+# ======================
+baseValue: 42
+stringValue: 'hello'
+boolValue: 'true'
+
+selfReferences:
+  # Type check self references
+  checkedNumber: ${self:baseValue | Number}
+  checkedString: ${self:stringValue | String}
+  checkedBool: ${self:boolValue | Boolean}
+
+# ======================
+# 4. Json parsing
+# ======================
+jsonString: '{"foo":"bar"}'
+
+jsonParsing:
+  # String that looks like JSON
+  parsed: ${self:jsonString | Json}
+
+# ======================
+# 5. Type validation edge cases
+# ======================
+edgeCases:
+  # Number from string
+  stringToNumber: ${'123' | Number}
+
+  # Boolean from various formats
+  boolFromTrue: ${'true' | Boolean}
+  boolFromYes: ${'yes' | Boolean}
+  boolFrom1: ${'1' | Boolean}
+  boolFromFalse: ${'false' | Boolean}
+  boolFromNo: ${'no' | Boolean}
+  boolFrom0: ${'0' | Boolean}
+
+  # String from number
+  numberToString: ${42 | String}
+
+  # Empty string from null/undefined
+  emptyString: ${opt:nonexistent, null | String}

@@ -11,15 +11,37 @@ const path = require('path')
  * @returns {object} Standardized occurrence object
  */
 function createOccurrence(instance, varMatch, options = {}) {
+  // Extract help text from filters and separate it
+  let filters = instance.filters
+  let description = undefined
+
+  if (filters && Array.isArray(filters)) {
+    // Find and extract help() filter
+    const helpFilterIndex = filters.findIndex(f => f && f.match(/^help\(/))
+    if (helpFilterIndex !== -1) {
+      const helpFilter = filters[helpFilterIndex]
+      const helpMatch = helpFilter.match(/^help\(['"](.+)['"]\)$/)
+      if (helpMatch) {
+        description = helpMatch[1]
+        // Remove help filter from filters array
+        filters = filters.filter((_, i) => i !== helpFilterIndex)
+      }
+    }
+  }
+
   const occurrence = {
     originalString: instance.originalStringValue,
     varMatch: varMatch,
     path: instance.path,
-    filters: instance.filters,
+    filters: filters && filters.length > 0 ? filters : undefined,
     defaultValue: options.defaultValue !== undefined ? options.defaultValue : instance.defaultValue,
     isRequired: options.isRequired !== undefined ? options.isRequired : instance.isRequired,
-    hasFilters: !!(instance.filters && instance.filters.length > 0),
+    hasFilters: !!(filters && filters.length > 0),
     hasFallback: options.hasFallback !== undefined ? options.hasFallback : (instance.hasFallback || false),
+  }
+
+  if (description) {
+    occurrence.description = description
   }
 
   if (instance.defaultValueSrc) {
@@ -86,15 +108,18 @@ function normalizePath(filePath) {
  * @param {RegExp} variableSyntax - The variable syntax regex.
  * @param {Array} fileRefsFound - The (incomplete) list of file refs found during resolution.
  * @param {object} originalConfig - The original config object (before resolution) for self/dot.prop lookups.
+ * @param {string} configPath - The path to the config file.
+ * @param {Array} filterNames - Array of known filter names.
  * @returns {object} Enriched metadata with resolution details and a complete file reference list.
  */
 function enrichMetadata(
-  metadata, 
-  resolutionTracking, 
-  variableSyntax, 
-  fileRefsFound = [], 
+  metadata,
+  resolutionTracking,
+  variableSyntax,
+  fileRefsFound = [],
   originalConfig = {},
-  configPath
+  configPath,
+  filterNames = []
 ) {
   if (!resolutionTracking) {
     return metadata
@@ -296,6 +321,21 @@ function enrichMetadata(
     // Get the base variable name without fallback
     // Use valueBeforeFallback if present, otherwise use the variable string
     let baseVar = lastResolveDetail.valueBeforeFallback || lastResolveDetail.variable
+
+    // Strip filters from baseVar using known filter names
+    // e.g., "opt:stage | toUpperCase | help(...)" -> "opt:stage"
+    if (baseVar && baseVar.includes(' |') && filterNames.length > 0) {
+      // Build a regex that matches known filters with optional arguments
+      // e.g., | filterName or | filterName(...)
+      const filterPattern = filterNames.map(name => {
+        // Escape special regex chars in filter name
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        return `\\s*\\|\\s*${escaped}(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?`
+      }).join('|')
+
+      const filterRegex = new RegExp(`(${filterPattern})+\\s*$`)
+      baseVar = baseVar.replace(filterRegex, '').trim()
+    }
 
     // Normalize file() and text() references
     if (baseVar.match(/^(?:file|text)\(/)) {

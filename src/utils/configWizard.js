@@ -244,6 +244,34 @@ function getExpectedType(occurrences) {
 }
 
 /**
+ * Extracts help text from variable occurrences
+ * @param {Array} occurrences - Variable occurrences
+ * @returns {string|null} Help text or null
+ */
+function getHelpText(occurrences) {
+  if (!occurrences || occurrences.length === 0) return null
+
+  for (const occ of occurrences) {
+    // Check for description field first (preferred)
+    if (occ.description) {
+      return occ.description
+    }
+
+    // Fallback to checking filters array (for backwards compatibility)
+    if (occ.filters && Array.isArray(occ.filters)) {
+      for (const filter of occ.filters) {
+        // Check if filter has help() syntax
+        const helpMatch = filter.match(/^help\(['"](.+)['"]\)$/)
+        if (helpMatch) {
+          return helpMatch[1]
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
  * Creates a human-readable prompt message
  * @param {object} varInfo - Variable info
  * @returns {string} Prompt message
@@ -270,19 +298,49 @@ function createPromptMessage(varInfo) {
     typeLabel = `${typeLabel}:${expectedType}`
   }
 
+  // Collect all unique descriptions from occurrences
+  const descriptions = []
+  if (occurrences && occurrences.length > 0) {
+    occurrences.forEach(occ => {
+      if (occ.description && !descriptions.includes(occ.description)) {
+        descriptions.push(occ.description)
+      }
+    })
+  }
+
   // Build context from all occurrences
   let contextHint = ''
 
+  // Show combined descriptions if available
+  if (descriptions.length > 0) {
+    contextHint = ` - ${descriptions.join('. ')}`
+  }
+
+  // Show usage list if there are occurrences
   if (occurrences && occurrences.length > 0) {
-    // Parse occurrences into key-value pairs
+    // Parse occurrences into key-value pairs with descriptions
     const parsedOccurrences = occurrences.map(occ => {
       const keyPath = occ.path
-      const originalValue = occ.value || occ.originalString || occ.varMatch
+      let originalValue = occ.value || occ.originalString || occ.varMatch
+
+      // Strip help() filter from the displayed value
+      if (originalValue && typeof originalValue === 'string') {
+        // Remove | help('...') including nested parens
+        originalValue = originalValue.replace(/\s*\|\s*help\([^)]*(?:\([^)]*\))?[^)]*\)/g, '')
+      }
 
       if (keyPath && originalValue) {
-        return { key: keyPath, value: originalValue }
+        return {
+          key: keyPath,
+          value: originalValue,
+          description: occ.description
+        }
       } else if (keyPath) {
-        return { key: keyPath, value: '' }
+        return {
+          key: keyPath,
+          value: '',
+          description: occ.description
+        }
       }
       return null
     }).filter(Boolean)
@@ -292,18 +350,22 @@ function createPromptMessage(varInfo) {
       const varPrefix = variableType === 'options' ? 'opt' : variableType === 'env' ? 'env' : 'self'
       const varSyntax = `\${${varPrefix}:${cleanName}}`
 
-      // Show variable syntax and count
-      contextHint = ` - ${varSyntax} - Used in ${parsedOccurrences.length} ${parsedOccurrences.length === 1 ? 'place' : 'places'}`
+      // Show variable syntax and count (only if no descriptions, otherwise it's redundant)
+      if (descriptions.length === 0) {
+        contextHint = ` - ${varSyntax} - Used in ${parsedOccurrences.length} ${parsedOccurrences.length === 1 ? 'place' : 'places'}`
+      }
 
       // Find longest key for alignment
       const maxKeyLength = Math.max(...parsedOccurrences.map(o => o.key.length))
 
       // List all occurrences with bullets and aligned values (using invisible unicode for indentation)
       const indent = '\u2800\u2800\u2800' // Braille blank pattern (invisible but not stripped)
-      const usageList = parsedOccurrences.map(({ key, value }, index) => {
+      const usageList = parsedOccurrences.map(({ key, value, description }, index) => {
         const padding = ' '.repeat(maxKeyLength - key.length)
         const leadingEmptyLine = index === 0 ? '│\n' : ''
-        return value ? `${leadingEmptyLine}│${indent}- ${key}:${padding}    ${value}` : `${leadingEmptyLine}│${indent}• ${key}`
+        // Only show inline description if there are multiple occurrences (otherwise it's redundant with header)
+        const descComment = description && parsedOccurrences.length > 1 ? ` - # ${description}` : ''
+        return value ? `${leadingEmptyLine}│${indent}- ${key}:${padding}    ${value}${descComment}` : `${leadingEmptyLine}│${indent}• ${key}${descComment}`
       })
       contextHint += '\n' + usageList.join('\n') + '\n│'
     }
@@ -320,11 +382,14 @@ function createPromptMessage(varInfo) {
  * @param {object} originalConfig - The original config before resolution
  * @returns {Promise<object>} User inputs by variable type
  */
-async function runConfigWizard(metadata, originalConfig = {}) {
+async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '') {
   const { uniqueVariables } = metadata
 
   if (!uniqueVariables || Object.keys(uniqueVariables).length === 0) {
     p.intro(chalk.cyan('Configuration Wizard'))
+    if (configFilePath) {
+      p.note(`File: ${configFilePath}`, 'File')
+    }
     p.outro('No variables found that require setup.')
     return {}
   }
@@ -339,6 +404,9 @@ async function runConfigWizard(metadata, originalConfig = {}) {
   }
 
   p.intro(chalk.cyan('Configuration Wizard'))
+  if (configFilePath) {
+    p.note(`Processing config file: ${configFilePath}`)
+  }
 
   const userInputs = {
     options: {},
@@ -494,5 +562,6 @@ module.exports = {
   isSensitiveVariable,
   createPromptMessage,
   getExpectedType,
+  getHelpText,
   validateType,
 }
