@@ -185,6 +185,65 @@ function isSensitiveVariable(name) {
 }
 
 /**
+ * Validates input value based on expected type
+ * @param {string} value - Input value
+ * @param {string} expectedType - Expected type (String, Number, Boolean, Json)
+ * @returns {string|undefined} Error message if invalid, undefined if valid
+ */
+function validateType(value, expectedType) {
+  if (!expectedType || !value) return
+
+  switch (expectedType) {
+    case 'Boolean':
+      const lowerVal = value.toLowerCase()
+      const validBooleans = ['true', 'false', 'yes', 'no', 'on', 'off', '1', '0']
+      if (!validBooleans.includes(lowerVal)) {
+        return `Must be a boolean value (true/false, yes/no, on/off, 1/0)`
+      }
+      break
+
+    case 'Number':
+      if (isNaN(Number(value))) {
+        return `Must be a valid number`
+      }
+      break
+
+    case 'Json':
+      try {
+        JSON.parse(value)
+      } catch (e) {
+        return `Must be valid JSON`
+      }
+      break
+
+    case 'String':
+      // String is always valid
+      break
+  }
+}
+
+/**
+ * Extracts type from variable occurrences
+ * @param {Array} occurrences - Variable occurrences
+ * @returns {string|null} Expected type or null
+ */
+function getExpectedType(occurrences) {
+  if (!occurrences || occurrences.length === 0) return null
+
+  for (const occ of occurrences) {
+    if (occ.filters && Array.isArray(occ.filters)) {
+      for (const filter of occ.filters) {
+        // Check if filter starts with uppercase letter
+        if (filter && typeof filter === 'string' && /^[A-Z]/.test(filter)) {
+          return filter
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
  * Creates a human-readable prompt message
  * @param {object} varInfo - Variable info
  * @returns {string} Prompt message
@@ -201,6 +260,14 @@ function createPromptMessage(varInfo) {
     typeLabel = 'Config'
   } else {
     typeLabel = 'Value'
+  }
+
+  // Check for type from filters
+  const expectedType = getExpectedType(occurrences)
+
+  // Append type to label if found
+  if (expectedType) {
+    typeLabel = `${typeLabel}:${expectedType}`
   }
 
   // Build context from all occurrences
@@ -292,6 +359,7 @@ async function runConfigWizard(metadata, originalConfig = {}) {
       const message = createPromptMessage(varInfo)
       const isSensitive = isSensitiveVariable(varInfo.cleanName)
       const promptFn = isSensitive ? p.password : p.text
+      const expectedType = getExpectedType(varInfo.occurrences)
 
       const placeholder = varInfo.hasFallback
         ? `${varInfo.defaultValue} (default)`
@@ -305,6 +373,9 @@ async function runConfigWizard(metadata, originalConfig = {}) {
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
             return 'This value is required'
           }
+          // Type validation
+          const typeError = validateType(val, expectedType)
+          if (typeError) return typeError
         }
       })
 
@@ -330,6 +401,7 @@ async function runConfigWizard(metadata, originalConfig = {}) {
       const message = createPromptMessage(varInfo)
       const isSensitive = isSensitiveVariable(varInfo.cleanName)
       const promptFn = isSensitive ? p.password : p.text
+      const expectedType = getExpectedType(varInfo.occurrences)
 
       const placeholder = varInfo.hasFallback
         ? `${varInfo.defaultValue} (default)`
@@ -343,6 +415,9 @@ async function runConfigWizard(metadata, originalConfig = {}) {
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
             return 'This value is required'
           }
+          // Type validation
+          const typeError = validateType(val, expectedType)
+          if (typeError) return typeError
         }
       })
 
@@ -368,6 +443,7 @@ async function runConfigWizard(metadata, originalConfig = {}) {
       const message = createPromptMessage(varInfo)
       const isSensitive = isSensitiveVariable(varInfo.cleanName)
       const promptFn = isSensitive ? p.password : p.text
+      const expectedType = getExpectedType(varInfo.occurrences)
 
       const placeholder = varInfo.hasFallback
         ? `${varInfo.defaultValue} (default)`
@@ -381,6 +457,9 @@ async function runConfigWizard(metadata, originalConfig = {}) {
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
             return 'This value is required'
           }
+          // Type validation
+          const typeError = validateType(val, expectedType)
+          if (typeError) return typeError
         }
       })
 
@@ -414,4 +493,6 @@ module.exports = {
   groupVariablesByType,
   isSensitiveVariable,
   createPromptMessage,
+  getExpectedType,
+  validateType,
 }
