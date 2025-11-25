@@ -371,7 +371,7 @@ function createPromptMessage(varInfo) {
     }
   }
 
-  const message = `[${typeLabel}] ${cleanName}${contextHint}`
+  const message = `[${typeLabel}] ${cleanName}${chalk.gray(contextHint)}`
 
   return message
 }
