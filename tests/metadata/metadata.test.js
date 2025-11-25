@@ -102,7 +102,7 @@ test('metadata contains variable information', async () => {
 
   assert.ok(firstVar.path, 'Variable should have path')
   assert.ok(firstVar.key, 'Variable should have key')
-  assert.ok(firstVar.value, 'Variable should have value')
+  assert.ok(firstVar.originalStringValue, 'Variable should have originalStringValue')
   assert.ok(firstVar.variable, 'Variable should have variable')
   assert.ok(typeof firstVar.isRequired === 'boolean', 'Variable should have isRequired')
   assert.ok(Array.isArray(firstVar.resolveOrder), 'Variable should have resolveOrder array')
@@ -334,13 +334,14 @@ test('metadata.uniqueVariables groups variables by base name without fallbacks',
 
   // Check occurrences have expected structure
   const awsOccurrences = uniqueVariables['env:AWS_REGION'].occurrences
-  assert.ok(awsOccurrences.some(o => o.fullMatch === '${env:AWS_REGION, us-east-1}'), 'Should have us-east-1 occurrence')
-  assert.ok(awsOccurrences.some(o => o.fullMatch === '${env:AWS_REGION, us-west-2}'), 'Should have us-west-2 occurrence')
+  assert.ok(awsOccurrences.some(o => o.varMatch === '${env:AWS_REGION, us-east-1}'), 'Should have us-east-1 occurrence')
+  assert.ok(awsOccurrences.some(o => o.varMatch === '${env:AWS_REGION, us-west-2}'), 'Should have us-west-2 occurrence')
 
   // Each occurrence should have expected fields
   const firstOccurrence = awsOccurrences[0]
-  assert.ok('fullMatch' in firstOccurrence, 'Should have fullMatch')
+  assert.ok('varMatch' in firstOccurrence, 'Should have varMatch')
   assert.ok('path' in firstOccurrence, 'Should have path')
+  assert.ok('filters' in firstOccurrence, 'Should have filters')
   assert.ok('isRequired' in firstOccurrence, 'Should have isRequired')
   assert.ok('defaultValue' in firstOccurrence, 'Should have defaultValue')
   assert.ok('hasFallback' in firstOccurrence, 'Should have hasFallback')

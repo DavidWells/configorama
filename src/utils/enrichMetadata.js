@@ -4,6 +4,32 @@ const fs = require('fs')
 const path = require('path')
 
 /**
+ * Create a standardized occurrence object
+ * @param {object} instance - The variable instance from metadata
+ * @param {string} varMatch - The variable match string
+ * @param {object} options - Optional override values
+ * @returns {object} Standardized occurrence object
+ */
+function createOccurrence(instance, varMatch, options = {}) {
+  const occurrence = {
+    originalString: instance.originalStringValue,
+    varMatch: varMatch,
+    path: instance.path,
+    filters: instance.filters,
+    defaultValue: options.defaultValue !== undefined ? options.defaultValue : instance.defaultValue,
+    isRequired: options.isRequired !== undefined ? options.isRequired : instance.isRequired,
+    hasFilters: !!(instance.filters && instance.filters.length > 0),
+    hasFallback: options.hasFallback !== undefined ? options.hasFallback : (instance.hasFallback || false),
+  }
+
+  if (instance.defaultValueSrc) {
+    occurrence.defaultValueSrc = instance.defaultValueSrc
+  }
+
+  return occurrence
+}
+
+/**
  * Extract file path from a file() or text() reference string
  * @param {string} propertyString - The property string containing file/text reference
  * @returns {object|null} Object with filePath, or null if no match
@@ -307,17 +333,7 @@ function enrichMetadata(
 
     for (const instance of varInstances) {
       // Add this occurrence with its full context
-      const occurrence = {
-        originalString: instance.value,
-        fullMatch: key,
-        path: instance.path,
-        isRequired: instance.isRequired,
-        hasFallback: instance.hasFallback || false,
-        defaultValue: instance.defaultValue,
-      }
-      if (instance.defaultValueSrc) {
-        occurrence.defaultValueSrc = instance.defaultValueSrc
-      }
+      const occurrence = createOccurrence(instance, key)
       entry.occurrences.push(occurrence)
 
       // Find inner variables in resolveDetails (excluding the outermost variable itself)
@@ -363,18 +379,15 @@ function enrichMetadata(
             const siblingEntry = uniqueVariablesMap.get(normalizedSiblingVar)
 
             // Add occurrence for this sibling variable
-            const siblingOccurrence = {
-              fullMatch: detail.fullMatch,
-              path: instance.path,
-              value: instance.value,
+            const siblingOccurrence = createOccurrence(instance, detail.varMatch, {
               isRequired: !detail.hasFallback,
               hasFallback: !!detail.hasFallback,
               defaultValue: detail.hasFallback ? (detail.fallbackValues?.[0]?.stringValue || detail.fallbackValues?.[0]?.variable) : undefined,
-            }
+            })
 
             // Check if this exact occurrence already exists
             const occurrenceExists = siblingEntry.occurrences.some(occ =>
-              occ.fullMatch === siblingOccurrence.fullMatch &&
+              occ.varMatch === siblingOccurrence.varMatch &&
               occ.path === siblingOccurrence.path
             )
 

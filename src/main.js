@@ -795,7 +795,7 @@ class Configorama {
                 if (instance.resolveDetails) {
                   instance.resolveDetails.forEach((detail) => {
                     // Check if this resolveDetail references our target variable
-                    if (detail.fullMatch === targetVariable) {
+                    if (detail.varMatch === targetVariable) {
                       count++
                     }
                   })
@@ -1059,8 +1059,8 @@ class Configorama {
         const lastKeyPath = this.path[this.path.length - 1]
         const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
 
-        // Extract filters from fullMatch
-        const originalSrc = lastItem.fullMatch || ''
+        // Extract filters from varMatch
+        const originalSrc = lastItem.varMatch || ''
         const hasFilters = filterMatch && originalSrc.match(filterMatch)
         let foundFilters = []
         let keyWithoutFilters = originalSrc
@@ -1083,10 +1083,10 @@ class Configorama {
         // Strip filters from resolveDetails
         const cleanedResolveDetails = nested.map(detail => {
           const cleaned = { ...detail }
-          if (cleaned.fullMatch && filterMatch) {
-            const match = cleaned.fullMatch.match(filterMatch)
+          if (cleaned.varMatch && filterMatch) {
+            const match = cleaned.varMatch.match(filterMatch)
             if (match) {
-              cleaned.fullMatch = cleaned.fullMatch.replace(filterMatch, '').replace(/\s+$/, '') + '}'
+              cleaned.varMatch = cleaned.varMatch.replace(filterMatch, '').replace(/\s+$/, '') + '}'
             }
           }
           if (cleaned.variable && filterMatch) {
@@ -1105,10 +1105,10 @@ class Configorama {
           if (cleaned.fallbackValues && Array.isArray(cleaned.fallbackValues)) {
             cleaned.fallbackValues = cleaned.fallbackValues.map(fb => {
               const cleanedFb = { ...fb }
-              if (cleanedFb.fullMatch && filterMatch) {
-                const match = cleanedFb.fullMatch.match(filterMatch)
+              if (cleanedFb.varMatch && filterMatch) {
+                const match = cleanedFb.varMatch.match(filterMatch)
                 if (match) {
-                  cleanedFb.fullMatch = cleanedFb.fullMatch.replace(filterMatch, '').trim()
+                  cleanedFb.varMatch = cleanedFb.varMatch.replace(filterMatch, '').trim()
                 }
               }
               if (cleanedFb.variable && filterMatch) {
@@ -1132,8 +1132,9 @@ class Configorama {
         const varData = {
           path: configValuePath,
           key: itemKey,
-          value: rawValue,
+          originalStringValue: rawValue,
           variable: keyWithoutFilters,
+          variableWithFilters: originalSrc,
           isRequired: false,
           defaultValue: undefined,
           matchIndex: matchCount++,
@@ -1280,12 +1281,12 @@ class Configorama {
         }
 
         const hasDotPropOrSelf = instances.reduce((acc, v) => {
-          const dotProp = v.resolveDetails.find((d) => d.variableType === 'dot.prop')
-          if (dotProp) {
-            acc.push(dotProp)
-          }
-          if (v.resolveDetails && v.resolveDetails.length === 1 && v.resolveDetails[0].variableType === 'self') {
-            acc.push(v.resolveDetails[0])
+          // Only check the outermost variable (last in resolveDetails)
+          if (v.resolveDetails && v.resolveDetails.length > 0) {
+            const outermostDetail = v.resolveDetails[v.resolveDetails.length - 1]
+            if (outermostDetail.variableType === 'dot.prop' || outermostDetail.variableType === 'self') {
+              acc.push(outermostDetail)
+            }
           }
           return acc
         }, dotPropArr)

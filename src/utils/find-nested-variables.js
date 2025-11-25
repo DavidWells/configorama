@@ -58,8 +58,8 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     const matchInfo = {
       variableType: undefined,
       location,
-      value: input,
-      fullMatch: match[0],
+      originalStringValue: input,
+      varMatch: match[0],
       variable: match[1].trim(),
       varString: match[1],
       resolveOrder: iteration,
@@ -128,10 +128,10 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
   
   // Second pass: Reconstruct each variable with original nested syntax
   // We need to do this recursively to ensure all placeholders are replaced properly
-  function replaceAllPlaceholders(text = '', matchesArray, key = 'fullMatch') {
+  function replaceAllPlaceholders(text = '', matchesArray, key = 'varMatch') {
     let result = text
     let needsAnotherPass = false
-    
+
     // Replace all placeholders with their original matches
     for (let i = 0; i < matchesArray.length; i++) {
       const m = matchesArray[i]
@@ -140,33 +140,33 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
         needsAnotherPass = true
       }
     }
-    
+
     // If we made replacements, we might need another pass to handle nested placeholders
     if (needsAnotherPass) {
       return replaceAllPlaceholders(result, matchesArray, key)
     }
-    
+
     return result
   }
   
   // For each match, reconstruct the original nested syntax
   for (let i = 0; i < matches.length; i++) {
     const currentMatch = matches[i]
-    
+
     // Skip if this match doesn't contain any placeholders
-    if (!currentMatch.fullMatch.includes('__VAR_') && !currentMatch.variable.includes('__VAR_')) {
+    if (!currentMatch.varMatch.includes('__VAR_') && !currentMatch.variable.includes('__VAR_')) {
       continue
     }
 
     if (currentMatch.hasFallback) {
       currentMatch.fallbackValues.forEach((item) => {
-        item.fullMatch = replaceAllPlaceholders(item.fullMatch, matches, 'fullMatch')
+        item.varMatch = replaceAllPlaceholders(item.varMatch, matches, 'varMatch')
         item.variable = replaceAllPlaceholders(item.variable, matches, 'variable')
       })
     }
-    
+
     // Reconstruct with all nested variables
-    currentMatch.fullMatch = replaceAllPlaceholders(currentMatch.fullMatch, matches)
+    currentMatch.varMatch = replaceAllPlaceholders(currentMatch.varMatch, matches)
     currentMatch.variable = replaceAllPlaceholders(currentMatch.variable, matches)
   }
 
@@ -192,7 +192,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
           const isVariable = variablesKnownTypes.test(innerContent) || VAR_MATCH_REGEX.test(item)
           const fallbackData = {
             isVariable,
-            fullMatch: item,
+            varMatch: item,
             variable: item,
           }
 
@@ -204,7 +204,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
           if (isVariable) {
             fallbackData.variableType = getVariableType(innerContent, variableTypes)
             // if (variableType === 'self:') {
-            //   fallbackData.fullMatch = item.replace('self:', '')
+            //   fallbackData.varMatch = item.replace('self:', '')
             //   fallbackData.variable = item.replace('self:', '')
             //   fallbackData.variableType = 'dot.prop'
             // }
@@ -224,8 +224,8 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
       {
         variableType: 'dot.prop',
         location: 'resolvedDomainName',
-        value: '${domainByStage.${opt:stage, ${defaultStage}}}',
-        fullMatch: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        originalStringValue: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        varMatch: '${domainByStage.${opt:stage, ${defaultStage}}}',
         variable: 'domainByStage.${opt:stage, ${defaultStage}}',
         varString: 'domainByStage.__VAR_1__',
         resolveOrder: 3,
@@ -235,8 +235,8 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
       {
         variableType: 'dot.prop',
         location: 'resolvedDomainName',
-        value: '${domainByStage.${opt:stage, ${defaultStage}}}',
-        fullMatch: '${defaultStage}',
+        originalStringValue: '${domainByStage.${opt:stage, ${defaultStage}}}',
+        varMatch: '${defaultStage}',
         variable: 'defaultStage',
         varString: 'defaultStage',
         resolveOrder: 1,
@@ -279,7 +279,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     console.log("\nReconstructed matches:")
     matches.forEach((m, i) => {
       console.log(`Match #${i+1} (order ${m.order}):`)
-      console.log(`Full: ${m.fullMatch}`)
+      console.log(`VarMatch: ${m.varMatch}`)
       console.log(`Variable: ${m.variable}`)
       console.log(`VarString: ${m.varString}`)
       console.log(`Placeholder: ${m.placeholder}`)
@@ -338,10 +338,10 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
 
   // Replace the `__REPLACED_${iteration - 1}__` with the original match
   matches = matches.map((match, index) => {
-    const indexOfReplaced = match.fullMatch.match(/__REPLACED_(\d+)__/)
+    const indexOfReplaced = match.varMatch.match(/__REPLACED_(\d+)__/)
     if (indexOfReplaced) {
       const replacedIndex = parseInt(indexOfReplaced[1])
-      match.fullMatch = match.fullMatch.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
+      match.varMatch = match.varMatch.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
       match.variable = match.variable.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
     }
     return match

@@ -42,7 +42,7 @@ module.exports = function cleanVariable(
       console.log('index', index)
       console.log('nestedVar', nestedVar)
       console.log('nestedVar[index]', nestedVar[index])
-      varToClean = lastMatch.varString.replace(/__VAR_(\d+)__/g, nestedVar[index].fullMatch)
+      varToClean = lastMatch.varString.replace(/__VAR_(\d+)__/g, nestedVar[index].varMatch)
       return varToClean
     }
   }

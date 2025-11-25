@@ -210,7 +210,7 @@ function createPromptMessage(varInfo) {
     // Parse occurrences into key-value pairs
     const parsedOccurrences = occurrences.map(occ => {
       const keyPath = occ.path
-      const originalValue = occ.value || occ.originalString || occ.fullMatch
+      const originalValue = occ.value || occ.originalString || occ.varMatch
 
       if (keyPath && originalValue) {
         return { key: keyPath, value: originalValue }

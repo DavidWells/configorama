@@ -50,7 +50,7 @@ test('findNestedVariables - simple variables', () => {
   deepLog('result', result)
   
   assert.equal(result.length, 1);
-  assert.equal(result[0].fullMatch, '${simple}');
+  assert.equal(result[0].varMatch, '${simple}');
   assert.equal(result[0].variable, 'simple');
   assert.equal(result[0].resolveOrder, 1, 'order should be 1'); 
 });
@@ -60,7 +60,7 @@ test('findNestedVariables - complex variable with colon syntax', () => {
   const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 1);
-  assert.equal(result[0].fullMatch, '${opt:stage, dev}');
+  assert.equal(result[0].varMatch, '${opt:stage, dev}');
   assert.equal(result[0].variable, 'opt:stage, dev');
 });
 
@@ -70,10 +70,10 @@ test('findNestedVariables - one level nesting', () => {
   
   assert.equal(result.length, 2);
   // The innermost variable should be found first
-  assert.equal(result[0].fullMatch, '${stage}');
+  assert.equal(result[0].varMatch, '${stage}');
   assert.equal(result[0].variable, 'stage');
   // Then the outer variable
-  assert.equal(result[1].fullMatch, '${file(./config.${stage}.json)}');
+  assert.equal(result[1].varMatch, '${file(./config.${stage}.json)}');
   assert.equal(result[1].variable, 'file(./config.${stage}.json)');
 });   
 
@@ -83,13 +83,13 @@ test('findNestedVariables - two levels of nesting', () => {
   
   assert.equal(result.length, 3);
   // Innermost first
-  assert.equal(result[0].fullMatch, '${defaultStage}');
+  assert.equal(result[0].varMatch, '${defaultStage}');
   assert.equal(result[0].variable, 'defaultStage');
   // Middle next
-  assert.equal(result[1].fullMatch, '${opt:stage, ${defaultStage}}');
+  assert.equal(result[1].varMatch, '${opt:stage, ${defaultStage}}');
   assert.equal(result[1].variable, 'opt:stage, ${defaultStage}');
   // Outermost last
-  assert.equal(result[2].fullMatch, '${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}');
+  assert.equal(result[2].varMatch, '${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}');
   assert.equal(result[2].variable, 'file(./config.${opt:stage, ${defaultStage}}.json):CREDS');
 });
 
@@ -98,8 +98,8 @@ test('findNestedVariables - multiple separate variables', () => {
   const result = findNestedVariables(input, regex, variablesKnownTypes, undefined, variableTypes);
   
   assert.equal(result.length, 2);
-  assert.equal(result[0].fullMatch, '${name}');
-  assert.equal(result[1].fullMatch, '${service}');
+  assert.equal(result[0].varMatch, '${name}');
+  assert.equal(result[1].varMatch, '${service}');
 });
 
 test('findNestedVariables - complex mixed case', () => {
@@ -108,11 +108,11 @@ test('findNestedVariables - complex mixed case', () => {
   console.log('result', result)
   assert.equal(result.length, 6);
   // Check the correct nesting order
-  assert.equal(result[0].fullMatch, '${envOne}');
-  assert.equal(result[1].fullMatch, '${db.${envOne}.host}');
-  assert.equal(result[2].fullMatch, '${envTwo}');
-  assert.equal(result[3].fullMatch, '${db.${envTwo}.port}');
-  assert.equal(result[4].fullMatch, '${user.role}');
+  assert.equal(result[0].varMatch, '${envOne}');
+  assert.equal(result[1].varMatch, '${db.${envOne}.host}');
+  assert.equal(result[2].varMatch, '${envTwo}');
+  assert.equal(result[3].varMatch, '${db.${envTwo}.port}');
+  assert.equal(result[4].varMatch, '${user.role}');
 });
 
 test('findNestedVariables - empty string', () => {
@@ -153,36 +153,36 @@ test('findNestedVariables - deep', () => {
   assert.equal(result.length, 5);
 
   // Check the innermost variable
-  assert.equal(result[0].fullMatch, '${env:foo}');
+  assert.equal(result[0].varMatch, '${env:foo}');
   assert.equal(result[0].variable, 'env:foo');
   assert.equal(result[0].variableType, 'env');
 
   // Check opt:stageOne with env:foo fallback
-  assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[1].varMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
   assert.equal(result[1].variableType, 'options');
   assert.equal(result[1].hasFallback, true);
   assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
   assert.equal(result[1].fallbackValues.length, 1);
   assert.equal(result[1].fallbackValues[0].isVariable, true);
-  assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
+  assert.equal(result[1].fallbackValues[0].varMatch, '${env:foo}');
   assert.equal(result[1].fallbackValues[0].variableType, 'env');
 
   // Check opt:stageTwo
-  assert.equal(result[2].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[2].varMatch, '${opt:stageTwo}');
   assert.equal(result[2].variable, 'opt:stageTwo');
 
   // Check opt:stage with multiple fallbacks
-  assert.equal(result[3].fullMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
+  assert.equal(result[3].varMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
   assert.equal(result[3].variable, 'opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"');
   assert.equal(result[3].hasFallback, true);
   assert.equal(result[3].valueBeforeFallback, 'opt:stage');
   assert.equal(result[3].fallbackValues.length, 3);
-  assert.equal(result[3].fallbackValues[0].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[3].fallbackValues[0].varMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[3].fallbackValues[0].isVariable, true);
-  assert.equal(result[3].fallbackValues[1].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[3].fallbackValues[1].varMatch, '${opt:stageTwo}');
   assert.equal(result[3].fallbackValues[1].isVariable, true);
-  assert.equal(result[3].fallbackValues[2].fullMatch, '"three"');
+  assert.equal(result[3].fallbackValues[2].varMatch, '"three"');
   assert.equal(result[3].fallbackValues[2].isVariable, false);
   assert.equal(result[3].fallbackValues[2].stringValue, 'three');
 
@@ -200,36 +200,36 @@ test('findNestedVariables - deep - no var types passed', () => {
   assert.equal(result.length, 5);
 
   // Check the innermost variable
-  assert.equal(result[0].fullMatch, '${env:foo}');
+  assert.equal(result[0].varMatch, '${env:foo}');
   assert.equal(result[0].variable, 'env:foo');
   assert.equal(result[0].variableType, 'env');
 
   // Check opt:stageOne with env:foo fallback
-  assert.equal(result[1].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[1].varMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[1].variable, 'opt:stageOne, ${env:foo}');
   assert.equal(result[1].variableType, 'options');
   assert.equal(result[1].hasFallback, true);
   assert.equal(result[1].valueBeforeFallback, 'opt:stageOne');
   assert.equal(result[1].fallbackValues.length, 1);
   assert.equal(result[1].fallbackValues[0].isVariable, true);
-  assert.equal(result[1].fallbackValues[0].fullMatch, '${env:foo}');
+  assert.equal(result[1].fallbackValues[0].varMatch, '${env:foo}');
   assert.equal(result[1].fallbackValues[0].variableType, 'env');
 
   // Check opt:stageTwo
-  assert.equal(result[2].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[2].varMatch, '${opt:stageTwo}');
   assert.equal(result[2].variable, 'opt:stageTwo');
 
   // Check opt:stage with multiple fallbacks
-  assert.equal(result[3].fullMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
+  assert.equal(result[3].varMatch, '${opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three" }');
   assert.equal(result[3].variable, 'opt:stage, ${opt:stageOne, ${env:foo}}, ${opt:stageTwo}, "three"');
   assert.equal(result[3].hasFallback, true);
   assert.equal(result[3].valueBeforeFallback, 'opt:stage');
   assert.equal(result[3].fallbackValues.length, 3);
-  assert.equal(result[3].fallbackValues[0].fullMatch, '${opt:stageOne, ${env:foo}}');
+  assert.equal(result[3].fallbackValues[0].varMatch, '${opt:stageOne, ${env:foo}}');
   assert.equal(result[3].fallbackValues[0].isVariable, true);
-  assert.equal(result[3].fallbackValues[1].fullMatch, '${opt:stageTwo}');
+  assert.equal(result[3].fallbackValues[1].varMatch, '${opt:stageTwo}');
   assert.equal(result[3].fallbackValues[1].isVariable, true);
-  assert.equal(result[3].fallbackValues[2].fullMatch, '"three"');
+  assert.equal(result[3].fallbackValues[2].varMatch, '"three"');
   assert.equal(result[3].fallbackValues[2].isVariable, false);
   assert.equal(result[3].fallbackValues[2].stringValue, 'three');
 
