@@ -715,7 +715,7 @@ class Configorama {
         fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
 
         deepLog('enrich', enrich)
-        process.exit(1)
+        // process.exit(1)
         /** */
       }
 
@@ -887,7 +887,7 @@ class Configorama {
             text: varMsg,
             title: {
               left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
-              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : 'x',
+              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
             },
           }
         })
