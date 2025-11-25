@@ -261,7 +261,7 @@ class Configorama {
       // Return metadata
       returnMetadata: false,
       // Return preResolvedVariableDetails
-      returnPreResolvedVariableDetails: true,
+      returnPreResolvedVariableDetails: false,
     }, options)
 
     this.filterCache = {}
@@ -515,7 +515,7 @@ class Configorama {
       toKebabCase: (val) => {
         return kebabCase(val)
       },
-      /* Type filters */
+      /* Type filters for coercion */
       toNumber: (val, from) => {
         const newVal = Number(val)
         return newVal
@@ -531,6 +531,30 @@ class Configorama {
       },
       toObject: (val) => {
         return JSON5.parse(val)
+      },
+      /* Type validation filters */
+      Number: (value) => {
+        const n = Number(value)
+        if (isNaN(n)) throw new Error(`Configorama Error: Expected Number, got "${value}"`)
+        return n
+      },
+      Boolean: (value) => {
+        if (typeof value === 'boolean') return value
+        const v = String(value).toLowerCase()
+        if (['true', '1', 'yes', 'on'].includes(v)) return true
+        if (['false', '0', 'no', 'off'].includes(v)) return false
+        throw new Error(`Configorama Error: Expected Boolean, got "${value}"`)
+      },
+      String: (value) => {
+        if (value === undefined || value === null || value === 'null') return ''
+        return String(value)
+      },
+      Json: (value) => {
+        try {
+          return typeof value === 'string' ? JSON.parse(value) : value
+        } catch (e) {
+          throw new Error(`Configorama Error: Invalid JSON in variable`)
+        }
       },
     }
 
@@ -688,6 +712,7 @@ class Configorama {
 
       // WALK through CLI prompt if --setup flag is set
       if (SETUP_MODE) {
+        deepLog('enrich', enrich)
         const userInputs = await runConfigWizard(enrich, this.originalConfig)
 
         console.log('\n')
@@ -1007,6 +1032,7 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
     const variableTypes = this.variableTypes
+    const filterMatch = this.filterMatch
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
@@ -1032,24 +1058,105 @@ class Configorama {
         const lastItem = nested[nested.length - 1]
         const lastKeyPath = this.path[this.path.length - 1]
         const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
-        const key = lastItem.fullMatch
+
+        // Extract filters from fullMatch
+        const originalSrc = lastItem.fullMatch || ''
+        const hasFilters = filterMatch && originalSrc.match(filterMatch)
+        let foundFilters = []
+        let keyWithoutFilters = originalSrc
+
+        if (hasFilters) {
+          // Extract filter names from the match (e.g., "| String}" -> ["String"])
+          const filterPart = hasFilters[0].replace(/}?$/, '') // Remove trailing }
+          foundFilters = filterPart
+            .split('|')
+            .map((filter) => filter.trim())
+            .filter(Boolean)
+
+          // Remove filters from the key (replace "| String}" with "}")
+          // Also clean up any trailing whitespace before the closing brace
+          keyWithoutFilters = originalSrc.replace(filterMatch, '}').replace(/\s+}$/, '}')
+        }
+
+        const key = keyWithoutFilters
+
+        // Strip filters from resolveDetails
+        const cleanedResolveDetails = nested.map(detail => {
+          const cleaned = { ...detail }
+          if (cleaned.fullMatch && filterMatch) {
+            const match = cleaned.fullMatch.match(filterMatch)
+            if (match) {
+              cleaned.fullMatch = cleaned.fullMatch.replace(filterMatch, '').replace(/\s+$/, '') + '}'
+            }
+          }
+          if (cleaned.variable && filterMatch) {
+            const match = cleaned.variable.match(filterMatch)
+            if (match) {
+              cleaned.variable = cleaned.variable.replace(filterMatch, '').replace(/\s+$/, '')
+            }
+          }
+          if (cleaned.varString && filterMatch) {
+            const match = cleaned.varString.match(filterMatch)
+            if (match) {
+              cleaned.varString = cleaned.varString.replace(filterMatch, '').trim()
+            }
+          }
+          // Also clean fallbackValues if present
+          if (cleaned.fallbackValues && Array.isArray(cleaned.fallbackValues)) {
+            cleaned.fallbackValues = cleaned.fallbackValues.map(fb => {
+              const cleanedFb = { ...fb }
+              if (cleanedFb.fullMatch && filterMatch) {
+                const match = cleanedFb.fullMatch.match(filterMatch)
+                if (match) {
+                  cleanedFb.fullMatch = cleanedFb.fullMatch.replace(filterMatch, '').trim()
+                }
+              }
+              if (cleanedFb.variable && filterMatch) {
+                const match = cleanedFb.variable.match(filterMatch)
+                if (match) {
+                  cleanedFb.variable = cleanedFb.variable.replace(filterMatch, '').trim()
+                }
+              }
+              if (cleanedFb.stringValue && filterMatch) {
+                const match = cleanedFb.stringValue.match(filterMatch)
+                if (match) {
+                  cleanedFb.stringValue = cleanedFb.stringValue.replace(filterMatch, '').trim()
+                }
+              }
+              return cleanedFb
+            })
+          }
+          return cleaned
+        })
+
         const varData = {
           path: configValuePath,
           key: itemKey,
           value: rawValue,
-          variable: lastItem.fullMatch,
+          variable: keyWithoutFilters,
           isRequired: false,
           defaultValue: undefined,
           matchIndex: matchCount++,
           resolveOrder: [],
-          resolveDetails: nested,
+          resolveDetails: cleanedResolveDetails,
+          ...(foundFilters.length > 0 && { filters: foundFilters }),
         }
         let defaultValueIsVar = false
 
         function calculateResolveOrder(item) {
+          // Helper to strip filters from variable strings
+          const stripFilters = (str) => {
+            if (!str || !filterMatch) return str
+            const match = str.match(filterMatch)
+            if (match) {
+              return str.replace(filterMatch, '').trim()
+            }
+            return str
+          }
+
           if (item && item.fallbackValues) {
             let hasResolvedFallback
-            const order = ([item.valueBeforeFallback]).concat(item.fallbackValues.map((f, i) => {
+            const order = ([stripFilters(item.valueBeforeFallback)]).concat(item.fallbackValues.map((f, i) => {
               if (f.fallbackValues) {
                 const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
                 if (!hasResolvedFallback && nestedResolvedFallback) {
@@ -1059,21 +1166,22 @@ class Configorama {
               }
 
               if (!hasResolvedFallback && f.isResolvedFallback) {
-                hasResolvedFallback = f.stringValue
+                hasResolvedFallback = stripFilters(f.stringValue)
               }
               if (f.isResolvedFallback) {
-                hasResolvedFallback = f.stringValue
+                hasResolvedFallback = stripFilters(f.stringValue)
               }
 
               if (!hasResolvedFallback && f.isVariable) {
                 defaultValueIsVar = f
               }
-              return `${f.stringValue || f.variable}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+              const valueStr = stripFilters(f.stringValue || f.variable)
+              return `${valueStr}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
             })).flat()
 
             return [order, hasResolvedFallback]
           }
-          return [[item.variable], undefined]
+          return [[stripFilters(item.variable)], undefined]
         }
 
         const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
