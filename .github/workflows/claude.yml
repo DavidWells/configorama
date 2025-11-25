@@ -480,7 +480,9 @@ jobs:
           echo "Base Ref: ${{ needs.setup.outputs.base-ref }}"
           echo "Head SHA: ${{ needs.setup.outputs.head-sha }}"
           echo "Has Linked PR: ${{ needs.setup.outputs.has-linked-pr }}"
-          echo "Trigger Text: '${{ needs.setup.outputs.trigger-text }}'"
+          cat << EOF
+          Trigger Text: ${{ needs.setup.outputs.trigger-text }}
+          EOF
           echo "=================================="
       
       - name: Fetch Base Branch (PR only)
