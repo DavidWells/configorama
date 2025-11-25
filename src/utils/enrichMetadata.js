@@ -511,7 +511,7 @@ function enrichMetadata(
           const fileRef = fileRefsFound.find(ref => ref.relativePath === filePath)
           if (fileRef) {
             entry.fileExists = fileRef.exists
-          } else {
+          } else if (configPath) {
             const thePath = path.resolve(path.dirname(configPath), filePath)
             const fileExists = fs.existsSync(thePath)
             entry.fileExists = fileExists

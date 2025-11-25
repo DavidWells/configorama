@@ -1,0 +1,265 @@
+# Kitchen Sink Example - All Built-in Variable Types
+# This example demonstrates every variable type supported by Configorama
+
+service: kitchen-sink-example
+
+# ======================
+# 1. Environment Variables
+# ======================
+envVariables:
+  apiKey: ${env:API_KEY}
+  apiKeyWithFallback: ${env:API_KEY, 'default-api-key'}
+  secretToken: ${env:SECRET_TOKEN}
+  dbHost: ${env:DB_HOST, 'localhost'}
+  dbPort: ${env:DB_PORT, 5432}
+  nodeEnv: ${env:NODE_ENV, 'development'}
+
+# ======================
+# 2. CLI Option Flags
+# ======================
+cliFlags:
+  stage: ${opt:stage}
+  stageWithFallback: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  verbose: ${opt:verbose, false}
+  composed: ${opt:stage}-${opt:region}
+
+# ======================
+# 3. Self References
+# ======================
+selfReferences:
+  baseValue: hello-world
+
+  # Simple self reference
+  simpleRef: ${self:selfReferences.baseValue}
+
+  # Shorthand self reference (without 'self:')
+  shorthandRef: ${selfReferences.baseValue}
+
+  # Nested object
+  nested:
+    level1:
+      level2:
+        value: deeply-nested-value
+
+  # Deep self reference
+  deepRef: ${self:selfReferences.nested.level1.level2.value}
+
+  # Self reference with fallback
+  withFallback: ${self:selfReferences.nonExistent, 'fallback-value'}
+
+# ======================
+# 4. File References
+# ======================
+fileReferences:
+  # Full file import
+  fullYamlFile: ${file(./data.yml)}
+
+  # Specific property from file
+  specificProperty: ${file(./data.yml):topLevel}
+
+  # Nested property from file
+  nestedProperty: ${file(./data.json):nested.value}
+
+  # File with fallback
+  fileWithFallback: ${file(./missing-file.yml), 'fallback-content'}
+
+  # Dynamic file path using variables
+  dynamicFilePath: ${file(./config.${opt:stage}.json)}
+
+# ======================
+# 5. Async/Sync JavaScript Files
+# ======================
+jsFileReferences:
+  # Async JS function
+  asyncValue: ${file(./async-function.js)}
+
+  # Sync JS function
+  syncValue: ${file(./sync-function.js)}
+
+  # JS file with arguments
+  withArgs: ${file(./function-with-args.js, 'arg1', 'arg2')}
+
+# ======================
+# 6. TypeScript Files
+# ======================
+tsFileReferences:
+  # TypeScript config object
+  tsConfig: ${file(./config.ts)}
+
+  # Async TypeScript function
+  tsAsyncSecrets: ${file(./async-secrets.ts)}
+
+  # Specific property from TS export
+  tsDatabase: ${file(./config.ts):database}
+
+# ======================
+# 7. Git References
+# ======================
+gitReferences:
+  repo: ${git:repo}
+  owner: ${git:owner}
+  url: ${git:url}
+  branch: ${git:branch}
+  commit: ${git:commit}
+  sha1: ${git:sha1}
+  message: ${git:message}
+  remote: ${git:remote}
+  tag: ${git:tag}
+  describe: ${git:describe}
+
+# ======================
+# 8. Cron Expressions
+# ======================
+cronExpressions:
+  everyMinute: ${cron('every minute')}
+  everyHour: ${cron('every hour')}
+  everyDay: ${cron('every day')}
+  weekdays: ${cron('weekdays')}
+  midnight: ${cron('midnight')}
+  noon: ${cron('noon')}
+  every5Minutes: ${cron('every 5 minutes')}
+  every15Minutes: ${cron('every 15 minutes')}
+  at930am: ${cron('at 9:30')}
+  at930pm: ${cron('at 9:30 pm')}
+  mondayMorning: ${cron('on monday at 9:00')}
+  customCron: ${cron('15 2 * * *')}
+
+# ======================
+# 9. Eval Expressions
+# ======================
+evalExpressions:
+  addition: ${eval(5 + 3)}
+  subtraction: ${eval(10 - 4)}
+  multiplication: ${eval(6 * 7)}
+  division: ${eval(20 / 4)}
+  complex: ${eval((10 + 5) * 2)}
+
+# ======================
+# 10. String Values
+# ======================
+stringValues:
+  simple: just-a-string
+  withQuotes: 'single quotes'
+  withDoubleQuotes: "double quotes"
+  multiline: |
+    This is a
+    multiline string
+    value
+
+# ======================
+# 11. Number Values
+# ======================
+numberValues:
+  integer: 123
+  float: 45.67
+  negative: -89
+  zero: 0
+
+# ======================
+# 12. Filters (experimental)
+# ======================
+filters:
+  uppercase: ${'hello world' | toUpperCase}
+  kebabCase: ${'helloWorld' | toKebabCase}
+  camelCase: ${'hello-world' | toCamelCase}
+
+  baseValue: some_value_here
+  transformedValue: ${filters.baseValue | toKebabCase}
+
+# ======================
+# 13. Functions (experimental)
+# ======================
+functions:
+  objectOne:
+    key1: value1
+    key2: value2
+
+  objectTwo:
+    key3: value3
+    key4: value4
+
+  merged: ${merge(${functions.objectOne}, ${functions.objectTwo})}
+
+  # MD5 hash
+  hashedValue: ${md5('some-string-to-hash')}
+
+# ======================
+# 14. Complex Compositions
+# ======================
+compositions:
+  # Multiple variable types in one value
+  multipleTypes: ${opt:stage}-${env:NODE_ENV}-${git:branch}
+
+  # Nested variable references
+  nestedVars: ${file(./config.${opt:stage}.json):database.${opt:region}}
+
+  # Self reference with multiple lookups
+  chainedRefs: ${self:selfReferences.${opt:stage}}
+
+  # Environment-specific configuration
+  envConfig: ${file(./config.${env:NODE_ENV}.yml)}
+
+  # Composed file path with fallback
+  safeFileRef: ${file(./optional-${opt:stage}.yml), ${file(./default.yml)}}
+
+# ======================
+# 15. Fallback Chains
+# ======================
+fallbacks:
+  # Simple fallback
+  withOneFallback: ${env:MISSING_VAR, 'default'}
+
+  # Multiple fallbacks (tries each in order)
+  multipleLayeredFallback: ${self:nonExistent1, ${self:nonExistent2}, 'final-fallback'}
+
+  # File fallback chain
+  fileFallbackChain: ${file(./missing1.yml), ${file(./missing2.yml), 'ultimate-fallback'}}
+
+# ======================
+# 16. Array References
+# ======================
+arrays:
+  simpleArray:
+    - item1
+    - item2
+    - item3
+
+  arrayFirstItem: ${arrays.simpleArray.0}
+  arraySecondItem: ${arrays.simpleArray.1}
+
+  nestedArray:
+    - name: first
+      value: 100
+    - name: second
+      value: 200
+
+  arrayObjectValue: ${arrays.nestedArray.1.value}
+
+# ======================
+# 17. Mixed Usage Example
+# ======================
+realWorldExample:
+  serviceName: ${opt:service, 'my-app'}
+  environment: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+  database:
+    host: ${env:DB_HOST, 'localhost'}
+    port: ${env:DB_PORT, 5432}
+    name: ${self:realWorldExample.serviceName}-${self:realWorldExample.environment}
+    credentials: ${file(./secrets.${self:realWorldExample.environment}.json)}
+
+  api:
+    baseUrl: https://${self:realWorldExample.serviceName}.${self:realWorldExample.region}.example.com
+    timeout: ${env:API_TIMEOUT, 5000}
+
+  deployment:
+    branch: ${git:branch}
+    commit: ${git:sha1}
+    timestamp: ${git:timestamp}
+    deployer: ${env:USER, 'unknown'}
+
+  schedule:
+    dailyBackup: ${cron('every day at 2:00 am')}
+    weeklyReport: ${cron('on monday at 9:00')}

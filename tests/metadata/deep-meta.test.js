@@ -9,6 +9,7 @@ const configorama = require('../../src')
 process.env.envNumber = 100
 process.env.MY_SECRET = 'lol hi there'
 process.env.MY_ENV_VAR = 'prod'
+process.env.FOO = 'dev'
 
 test('Nested file references', async () => {
   const configFile = path.join(__dirname, '../fileValues/fileValues.yml')
