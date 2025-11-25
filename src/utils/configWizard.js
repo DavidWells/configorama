@@ -281,7 +281,12 @@ async function runConfigWizard(metadata, originalConfig = {}) {
 
   // Prompt for options (CLI flags)
   if (grouped.options.length > 0) {
-    p.note(`Found ${grouped.options.length} CLI flag(s)`, 'CLI Flags')
+    const flagsList = grouped.options.map(v => {
+      const varSyntax = `\${opt:${v.cleanName}}`
+      return `  - ${varSyntax}`
+    }).join('\n')
+    const noteContent = `Found ${grouped.options.length} CLI flag(s)\n${flagsList}`
+    p.note(noteContent, 'CLI Flags')
 
     for (const varInfo of grouped.options) {
       const message = createPromptMessage(varInfo)
@@ -314,7 +319,12 @@ async function runConfigWizard(metadata, originalConfig = {}) {
 
   // Prompt for environment variables
   if (grouped.env.length > 0) {
-    p.note(`Found ${grouped.env.length} environment variable(s)`, 'Environment Variables')
+    const envList = grouped.env.map(v => {
+      const varSyntax = `\${env:${v.cleanName}}`
+      return `  - ${varSyntax}`
+    }).join('\n')
+    const noteContent = `Found ${grouped.env.length} environment variable(s)\n${envList}`
+    p.note(noteContent, 'Environment Variables')
 
     for (const varInfo of grouped.env) {
       const message = createPromptMessage(varInfo)
@@ -347,7 +357,12 @@ async function runConfigWizard(metadata, originalConfig = {}) {
 
   // Prompt for self references (if any need values)
   if (grouped.self.length > 0) {
-    p.note(`Found ${grouped.self.length} config reference(s)`, 'Config References')
+    const selfList = grouped.self.map(v => {
+      const varSyntax = `\${self:${v.cleanName}}`
+      return `  - ${varSyntax}`
+    }).join('\n')
+    const noteContent = `Found ${grouped.self.length} config reference(s)\n${selfList}`
+    p.note(noteContent, 'Config References')
 
     for (const varInfo of grouped.self) {
       const message = createPromptMessage(varInfo)
