@@ -7,6 +7,7 @@
   "files": [
     "cli.js",
     "src",
+    "types",
     "index.d.ts",
     "package.json",
     "package-lock.json",
@@ -25,6 +26,10 @@
     "test:api": "uvu tests/api api.test.js",
     "test:lib": "uvu src \".*\\.test.js$\"",
     "watch": "watchlist tests -- npm test",
+    "typecheck": "tsc --noEmit",
+    "types": "tsc",
+    "types:watch": "tsc --watch",
+    "prepublishOnly": "npm run types",
     "publish": "git push origin && git push origin --tags",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
@@ -76,6 +81,7 @@
     "traverse": "^0.6.8"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
     "markdown-magic": "^3.4.0",
     "tsx": "^4.7.0",
     "typescript": "^5.8.3",

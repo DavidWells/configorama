@@ -3,6 +3,7 @@
 /.nyc_output
 /dist
 /tmp
+/types
 node_modules
 misc
 coverage
