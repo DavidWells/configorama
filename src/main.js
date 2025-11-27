@@ -816,6 +816,7 @@ class Configorama {
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
+          console.log('variableInstances', variableInstances)
           const firstInstance = variableInstances[0]
 
           // Get uniqueVariable data for description and other metadata
@@ -835,23 +836,6 @@ class Configorama {
           // Show required status from metadata
           if (firstInstance.isRequired) {
             requiredMessage = `${chalk.red.bold('[Required]')}`
-          }
-
-          // Show description from uniqueVariables if available
-          if (uniqueVar && uniqueVar.occurrences.length > 0) {
-            // Collect unique descriptions from all occurrences
-            const descriptions = uniqueVar.occurrences
-              .map(occ => occ.description)
-              .filter((desc, index, self) => desc && self.indexOf(desc) === index)
-
-            if (descriptions.length > 0) {
-              const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
-              if (descriptions.length === 1) {
-                varMsg += `${descText} ${valueChalk(descriptions[0])}\n`
-              } else {
-                varMsg += `${descText}\n${descriptions.map(d => valueChalk(`${indent}- ${d}`)).join('\n')}\n`
-              }
-            }
           }
 
           // Show type filter if present (Boolean, String, Number, etc.)
@@ -875,6 +859,22 @@ class Configorama {
             }
           }
 
+          // Show description from uniqueVariables if available
+          if (uniqueVar && uniqueVar.occurrences.length > 0) {
+            // Collect unique descriptions from all occurrences
+            const descriptions = uniqueVar.occurrences
+              .map(occ => occ.description)
+              .filter((desc, index, self) => desc && self.indexOf(desc) === index)
+
+            if (descriptions.length > 0) {
+              const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+              const combinedDesc = descriptions.join('. ')
+              varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
+            }
+          }
+
+    
+
           // Show default value from metadata
           if (typeof firstInstance.defaultValue !== 'undefined') {
             const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
@@ -897,9 +897,11 @@ class Configorama {
 
           // Show path(s) from metadata
           let locationRender = valueChalk(variableInstances[0].path)
-          let locationLabel = `${indent}${keyChalk('Path:'.padEnd(titleText.length, ' '))}`
+          let locationLabel = `${indent}${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
+          let typeText = ''
           if (variableInstances.length > 1) {
-            locationRender = `\n${variableInstances.map((v) => {
+            const pathIndent = ' '.repeat(titleText.length + 1)
+            const pathItems = variableInstances.map((v, idx) => {
               // Show type filter per path if different
               if (uniqueVar && uniqueVar.occurrences.length > 1) {
                 const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
@@ -907,26 +909,46 @@ class Configorama {
                 const pathType = occurrence && occurrence.filters
                   ? occurrence.filters.find(f => typeFilters.includes(f))
                   : null
-                const typeLabel = pathType ? ` ${chalk.dim(`[${pathType}]`)}` : ''
-                return valueChalk(`${indent}- ${v.path}`) + typeLabel
+
+                typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
+                const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+                return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
               }
-              return valueChalk(`${indent}- ${v.path}`)
-            }).join('\n')}`
-            locationLabel = `${indent}${keyChalk('Paths:')}`
+              const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+              return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
+            })
+            locationRender = pathItems.join('\n')
+            locationLabel = `${indent}${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
+          } else {
+            // look for type filter in the first instance
+            const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
+            const pathType = firstInstance.filters
+              ? firstInstance.filters.find(f => typeFilters.includes(f))
+              : null
+
+            typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
           }
           varMsg += `${locationLabel} ${locationRender}`
 
-          // Find line number in config file
-          const line = lines.findIndex((line) => line.includes(key))
-          const lineNumber = line + 1
+          // Find line number in config file using the YAML key (e.g., 'apiKey', 'dbPort')
+          const yamlKey = firstInstance.key
+          const line = lines.findIndex((line) => line.includes(`${yamlKey}:`))
+          const lineNumber = line !== -1 ? line + 1 : 0
 
 
           return {
-            text: varMsg,
+            content: {
+              left: varMsg,
+              backgroundColor: 'red',
+              width: '100%',
+            },
             title: {
               left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
               right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
+              center: typeText,
+              paddingBottom: 1,
             },
+            width: '100%',
           }
         })
 
@@ -935,8 +957,9 @@ class Configorama {
 
         console.log(makeStackedBoxes(boxes, {
           borderColor: 'gray',
-          minWidth: '90%',
+          minWidth: '96%',
           borderStyle: 'bold',
+          disableTitleSeparator: true,
         }))
         // process.exit(1)
       }
@@ -1225,7 +1248,7 @@ class Configorama {
                 defaultValueIsVar = f
               }
               const valueStr = stripFilters(f.stringValue || f.variable)
-              return `${valueStr}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+              return `${valueStr}${f.isResolvedFallback ? ' (default)' : ''}`
             })).flat()
 
             return [order, hasResolvedFallback]

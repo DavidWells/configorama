@@ -479,7 +479,10 @@ function enrichMetadata(
               innerVariable.defaultValueSrc = defaultValueSrc
             }
 
-            entry.innerVariables.push(innerVariable)
+            if (entry.innerVariables) {
+              entry.innerVariables.push(innerVariable)
+            }
+
           }
         }
       }
