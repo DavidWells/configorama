@@ -723,9 +723,9 @@ class Configorama {
       const varKeys = Object.keys(variableData)
       const uniqueVarKeys = Object.keys(uniqueVariables)
 
-      // if (this.opts.returnPreResolvedVariableDetails) {
-      //   return metadata
-      // }
+      if (this.opts.returnPreResolvedVariableDetails) {
+        return enrich
+      }
 
       if (!varKeys.length) {
         logHeader('No Variables Found in Config')
