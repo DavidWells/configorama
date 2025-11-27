@@ -810,8 +810,10 @@ class Configorama {
 
         logHeader('Variable Details')
 
-        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
     
+
+        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
+
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
@@ -929,9 +931,34 @@ class Configorama {
           }
           varMsg += `${locationLabel} ${locationRender}`
 
-          // Find line number in config file using the YAML key (e.g., 'apiKey', 'dbPort')
-          const yamlKey = firstInstance.key
-          const line = lines.findIndex((line) => line.includes(`${yamlKey}:`))
+          // Find line number in config file based on format (YAML, TOML, JSON, INI)
+          const configKey = firstInstance.key
+          const line = lines.findIndex((line) => {
+            const fileType = this.configFileType
+            const escapedKey = configKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // YAML: key: or key :
+            if (fileType === '.yml' || fileType === '.yaml') {
+              return new RegExp(`^\\s*${escapedKey}\\s*:`).test(line)
+            }
+            // TOML: key = or key=
+            if (fileType === '.toml') {
+              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
+            }
+            // JSON: "key": or "key" :
+            if (fileType === '.json' || fileType === '.json5') {
+              return new RegExp(`"${escapedKey}"\\s*:`).test(line)
+            }
+            // INI: key = or key=
+            if (fileType === '.ini') {
+              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
+            }
+            // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
+            if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
+              return new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`).test(line)
+            }
+            // Default fallback: try YAML-style
+            return line.includes(`${configKey}:`)
+          })
           const lineNumber = line !== -1 ? line + 1 : 0
 
 
@@ -942,7 +969,7 @@ class Configorama {
               width: '100%',
             },
             title: {
-              left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
+              left: `▷ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
               right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
               center: typeText,
               paddingBottom: 1,
@@ -956,7 +983,7 @@ class Configorama {
         // process.exit(1)
 
         console.log(makeStackedBoxes(boxes, {
-          borderText: 'Variable Details',
+          borderText: 'Variable Details. Click on titles to open in editor.',
           borderColor: 'gray',
           minWidth: '96%',
           borderStyle: 'bold',
