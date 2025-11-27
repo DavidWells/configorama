@@ -710,10 +710,9 @@ class Configorama {
       )
 
       if (showFoundVariables) {
-        //*
+        /*
         deepLog('metadata', metadata)
         fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
-
         deepLog('enrich', enrich)
         // process.exit(1)
         /** */
@@ -743,7 +742,7 @@ class Configorama {
         logHeader('Resolving Configuration')
         console.log()
 
-        process.exit(1)
+        // process.exit(1)
 
         // Continue with normal resolution flow using the new values
         // Don't exit - let it fall through to resolve the config
@@ -816,7 +815,7 @@ class Configorama {
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
-          console.log('variableInstances', variableInstances)
+          // console.log('variableInstances', variableInstances)
           const firstInstance = variableInstances[0]
 
           // Get uniqueVariable data for description and other metadata
@@ -947,6 +946,7 @@ class Configorama {
               right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
               center: typeText,
               paddingBottom: 1,
+              paddingTop: (i === 0) ? 1 : 0,
             },
             width: '100%',
           }
@@ -956,6 +956,7 @@ class Configorama {
         // process.exit(1)
 
         console.log(makeStackedBoxes(boxes, {
+          borderText: 'Variable Details',
           borderColor: 'gray',
           minWidth: '96%',
           borderStyle: 'bold',
