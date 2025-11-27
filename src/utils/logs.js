@@ -2,7 +2,7 @@ const { makeHeader } = require('@davidwells/box-logger')
 
 function logHeader(message) {
   console.log(makeHeader({
-    text: message, 
+    content: message, 
     rightBorder: true, 
     minWidth: 80, 
     textStyle: 'bold',

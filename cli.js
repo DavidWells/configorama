@@ -181,7 +181,7 @@ configorama(inputFile, options)
     const errorMsg = makeBox({
       title: `Error Processing Configuration: ${inputFile}`,
       minWidth: '100%',
-      text: error.message,
+      content: error.message,
       type: 'error',
     })
     console.log(errorMsg)

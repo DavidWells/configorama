@@ -710,10 +710,9 @@ class Configorama {
       )
 
       if (showFoundVariables) {
-        //*
+        /*
         deepLog('metadata', metadata)
         fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
-
         deepLog('enrich', enrich)
         // process.exit(1)
         /** */
@@ -743,7 +742,7 @@ class Configorama {
         logHeader('Resolving Configuration')
         console.log()
 
-        process.exit(1)
+        // process.exit(1)
 
         // Continue with normal resolution flow using the new values
         // Don't exit - let it fall through to resolve the config
@@ -751,7 +750,9 @@ class Configorama {
 
 
       const variableData = metadata.variables
+      const uniqueVariables = metadata.uniqueVariables
       const varKeys = Object.keys(variableData)
+      const uniqueVarKeys = Object.keys(uniqueVariables)
 
       // if (this.opts.returnPreResolvedVariableDetails) {
       //   return metadata
@@ -792,32 +793,14 @@ class Configorama {
           const longestKey = varKeys.reduce((acc, k) => {
             return Math.max(acc, k.length)
           }, 0)
-          // Count all references including nested ones within other variables
-          const countAllReferences = (targetVariable) => {
-            // Start with direct references
-            let count = variableData[targetVariable].length
 
-            // Check all other variables for nested references to this variable
-            varKeys.forEach((otherKey) => {
-              if (otherKey === targetVariable) return
-
-              variableData[otherKey].forEach((instance) => {
-                if (instance.resolveDetails) {
-                  instance.resolveDetails.forEach((detail) => {
-                    // Check if this resolveDetail references our target variable
-                    if (detail.varMatch === targetVariable) {
-                      count++
-                    }
-                  })
-                }
-              })
-            })
-
-            return count
-          }
-
+          // Use uniqueVariables for simpler reference counting
           const referenceData = varKeys.map((k) => {
-            const refCount = countAllReferences(k)
+            // Map from varMatch (e.g., '${env:API_KEY}') to variable name (e.g., 'env:API_KEY')
+            // Extract the variable name from the key by removing ${ and }
+            const varName = k.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+            const uniqueVar = uniqueVariables[varName]
+            const refCount = uniqueVar ? uniqueVar.occurrences.length : variableData[k].length
             const placesWord = refCount > 1 ? 'places' : 'place'
             return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${refCount} ${placesWord}`
           }).join('\n')
@@ -827,12 +810,19 @@ class Configorama {
 
         logHeader('Variable Details')
 
-        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
     
+
+        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
+
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
+          // console.log('variableInstances', variableInstances)
           const firstInstance = variableInstances[0]
+
+          // Get uniqueVariable data for description and other metadata
+          const varName = key.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+          const uniqueVar = uniqueVariables[varName]
 
           // Build display message from enriched metadata
           const spacing = '           '
@@ -849,46 +839,143 @@ class Configorama {
             requiredMessage = `${chalk.red.bold('[Required]')}`
           }
 
+          // Show type filter if present (Boolean, String, Number, etc.)
+          if (uniqueVar && uniqueVar.occurrences.length > 0) {
+            const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
+            const foundTypes = new Set()
+
+            uniqueVar.occurrences.forEach(occ => {
+              if (occ.filters && Array.isArray(occ.filters)) {
+                occ.filters.forEach(filter => {
+                  if (typeFilters.includes(filter)) {
+                    foundTypes.add(filter)
+                  }
+                })
+              }
+            })
+
+            if (foundTypes.size > 0) {
+              const typeText = `${indent}${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
+              varMsg += `${typeText} ${valueChalk(Array.from(foundTypes).join(', '))}\n`
+            }
+          }
+
+          // Show description from uniqueVariables if available
+          if (uniqueVar && uniqueVar.occurrences.length > 0) {
+            // Collect unique descriptions from all occurrences
+            const descriptions = uniqueVar.occurrences
+              .map(occ => occ.description)
+              .filter((desc, index, self) => desc && self.indexOf(desc) === index)
+
+            if (descriptions.length > 0) {
+              const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+              const combinedDesc = descriptions.join('. ')
+              varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
+            }
+          }
+
+    
+
           // Show default value from metadata
           if (typeof firstInstance.defaultValue !== 'undefined') {
             const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
-            const defaultValueText = `${indent}${keyChalk(`Default value:`.padEnd(titleText.length, ' '))}`
-            varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}`
+            const defaultValueText = `${indent}${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
           }
 
           // Show default value source path from metadata
           if (firstInstance.defaultValueSrc) {
-            varMsg += `\n${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
+            varMsg += `${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
             varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
           }
 
           // Show resolve order from metadata
           if (firstInstance.resolveOrder.length > 1) {
-            varMsg += `\n${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
             const resolveOrder = firstInstance.resolveOrder.join(', ')
             varMsg += ` ${valueChalk(resolveOrder)}\n`
           }
 
           // Show path(s) from metadata
           let locationRender = valueChalk(variableInstances[0].path)
-          let locationLabel = `${indent}${keyChalk('Path:'.padEnd(titleText.length, ' '))}`
+          let locationLabel = `${indent}${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
+          let typeText = ''
           if (variableInstances.length > 1) {
-            locationRender = `\n${variableInstances.map((v) => valueChalk(`${indent}- ${v.path}`)).join('\n')}`
-            locationLabel = `${indent}${keyChalk('Paths:')}`
+            const pathIndent = ' '.repeat(titleText.length + 1)
+            const pathItems = variableInstances.map((v, idx) => {
+              // Show type filter per path if different
+              if (uniqueVar && uniqueVar.occurrences.length > 1) {
+                const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
+                const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
+                const pathType = occurrence && occurrence.filters
+                  ? occurrence.filters.find(f => typeFilters.includes(f))
+                  : null
+
+                typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
+                const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+                return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
+              }
+              const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+              return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
+            })
+            locationRender = pathItems.join('\n')
+            locationLabel = `${indent}${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
+          } else {
+            // look for type filter in the first instance
+            const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
+            const pathType = firstInstance.filters
+              ? firstInstance.filters.find(f => typeFilters.includes(f))
+              : null
+
+            typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
           }
           varMsg += `${locationLabel} ${locationRender}`
 
-          // Find line number in config file
-          const line = lines.findIndex((line) => line.includes(key))
-          const lineNumber = line + 1
-          
+          // Find line number in config file based on format (YAML, TOML, JSON, INI)
+          const configKey = firstInstance.key
+          const line = lines.findIndex((line) => {
+            const fileType = this.configFileType
+            const escapedKey = configKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // YAML: key: or key :
+            if (fileType === '.yml' || fileType === '.yaml') {
+              return new RegExp(`^\\s*${escapedKey}\\s*:`).test(line)
+            }
+            // TOML: key = or key=
+            if (fileType === '.toml') {
+              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
+            }
+            // JSON: "key": or "key" :
+            if (fileType === '.json' || fileType === '.json5') {
+              return new RegExp(`"${escapedKey}"\\s*:`).test(line)
+            }
+            // INI: key = or key=
+            if (fileType === '.ini') {
+              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
+            }
+            // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
+            if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
+              return new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`).test(line)
+            }
+            // Default fallback: try YAML-style
+            return line.includes(`${configKey}:`)
+          })
+          const lineNumber = line !== -1 ? line + 1 : 0
+
 
           return {
-            text: varMsg,
-            title: {
-              left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
-              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
+            content: {
+              left: varMsg,
+              backgroundColor: 'red',
+              width: '100%',
             },
+            title: {
+              left: `▷ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
+              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
+              center: typeText,
+              paddingBottom: 1,
+              paddingTop: (i === 0) ? 1 : 0,
+            },
+            width: '100%',
           }
         })
 
@@ -896,9 +983,11 @@ class Configorama {
         // process.exit(1)
 
         console.log(makeStackedBoxes(boxes, {
+          borderText: 'Variable Details. Click on titles to open in editor.',
           borderColor: 'gray',
-          minWidth: '90%',
+          minWidth: '96%',
           borderStyle: 'bold',
+          disableTitleSeparator: true,
         }))
         // process.exit(1)
       }
@@ -1187,7 +1276,7 @@ class Configorama {
                 defaultValueIsVar = f
               }
               const valueStr = stripFilters(f.stringValue || f.variable)
-              return `${valueStr}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+              return `${valueStr}${f.isResolvedFallback ? ' (default)' : ''}`
             })).flat()
 
             return [order, hasResolvedFallback]
@@ -2507,10 +2596,12 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           if (valueCount.length === 1 && noNestedVars) {
-            const configFilePath = (this.configFilePath) ? `\nin file ${this.configFilePath}` : ''
+            const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
 
-            throw new Error(`Unable to resolve configuration "${propertyString}" variable at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${configFilePath}${fromLine}
+
+
+            throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
