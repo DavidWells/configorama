@@ -461,11 +461,11 @@ class Configorama {
       // ensure each variable source has a type
       options.variableSources.forEach((v) => {
         if (!v.type) {
-          console.log('v', v)
+          console.log('Variable', v)
           throw new Error('Variable source must have a type')
         }
         if (!v.match || !v.resolver) {
-          console.log('v', v)
+          console.log('Variable', v)
           throw new Error('Variable source must have a match and resolver functions')
         }
       })
@@ -718,37 +718,6 @@ class Configorama {
         /** */
       }
 
-      // WALK through CLI prompt if --setup flag is set
-      if (SETUP_MODE) {
-        deepLog('enrich', enrich)
-        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
-
-        console.log('\n')
-        logHeader('User Inputs Summary')
-        console.log(JSON.stringify(userInputs, null, 2))
-
-        // TODO set values
-
-        // Apply user inputs to options and environment
-        if (userInputs.options) {
-          Object.assign(this.opts, userInputs.options)
-        }
-        if (userInputs.env) {
-          Object.assign(process.env, userInputs.env)
-        }
-        // Note: self references are in the config, so no need to apply them
-
-        console.log()
-        logHeader('Resolving Configuration')
-        console.log()
-
-        // process.exit(1)
-
-        // Continue with normal resolution flow using the new values
-        // Don't exit - let it fall through to resolve the config
-      }
-
-
       const variableData = metadata.variables
       const uniqueVariables = metadata.uniqueVariables
       const varKeys = Object.keys(variableData)
@@ -809,8 +778,6 @@ class Configorama {
         }
 
         logHeader('Variable Details')
-
-    
 
         const lines = this.configFileContents ? this.configFileContents.split('\n') : []
 
@@ -974,13 +941,11 @@ class Configorama {
               center: typeText,
               paddingBottom: 1,
               paddingTop: (i === 0) ? 1 : 0,
+              truncate: true,
             },
             width: '100%',
           }
         })
-
-        // console.log('boxes', boxes)
-        // process.exit(1)
 
         console.log(makeStackedBoxes(boxes, {
           borderText: 'Variable Details. Click on titles to open in editor.',
@@ -990,6 +955,38 @@ class Configorama {
           disableTitleSeparator: true,
         }))
         // process.exit(1)
+      }
+
+
+      // WALK through CLI prompt if --setup flag is set
+      if (SETUP_MODE) {
+        logHeader('Setup Mode')
+        // deepLog('enrich', enrich)
+        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
+
+        console.log('\n')
+        logHeader('User Inputs Summary')
+        console.log(JSON.stringify(userInputs, null, 2))
+
+        // TODO set values
+
+        // Apply user inputs to options and environment
+        if (userInputs.options) {
+          Object.assign(this.opts, userInputs.options)
+        }
+        if (userInputs.env) {
+          Object.assign(process.env, userInputs.env)
+        }
+        // Note: self references are in the config, so no need to apply them
+
+        console.log()
+        logHeader('Resolving Configuration')
+        console.log()
+
+        // process.exit(1)
+
+        // Continue with normal resolution flow using the new values
+        // Don't exit - let it fall through to resolve the config
       }
     
       /* Exit early if list or info flag is set */
