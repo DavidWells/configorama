@@ -2568,10 +2568,12 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           if (valueCount.length === 1 && noNestedVars) {
-            const configFilePath = (this.configFilePath) ? `\nin file ${this.configFilePath}` : ''
+            const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
 
-            throw new Error(`Unable to resolve configuration "${propertyString}" variable at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${configFilePath}${fromLine}
+
+
+            throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
