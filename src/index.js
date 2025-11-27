@@ -5,20 +5,34 @@ const enrichMetadata = require('./utils/enrichMetadata')
 module.exports.Configorama = Configorama
 
 /**
+ * @typedef {Object} ConfigoramaSettings
+ * @property {Object.<string, any>} [options] - options to populate for ${opt:xyz}. These could be CLI flags
+ * @property {string} [syntax] - Regex of variable syntax
+ * @property {string} [configDir] - cwd of config. Needed if raw object passed in instead of file path
+ * @property {Array} [variableSources] - array of custom variable sources
+ * @property {Object.<string, Function>} [filters] - Object of custom filters
+ * @property {Object.<string, Function>} [functions] - Object of custom functions
+ * @property {boolean} [allowUnknownVars] - allow unknown variables to pass through without throwing errors
+ * @property {boolean} [allowUndefinedValues] - allow undefined values to pass through without throwing errors
+ * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
+ * @property {boolean} [returnMetadata] - return both config and metadata about variables found
+ */
+
+/**
+ * @typedef {Object} ConfigoramaResult
+ * @property {string} variableSyntax - The variable syntax pattern used
+ * @property {Object.<string, string>} variableTypes - Map of variable types found
+ * @property {Object} config - The resolved configuration object
+ * @property {Object} originalConfig - The original unresolved configuration
+ * @property {Object} metadata - Metadata about variables found and resolved
+ * @property {Object} resolutionHistory - Resolution history per path for debugging
+ */
+
+/**
  * Configorama async API
- * @param  {string|object} configPathOrObject - Path to config file or raw javascript config object
- * @param {object}  [settings] Information about the user.
- * @param {object}  [settings.options] - options to populate for ${opt:xyz}. These could be CLI flags
- * @param {string}  [settings.syntax] - Regex of variable syntax
- * @param {string}  [settings.configDir] - cwd of config. Needed if raw object passed in instead of file path
- * @param {array}   [settings.variableSources] - array of custom variable sources
- * @param {object}  [settings.filters] - Object of of custom filters
- * @param {object}  [settings.functions] - Object of of custom functions
- * @param {boolean} [settings.allowUnknownVars] - allow unknown variables to pass through without throwing errors
- * @param {boolean} [settings.allowUndefinedValues] - allow undefined values to pass through without throwing errors
- * @param {object|function} [settings.dynamicArgs] - values passed into .js config files if user using javascript config.
- * @param {boolean} [settings.returnMetadata] - return both config and metadata about variables found
- * @return {Promise} resolved configuration or {config, metadata} if returnMetadata is true
+ * @param {string|Object} configPathOrObject - Path to config file or raw javascript config object
+ * @param {ConfigoramaSettings} [settings={}] - Configuration settings
+ * @returns {Promise<Object|ConfigoramaResult>} resolved configuration or {config, metadata} if returnMetadata is true
  */
 module.exports = async (configPathOrObject, settings = {}) => {
   const instance = new Configorama(configPathOrObject, settings)
@@ -80,6 +94,12 @@ module.exports = async (configPathOrObject, settings = {}) => {
   return config
 }
 
+/**
+ * Configorama sync API
+ * @param {string|Object} configPathOrObject - Path to config file or raw javascript config object
+ * @param {ConfigoramaSettings} [settings={}] - Configuration settings
+ * @returns {Object} resolved configuration object
+ */
 module.exports.sync = (configPathOrObject, settings = {}) => {
   const _settings = settings || {}
   if (_settings.dynamicArgs && typeof _settings.dynamicArgs === 'function') {
@@ -96,5 +116,8 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
   })
 }
 
-// Export format utilities
+/**
+ * Format utilities for parsing various config formats
+ * @type {Object}
+ */
 module.exports.format = parsers

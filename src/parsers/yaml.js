@@ -2,7 +2,12 @@ const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
 
-// Loader for custom CF syntax
+/**
+ * Loader for custom CF syntax
+ * @param {string|Buffer} contents - YAML content to load
+ * @param {Object} [options] - YAML load options
+ * @returns {{data: Object|null, error: Error|null}} Parsed data and error if any
+ */
 function load(contents, options) {
   let data
   let error
@@ -14,6 +19,12 @@ function load(contents, options) {
   return { data, error }
 }
 
+/**
+ * Parse YAML content into JavaScript object
+ * @param {string} ymlContents - YAML string to parse
+ * @returns {Object} Parsed YAML object
+ * @throws {Error} If YAML parsing fails
+ */
 function parse(ymlContents) {
   // Get document, or throw exception on error
   let ymlObject = {}
@@ -25,6 +36,12 @@ function parse(ymlContents) {
   return ymlObject
 }
 
+/**
+ * Convert JavaScript object to YAML string
+ * @param {Object} object - Object to convert to YAML
+ * @returns {string} YAML string representation
+ * @throws {Error} If conversion fails
+ */
 function dump(object) {
   let yml
   try {
@@ -37,6 +54,12 @@ function dump(object) {
   return yml
 }
 
+/**
+ * Convert YAML content to TOML format
+ * @param {string} ymlContents - YAML string to convert
+ * @returns {string} TOML string representation
+ * @throws {Error} If conversion fails
+ */
 function toToml(ymlContents) {
   let toml
   try {
@@ -47,6 +70,12 @@ function toToml(ymlContents) {
   return toml
 }
 
+/**
+ * Convert YAML content to JSON format
+ * @param {string} ymlContents - YAML string to convert
+ * @returns {string} JSON string representation
+ * @throws {Error} If conversion fails
+ */
 function toJson(ymlContents) {
   let json
   try {
@@ -57,7 +86,12 @@ function toJson(ymlContents) {
   return json
 }
 
-// TODO only works for default var syntax ${}. Maybe fix?
+/**
+ * Find outermost variables in text using ${} syntax
+ * TODO: only works for default var syntax ${}. Maybe fix?
+ * @param {string} text - Text to search for variables
+ * @returns {string[]} Array of variable matches
+ */
 function findOutermostVariables(text) {
   let matches = [];
   let depth = 0;
@@ -81,7 +115,11 @@ function findOutermostVariables(text) {
   return matches;
 }
 
-
+/**
+ * Match outermost braces in text
+ * @param {string} text - Text to search for braces
+ * @returns {string[]} Array of matched brace content
+ */
 function matchOutermostBraces(text) {
   let depth = 0
   let startIndex = -1
@@ -111,6 +149,11 @@ const KEY_OBJECT = /^[ \t]*[^":\s]*:\s+\{/gm
 
 const INNER_ARRAY = /\[(?:[^\[\]])*\]/g
 
+/**
+ * Pre-process YAML string to handle nested variables and CloudFormation syntax
+ * @param {string} [ymlStr=''] - YAML string to pre-process
+ * @returns {string} Pre-processed YAML string
+ */
 function preProcess(ymlStr = '') {
   /*
   return ymlStr
