@@ -957,6 +957,11 @@ class Configorama {
    * @returns {object} Metadata object containing variables, fileRefs, and summary
    */
   collectVariableMetadata() {
+    // Return cached metadata if already computed
+    if (this._cachedMetadata) {
+      return this._cachedMetadata
+    }
+
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
     const variableTypes = this.variableTypes
@@ -1282,7 +1287,7 @@ class Configorama {
       }
     })
 
-    return {
+    this._cachedMetadata = {
       variables: variableData,
       uniqueVariables: {},
       fileDependencies: {
@@ -1303,6 +1308,8 @@ class Configorama {
         variablesWithDefaults: withDefaultsCount
       },
     }
+
+    return this._cachedMetadata
   }
   /**
    * Populate the variables in the given object.
