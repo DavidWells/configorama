@@ -532,7 +532,7 @@ class Configorama {
         this.opts
       )
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
+      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
@@ -559,7 +559,7 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
+    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
       // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
 
@@ -807,7 +807,7 @@ class Configorama {
 
         // Apply user inputs to options and environment
         if (userInputs.options) {
-          Object.assign(this.opts, userInputs.options)
+          Object.assign(this.options, userInputs.options)
         }
         if (userInputs.env) {
           Object.assign(process.env, userInputs.env)
@@ -1836,7 +1836,8 @@ class Configorama {
     const hasFilters = originalSrc.match(this.filterMatch)
     let foundFilters = []
     if (hasFilters) {
-      foundFilters = hasFilters[1]
+      foundFilters = hasFilters[0]
+        .replace(/}$/, '') // remove trailing }
         .split('|')
         .map((filter) => filter.trim())
         .filter(Boolean)
@@ -2103,14 +2104,13 @@ Missing Value ${missingValue} - ${matchedString}
     if (typeof valueToPopulate === 'number' && foundFilters.length) {
       runFilters = true
     } else if (
-      typeof valueToPopulate === 'string' && 
-      !valueToPopulate.match(deepRefSyntax) && 
-      foundFilters.length && 
+      typeof valueToPopulate === 'string' &&
+      !valueToPopulate.match(deepRefSyntax) &&
+      foundFilters.length &&
       !property.match(this.variableSyntax)
     ) {
       runFilters = true
     }
-
     /* Apply filters if found */
     //console.log('> property', property)
     if (runFilters) {

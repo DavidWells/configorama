@@ -81,7 +81,7 @@ const options = {
   allowUndefinedValues: argv['allow-undefined'] || false,
   allowUnknownFileRefs: argv['allow-unknown-file-refs'] || false,
   returnMetadata: argv['return-metadata'] || false,
-  returnPreResolvedVariableDetails: argv['setup'] || false,
+  returnPreResolvedVariableDetails: false,
   dynamicArgs: argv
 }
 
