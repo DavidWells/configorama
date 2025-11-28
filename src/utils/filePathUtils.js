@@ -45,12 +45,13 @@ function extractFilePath(variableString) {
     return null
   }
 
+  const { trimSurroundingQuotes } = require('./quoteUtils')
   const fileContent = fileMatch[1].trim()
   const parts = splitCsv(fileContent)
   let filePath = parts[0].trim()
 
   // Remove quotes if present
-  filePath = filePath.replace(/^['"]|['"]$/g, '')
+  filePath = trimSurroundingQuotes(filePath, false)
 
   return { filePath }
 }

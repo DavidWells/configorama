@@ -28,10 +28,6 @@ module.exports = async (configPathOrObject, settings = {}) => {
   if (settings.returnMetadata) {
     const metadata = instance.collectVariableMetadata()
 
-    // console.log('instance.fileRefsFound', instance.fileRefsFound)
-    // console.log('instance.resolutionTracking', instance.resolutionTracking)
-    // process.exit(1)
-
     // Enrich metadata with resolution tracking data collected during execution
     const enrichedMetadata = enrichMetadata(
       metadata,
@@ -40,31 +36,9 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.fileRefsFound,
       instance.originalConfig,
       instance.configFilePath,
-      Object.keys(instance.filters)
+      Object.keys(instance.filters),
+      config // pass resolved config for post-resolution enrichment
     )
-
-    // Add resolvedPropertyValue to resolutionTracking
-    const resolutionHistoryWithResolvedValues = {}
-    for (const pathKey in instance.resolutionTracking) {
-      const tracking = instance.resolutionTracking[pathKey]
-      const keys = pathKey.split('.')
-      let resolvedValue = config
-
-      // Navigate to the resolved value in the config
-      for (const key of keys) {
-        if (resolvedValue && typeof resolvedValue === 'object') {
-          resolvedValue = resolvedValue[key]
-        } else {
-          resolvedValue = undefined
-          break
-        }
-      }
-
-      resolutionHistoryWithResolvedValues[pathKey] = {
-        ...tracking,
-        resolvedPropertyValue: resolvedValue
-      }
-    }
 
     return {
       variableSyntax: instance.variableSyntax,
@@ -72,8 +46,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
       config,
       originalConfig: instance.originalConfig,
       metadata: enrichedMetadata,
-      // Include resolution history per path for debugging and advanced use cases
-      resolutionHistory: resolutionHistoryWithResolvedValues,
+      resolutionHistory: enrichedMetadata.resolutionHistory,
     }
   }
 
@@ -94,6 +67,21 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
     filePath: configPathOrObject,
     settings: _settings
   })
+}
+
+/**
+ * Analyze config variables without resolving them
+ * @param  {string|object} configPathOrObject - Path to config file or raw javascript config object
+ * @param {object}  [settings] - Same settings as the main API
+ * @return {Promise} Pre-resolved variable metadata
+ */
+module.exports.analyze = async (configPathOrObject, settings = {}) => {
+  const instance = new Configorama(configPathOrObject, {
+    ...settings,
+    returnPreResolvedVariableDetails: true,
+  })
+  const options = settings.options || {}
+  return instance.init(options)
 }
 
 // Export format utilities

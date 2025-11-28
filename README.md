@@ -15,6 +15,7 @@ Configorama extends your configuration with a powerful variable system. It resol
 - Self references (other keys/values in config)
 - Git references
 - Cron values
+- Eval expressions
 - Async/sync JS functions
 - Filters (experimental)
 - Functions (experimental)
@@ -39,10 +40,12 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [TypeScript file references](#typescript-file-references)
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
+  - [Eval expressions](#eval-expressions)
   - [Filters (experimental)](#filters-experimental)
   - [Functions (experimental)](#functions-experimental)
   - [More Examples](#more-examples)
 - [Custom Variable Sources](#custom-variable-sources)
+- [Options](#options)
 - [FAQ](#faq)
 - [Whats new](#whats-new)
 - [Alt libs](#alt-libs)
@@ -129,6 +132,16 @@ console.log(result.resolutionHistory) // Step-by-step resolution for each path
 
 ## Variable Sources
 
+| Variable | Syntax                | Description            |
+|----------|-----------------------|------------------------|
+| env      | ${env:VAR}            | Environment variables  |
+| opt      | ${opt:flag}           | CLI option flags       |
+| self     | ${key} or ${self:key} | Self references        |
+| file     | ${file(path)}         | File references        |
+| git      | ${git:value}          | Git data               |
+| cron     | ${cron(expr)}         | Cron expressions       |
+| eval     | ${eval(expr)}         | Math/logic expressions |
+
 ### Environment variables
 
 Access values from `process.env` environment variables.
@@ -194,6 +207,18 @@ fileValueSubKey: ${file(./other-config.json):nested.value}
 # Fallback to default value if file not found
 fallbackValueExample: ${file(./not-found.yml), 'fall back value'}
 ```
+
+Supported file types (extensions are case-insensitive):
+
+| Type | Extensions |
+|------|------------|
+| TypeScript | `.ts`, `.tsx`, `.mts`, `.cts` |
+| JavaScript | `.js`, `.cjs` |
+| ESM | `.mjs`, `.esm` |
+| YAML | `.yml`, `.yaml` |
+| TOML | `.toml`, `.tml` |
+| INI | `.ini` |
+| JSON | `.json`, `.json5` |
 
 ### Sync/Async file references
 
@@ -463,6 +488,28 @@ sundayNoon: ${cron('on sunday at 12:00')}    # 0 12 * * 0
 customCron: ${cron('15 2 * * *')}           # 15 2 * * *
 ```
 
+### Eval expressions
+
+Evaluate mathematical and logical expressions safely (without using JavaScript's `eval`).
+
+```yml
+# Math operations
+sum: ${eval(10 + 5)}                  # 15
+multiply: ${eval(10 * 3)}             # 30
+divide: ${eval(100 / 4)}              # 25
+
+# Comparisons (returns boolean)
+isGreater: ${eval(200 > 100)}         # true
+isLess: ${eval(100 > 200)}            # false
+
+# String comparisons
+isEqual: ${eval("hello" == "hello")}  # true
+strictEqual: ${eval("foo" === "foo")} # true
+
+# Complex expressions
+complex: ${eval((10 + 5) * 2)}        # 30
+```
+
 ### Filters (experimental)
 
 Pipe resolved values through transformation functions like case conversion.
@@ -532,6 +579,48 @@ There are 2 ways to resolve variables from custom sources.
     key: ${consul:xyz}
     ```
 
+## Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `options` | object | `{}` | CLI options/flags to populate `${opt:xyz}` variables |
+| `allowUnknownVariables` | boolean | `false` | Allow unknown variable types to pass through (e.g., `${custom:thing}`) |
+| `allowUnresolvedVariables` | boolean | `false` | Allow known variable types that can't be resolved to pass through instead of throwing |
+| `allowUndefinedValues` | boolean | `false` | Allow undefined to be an end result |
+| `variableSources` | array | `[]` | Custom variable sources (see above) |
+
+> **Note:** `allowUnknownVars` is deprecated, use `allowUnknownVariables` instead.
+
+### allowUnknownVariables
+
+When `allowUnknownVariables: true`, unknown variable types (not registered resolvers) pass through as-is:
+
+```js
+const config = await configorama(configFile, {
+  allowUnknownVariables: true,
+  options: { stage: 'dev' }
+})
+
+// Input:  { key: '${ssm:/path/to/secret}' }  // ssm: not a registered type
+// Output: { key: '${ssm:/path/to/secret}' }  // passes through instead of throwing
+```
+
+### allowUnresolvedVariables
+
+When `allowUnresolvedVariables: true`, variables that can't be resolved (missing env vars, missing files, etc.) pass through as-is instead of throwing an error:
+
+```js
+const config = await configorama(configFile, {
+  allowUnresolvedVariables: true,
+  options: { stage: 'dev' }
+})
+
+// Input:  { key: '${env:MISSING_VAR}' }
+// Output: { key: '${env:MISSING_VAR}' }  // passes through instead of throwing
+```
+
+This is useful for multi-stage resolution or when you want to analyze config structure without providing all values.
+
 ## FAQ
 
 **Q: Why should I use this?**
@@ -587,12 +676,11 @@ How is this different than the serverless variable system?
     key: ${env:whatever, 2}
     ```
 
-6. TOML, YML, JSON, etc support
+6. TOML, YML, JSON, INI etc support
 
     Configorama will work on any configuration format that can be converted into a JS object.
 
     Parse any config format and pass it into configorama.
-
 
 7. Configorama has a number of built-in functions.
 

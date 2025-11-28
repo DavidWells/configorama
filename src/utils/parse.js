@@ -18,7 +18,7 @@ const cloudFormationSchema = require('./cloudformationSchema')
 function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}) {
   let configObject
 
-  if (fileType.match(/\.(yml|yaml)/)) {
+  if (fileType.match(/\.(yml|yaml)/i)) {
     try {
       const ymlText = YAML.preProcess(fileContents, varRegex)
       configObject = YAML.parse(ymlText)
@@ -36,14 +36,14 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
         configObject = result.data
       }
     }
-  } else if (fileType.match(/\.(toml|tml)/)) {
+  } else if (fileType.match(/\.(toml|tml)/i)) {
     configObject = TOML.parse(fileContents)
-  } else if (fileType.match(/\.(ini)/)) {
+  } else if (fileType.match(/\.(ini)/i)) {
     configObject = INI.parse(fileContents)
-  } else if (fileType.match(/\.(json|json5)/)) {
+  } else if (fileType.match(/\.(json|json5)/i)) {
     configObject = JSON5.parse(fileContents)
   // TODO detect js syntax and use appropriate parser
-  } else if (fileType.match(/\.(js|cjs)/)) {
+  } else if (fileType.match(/\.(js|cjs)/i)) {
     let jsFile
     try {
       jsFile = require(filePath)
@@ -60,7 +60,7 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
     } catch (err) {
       throw new Error(err)
     }
-  } else if (fileType.match(/\.(ts|tsx)/)) {
+  } else if (fileType.match(/\.(ts|tsx|mts|cts)/i)) {
     try {
       let jsArgs = opts.dynamicArgs || {}
       if (jsArgs && typeof jsArgs === 'function') {
@@ -76,7 +76,7 @@ function parseFileContents(fileContents, fileType, filePath, varRegex, opts = {}
     } catch (err) {
       throw new Error(`Failed to execute TypeScript file ${filePath}: ${err.message}`)
     }
-  } else if (fileType.match(/\.(mjs|esm)/)) {
+  } else if (fileType.match(/\.(mjs|esm)/i)) {
     try {
       let jsArgs = opts.dynamicArgs || {}
       if (jsArgs && typeof jsArgs === 'function') {
