@@ -45,6 +45,9 @@ const formatFunctionArgs = require('./utils/formatFunctionArgs')
 const { trimSurroundingQuotes, ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/quoteUtils')
 const deepLog = require('./utils/deep-log')
 const { splitByComma } = require('./utils/splitByComma')
+const { combineRegexes, funcRegex, funcStartOfLineRegex, subFunctionRegex } = require('./utils/regex')
+const warnIfNotFound = require('./utils/warnIfNotFound')
+const preProcess = require('./utils/preProcess')
 const {
   isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
   isEmpty, trim, camelCase, kebabCase, capitalize, split, map, mapValues,
@@ -90,9 +93,6 @@ const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 const envRefSyntax = RegExp(/^env:/g)
 const optRefSyntax = RegExp(/^opt:/g)
 const selfRefSyntax = RegExp(/^self:/g)
-const funcRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const funcStartOfLineRegex = /^(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const subFunctionRegex = /(\w+):(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
 const base64WrapperRegex = /\[_\[([A-Za-z0-9+/=\s]*)\]_\]/g
 const logLines = '─────────────────────────────────────────────────'
 
@@ -103,146 +103,7 @@ let SETUP_MODE = process.argv.includes('--setup') ? true : false
 let DEBUG_TYPE = false
 const ENABLE_FUNCTIONS = true
 
-function combineRegexes(regexes) {
-  // Extract the pattern from each RegExp and join with OR operator
-  const patterns = regexes.map(regex => {
-    // Get source pattern string without flags
-    return regex.source
-  }).filter(Boolean)
-  // Join patterns with the OR operator and create new RegExp
-  return new RegExp(`(${patterns.join('|')})`)
-}
 
-/**
- * Preprocess config to fix malformed fallback references
- * @param {Object} configObject - The parsed configuration object
- * @param {RegExp} variableSyntax - The variable syntax regex to use
- * @returns {Object} The preprocessed configuration object
- */
-function preProcess(configObject, variableSyntax) {
-  // Known reference prefixes that should be wrapped in ${}
-  const refPrefixes = ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
-
-  /**
-   * Fix malformed fallback references in a string
-   * @param {string} str - String potentially containing variables
-   * @returns {string} String with fixed fallback references
-   */
-  function fixFallbacksInString(str) {
-    if (typeof str !== 'string') return str
-
-    let result = str
-    // result = result.replace(/\$\{self:/g, '${')
-    let changed = true
-
-    // Keep iterating until no more changes (to handle nested variables)
-    while (changed) {
-      changed = false
-
-      // Find innermost ${...} blocks (ones that don't contain other ${)
-      let i = 0
-      while (i < result.length) {
-        if (result[i] === '$' && result[i + 1] === '{') {
-          const start = i
-          let braceCount = 1
-          let j = i + 2
-
-          // Find the matching closing brace by counting { and }
-          while (j < result.length && braceCount > 0) {
-            if (result[j] === '{') {
-              braceCount++
-            } else if (result[j] === '}') {
-              braceCount--
-            }
-            j++
-          }
-
-          if (braceCount === 0) {
-            const end = j
-            const match = result.substring(start, end)
-            const content = result.substring(start + 2, end - 1)
-
-            // Only process if there's a comma (indicating fallback syntax)
-            if (content.includes(',')) {
-              // Split by comma
-              const parts = splitByComma(content, variableSyntax)
-
-              if (parts.length > 1) {
-                // Check if the first part has nested ${} - if so, skip this (process inner ones first)
-                const firstPart = parts[0]
-                if (firstPart.includes('${')) {
-                  i = start + 2 // Move past ${ to find inner variables
-                  continue
-                }
-
-                // Check each part after the first (these are fallback values)
-                const fixed = parts.map((part, index) => {
-                  if (index === 0) {
-                    return part // Keep the main reference as-is
-                  }
-
-                  const trimmed = part.trim()
-
-                  // Check if this looks like a reference but is not wrapped
-                  const looksLikeRef = refPrefixes.some(prefix => trimmed.startsWith(prefix))
-                  const alreadyWrapped = trimmed.startsWith('${') && trimmed.endsWith('}')
-
-                  if (looksLikeRef && !alreadyWrapped) {
-                    return ` \${${trimmed}}`
-                  }
-
-                  return ` ${trimmed}`
-                })
-
-                const replacement = `\${${fixed.join(',')}}`
-                if (replacement !== match) {
-                  result = result.substring(0, start) + replacement + result.substring(end)
-                  changed = true
-                  break // Restart search from beginning
-                }
-              }
-            }
-
-            i = start + 2 // Move past ${ to continue searching for nested variables
-          } else {
-            i++
-          }
-        } else {
-          i++
-        }
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Recursively traverse and fix the config object
-   */
-  function traverseAndFix(obj) {
-    if (typeof obj === 'string') {
-      return fixFallbacksInString(obj)
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map(item => traverseAndFix(item))
-    }
-
-    if (obj !== null && typeof obj === 'object') {
-      const result = {}
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          result[key] = traverseAndFix(obj[key])
-        }
-      }
-      return result
-    }
-
-    return obj
-  }
-
-  return traverseAndFix(configObject)
-}
 
 class Configorama {
   constructor(fileOrObject, opts) {
@@ -639,15 +500,9 @@ class Configorama {
     this.callCount = 0
   }
 
-  initialCall(func) {
-    this.deep = []
-    this.tracker.start()
-    return func().finally(() => {
-      this.tracker.stop()
-      this.deep = []
-    })
-  }
-
+  // ################
+  // ## PUBLIC API ##
+  // ################
   /**
    * Populate all variables in the service, conveniently remove and restore the service attributes
    * that confuse the population methods.
@@ -1442,60 +1297,41 @@ class Configorama {
       },
     }
   }
-  runFunction(variableString) {
-    // console.log('runFunction', variableString)
-    /* If json object value return it */
-    if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
-      return variableString
-    }
-    // console.log('runFunction', variableString)
-    var hasFunc = funcRegex.exec(variableString)
-    // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
-    // console.log('hasFunc', hasFunc)
-    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
-      return variableString
-    }
-    // test for object
-    const functionName = hasFunc[1]
-    const rawArgs = hasFunc[2]
-    // TODO @DWELLS. Loop through all raw args and parse to correct datatype
-    // argument is object
-    let argsToPass
-    if (rawArgs && rawArgs.match(/^{([^}]+)}$/)) {
-      // console.log('OBJECT', hasFunc[2])
-      // TODO use JSON5
-      argsToPass = [JSON.parse(rawArgs)]
-    } else {
-      // TODO fix how commas + spaces are ned
-      const splitter = splitCsv(rawArgs, ', ')
-      // console.log('splitter', splitter)
-      argsToPass = formatFunctionArgs(splitter)
-    }
-    // console.log('argsToPass runFunction', argsToPass)
-    // TODO check for camelCase version. | toUpperCase messes with function name
-    const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
-
-    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
-
-    const funcValue = theFunction(...argsToPass)
-    // console.log('funcValue', funcValue)
-    // console.log('typeof funcValue', typeof funcValue)
-    let replaceVal = funcValue
-    if (typeof funcValue === 'string') {
-      const replaceIt = variableString.replace(hasFunc[0], funcValue)
-      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
-    }
-
-    // If wrapped in outer function, recurse
-    const hasMoreFunctions = funcRegex.exec(replaceVal)
-    if (hasMoreFunctions) {
-      return this.runFunction(replaceVal)
-    }
-    return replaceVal
+  /**
+   * Populate the variables in the given object.
+   * @param objectToPopulate The object to populate variables within.
+   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
+   */
+  populateObject(objectToPopulate) {
+    return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
   }
-  // ############
-  // ## OBJECT ##
-  // ############
+  populateObjectImpl(objectToPopulate) {
+    this.callCount = this.callCount + 1
+
+    if (DEBUG) {
+      deepLog(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
+      // process.exit(0)
+    }
+
+    const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
+    this.leaves = leaves
+    // console.log('leaves', leaves)
+    const populations = this.populateVariables(leaves)
+    // console.log("FILL LEAVES", populations)
+
+    if (populations.length === 0) {
+      if (DEBUG) console.log('Config Population Finished')
+      return Promise.resolve(objectToPopulate)
+    }
+
+    return this.assignProperties(objectToPopulate, populations).then(() => {
+      return this.populateObjectImpl(objectToPopulate)
+    })
+  }
+
+  // #######################
+  // ## PROPERTY HANDLING ##
+  // #######################
   /**
    * The declaration of a terminal property.  This declaration includes the path and value of the
    * property.
@@ -1643,40 +1479,9 @@ class Configorama {
       })
     })
   }
-  /**
-   * Populate the variables in the given object.
-   * @param objectToPopulate The object to populate variables within.
-   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
-   */
-  populateObject(objectToPopulate) {
-    return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
-  }
-  populateObjectImpl(objectToPopulate) {
-    this.callCount = this.callCount + 1
-
-    if (DEBUG) {
-      deepLog(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
-      // process.exit(0)
-    }
-
-    const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
-    this.leaves = leaves
-    // console.log('leaves', leaves)
-    const populations = this.populateVariables(leaves)
-    // console.log("FILL LEAVES", populations)
-
-    if (populations.length === 0) {
-      if (DEBUG) console.log('Config Population Finished')
-      return Promise.resolve(objectToPopulate)
-    }
-
-    return this.assignProperties(objectToPopulate, populations).then(() => {
-      return this.populateObjectImpl(objectToPopulate)
-    })
-  }
-  // ##############
-  // ## PROPERTY ##
-  // ##############
+  // ##################
+  // ## MATCH/RENDER ##
+  // ##################
   /**
    * @typedef {Object} MatchResult
    * @property {String} match The original property value that matched the variable syntax
@@ -1739,7 +1544,17 @@ class Configorama {
 
     let result = valueObject.value
     for (let i = 0; i < matches.length; i += 1) {
-      this.warnIfNotFound(matches[i].variable, results[i])
+      warnIfNotFound(matches[i].variable, results[i], {
+        patterns: {
+          env: envRefSyntax,
+          opt: optRefSyntax,
+          self: selfRefSyntax,
+          file: fileRefSyntax,
+          deep: deepRefSyntax,
+          text: textRefSyntax
+        },
+        debug: DEBUG
+      })
 
       // Extract metadata from result if present
       let actualResult = results[i]
@@ -1883,6 +1698,10 @@ class Configorama {
 
     return result
   }
+
+  // ######################
+  // ## VALUE RESOLUTION ##
+  // ######################
   /**
    * Populate the given value, recursively if root is true
    * @param valueObject The value to populate variables within
@@ -2394,6 +2213,10 @@ Missing Value ${missingValue} - ${matchedString}
         : Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
     })
   }
+
+  // ####################
+  // ## SOURCE GETTERS ##
+  // ####################
   /**
    * Given any variable string, return the value it should be populated with.
    * @param variableString The variable string to retrieve a value for.
@@ -2929,15 +2752,6 @@ Missing Value ${missingValue} - ${matchedString}
     }
     return getValueFromFileResolver(ctx, variableString, options)
   }
-  getVariableFromDeep(variableString) {
-    const index = variableString.replace(deepIndexReplacePattern, '')
-    // const index = this.getDeepIndex(variableString)
-    /*
-    console.log('FIND INDEX', index)
-    console.log(this.deep, this.deep[index])
-    /** */
-    return this.deep[index]
-  }
   getValueFromDeep(variableString, pathValue) {
     const variable = this.getVariableFromDeep(variableString)
     const deepRef = variableString.replace(deepPrefixReplacePattern, '')
@@ -2967,6 +2781,19 @@ Missing Value ${missingValue} - ${matchedString}
       })
     }
     return ret
+  }
+
+  // ############################
+  // ## DEEP VARIABLE HANDLING ##
+  // ############################
+  getVariableFromDeep(variableString) {
+    const index = variableString.replace(deepIndexReplacePattern, '')
+    // const index = this.getDeepIndex(variableString)
+    /*
+    console.log('FIND INDEX', index)
+    console.log(this.deep, this.deep[index])
+    /** */
+    return this.deep[index]
   }
   makeDeepVariable(variable, caller) {
     // variable = variable.replace("dev", '"dev"')
@@ -3062,32 +2889,67 @@ Missing Value ${missingValue} - ${matchedString}
     return veryDeep
   }
 
-  warnIfNotFound(variableString, valueToPopulate) {
-    let variableTypeText
-    if (variableString.match(envRefSyntax)) {
-      variableTypeText = 'environment variable'
-    } else if (variableString.match(optRefSyntax)) {
-      variableTypeText = 'option'
-    } else if (variableString.match(selfRefSyntax)) {
-      variableTypeText = 'config attribute'
-    } else if (variableString.match(fileRefSyntax)) {
-      variableTypeText = 'file'
-    } else if (variableString.match(deepRefSyntax)) {
-      variableTypeText = 'deep'
-    } else if (variableString.match(textRefSyntax)) {
-      variableTypeText = 'text'
+  // ###############
+  // ## UTILITIES ##
+  // ###############
+  initialCall(func) {
+    this.deep = []
+    this.tracker.start()
+    return func().finally(() => {
+      this.tracker.stop()
+      this.deep = []
+    })
+  }
+  runFunction(variableString) {
+    // console.log('runFunction', variableString)
+    /* If json object value return it */
+    if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
+      return variableString
     }
-    if (!isValidValue(valueToPopulate)) {
-      // console.log("MISSING", variableString)
-      // console.log(this.deep)
-      // console.log(valueToPopulate)
-      const notFoundMsg = `No ${variableTypeText} found to satisfy the '\${${variableString}}' variable. Attempting fallback value`
-      if (DEBUG) {
-        console.log(notFoundMsg)
-      }
-      // errors make fallbacks not function. throw new Error(errorMsg)
+    // console.log('runFunction', variableString)
+    var hasFunc = funcRegex.exec(variableString)
+    // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
+    // console.log('hasFunc', hasFunc)
+    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
+      return variableString
     }
-    return valueToPopulate
+    // test for object
+    const functionName = hasFunc[1]
+    const rawArgs = hasFunc[2]
+    // TODO @DWELLS. Loop through all raw args and parse to correct datatype
+    // argument is object
+    let argsToPass
+    if (rawArgs && rawArgs.match(/^{([^}]+)}$/)) {
+      // console.log('OBJECT', hasFunc[2])
+      // TODO use JSON5
+      argsToPass = [JSON.parse(rawArgs)]
+    } else {
+      // TODO fix how commas + spaces are ned
+      const splitter = splitCsv(rawArgs, ', ')
+      // console.log('splitter', splitter)
+      argsToPass = formatFunctionArgs(splitter)
+    }
+    // console.log('argsToPass runFunction', argsToPass)
+    // TODO check for camelCase version. | toUpperCase messes with function name
+    const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
+
+    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
+
+    const funcValue = theFunction(...argsToPass)
+    // console.log('funcValue', funcValue)
+    // console.log('typeof funcValue', typeof funcValue)
+    let replaceVal = funcValue
+    if (typeof funcValue === 'string') {
+      const replaceIt = variableString.replace(hasFunc[0], funcValue)
+      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
+    }
+
+    // If wrapped in outer function, recurse
+    const hasMoreFunctions = funcRegex.exec(replaceVal)
+    if (hasMoreFunctions) {
+      return this.runFunction(replaceVal)
+    }
+    return replaceVal
   }
 }
 
