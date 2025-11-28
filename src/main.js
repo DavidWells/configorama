@@ -411,8 +411,8 @@ class Configorama {
       Boolean: (value) => {
         if (typeof value === 'boolean') return value
         const v = String(value).toLowerCase()
-        if (['true', '1', 'yes', 'on'].includes(v)) return true
-        if (['false', '0', 'no', 'off'].includes(v)) return false
+        if (['true', '1', 'yes', 'on', 'enabled'].includes(v)) return true
+        if (['false', '0', 'no', 'off', 'disabled'].includes(v)) return false
         throw new Error(`Configorama Error: Expected Boolean, got "${value}"`)
       },
       String: (value) => {
