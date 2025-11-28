@@ -13,90 +13,7 @@ const { encodeJsSyntax } = require('../utils/encoders/js-fixes')
 const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
 const INI = require('../parsers/ini')
-
-/**
- * Parses variable string to extract module reference path
- * Supports both : and . as separators for module references
- * @param {string} variableString - The full variable string
- * @param {string} matchedFileString - The matched file path portion
- * @returns {{ variableArray: string[], moduleName: string|null }}
- */
-function parseModuleReference(variableString, matchedFileString) {
-  let variableArray = variableString.split(':')
-  if (variableArray.length === 1) {
-    const dotIndex = variableString.indexOf(matchedFileString) + matchedFileString.length
-    const afterMatch = variableString.substring(dotIndex)
-    if (afterMatch.startsWith('.')) {
-      variableArray = [variableString.substring(0, dotIndex), afterMatch.substring(1)]
-    }
-  }
-
-  let moduleName = null
-  if (variableArray[1]) {
-    moduleName = variableArray[1].split('.')[0]
-  }
-
-  return { variableArray, moduleName }
-}
-
-/**
- * Extracts deep properties from variable string after file match
- * @param {string} variableString - The full variable string
- * @param {string} matchedFileString - The matched file path portion
- * @returns {string[]} Array of property keys to traverse
- */
-function extractDeepProperties(variableString, matchedFileString) {
-  let deepProperties = variableString.replace(matchedFileString, '')
-  deepProperties = deepProperties.slice(1).split('.')
-  deepProperties.splice(0, 1)
-  return deepProperties.map((prop) => trim(prop))
-}
-
-/**
- * Processes executable file (JS/TS/ESM) and resolves deep properties
- * @param {object} params - Parameters
- * @param {object} params.fileModule - The loaded module
- * @param {Function} params.returnValueFunction - The function to call
- * @param {object} params.valueForFunction - Context passed to the function
- * @param {string[]} params.argsToPass - Additional args for the function
- * @param {string} params.variableString - Original variable string
- * @param {string} params.matchedFileString - Matched file path
- * @param {string} params.relativePath - Relative file path for errors
- * @param {string} params.fileType - Type of file (javascript/TypeScript/ESM)
- * @param {Function} params.getDeeperValue - Function to resolve nested values
- * @returns {Promise<any>}
- */
-async function processExecutableFile({
-  fileModule,
-  returnValueFunction,
-  valueForFunction,
-  argsToPass,
-  variableString,
-  matchedFileString,
-  relativePath,
-  fileType,
-  getDeeperValue
-}) {
-  if (typeof returnValueFunction !== 'function') {
-    const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your ${fileType} is exporting a function that returns a value.`
-    return Promise.reject(new Error(errorMessage))
-  }
-
-  const valueToPopulate = returnValueFunction.call(fileModule, valueForFunction, ...argsToPass)
-
-  return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-    const deepProperties = extractDeepProperties(variableString, matchedFileString)
-    return getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
-      if (typeof deepValueToPopulateResolved === 'undefined') {
-        const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your ${fileType} is returning the correct data.`
-        return Promise.reject(new Error(errorMessage))
-      }
-      return Promise.resolve(deepValueToPopulateResolved)
-    })
-  })
-}
+const JSON5 = require('../parsers/json5')
 
 /**
  * Resolves a value from a file reference
@@ -167,7 +84,7 @@ async function getValueFromFile(ctx, variableString, options) {
 
   let fileExtension = resolvedPath.split('.')
 
-  fileExtension = fileExtension[fileExtension.length - 1]
+  fileExtension = fileExtension[fileExtension.length - 1].toLowerCase()
 
   // Validate file exists
   if (!exists) {
@@ -251,7 +168,7 @@ ${JSON.stringify(options.context, null, 2)}`,
     })
   }
 
-  if (fileExtension === 'ts') {
+  if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
     const { executeTypeScriptFile } = require('../parsers/typescript')
     const { moduleName } = parseModuleReference(variableString, matchedFileString)
 
@@ -315,7 +232,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       if (fileExtension === 'yml' || fileExtension === 'yaml') {
         valueToPopulate = JSON.stringify(YAML.parse(valueToPopulate))
       }
-      if (fileExtension === 'toml') {
+      if (fileExtension === 'toml' || fileExtension === 'tml') {
         valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
       }
       if (fileExtension === 'ini') {
@@ -340,7 +257,7 @@ Please use ":" or "." to reference sub properties. ${deepProperties}`
       return Promise.resolve(valueToPopulate)
     }
 
-    if (fileExtension === 'toml') {
+    if (fileExtension === 'toml' || fileExtension === 'tml') {
       valueToPopulate = TOML.parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }
@@ -350,13 +267,97 @@ Please use ":" or "." to reference sub properties. ${deepProperties}`
       return Promise.resolve(valueToPopulate)
     }
 
-    if (fileExtension === 'json') {
-      valueToPopulate = JSON.parse(valueToPopulate)
+    if (fileExtension === 'json' || fileExtension === 'json5') {
+      valueToPopulate = JSON5.parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }
   }
   // console.log('fall thru', valueToPopulate)
   return Promise.resolve(valueToPopulate)
+}
+
+/**
+ * Parses variable string to extract module reference path
+ * Supports both : and . as separators for module references
+ * @param {string} variableString - The full variable string
+ * @param {string} matchedFileString - The matched file path portion
+ * @returns {{ variableArray: string[], moduleName: string|null }}
+ */
+function parseModuleReference(variableString, matchedFileString) {
+  let variableArray = variableString.split(':')
+  if (variableArray.length === 1) {
+    const dotIndex = variableString.indexOf(matchedFileString) + matchedFileString.length
+    const afterMatch = variableString.substring(dotIndex)
+    if (afterMatch.startsWith('.')) {
+      variableArray = [variableString.substring(0, dotIndex), afterMatch.substring(1)]
+    }
+  }
+
+  let moduleName = null
+  if (variableArray[1]) {
+    moduleName = variableArray[1].split('.')[0]
+  }
+
+  return { variableArray, moduleName }
+}
+
+/**
+ * Extracts deep properties from variable string after file match
+ * @param {string} variableString - The full variable string
+ * @param {string} matchedFileString - The matched file path portion
+ * @returns {string[]} Array of property keys to traverse
+ */
+function extractDeepProperties(variableString, matchedFileString) {
+  let deepProperties = variableString.replace(matchedFileString, '')
+  deepProperties = deepProperties.slice(1).split('.')
+  deepProperties.splice(0, 1)
+  return deepProperties.map((prop) => trim(prop))
+}
+
+/**
+ * Processes executable file (JS/TS/ESM) and resolves deep properties
+ * @param {object} params - Parameters
+ * @param {object} params.fileModule - The loaded module
+ * @param {Function} params.returnValueFunction - The function to call
+ * @param {object} params.valueForFunction - Context passed to the function
+ * @param {string[]} params.argsToPass - Additional args for the function
+ * @param {string} params.variableString - Original variable string
+ * @param {string} params.matchedFileString - Matched file path
+ * @param {string} params.relativePath - Relative file path for errors
+ * @param {string} params.fileType - Type of file (javascript/TypeScript/ESM)
+ * @param {Function} params.getDeeperValue - Function to resolve nested values
+ * @returns {Promise<any>}
+ */
+async function processExecutableFile({
+  fileModule,
+  returnValueFunction,
+  valueForFunction,
+  argsToPass,
+  variableString,
+  matchedFileString,
+  relativePath,
+  fileType,
+  getDeeperValue
+}) {
+  if (typeof returnValueFunction !== 'function') {
+    const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ${fileType} is exporting a function that returns a value.`
+    return Promise.reject(new Error(errorMessage))
+  }
+
+  const valueToPopulate = returnValueFunction.call(fileModule, valueForFunction, ...argsToPass)
+
+  return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
+    const deepProperties = extractDeepProperties(variableString, matchedFileString)
+    return getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
+      if (typeof deepValueToPopulateResolved === 'undefined') {
+        const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
+Check if your ${fileType} is returning the correct data.`
+        return Promise.reject(new Error(errorMessage))
+      }
+      return Promise.resolve(deepValueToPopulateResolved)
+    })
+  })
 }
 
 module.exports = {

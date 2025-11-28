@@ -15,6 +15,7 @@ Configorama extends your configuration with a powerful variable system. It resol
 - Self references (other keys/values in config)
 - Git references
 - Cron values
+- Eval expressions
 - Async/sync JS functions
 - Filters (experimental)
 - Functions (experimental)
@@ -38,6 +39,7 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [TypeScript file references](#typescript-file-references)
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
+  - [Eval expressions](#eval-expressions)
   - [Filters (experimental)](#filters-experimental)
   - [Functions (experimental)](#functions-experimental)
   - [More Examples](#more-examples)
@@ -84,6 +86,16 @@ const config = configorama.sync(myConfigFilePath, {
 
 ## Variable Sources
 
+| Variable | Syntax                | Description            |
+|----------|-----------------------|------------------------|
+| env      | ${env:VAR}            | Environment variables  |
+| opt      | ${opt:flag}           | CLI option flags       |
+| self     | ${key} or ${self:key} | Self references        |
+| file     | ${file(path)}         | File references        |
+| git      | ${git:value}          | Git data               |
+| cron     | ${cron(expr)}         | Cron expressions       |
+| eval     | ${eval(expr)}         | Math/logic expressions |
+
 ### Environment variables
 
 ```yml
@@ -128,6 +140,8 @@ three: ${zaz.wow.cool}
 
 ### File references
 
+Pull in values from files.
+
 ```yml
 # Import full yml/json/toml file via relative path
 fileRef: ${file(./subFile.yml)}
@@ -141,6 +155,18 @@ fileValueSubKey: ${file(./other-config.json):nested.value}
 # Fallback to default value if file not found
 fallbackValueExample: ${file(./not-found.yml), 'fall back value'}
 ```
+
+Supported file types (extensions are case-insensitive):
+
+| Type | Extensions |
+|------|------------|
+| TypeScript | `.ts`, `.tsx`, `.mts`, `.cts` |
+| JavaScript | `.js`, `.cjs` |
+| ESM | `.mjs`, `.esm` |
+| YAML | `.yml`, `.yaml` |
+| TOML | `.toml`, `.tml` |
+| INI | `.ini` |
+| JSON | `.json`, `.json5` |
 
 ### Sync/Async file references
 
@@ -413,6 +439,28 @@ sundayNoon: ${cron('on sunday at 12:00')}    # 0 12 * * 0
 customCron: ${cron('15 2 * * *')}           # 15 2 * * *
 ```
 
+### Eval expressions
+
+Evaluate mathematical and logical expressions safely (without using JavaScript's `eval`).
+
+```yml
+# Math operations
+sum: ${eval(10 + 5)}                  # 15
+multiply: ${eval(10 * 3)}             # 30
+divide: ${eval(100 / 4)}              # 25
+
+# Comparisons (returns boolean)
+isGreater: ${eval(200 > 100)}         # true
+isLess: ${eval(100 > 200)}            # false
+
+# String comparisons
+isEqual: ${eval("hello" == "hello")}  # true
+strictEqual: ${eval("foo" === "foo")} # true
+
+# Complex expressions
+complex: ${eval((10 + 5) * 2)}        # 30
+```
+
 ### Filters (experimental)
 
 Filters will transform the resolved variables
@@ -537,12 +585,11 @@ How is this different than the serverless variable system?
     key: ${env:whatever, 2}
     ```
 
-6. TOML, YML, JSON, etc support
+6. TOML, YML, JSON, INI etc support
 
     Configorama will work on any configuration format that can be converted into a JS object.
 
     Parse any config format and pass it into configorama.
-
 
 7. Configorama has a number of built-in functions.
 
