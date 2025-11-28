@@ -96,5 +96,20 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
   })
 }
 
+/**
+ * Analyze config variables without resolving them
+ * @param  {string|object} configPathOrObject - Path to config file or raw javascript config object
+ * @param {object}  [settings] - Same settings as the main API
+ * @return {Promise} Pre-resolved variable metadata
+ */
+module.exports.analyze = async (configPathOrObject, settings = {}) => {
+  const instance = new Configorama(configPathOrObject, {
+    ...settings,
+    returnPreResolvedVariableDetails: true,
+  })
+  const options = settings.options || {}
+  return instance.init(options)
+}
+
 // Export format utilities
 module.exports.format = parsers
