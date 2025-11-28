@@ -1,6 +1,7 @@
 const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
+const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/bracketMatcher')
 
 // Loader for custom CF syntax
 function load(contents, options) {
@@ -57,53 +58,8 @@ function toJson(ymlContents) {
   return json
 }
 
-// TODO only works for default var syntax ${}. Maybe fix?
-function findOutermostVariables(text) {
-  let matches = [];
-  let depth = 0;
-  let startIndex = -1;
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '$' && text[i + 1] === '{') {
-      if (depth === 0) {
-          startIndex = i;
-      }
-      depth++;
-      i++; // Skip '{'
-    } else if (text[i] === '}') {
-      depth--;
-      if (depth === 0 && startIndex !== -1) {
-        matches.push(text.substring(startIndex, i + 1));
-        startIndex = -1;
-      }
-    }
-  }
-  return matches;
-}
-
-
-function matchOutermostBraces(text) {
-  let depth = 0
-  let startIndex = -1
-  let results = []
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
-      if (depth === 0) {
-        startIndex = i
-      }
-      depth++
-    } else if (text[i] === '}') {
-      depth--
-      if (depth === 0 && startIndex !== -1) {
-        results.push(text.substring(startIndex, i + 1))
-        startIndex = -1
-      }
-    }
-  }
-
-  return results
-}
+// Alias for backward compatibility
+const matchOutermostBraces = findOutermostBracesDepthFirst
 
 
 // https://regex101.com/r/XIltbc/1

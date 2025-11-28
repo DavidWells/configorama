@@ -61,12 +61,17 @@ module.exports = function configoramaSync(variableSources = []) {
         instance.fileRefsFound,
         instance.originalConfig,
         instance.configFilePath,
-        Object.keys(instance.filters)
+        Object.keys(instance.filters),
+        result // pass resolved config for post-resolution enrichment
       )
 
       return {
+        variableSyntax: instance.variableSyntax,
+        variableTypes: instance.variableTypes,
         config: result,
-        metadata: enrichedMetadata
+        originalConfig: instance.originalConfig,
+        metadata: enrichedMetadata,
+        resolutionHistory: enrichedMetadata.resolutionHistory,
       }
     }
 

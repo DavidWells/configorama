@@ -84,31 +84,10 @@ module.exports = function cleanVariable(
 }
 
 
+const { findOutermostBraces: findOutermostBracesUtil } = require('./bracketMatcher')
+
 function findOutermostBraces(str) {
-  const matches = []
-  let i = 0
-  
-  while (i < str.length) {
-    if (str.substring(i, i + 2) === '${') {
-      let braceCount = 1
-      let start = i
-      i += 2
-      
-      while (i < str.length && braceCount > 0) {
-        if (str[i] === '{') braceCount++
-        else if (str[i] === '}') braceCount--
-        i++
-      }
-      
-      if (braceCount === 0) {
-        matches.push(str.substring(start, i))
-      }
-    } else {
-      i++
-    }
-  }
-  
-  return matches
+  return findOutermostBracesUtil(str, '{', '}', '$')
 }
 
 /**

@@ -96,6 +96,7 @@ function createOccurrence(instance, varMatch, options = {}) {
  * @param {object} originalConfig - The original config object (before resolution) for self/dot.prop lookups.
  * @param {string} configPath - The path to the config file.
  * @param {Array} filterNames - Array of known filter names.
+ * @param {object} [resolvedConfig] - The resolved config object (optional, for post-resolution enrichment).
  * @returns {object} Enriched metadata with resolution details and a complete file reference list.
  */
 function enrichMetadata(
@@ -105,7 +106,8 @@ function enrichMetadata(
   fileRefsFound = [],
   originalConfig = {},
   configPath,
-  filterNames = []
+  filterNames = [],
+  resolvedConfig
 ) {
   if (!resolutionTracking) {
     return metadata
@@ -567,6 +569,30 @@ function enrichMetadata(
 
   // Convert map to object for metadata
   metadata.uniqueVariables = Object.fromEntries(uniqueVariablesMap)
+
+  // Add resolvedPropertyValue to resolutionTracking if resolvedConfig provided
+  if (resolvedConfig) {
+    metadata.resolutionHistory = {}
+    for (const pathKey in resolutionTracking) {
+      const tracking = resolutionTracking[pathKey]
+      const keys = pathKey.split('.')
+      let resolvedValue = resolvedConfig
+
+      for (const key of keys) {
+        if (resolvedValue && typeof resolvedValue === 'object') {
+          resolvedValue = resolvedValue[key]
+        } else {
+          resolvedValue = undefined
+          break
+        }
+      }
+
+      metadata.resolutionHistory[pathKey] = {
+        ...tracking,
+        resolvedPropertyValue: resolvedValue
+      }
+    }
+  }
 
   return metadata
 }
