@@ -3,6 +3,35 @@ const fs = require('fs')
 const path = require('path')
 const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('./filePathUtils')
 
+// Type filters that indicate expected value types
+const TYPE_FILTERS = ['Boolean', 'String', 'Number', 'Array', 'Object', 'Json']
+
+/**
+ * Extract type filter from filters array
+ * @param {Array} filters - Filters array from variable instance
+ * @returns {string|undefined} Type filter if found
+ */
+function extractTypeFromFilters(filters) {
+  if (!filters || !Array.isArray(filters)) return undefined
+  return filters.find(f => TYPE_FILTERS.includes(f))
+}
+
+/**
+ * Extract description from filters array (help filter)
+ * @param {Array} filters - Filters array from variable instance
+ * @returns {string|undefined} Description if found
+ */
+function extractDescriptionFromFilters(filters) {
+  if (!filters || !Array.isArray(filters)) return undefined
+  for (const filter of filters) {
+    if (filter && typeof filter === 'string') {
+      const helpMatch = filter.match(/^help\(['"](.+)['"]\)$/)
+      if (helpMatch) return helpMatch[1]
+    }
+  }
+  return undefined
+}
+
 /**
  * Create a standardized occurrence object
  * @param {object} instance - The variable instance from metadata
@@ -29,6 +58,9 @@ function createOccurrence(instance, varMatch, options = {}) {
     }
   }
 
+  // Extract type from filters
+  const type = extractTypeFromFilters(filters)
+
   const occurrence = {
     originalString: instance.originalStringValue,
     varMatch: varMatch,
@@ -38,6 +70,10 @@ function createOccurrence(instance, varMatch, options = {}) {
     isRequired: options.isRequired !== undefined ? options.isRequired : instance.isRequired,
     hasFilters: !!(filters && filters.length > 0),
     hasFallback: options.hasFallback !== undefined ? options.hasFallback : (instance.hasFallback || false),
+  }
+
+  if (type) {
+    occurrence.type = type
   }
 
   if (description) {
@@ -122,6 +158,16 @@ function enrichMetadata(
             }
           }
         }
+      }
+
+      // Add type and description to individual variable instance
+      const instanceType = extractTypeFromFilters(varData.filters)
+      const instanceDescription = extractDescriptionFromFilters(varData.filters)
+      if (instanceType) {
+        varData.type = instanceType
+      }
+      if (instanceDescription) {
+        varData.description = instanceDescription
       }
     }
   }
@@ -497,6 +543,25 @@ function enrichMetadata(
           }
         }
       }
+    }
+  }
+
+  // Aggregate types and descriptions for each uniqueVariable
+  for (const [, entry] of uniqueVariablesMap) {
+    // Collect unique types from occurrences
+    const types = entry.occurrences
+      .map(occ => occ.type)
+      .filter((t, i, a) => t && a.indexOf(t) === i)
+    if (types.length > 0) {
+      entry.types = types
+    }
+
+    // Collect unique descriptions from occurrences
+    const descriptions = entry.occurrences
+      .map(occ => occ.description)
+      .filter((d, i, a) => d && a.indexOf(d) === i)
+    if (descriptions.length > 0) {
+      entry.descriptions = descriptions
     }
   }
 

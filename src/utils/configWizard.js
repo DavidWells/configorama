@@ -223,17 +223,27 @@ function validateType(value, expectedType) {
 }
 
 /**
- * Extracts type from variable occurrences
- * @param {Array} occurrences - Variable occurrences
+ * Extracts type from variable data or occurrences
+ * @param {object} varData - Variable data with types array or occurrences
  * @returns {string|null} Expected type or null
  */
-function getExpectedType(occurrences) {
-  if (!occurrences || occurrences.length === 0) return null
+function getExpectedType(varData) {
+  // Use pre-computed types if available
+  if (varData && varData.types && varData.types.length > 0) {
+    return varData.types[0]
+  }
+
+  // Fallback to checking occurrences
+  const occurrences = varData && varData.occurrences ? varData.occurrences : varData
+  if (!occurrences || !Array.isArray(occurrences) || occurrences.length === 0) return null
 
   for (const occ of occurrences) {
+    // Check pre-computed type on occurrence
+    if (occ.type) return occ.type
+
+    // Fallback to filters
     if (occ.filters && Array.isArray(occ.filters)) {
       for (const filter of occ.filters) {
-        // Check if filter starts with uppercase letter
         if (filter && typeof filter === 'string' && /^[A-Z]/.test(filter)) {
           return filter
         }
@@ -244,23 +254,28 @@ function getExpectedType(occurrences) {
 }
 
 /**
- * Extracts help text from variable occurrences
- * @param {Array} occurrences - Variable occurrences
+ * Extracts help text from variable data or occurrences
+ * @param {object} varData - Variable data with descriptions array or occurrences
  * @returns {string|null} Help text or null
  */
-function getHelpText(occurrences) {
-  if (!occurrences || occurrences.length === 0) return null
+function getHelpText(varData) {
+  // Use pre-computed descriptions if available
+  if (varData && varData.descriptions && varData.descriptions.length > 0) {
+    return varData.descriptions.join('. ')
+  }
+
+  // Fallback to checking occurrences
+  const occurrences = varData && varData.occurrences ? varData.occurrences : varData
+  if (!occurrences || !Array.isArray(occurrences) || occurrences.length === 0) return null
 
   for (const occ of occurrences) {
-    // Check for description field first (preferred)
     if (occ.description) {
       return occ.description
     }
 
-    // Fallback to checking filters array (for backwards compatibility)
+    // Fallback to checking filters array
     if (occ.filters && Array.isArray(occ.filters)) {
       for (const filter of occ.filters) {
-        // Check if filter has help() syntax
         const helpMatch = filter.match(/^help\(['"](.+)['"]\)$/)
         if (helpMatch) {
           return helpMatch[1]
@@ -290,22 +305,20 @@ function createPromptMessage(varInfo) {
     typeLabel = 'Value'
   }
 
-  // Check for type from filters
-  const expectedType = getExpectedType(occurrences)
+  // Check for type - use pre-computed if available
+  const expectedType = getExpectedType(varInfo)
 
   // Append type to label if found
   if (expectedType) {
     typeLabel = `${typeLabel}:${expectedType}`
   }
 
-  // Collect all unique descriptions from occurrences
-  const descriptions = []
-  if (occurrences && occurrences.length > 0) {
-    occurrences.forEach(occ => {
-      if (occ.description && !descriptions.includes(occ.description)) {
-        descriptions.push(occ.description)
-      }
-    })
+  // Use pre-computed descriptions if available, otherwise collect from occurrences
+  let descriptions = varInfo.descriptions || []
+  if (descriptions.length === 0 && occurrences && occurrences.length > 0) {
+    descriptions = occurrences
+      .map(occ => occ.description)
+      .filter((d, i, a) => d && a.indexOf(d) === i)
   }
 
   // Build context from all occurrences

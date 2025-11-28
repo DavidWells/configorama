@@ -754,6 +754,9 @@ class Configorama {
       if (varKeys.length > 0) {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
 
+        // Extract base variable name from varMatch key (e.g., '${env:FOO, default}' -> 'env:FOO')
+        const getBaseVarName = (key) => key.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+
         logHeader(`Found ${varKeys.length} Variables${fileName}`)
 
         // deepLog('variableData', variableData)
@@ -766,9 +769,7 @@ class Configorama {
 
           // Use uniqueVariables for simpler reference counting
           const referenceData = varKeys.map((k) => {
-            // Map from varMatch (e.g., '${env:API_KEY}') to variable name (e.g., 'env:API_KEY')
-            // Extract the variable name from the key by removing ${ and }
-            const varName = k.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+            const varName = getBaseVarName(k)
             const uniqueVar = uniqueVariables[varName]
             const refCount = uniqueVar ? uniqueVar.occurrences.length : variableData[k].length
             const placesWord = refCount > 1 ? 'places' : 'place'
@@ -789,7 +790,7 @@ class Configorama {
           const firstInstance = variableInstances[0]
 
           // Get uniqueVariable data for description and other metadata
-          const varName = key.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+          const varName = getBaseVarName(key)
           const uniqueVar = uniqueVariables[varName]
 
           // Build display message from enriched metadata
@@ -808,38 +809,16 @@ class Configorama {
           }
 
           // Show type filter if present (Boolean, String, Number, etc.)
-          if (uniqueVar && uniqueVar.occurrences.length > 0) {
-            const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
-            const foundTypes = new Set()
-
-            uniqueVar.occurrences.forEach(occ => {
-              if (occ.filters && Array.isArray(occ.filters)) {
-                occ.filters.forEach(filter => {
-                  if (typeFilters.includes(filter)) {
-                    foundTypes.add(filter)
-                  }
-                })
-              }
-            })
-
-            if (foundTypes.size > 0) {
-              const typeText = `${indent}${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
-              varMsg += `${typeText} ${valueChalk(Array.from(foundTypes).join(', '))}\n`
-            }
+          if (uniqueVar && uniqueVar.types && uniqueVar.types.length > 0) {
+            const typeLabel = `${indent}${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${typeLabel} ${valueChalk(uniqueVar.types.join(', '))}\n`
           }
 
           // Show description from uniqueVariables if available
-          if (uniqueVar && uniqueVar.occurrences.length > 0) {
-            // Collect unique descriptions from all occurrences
-            const descriptions = uniqueVar.occurrences
-              .map(occ => occ.description)
-              .filter((desc, index, self) => desc && self.indexOf(desc) === index)
-
-            if (descriptions.length > 0) {
-              const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
-              const combinedDesc = descriptions.join('. ')
-              varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
-            }
+          if (uniqueVar && uniqueVar.descriptions && uniqueVar.descriptions.length > 0) {
+            const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+            const combinedDesc = uniqueVar.descriptions.join('. ')
+            varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
           }
 
     
@@ -874,11 +853,7 @@ class Configorama {
               // Show type filter per path if different
               if (uniqueVar && uniqueVar.occurrences.length > 1) {
                 const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
-                const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
-                const pathType = occurrence && occurrence.filters
-                  ? occurrence.filters.find(f => typeFilters.includes(f))
-                  : null
-
+                const pathType = occurrence && occurrence.type
                 typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
                 const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
                 return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
@@ -889,12 +864,7 @@ class Configorama {
             locationRender = pathItems.join('\n')
             locationLabel = `${indent}${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
           } else {
-            // look for type filter in the first instance
-            const typeFilters = ['Boolean', 'String', 'Number', 'Array', 'Object']
-            const pathType = firstInstance.filters
-              ? firstInstance.filters.find(f => typeFilters.includes(f))
-              : null
-
+            const pathType = firstInstance.type
             typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
           }
           varMsg += `${locationLabel} ${locationRender}`
