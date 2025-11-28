@@ -1,7 +1,7 @@
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
-const { normalizePath, extractFilePath } = require('./filePathUtils')
+const { normalizePath, extractFilePath, normalizeFileVariable } = require('./filePathUtils')
 
 /**
  * Create a standardized occurrence object
@@ -293,24 +293,7 @@ function enrichMetadata(
     }
 
     // Normalize file() and text() references
-    if (baseVar.match(/^(?:file|text)\(/)) {
-      // Strip sub-key accessors like :topLevel, :nested.value, etc.
-      baseVar = baseVar.replace(/:[\w.[\]]+$/, '')
-
-      // Normalize path - remove quotes and ensure it starts with ./
-      baseVar = baseVar.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
-        // Remove surrounding quotes (single or double)
-        let cleanPath = filePath.trim().replace(/^["']|["']$/g, '')
-
-        // Use normalizePath for consistent normalization (handles ./, .// etc)
-        const normalized = normalizePath(cleanPath)
-        if (normalized) {
-          return `${funcName}(${normalized})`
-        }
-
-        return match
-      })
-    }
+    baseVar = normalizeFileVariable(baseVar)
 
     if (!uniqueVariablesMap.has(baseVar)) {
       uniqueVariablesMap.set(baseVar, {
@@ -349,17 +332,7 @@ function enrichMetadata(
             const siblingBaseVar = detail.valueBeforeFallback || detail.variable
 
             // Normalize file/text references for sibling too
-            let normalizedSiblingVar = siblingBaseVar
-            if (normalizedSiblingVar.match(/^(?:file|text)\(/)) {
-              // Strip sub-key accessor (e.g., :foo from file(./_inner.yml):foo)
-              normalizedSiblingVar = normalizedSiblingVar.replace(/:[\w.[\]]+$/, '')
-
-              normalizedSiblingVar = normalizedSiblingVar.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
-                let cleanPath = filePath.trim().replace(/^["']|["']$/g, '')
-                const normalized = normalizePath(cleanPath)
-                return normalized ? `${funcName}(${normalized})` : match
-              })
-            }
+            const normalizedSiblingVar = normalizeFileVariable(siblingBaseVar)
 
             // Create or get entry for this sibling variable
             if (!uniqueVariablesMap.has(normalizedSiblingVar)) {
@@ -467,12 +440,7 @@ function enrichMetadata(
         }
 
         // Normalize file paths after variable substitution
-        if (resolvedVariable.match(/^(?:file|text)\(/)) {
-          resolvedVariable = resolvedVariable.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
-            const normalized = normalizePath(filePath)
-            return normalized ? `${funcName}(${normalized})` : match
-          })
-        }
+        resolvedVariable = normalizeFileVariable(resolvedVariable)
 
         // Update the variable to the resolved version and update map key
         if (resolvedVariable !== baseVar) {

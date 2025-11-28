@@ -55,7 +55,32 @@ function extractFilePath(variableString) {
   return { filePath }
 }
 
+/**
+ * Normalize a file() or text() variable string
+ * Strips key accessors and normalizes the path inside
+ * @param {string} variableString - e.g. "file('./config.json'):key" or "file(config.json)"
+ * @returns {string} Normalized variable string, e.g. "file(./config.json)"
+ */
+function normalizeFileVariable(variableString) {
+  if (!variableString.match(/^(?:file|text)\(/)) {
+    return variableString
+  }
+
+  // Strip sub-key accessors like :topLevel, :nested.value, etc.
+  let normalized = variableString.replace(/:[\w.[\]]+$/, '')
+
+  // Normalize the path inside
+  normalized = normalized.replace(/^(file|text)\((.+?)\)/, (match, funcName, filePath) => {
+    let cleanPath = filePath.trim().replace(/^["']|["']$/g, '')
+    const normalizedPath = normalizePath(cleanPath)
+    return normalizedPath ? `${funcName}(${normalizedPath})` : match
+  })
+
+  return normalized
+}
+
 module.exports = {
   normalizePath,
   extractFilePath,
+  normalizeFileVariable,
 }

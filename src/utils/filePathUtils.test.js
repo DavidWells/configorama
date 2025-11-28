@@ -2,7 +2,7 @@
 
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { normalizePath, extractFilePath } = require('./filePathUtils')
+const { normalizePath, extractFilePath, normalizeFileVariable } = require('./filePathUtils')
 
 // normalizePath tests
 
@@ -101,6 +101,47 @@ test('extractFilePath - returns null for empty input', () => {
 test('extractFilePath - handles bare filename', () => {
   const result = extractFilePath('file(config.json)')
   assert.is(result.filePath, 'config.json')
+})
+
+// normalizeFileVariable tests
+
+test('normalizeFileVariable - returns non-file strings unchanged', () => {
+  assert.is(normalizeFileVariable('opt:stage'), 'opt:stage')
+  assert.is(normalizeFileVariable('self:provider.stage'), 'self:provider.stage')
+})
+
+test('normalizeFileVariable - normalizes bare path in file()', () => {
+  assert.is(normalizeFileVariable('file(config.json)'), 'file(./config.json)')
+})
+
+test('normalizeFileVariable - normalizes bare path in text()', () => {
+  assert.is(normalizeFileVariable('text(readme.txt)'), 'text(./readme.txt)')
+})
+
+test('normalizeFileVariable - strips key accessor', () => {
+  assert.is(normalizeFileVariable('file(./env.yml):FOO'), 'file(./env.yml)')
+  assert.is(normalizeFileVariable('file(./config.json):nested.value'), 'file(./config.json)')
+})
+
+test('normalizeFileVariable - strips key accessor with array notation', () => {
+  assert.is(normalizeFileVariable('file(./data.json):items[0]'), 'file(./data.json)')
+})
+
+test('normalizeFileVariable - removes quotes from path', () => {
+  assert.is(normalizeFileVariable("file('./config.json')"), 'file(./config.json)')
+  assert.is(normalizeFileVariable('file("./config.json")'), 'file(./config.json)')
+})
+
+test('normalizeFileVariable - handles combined normalization', () => {
+  assert.is(normalizeFileVariable("file('config.json'):key"), 'file(./config.json)')
+})
+
+test('normalizeFileVariable - keeps ./ paths unchanged', () => {
+  assert.is(normalizeFileVariable('file(./already-normalized.yml)'), 'file(./already-normalized.yml)')
+})
+
+test('normalizeFileVariable - keeps ../ paths unchanged', () => {
+  assert.is(normalizeFileVariable('file(../parent/config.yml)'), 'file(../parent/config.yml)')
 })
 
 test.run()
