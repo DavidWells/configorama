@@ -12,12 +12,12 @@ yamlFullFile: ${file("./_ymlfull.yml")}
 # Import full yml file object via absolute path
 yamlFullFileNoPath: ${file(_ymlfull.yml)}
 
-# Import full yml file object with variable filename. 
+# Import full yml file object with variable filename.
 # normalKey === 'full' so this will resolve to _ymlfull.yml
 yamlFullFileNestedRef: ${file(./_yml${self:normalKey}.yml)}
 
-yamlFullFileNestedRefParent: 
-  child: 
+yamlFullFileNestedRefParent:
+  child:
     grandchild: ${file(./_yml${self:normalKey}.yml)}
 
 # fallback to default value if file not found
@@ -42,6 +42,20 @@ yamlPartialArrayObjectRef: ${file(./_ymlpartial.yml):arrayTwo.1.object}
 # Import partial yml file array object value key
 yamlPartialArrayObjectRefValue: ${file(./_ymlpartial.yml):arrayTwo.1.object.key}
 
+# NEW: Test cases with . syntax (instead of :)
+# Import partial yml file key value with . syntax
+yamlPartialTopLevelKeyDot: ${file(./_ymlpartial.yml).topLevel}
+# Import partial yml file nested key value pair with . syntax
+yamlPartialSecondLevelKeyDot: ${file(./_ymlpartial.yml).nested.value}
+# Import partial yml file triple nested key value pair with . syntax
+yamlPartialThirdLevelKeyDot: ${file(./_ymlpartial.yml).nested.again.value}
+# Import partial yml file array value with . syntax
+yamlPartialArrayRefDot: ${file(./_ymlpartial.yml).array.1}
+# Import partial yml file array object value with . syntax
+yamlPartialArrayObjectRefDot: ${file(./_ymlpartial.yml).arrayTwo.1.object}
+# Import partial yml file array object value key with . syntax
+yamlPartialArrayObjectRefValueDot: ${file(./_ymlpartial.yml).arrayTwo.1.object.key}
+
 ########################
 # Values from JSON files
 ########################
@@ -56,6 +70,16 @@ jsonPartialSecondLevelKey: ${file(./_jsonpartial.json):nested.value}
 jsonPartialThirdLevelKey: ${file(./_jsonpartial.json):nested.again.value}
 # Import partial json file array value
 jsonPartialArrayRef: ${file(./_jsonpartial.json):array.0}
+
+# NEW: Test cases with . syntax (instead of :)
+# Import partial json file key value with . syntax
+jsonPartialTopLevelKeyDot: ${file(./_jsonpartial.json).topLevel}
+# Import partial json file nested dot prop key value with . syntax
+jsonPartialSecondLevelKeyDot: ${file(./_jsonpartial.json).nested.value}
+# Import partial json file triple nested dot prop key value with . syntax
+jsonPartialThirdLevelKeyDot: ${file(./_jsonpartial.json).nested.again.value}
+# Import partial json file array value with . syntax
+jsonPartialArrayRefDot: ${file(./_jsonpartial.json).array.0}
 
 ########################
 # Dynamic File Names

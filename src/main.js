@@ -376,7 +376,7 @@ class Configorama {
         type: 'file',
         prefix: 'file',
         syntax: '${file(pathToFile.json)}',
-        description: `Resolves values from files. Supports sub-properties via :key lookup.`,
+        description: `Resolves values from files. Supports sub-properties via :key or .key lookup.`,
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           return this.getValueFromFile(varString, { context: pathValue })
@@ -3031,8 +3031,17 @@ ${JSON.stringify(options.context, null, 2)}`,
       // Possible alt importer tool https://github.com/humanwhocodes/module-importer
       const jsFile = require(fullFilePath)
       let returnValueFunction = jsFile
-      // TODO change how exported functions are referenced
-      const variableArray = variableString.split(':')
+      // Support both : and . as the separator for module references
+      // Split by : first, then check if there's a . separator
+      let variableArray = variableString.split(':')
+      if (variableArray.length === 1) {
+        // No : found, try splitting by .
+        const dotIndex = variableString.indexOf(matchedFileString) + matchedFileString.length
+        const afterMatch = variableString.substring(dotIndex)
+        if (afterMatch.startsWith('.')) {
+          variableArray = [variableString.substring(0, dotIndex), afterMatch.substring(1)]
+        }
+      }
 
       if (variableArray[1]) {
         let jsModule = variableArray[1]
@@ -3077,7 +3086,16 @@ Check if your javascript is returning the correct data.`
     if (fileExtension === 'ts') {
       const { executeTypeScriptFile } = require('./parsers/typescript')
       let returnValueFunction
-      const variableArray = variableString.split(':')
+      // Support both : and . as the separator for module references
+      let variableArray = variableString.split(':')
+      if (variableArray.length === 1) {
+        // No : found, try splitting by .
+        const dotIndex = variableString.indexOf(matchedFileString) + matchedFileString.length
+        const afterMatch = variableString.substring(dotIndex)
+        if (afterMatch.startsWith('.')) {
+          variableArray = [variableString.substring(0, dotIndex), afterMatch.substring(1)]
+        }
+      }
 
       try {
         const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
@@ -3131,7 +3149,16 @@ Check if your TypeScript is returning the correct data.`
       // Possible alt importer tool https://github.com/humanwhocodes/module-importer
       const { executeESMFile } = require('./parsers/esm')
       let returnValueFunction
-      const variableArray = variableString.split(':')
+      // Support both : and . as the separator for module references
+      let variableArray = variableString.split(':')
+      if (variableArray.length === 1) {
+        // No : found, try splitting by .
+        const dotIndex = variableString.indexOf(matchedFileString) + matchedFileString.length
+        const afterMatch = variableString.substring(dotIndex)
+        if (afterMatch.startsWith('.')) {
+          variableArray = [variableString.substring(0, dotIndex), afterMatch.substring(1)]
+        }
+      }
 
       try {
         const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
@@ -3200,10 +3227,11 @@ Check if your ESM is returning the correct data.`
         // console.log('deep', variableString)
         // console.log('matchedFileString', matchedFileString)
         let deepProperties = variableString.replace(matchedFileString, '')
-        // TODO 2025-11-12 add file.path.support instead of just : 
-        if (deepProperties.substring(0, 1) !== ':') {
+        // Support both : and . as the separator for sub properties
+        const firstChar = deepProperties.substring(0, 1)
+        if (firstChar !== ':' && firstChar !== '.') {
           const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" to reference sub properties. ${deepProperties}`
+Please use ":" or "." to reference sub properties. ${deepProperties}`
           return Promise.reject(new Error(errorMessage))
         }
         deepProperties = deepProperties.slice(1).split('.')
