@@ -1129,10 +1129,13 @@ class Configorama {
     const variablesKnownTypes = this.variablesKnownTypes
     const variableTypes = this.variableTypes
     const filterMatch = this.filterMatch
+    const configFilePath = this.configFilePath
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
     const fileGlobPatterns = []
+    const byConfigPath = []
+    const referencesMap = new Map()
     let matchCount = 1
 
     traverse(this.originalConfig).forEach(function (rawValue) {
@@ -1335,15 +1338,51 @@ class Configorama {
               if (!fileRefs.includes(normalizedPath)) {
                 fileRefs.push(normalizedPath)
               }
-              
+
               // Check if path contains variables and create glob pattern
-              if (normalizedPath.match(variableSyntax)) {
+              const containsVariables = !!normalizedPath.match(variableSyntax)
+              let globPattern
+              if (containsVariables) {
                 // Replace variable syntax ${...} with * for glob pattern
-                const globPattern = normalizedPath.replace(variableSyntax, '*')
+                globPattern = normalizedPath.replace(variableSyntax, '*')
                 if (!fileGlobPatterns.includes(globPattern)) {
                   fileGlobPatterns.push(globPattern)
                 }
               }
+
+              // Build byConfigPath entry
+              const absolutePath = configFilePath
+                ? path.resolve(path.dirname(configFilePath), normalizedPath)
+                : normalizedPath
+              const fileExists = configFilePath ? fs.existsSync(absolutePath) : false
+
+              const configPathEntry = {
+                location: configValuePath,
+                filePath: absolutePath,
+                relativePath: normalizedPath,
+                originalVariableString: rawValue,
+                resolvedVariableString: rawValue,
+                containsVariables,
+                exists: fileExists,
+              }
+              if (globPattern) {
+                configPathEntry.pattern = globPattern
+              }
+              byConfigPath.push(configPathEntry)
+
+              // Build references entry
+              if (!referencesMap.has(normalizedPath)) {
+                referencesMap.set(normalizedPath, {
+                  resolvedPath: normalizedPath,
+                  refs: [],
+                })
+              }
+              const refEntry = referencesMap.get(normalizedPath)
+              refEntry.refs.push({
+                location: configValuePath,
+                value: normalizedPath,
+                originalVariableString: rawValue,
+              })
             }
           }
         })
@@ -1425,10 +1464,8 @@ class Configorama {
         dynamicPaths: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
         // resolve files are those that are paths with no * and no inner variables
         resolvedPaths: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
-        // Set in enrichMetadata
-        byConfigPath: undefined,
-        // Set in enrichMetadata
-        references: undefined,
+        byConfigPath,
+        references: Array.from(referencesMap.values()),
       },
       summary: {
         totalVariables: varKeys.length,

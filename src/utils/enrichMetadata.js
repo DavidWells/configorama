@@ -198,7 +198,8 @@ function enrichMetadata(
   }
 
   // Update fileDependencies.resolvedPaths with the resolved file refs
-  if (metadata.fileDependencies) {
+  // Only overwrite if we have enriched data, otherwise keep original from collectVariableMetadata
+  if (metadata.fileDependencies && resolvedFileRefs.length > 0) {
     metadata.fileDependencies.resolvedPaths = resolvedFileRefs
   }
 
@@ -304,10 +305,14 @@ function enrichMetadata(
     }
   }
 
-  // Update fileDependencies with the enriched data
+  // Update fileDependencies with the enriched data (only if we have data)
   if (metadata.fileDependencies) {
-    metadata.fileDependencies.byConfigPath = byConfigPath
-    metadata.fileDependencies.references = references
+    if (byConfigPath.length > 0) {
+      metadata.fileDependencies.byConfigPath = byConfigPath
+    }
+    if (references.length > 0) {
+      metadata.fileDependencies.references = references
+    }
   }
 
   // Build uniqueVariables rollup - group by base variable (without fallbacks)
