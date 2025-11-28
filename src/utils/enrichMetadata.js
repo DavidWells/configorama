@@ -1,7 +1,7 @@
-const { splitCsv } = require('./splitCsv')
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
+const { normalizePath, extractFilePath } = require('./filePathUtils')
 
 /**
  * Create a standardized occurrence object
@@ -49,56 +49,6 @@ function createOccurrence(instance, varMatch, options = {}) {
   }
 
   return occurrence
-}
-
-/**
- * Extract file path from a file() or text() reference string
- * @param {string} propertyString - The property string containing file/text reference
- * @returns {object|null} Object with filePath, or null if no match
- */
-function extractFilePath(propertyString) {
-  const fileMatch = propertyString.match(/^\$\{(?:file|text)\((.*?)\)/)
-  if (!fileMatch || !fileMatch[1]) {
-    return null
-  }
-  
-  const fileContent = fileMatch[1].trim()
-  const parts = splitCsv(fileContent)
-  let filePath = parts[0].trim()
-  
-  // Remove quotes if present
-  filePath = filePath.replace(/^['"]|['"]$/g, '')
-  
-  return { filePath }
-}
-
-/**
- * Normalize a file path (add ./ prefix, fix .//, skip deep refs)
- * @param {string} filePath - The file path to normalize
- * @returns {string|null} Normalized path, or null if should be skipped
- */
-function normalizePath(filePath) {
-  // Skip deep references
-  if (filePath.includes('deep:')) {
-    return null
-  }
-  
-  let normalized = filePath
-  
-  // Add ./ prefix for relative paths
-  if (!filePath.startsWith('./') && 
-      !filePath.startsWith('../') && 
-      !filePath.startsWith('/') && 
-      !filePath.startsWith('~')) {
-    normalized = './' + filePath
-  }
-  
-  // Fix double slashes
-  if (normalized.startsWith('.//')) {
-    normalized = normalized.replace('.//', './')
-  }
-  
-  return normalized
 }
 
 /**

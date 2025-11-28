@@ -2,6 +2,7 @@ const os = require('os')
 const path = require('path')
 const fs = require('fs')
 const enrichMetadata = require('./utils/enrichMetadata')
+const { normalizePath, extractFilePath } = require('./utils/filePathUtils')
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
@@ -1307,33 +1308,11 @@ class Configorama {
         nested.forEach((detail) => {
           // console.log('detail', detail)
           if (detail.variableType && (detail.variableType === 'file' || detail.variableType === 'text')) {
-            const fileMatch = detail.variable.match(/^(?:file|text)\((.*?)\)/)
-            if (fileMatch && fileMatch[1]) {
-              let fileContent = fileMatch[1].trim()
-              
-              // Split by comma to separate file path from parameters/fallback values
-              const parts = splitCsv(fileContent)
-              let filePath = parts[0].trim()
-              
-              // Remove quotes if present
-              filePath = filePath.replace(/^['"]|['"]$/g, '')
-              
-              // Normalize path: ensure relative paths start with ./
-              let normalizedPath = filePath
-              if (
-                !filePath.startsWith('./') && 
-                !filePath.startsWith('../') && 
-                !filePath.startsWith('/') && 
-                !filePath.startsWith('~')
-              ) {
-                normalizedPath = './' + filePath
-              }
+            const extracted = extractFilePath(detail.variable)
+            if (extracted) {
+              const normalizedPath = normalizePath(extracted.filePath)
+              if (!normalizedPath) return
 
-              // file .// 
-              if (normalizedPath.startsWith('.//')) {
-                normalizedPath = normalizedPath.replace('.//', './')
-              }
-              
               // Handle variables in file paths - just record the pattern
               if (!fileRefs.includes(normalizedPath)) {
                 fileRefs.push(normalizedPath)
