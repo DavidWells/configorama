@@ -1,5 +1,5 @@
 const { trim } = require('./lodash')
-const trimSurroundingQuotes = require('./trimSurroundingQuotes')
+const { trimSurroundingQuotes } = require('./quoteUtils')
 
 function formatArg(arg) {
   const cleanArg = trimSurroundingQuotes(trim(arg), false)

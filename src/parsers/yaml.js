@@ -1,6 +1,7 @@
 const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
+const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/bracketMatcher')
 
 // Loader for custom CF syntax
 function load(contents, options) {
@@ -56,8 +57,6 @@ function toJson(ymlContents) {
   }
   return json
 }
-
-const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/bracketMatcher')
 
 // Alias for backward compatibility
 const matchOutermostBraces = findOutermostBracesDepthFirst

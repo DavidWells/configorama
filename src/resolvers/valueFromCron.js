@@ -1,3 +1,4 @@
+const { trimSurroundingQuotes } = require('../utils/quoteUtils')
 const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 
 /**
@@ -225,7 +226,6 @@ Examples:
 `)
   }
   
-  const trimSurroundingQuotes = require('../utils/trimSurroundingQuotes')
   // Remove surrounding quotes if present
   const cleanExpression = trimSurroundingQuotes(cronExpression, true)
   

@@ -45,7 +45,7 @@ function extractFilePath(variableString) {
     return null
   }
 
-  const trimSurroundingQuotes = require('./trimSurroundingQuotes')
+  const { trimSurroundingQuotes } = require('./quoteUtils')
   const fileContent = fileMatch[1].trim()
   const parts = splitCsv(fileContent)
   let filePath = parts[0].trim()

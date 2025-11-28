@@ -1,5 +1,5 @@
 const { splitByComma } = require('./splitByComma')
-const trimQuotes = require('./trimSurroundingQuotes')
+const { trimSurroundingQuotes: trimQuotes } = require('./quoteUtils')
 const { getVariableType } = require('./getVariableType')
 const FALLBACK_REGEX = /,\s*/
 const VAR_MATCH_REGEX = /__VAR_\d+__/
