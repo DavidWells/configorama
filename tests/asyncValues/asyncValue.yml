@@ -18,3 +18,8 @@ asyncWithFilter: ${file(./asyncValueObject.js):func.keyTwo | toCamelCase}
 asyncWithFilterTwo: ${file(./asyncValueObject.js):func.key | toUpperCase}
 
 asyncJSValueReference: ${asyncKey}
+
+# Test . syntax for JS files (instead of :)
+asyncKeyDot: ${file(./asyncValueObject.js).func.key}
+asyncKeyTwoDot: ${file(./asyncValueObject.js).func.keyTwo}
+asyncKeyThreeDot: ${file(./asyncValueObject.js).func.keyThree}
