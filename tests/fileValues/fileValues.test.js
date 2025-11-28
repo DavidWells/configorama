@@ -138,6 +138,47 @@ test('jsonPartialArrayRef -> ${file(./_jsonpartial.json):array.0}', () => {
   assert.equal(config.jsonPartialArrayRef, 'zero')
 })
 
+// NEW: Test cases with . syntax (instead of :)
+test('yamlPartialTopLevelKeyDot -> ${file(./_ymlpartial.yml).topLevel}', () => {
+  assert.equal(config.yamlPartialTopLevelKeyDot, 'topLevelValue')
+})
+
+test('yamlPartialSecondLevelKeyDot -> ${file(./_ymlpartial.yml).nested.value}', () => {
+  assert.equal(config.yamlPartialSecondLevelKeyDot, '1leveldown')
+})
+
+test('yamlPartialThirdLevelKeyDot -> ${file(./_ymlpartial.yml).nested.again.value}', () => {
+  assert.equal(config.yamlPartialThirdLevelKeyDot, '2levelsdown')
+})
+
+test('yamlPartialArrayRefDot -> ${file(./_ymlpartial.yml).array.1}', () => {
+  assert.equal(config.yamlPartialArrayRefDot, 'one')
+})
+
+test('yamlPartialArrayObjectRefDot -> ${file(./_ymlpartial.yml).arrayTwo.1.object}', () => {
+  assert.equal(config.yamlPartialArrayObjectRefDot, { key: 'helloTwo' })
+})
+
+test('yamlPartialArrayObjectRefValueDot -> ${file(./_ymlpartial.yml).arrayTwo.1.object.key}', () => {
+  assert.equal(config.yamlPartialArrayObjectRefValueDot, 'helloTwo')
+})
+
+test('jsonPartialTopLevelKeyDot -> ${file(./_jsonpartial.json).topLevel}', () => {
+  assert.equal(config.jsonPartialTopLevelKeyDot, 'topLevelValueJson')
+})
+
+test('jsonPartialSecondLevelKeyDot -> ${file(./_jsonpartial.json).nested.value}', () => {
+  assert.equal(config.jsonPartialSecondLevelKeyDot, '1leveldownJson')
+})
+
+test('jsonPartialThirdLevelKeyDot -> ${file(./_jsonpartial.json).nested.again.value}', () => {
+  assert.equal(config.jsonPartialThirdLevelKeyDot, '2levelsdownJson')
+})
+
+test('jsonPartialArrayRefDot -> ${file(./_jsonpartial.json).array.0}', () => {
+  assert.equal(config.jsonPartialArrayRefDot, 'zero')
+})
+
 test('stageSpecificViaFlag -> ${file(./config.${opt:stage}.json)}', () => {
   assert.equal(config.stageSpecificViaFlag, {
     'CREDS': 'dev creds here'
