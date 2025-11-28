@@ -2,7 +2,7 @@ const os = require('os')
 const path = require('path')
 const fs = require('fs')
 const enrichMetadata = require('./utils/enrichMetadata')
-const { normalizePath, extractFilePath } = require('./utils/filePathUtils')
+const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/filePathUtils')
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
@@ -1131,10 +1131,12 @@ class Configorama {
     const variableTypes = this.variableTypes
     const filterMatch = this.filterMatch
     const configFilePath = this.configFilePath
+    const originalConfig = this.originalConfig
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
     const fileGlobPatterns = []
+    const preResolvedPaths = new Set()
     const byConfigPath = []
     const referencesMap = new Map()
     let matchCount = 1
@@ -1329,18 +1331,32 @@ class Configorama {
                 }
               }
 
+              // Try to pre-resolve inner variables from originalConfig
+              let resolvedPath = normalizedPath
+              let resolvedVarString = rawValue
+              if (containsVariables) {
+                const pathResult = resolveInnerVariables(normalizedPath, variableSyntax, originalConfig, dotProp.get)
+                const varStringResult = resolveInnerVariables(rawValue, variableSyntax, originalConfig, dotProp.get)
+
+                if (pathResult.didResolve) {
+                  resolvedPath = normalizePath(pathResult.resolved) || pathResult.resolved
+                  resolvedVarString = varStringResult.resolved
+                  preResolvedPaths.add(resolvedPath)
+                }
+              }
+
               // Build byConfigPath entry
               const absolutePath = configFilePath
-                ? path.resolve(path.dirname(configFilePath), normalizedPath)
-                : normalizedPath
+                ? path.resolve(path.dirname(configFilePath), resolvedPath)
+                : resolvedPath
               const fileExists = configFilePath ? fs.existsSync(absolutePath) : false
 
               const configPathEntry = {
                 location: configValuePath,
                 filePath: absolutePath,
-                relativePath: normalizedPath,
+                relativePath: resolvedPath,
                 originalVariableString: rawValue,
-                resolvedVariableString: rawValue,
+                resolvedVariableString: resolvedVarString,
                 containsVariables,
                 exists: fileExists,
               }
@@ -1349,14 +1365,15 @@ class Configorama {
               }
               byConfigPath.push(configPathEntry)
 
-              // Build references entry
-              if (!referencesMap.has(normalizedPath)) {
-                referencesMap.set(normalizedPath, {
-                  resolvedPath: normalizedPath,
+              // Build references entry (use resolvedPath as key when available)
+              const refKey = resolvedPath
+              if (!referencesMap.has(refKey)) {
+                referencesMap.set(refKey, {
+                  resolvedPath: refKey,
                   refs: [],
                 })
               }
-              const refEntry = referencesMap.get(normalizedPath)
+              const refEntry = referencesMap.get(refKey)
               refEntry.refs.push({
                 location: configValuePath,
                 value: normalizedPath,
@@ -1441,8 +1458,11 @@ class Configorama {
         globPatterns: fileGlobPatterns,
         // all: fileRefs,
         dynamicPaths: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
-        // resolve files are those that are paths with no * and no inner variables
-        resolvedPaths: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
+        // Resolved paths: static paths + pre-resolved dynamic paths
+        resolvedPaths: [
+          ...fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
+          ...preResolvedPaths
+        ],
         byConfigPath,
         references: Array.from(referencesMap.values()),
       },

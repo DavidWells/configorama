@@ -2,7 +2,7 @@
 
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { normalizePath, extractFilePath, normalizeFileVariable } = require('./filePathUtils')
+const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('./filePathUtils')
 
 // normalizePath tests
 
@@ -142,6 +142,73 @@ test('normalizeFileVariable - keeps ./ paths unchanged', () => {
 
 test('normalizeFileVariable - keeps ../ paths unchanged', () => {
   assert.is(normalizeFileVariable('file(../parent/config.yml)'), 'file(../parent/config.yml)')
+})
+
+// resolveInnerVariables tests
+
+const variableSyntax = /\$\{([^}]+)\}/g
+const getProp = (obj, path) => path.split('.').reduce((o, k) => o && o[k], obj)
+
+test('resolveInnerVariables - returns unchanged when no variables', () => {
+  const result = resolveInnerVariables('./config.json', variableSyntax, {}, getProp)
+  assert.is(result.resolved, './config.json')
+  assert.is(result.didResolve, false)
+})
+
+test('resolveInnerVariables - resolves self: variables from config', () => {
+  const config = { stage: 'prod' }
+  const result = resolveInnerVariables('./database-${self:stage}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './database-prod.json')
+  assert.is(result.didResolve, true)
+})
+
+test('resolveInnerVariables - resolves dot.prop style variables', () => {
+  const config = { stage: 'dev' }
+  const result = resolveInnerVariables('./database-${stage}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './database-dev.json')
+  assert.is(result.didResolve, true)
+})
+
+test('resolveInnerVariables - resolves nested config paths', () => {
+  const config = { provider: { stage: 'test' } }
+  const result = resolveInnerVariables('./db-${self:provider.stage}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './db-test.json')
+  assert.is(result.didResolve, true)
+})
+
+test('resolveInnerVariables - resolves multiple variables', () => {
+  const config = { stage: 'prod', region: 'us-east-1' }
+  const result = resolveInnerVariables('./config-${self:stage}-${self:region}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './config-prod-us-east-1.json')
+  assert.is(result.didResolve, true)
+})
+
+test('resolveInnerVariables - does not resolve if config value is a variable', () => {
+  const config = { stage: '${opt:stage}' }
+  const result = resolveInnerVariables('./database-${self:stage}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './database-${self:stage}.json')
+  assert.is(result.didResolve, false)
+})
+
+test('resolveInnerVariables - does not resolve if config value is undefined', () => {
+  const config = {}
+  const result = resolveInnerVariables('./database-${self:stage}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './database-${self:stage}.json')
+  assert.is(result.didResolve, false)
+})
+
+test('resolveInnerVariables - does not resolve env: or opt: variables', () => {
+  const config = { stage: 'prod' }
+  const result = resolveInnerVariables('./database-${env:STAGE}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './database-${env:STAGE}.json')
+  assert.is(result.didResolve, false)
+})
+
+test('resolveInnerVariables - partial resolution fails completely', () => {
+  const config = { stage: 'prod' }
+  const result = resolveInnerVariables('./config-${self:stage}-${env:REGION}.json', variableSyntax, config, getProp)
+  assert.is(result.resolved, './config-${self:stage}-${env:REGION}.json')
+  assert.is(result.didResolve, false)
 })
 
 test.run()

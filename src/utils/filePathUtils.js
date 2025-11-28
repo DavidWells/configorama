@@ -79,8 +79,57 @@ function normalizeFileVariable(variableString) {
   return normalized
 }
 
+/**
+ * Resolve inner variables in a string from config values
+ * @param {string} str - String containing variables like ${self:stage}
+ * @param {RegExp} variableSyntax - Regex to match variable syntax
+ * @param {object} config - Config object to look up values
+ * @param {function} getProp - Function to get nested property (e.g. dotProp.get)
+ * @returns {{resolved: string, didResolve: boolean}} Resolved string and whether resolution happened
+ */
+function resolveInnerVariables(str, variableSyntax, config, getProp) {
+  const varMatches = str.match(variableSyntax)
+  if (!varMatches) {
+    return { resolved: str, didResolve: false }
+  }
+
+  let canResolve = true
+  let resolved = str
+  for (const varMatch of varMatches) {
+    const innerVar = varMatch.slice(2, -1) // Remove ${ and }
+    let configPath = null
+
+    // Handle self: prefix
+    if (innerVar.startsWith('self:')) {
+      configPath = innerVar.slice(5)
+    } else if (!innerVar.includes(':')) {
+      // dot.prop style
+      configPath = innerVar
+    }
+
+    if (configPath) {
+      const configValue = getProp(config, configPath)
+      // Only use if it's a static value (not another variable)
+      if (configValue !== undefined &&
+          typeof configValue === 'string' &&
+          !configValue.match(variableSyntax)) {
+        resolved = resolved.replace(varMatch, configValue)
+      } else {
+        canResolve = false
+        break
+      }
+    } else {
+      canResolve = false
+      break
+    }
+  }
+
+  return { resolved: canResolve ? resolved : str, didResolve: canResolve }
+}
+
 module.exports = {
   normalizePath,
   extractFilePath,
   normalizeFileVariable,
+  resolveInnerVariables,
 }

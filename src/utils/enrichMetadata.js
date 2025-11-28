@@ -1,7 +1,7 @@
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
-const { normalizePath, extractFilePath, normalizeFileVariable } = require('./filePathUtils')
+const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('./filePathUtils')
 
 /**
  * Create a standardized occurrence object
