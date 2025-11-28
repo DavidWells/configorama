@@ -14,22 +14,48 @@ function load(contents, options) {
   return { data, error }
 }
 
-const { createSafeWrapper, createFormatConverter } = require('../utils/safeParser')
-
-function parseYaml(ymlContents) {
-  return YAML.safeLoad(ymlContents)
+function parse(ymlContents) {
+  // Get document, or throw exception on error
+  let ymlObject = {}
+  try {
+    ymlObject = YAML.safeLoad(ymlContents)
+  } catch (e) {
+    throw new Error(e)
+  }
+  return ymlObject
 }
 
-function dumpYaml(object) {
-  return YAML.safeDump(object, {
-    noRefs: true
-  })
+function dump(object) {
+  let yml
+  try {
+    yml = YAML.safeDump(object, {
+      noRefs: true
+    })
+  } catch (e) {
+    throw new Error(e)
+  }
+  return yml
 }
 
-const parse = createSafeWrapper(parseYaml)
-const dump = createSafeWrapper(dumpYaml)
-const toToml = createFormatConverter(parse, TOML.dump)
-const toJson = createFormatConverter(parse, JSON.dump)
+function toToml(ymlContents) {
+  let toml
+  try {
+    toml = TOML.dump(parse(ymlContents))
+  } catch (e) {
+    throw new Error(e)
+  }
+  return toml
+}
+
+function toJson(ymlContents) {
+  let json
+  try {
+    json = JSON.dump(parse(ymlContents))
+  } catch (e) {
+    throw new Error(e)
+  }
+  return json
+}
 
 const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/bracketMatcher')
 
