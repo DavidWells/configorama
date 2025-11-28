@@ -1,46 +1,12 @@
 const TOML = require('@iarna/toml')
 const YAML = require('./yaml')
 const JSON = require('./json5')
+const { createSafeWrapper, createFormatConverter } = require('../utils/safeParser')
 
-function parse(contents) {
-  let object
-  try {
-    object = TOML.parse(contents)
-  } catch (e) {
-    throw new Error(e)
-  }
-  return object
-}
-
-function dump(object) {
-  let toml
-  try {
-    toml = TOML.stringify(object)
-  } catch (e) {
-    throw new Error(e)
-  }
-  return toml
-}
-
-function toYaml(tomlContents) {
-  let yml
-  try {
-    yml = YAML.dump(parse(tomlContents))
-  } catch (e) {
-    throw new Error(e)
-  }
-  return yml
-}
-
-function toJson(tomlContents) {
-  let json
-  try {
-    json = JSON.dump(parse(tomlContents))
-  } catch (e) {
-    throw new Error(e)
-  }
-  return json
-}
+const parse = createSafeWrapper(TOML.parse.bind(TOML))
+const dump = createSafeWrapper(TOML.stringify.bind(TOML))
+const toYaml = createFormatConverter(parse, YAML.dump)
+const toJson = createFormatConverter(parse, JSON.dump)
 
 module.exports = {
   parse: parse,

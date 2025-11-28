@@ -5,23 +5,34 @@ const findUp = require('find-up')
 const trimSurroundingQuotes = require('./trimSurroundingQuotes')
 const { resolveAlias } = require('./resolveAlias')
 
-module.exports = function getFullPath(fileString, cwd) {
-  const configPath = cwd || process.cwd()
-  const relativePath = fileString.replace('~', os.homedir())
-
-  let fullFilePath = (path.isAbsolute(relativePath) ? relativePath : path.join(configPath, relativePath))
+/**
+ * Core path resolution logic - resolves a file path handling absolute paths, symlinks, and findUp
+ * @param {string} pathToResolve - The path to resolve
+ * @param {string} basePath - The base directory for relative paths
+ * @returns {string} The resolved full file path
+ */
+function resolveFilePath(pathToResolve, basePath) {
+  let fullFilePath = path.isAbsolute(pathToResolve) ? pathToResolve : path.join(basePath, pathToResolve)
 
   if (fs.existsSync(fullFilePath)) {
     // Get real path to handle potential symlinks (but don't fatal error)
     fullFilePath = fs.realpathSync(fullFilePath)
-
   // Only match files that are relative
-  } else if (relativePath.match(/\.\//)) {
-    const cleanName = path.basename(relativePath)
-    fullFilePath = findUp.sync(cleanName, { cwd: configPath })
+  } else if (pathToResolve.match(/\.\//)) {
+    const cleanName = path.basename(pathToResolve)
+    const findUpResult = findUp.sync(cleanName, { cwd: basePath })
+    if (findUpResult) {
+      fullFilePath = findUpResult
+    }
   }
 
   return fullFilePath
+}
+
+module.exports = function getFullPath(fileString, cwd) {
+  const configPath = cwd || process.cwd()
+  const relativePath = fileString.replace('~', os.homedir())
+  return resolveFilePath(relativePath, configPath)
 }
 
 /**
@@ -38,22 +49,7 @@ function resolveFilePathFromMatch(matchedFileString, syntax, configPath) {
 
   // Resolve alias if the path contains alias syntax
   const resolvedPath = resolveAlias(relativePath, configPath)
-
-  let fullFilePath = path.isAbsolute(resolvedPath) ? resolvedPath : path.join(configPath, resolvedPath)
-
-  if (fs.existsSync(fullFilePath)) {
-    // Get real path to handle potential symlinks (but don't fatal error)
-    fullFilePath = fs.realpathSync(fullFilePath)
-
-    // Only match files that are relative
-  } else if (resolvedPath.match(/\.\//)) {
-    // TODO test higher parent refs
-    const cleanName = path.basename(resolvedPath)
-    const findUpResult = findUp.sync(cleanName, { cwd: configPath })
-    if (findUpResult) {
-      fullFilePath = findUpResult
-    }
-  }
+  const fullFilePath = resolveFilePath(resolvedPath, configPath)
 
   return { fullFilePath, resolvedPath, relativePath }
 }

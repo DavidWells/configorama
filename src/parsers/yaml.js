@@ -14,96 +14,27 @@ function load(contents, options) {
   return { data, error }
 }
 
-function parse(ymlContents) {
-  // Get document, or throw exception on error
-  let ymlObject = {}
-  try {
-    ymlObject = YAML.safeLoad(ymlContents)
-  } catch (e) {
-    throw new Error(e)
-  }
-  return ymlObject
+const { createSafeWrapper, createFormatConverter } = require('../utils/safeParser')
+
+function parseYaml(ymlContents) {
+  return YAML.safeLoad(ymlContents)
 }
 
-function dump(object) {
-  let yml
-  try {
-    yml = YAML.safeDump(object, {
-      noRefs: true
-    })
-  } catch (e) {
-    throw new Error(e)
-  }
-  return yml
+function dumpYaml(object) {
+  return YAML.safeDump(object, {
+    noRefs: true
+  })
 }
 
-function toToml(ymlContents) {
-  let toml
-  try {
-    toml = TOML.dump(parse(ymlContents))
-  } catch (e) {
-    throw new Error(e)
-  }
-  return toml
-}
+const parse = createSafeWrapper(parseYaml)
+const dump = createSafeWrapper(dumpYaml)
+const toToml = createFormatConverter(parse, TOML.dump)
+const toJson = createFormatConverter(parse, JSON.dump)
 
-function toJson(ymlContents) {
-  let json
-  try {
-    json = JSON.dump(parse(ymlContents))
-  } catch (e) {
-    throw new Error(e)
-  }
-  return json
-}
+const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/bracketMatcher')
 
-// TODO only works for default var syntax ${}. Maybe fix?
-function findOutermostVariables(text) {
-  let matches = [];
-  let depth = 0;
-  let startIndex = -1;
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '$' && text[i + 1] === '{') {
-      if (depth === 0) {
-          startIndex = i;
-      }
-      depth++;
-      i++; // Skip '{'
-    } else if (text[i] === '}') {
-      depth--;
-      if (depth === 0 && startIndex !== -1) {
-        matches.push(text.substring(startIndex, i + 1));
-        startIndex = -1;
-      }
-    }
-  }
-  return matches;
-}
-
-
-function matchOutermostBraces(text) {
-  let depth = 0
-  let startIndex = -1
-  let results = []
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
-      if (depth === 0) {
-        startIndex = i
-      }
-      depth++
-    } else if (text[i] === '}') {
-      depth--
-      if (depth === 0 && startIndex !== -1) {
-        results.push(text.substring(startIndex, i + 1))
-        startIndex = -1
-      }
-    }
-  }
-
-  return results
-}
+// Alias for backward compatibility
+const matchOutermostBraces = findOutermostBracesDepthFirst
 
 
 // https://regex101.com/r/XIltbc/1

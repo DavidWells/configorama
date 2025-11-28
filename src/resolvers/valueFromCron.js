@@ -225,8 +225,9 @@ Examples:
 `)
   }
   
+  const trimSurroundingQuotes = require('../utils/trimSurroundingQuotes')
   // Remove surrounding quotes if present
-  const cleanExpression = cronExpression.replace(/^['"`](.*)['"`]$/, '$1')
+  const cleanExpression = trimSurroundingQuotes(cronExpression, true)
   
   // If already a cron expression, return it
   if (cleanExpression.match(/^[\*\/,\-\d]+$/)) {

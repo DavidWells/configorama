@@ -1,7 +1,8 @@
 const { trim } = require('./lodash')
+const trimSurroundingQuotes = require('./trimSurroundingQuotes')
 
 function formatArg(arg) {
-  const cleanArg = trim(arg).replace(/^('|")/, '').replace(/('|")$/, '')
+  const cleanArg = trimSurroundingQuotes(trim(arg), false)
   if (cleanArg.match(/^{([^}]+)}$/)) {
     return JSON.parse(cleanArg)
   }
