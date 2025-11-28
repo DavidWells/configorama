@@ -725,7 +725,10 @@ class Configorama {
       const uniqueVarKeys = Object.keys(uniqueVariables)
 
       if (this.opts.returnPreResolvedVariableDetails) {
-        return enrich
+        return Object.assign({}, {
+          resolved: false,
+          originalConfig: this.originalConfig 
+        }, enrich)
       }
 
       if (!varKeys.length) {
@@ -820,8 +823,6 @@ class Configorama {
             const combinedDesc = uniqueVar.descriptions.join('. ')
             varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
           }
-
-    
 
           // Show default value from metadata
           if (typeof firstInstance.defaultValue !== 'undefined') {
