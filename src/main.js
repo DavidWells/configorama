@@ -116,16 +116,23 @@ class Configorama {
     // Set opts to pass into JS file calls
     this.opts = Object.assign({}, {
       // Allow for unknown variable syntax to pass through without throwing errors
-      allowUnknownVars: false,
+      allowUnknownVariables: false,
       // Allow undefined to be an end result.
       allowUndefinedValues: false,
       // Allow unknown file refs to pass through without throwing errors
       allowUnknownFileRefs: false,
+      // Allow known variable types that can't be resolved to pass through
+      allowUnresolvedVariables: false,
       // Return metadata
       returnMetadata: false,
       // Return preResolvedVariableDetails
       returnPreResolvedVariableDetails: false,
     }, options)
+
+    // Backward compat: allowUnknownVars -> allowUnknownVariables
+    if (options.allowUnknownVars !== undefined && options.allowUnknownVariables === undefined) {
+      this.opts.allowUnknownVariables = options.allowUnknownVars
+    }
 
     this.filterCache = {}
 
@@ -1974,7 +1981,7 @@ class Configorama {
 
       if (nestedVar) {
         const fallbackStr = getFallbackString(splitVars, nestedVar)
-        if (!this.opts.allowUnknownVars) {
+        if (!this.opts.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
@@ -2420,6 +2427,11 @@ Missing Value ${missingValue} - ${matchedString}
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
+          if (this.opts.allowUnresolvedVariables) {
+            // Encode unresolved variable to pass through resolution
+            return Promise.resolve(encodeUnknown(propertyString))
+          }
+
           if (valueCount.length === 1 && noNestedVars) {
             const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
@@ -2582,7 +2594,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
-        if (!this.opts.allowUnknownVars) {
+        if (!this.opts.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
         const fallbackStr = getFallbackString(split, nestedVar)
@@ -2685,7 +2697,7 @@ Missing Value ${missingValue} - ${matchedString}
 
 
     /* Pass through unknown variables */
-    if (this.opts.allowUnknownVars || allowSpecialCase) {
+    if (this.opts.allowUnknownVariables || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
