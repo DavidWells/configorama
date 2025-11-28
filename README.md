@@ -44,6 +44,7 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [Functions (experimental)](#functions-experimental)
   - [More Examples](#more-examples)
 - [Custom Variable Sources](#custom-variable-sources)
+- [Options](#options)
 - [FAQ](#faq)
 - [Whats new](#whats-new)
 - [Alt libs](#alt-libs)
@@ -529,6 +530,48 @@ There are 2 ways to resolve variables from custom sources.
     ```yml
     key: ${consul:xyz}
     ```
+
+## Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `options` | object | `{}` | CLI options/flags to populate `${opt:xyz}` variables |
+| `allowUnknownVariables` | boolean | `false` | Allow unknown variable types to pass through (e.g., `${custom:thing}`) |
+| `allowUnresolvedVariables` | boolean | `false` | Allow known variable types that can't be resolved to pass through instead of throwing |
+| `allowUndefinedValues` | boolean | `false` | Allow undefined to be an end result |
+| `variableSources` | array | `[]` | Custom variable sources (see above) |
+
+> **Note:** `allowUnknownVars` is deprecated, use `allowUnknownVariables` instead.
+
+### allowUnknownVariables
+
+When `allowUnknownVariables: true`, unknown variable types (not registered resolvers) pass through as-is:
+
+```js
+const config = await configorama(configFile, {
+  allowUnknownVariables: true,
+  options: { stage: 'dev' }
+})
+
+// Input:  { key: '${ssm:/path/to/secret}' }  // ssm: not a registered type
+// Output: { key: '${ssm:/path/to/secret}' }  // passes through instead of throwing
+```
+
+### allowUnresolvedVariables
+
+When `allowUnresolvedVariables: true`, variables that can't be resolved (missing env vars, missing files, etc.) pass through as-is instead of throwing an error:
+
+```js
+const config = await configorama(configFile, {
+  allowUnresolvedVariables: true,
+  options: { stage: 'dev' }
+})
+
+// Input:  { key: '${env:MISSING_VAR}' }
+// Output: { key: '${env:MISSING_VAR}' }  // passes through instead of throwing
+```
+
+This is useful for multi-stage resolution or when you want to analyze config structure without providing all values.
 
 ## FAQ
 
