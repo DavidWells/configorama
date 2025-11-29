@@ -1083,6 +1083,12 @@ class Configorama {
           Object.assign(this.config, userInputs.self)
         }
 
+        if (userInputs.dotProp) {
+          for (const [key, value] of Object.entries(userInputs.dotProp)) {
+            dotProp.set(this.config, key, value)
+          }
+        }
+
         console.log()
         logHeader('Resolving Configuration')
         console.log()

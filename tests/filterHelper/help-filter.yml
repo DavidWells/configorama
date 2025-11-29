@@ -22,6 +22,8 @@ fun: ${self:noExist}
 
 rad: ${fake.my.fake.var | String}
 
+ok: ${rad | String}
+
 # With multiple filters
 stage: ${opt:stage | toUpperCase | help('Deployment stage (${allowedValues}, funky)')}
 

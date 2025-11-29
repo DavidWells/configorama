@@ -46,6 +46,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
     options: [],
     env: [],
     self: [],
+    dotProp: [],
   }
 
   // Track variables we've already added to avoid duplicates
@@ -132,6 +133,8 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
           grouped.env.push(varInfo)
         } else if (variableType === 'self') {
           grouped.self.push(varInfo)
+        } else if (variableType === 'dot.prop') {
+          grouped.dotProp.push(varInfo)
         }
       }
     }
@@ -355,6 +358,8 @@ function createPromptMessage(varInfo) {
     typeLabel = 'Env'
   } else if (variableType === 'self') {
     typeLabel = 'Config'
+  } else if (variableType === 'dot.prop') {
+    typeLabel = 'Config'
   } else {
     typeLabel = 'Value'
   }
@@ -414,8 +419,13 @@ function createPromptMessage(varInfo) {
 
     if (parsedOccurrences.length > 0) {
       // Get the variable reference syntax
-      const varPrefix = variableType === 'options' ? 'opt' : variableType === 'env' ? 'env' : 'self'
-      const varSyntax = `\${${varPrefix}:${cleanName}}`
+      let varSyntax
+      if (variableType === 'dot.prop') {
+        varSyntax = `\${${cleanName}}`
+      } else {
+        const varPrefix = variableType === 'options' ? 'opt' : variableType === 'env' ? 'env' : 'self'
+        varSyntax = `\${${varPrefix}:${cleanName}}`
+      }
 
       // Show variable syntax and count (only if no descriptions, otherwise it's redundant)
       if (descriptions.length === 0) {
@@ -463,7 +473,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
   }
 
   const grouped = groupVariablesByType(uniqueVariables, originalConfig)
-  const totalVars = grouped.options.length + grouped.env.length + grouped.self.length
+  const totalVars = grouped.options.length + grouped.env.length + grouped.self.length + grouped.dotProp.length
 
   if (totalVars === 0) {
     p.intro(chalk.cyan('Configuration Wizard'))
@@ -480,6 +490,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
     options: {},
     env: {},
     self: {},
+    dotProp: {},
   }
 
   // Prompt for options (CLI flags)
@@ -633,6 +644,48 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
     }
   }
 
+  // Prompt for config dot.prop references
+  if (grouped.dotProp.length > 0) {
+    const configList = grouped.dotProp.map(v => {
+      const varSyntax = `\${${v.cleanName}}`
+      return `  - ${varSyntax}`
+    }).join('\n')
+    const noteContent = `Found ${grouped.dotProp.length} config reference(s)\n${configList}`
+    p.note(noteContent, 'Config References')
+
+    for (const varInfo of grouped.dotProp) {
+      const message = createPromptMessage(varInfo)
+      const isSensitive = isSensitiveVariable(varInfo.cleanName)
+      const promptFn = isSensitive ? p.password : p.text
+      const expectedType = getExpectedType(varInfo.occurrences)
+
+      const placeholder = varInfo.hasFallback
+        ? `${varInfo.defaultValue} (default)`
+        : `Enter value for ${varInfo.cleanName}`
+
+      const value = await promptFn({
+        message,
+        placeholder,
+        validate: (val) => {
+          // Only required if no fallback exists
+          if (!val && varInfo.isRequired && !varInfo.hasFallback) {
+            return 'This value is required'
+          }
+          // Type validation
+          const typeError = validateType(val, expectedType)
+          if (typeError) return typeError
+        }
+      })
+
+      if (p.isCancel(value)) {
+        p.cancel('Setup cancelled')
+        process.exit(0)
+      }
+
+      userInputs.dotProp[varInfo.cleanName] = value || varInfo.defaultValue
+    }
+  }
+
   p.outro(chalk.green('Setup complete!'))
 
   // Remove empty sections
@@ -644,6 +697,9 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
   }
   if (Object.keys(userInputs.self).length === 0) {
     delete userInputs.self
+  }
+  if (Object.keys(userInputs.dotProp).length === 0) {
+    delete userInputs.dotProp
   }
 
   return userInputs
