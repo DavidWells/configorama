@@ -1,4 +1,4 @@
-const { trimSurroundingQuotes } = require('../utils/quoteUtils')
+const { trimSurroundingQuotes } = require('../utils/strings/quoteUtils')
 
 const stringRefSyntax = RegExp(/(?:('|").*?\1)/g)
 

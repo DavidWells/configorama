@@ -1,4 +1,4 @@
-const stringResolver = require('../resolvers/valueFromString')
+const stringResolver = require('../../resolvers/valueFromString')
 const overwriteSyntax = RegExp(/\s*(?:,\s*)+/g) // /\s*(?:,\s*)+/g
 const stringRefSyntax = stringResolver.match
 /**

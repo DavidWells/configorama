@@ -5,8 +5,8 @@
 const dotProp = require('dot-prop')
 const path = require('path')
 const fs = require('fs')
-const createGitResolver = require('../resolvers/valueFromGit')
-const { parseFileContents } = require('../resolvers/valueFromFile')
+const createGitResolver = require('../../resolvers/valueFromGit')
+const { parseFileContents } = require('../../resolvers/valueFromFile')
 
 // Cache for resolved values (they don't change during execution)
 const resolverCache = {}

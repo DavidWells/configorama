@@ -1,5 +1,5 @@
-const { findNestedVariables } = require('./find-nested-variables')
-const { functionRegex } = require('./regex')
+const { findNestedVariables } = require('./findNestedVariables')
+const { functionRegex } = require('../regex')
 
 const DEBUG = false
 /**
@@ -84,7 +84,7 @@ module.exports = function cleanVariable(
 }
 
 
-const { findOutermostBraces: findOutermostBracesUtil } = require('./bracketMatcher')
+const { findOutermostBraces: findOutermostBracesUtil } = require('../strings/bracketMatcher')
 
 function findOutermostBraces(str) {
   return findOutermostBracesUtil(str, '{', '}', '$')

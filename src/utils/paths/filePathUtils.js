@@ -1,6 +1,6 @@
 // Utilities for parsing and normalizing file paths in variable references
 
-const { splitCsv } = require('./splitCsv')
+const { splitCsv } = require('../strings/splitCsv')
 
 /**
  * Normalize a file path (add ./ prefix, fix .//, skip deep refs)
@@ -45,7 +45,7 @@ function extractFilePath(variableString) {
     return null
   }
 
-  const { trimSurroundingQuotes } = require('./quoteUtils')
+  const { trimSurroundingQuotes } = require('../strings/quoteUtils')
   const fileContent = fileMatch[1].trim()
   const parts = splitCsv(fileContent)
   let filePath = parts[0].trim()
