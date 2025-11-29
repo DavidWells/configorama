@@ -29,7 +29,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
     const metadata = instance.collectVariableMetadata()
 
     // Enrich metadata with resolution tracking data collected during execution
-    const enrichedMetadata = enrichMetadata(
+    const enrichedMetadata = await enrichMetadata(
       metadata,
       instance.resolutionTracking,
       instance.variableSyntax,
@@ -37,7 +37,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.originalConfig,
       instance.configFilePath,
       Object.keys(instance.filters),
-      config // pass resolved config for post-resolution enrichment
+      config, // pass resolved config for post-resolution enrichment
+      options
     )
 
     return {

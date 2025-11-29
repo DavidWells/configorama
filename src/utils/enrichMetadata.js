@@ -2,6 +2,7 @@ const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
 const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('./filePathUtils')
+const { preResolveString, preResolveSingle } = require('./preResolveVariable')
 
 // Type filters that indicate expected value types
 const TYPE_FILTERS = ['Boolean', 'String', 'Number', 'Array', 'Object', 'Json']
@@ -97,9 +98,10 @@ function createOccurrence(instance, varMatch, options = {}) {
  * @param {string} configPath - The path to the config file.
  * @param {Array} filterNames - Array of known filter names.
  * @param {object} [resolvedConfig] - The resolved config object (optional, for post-resolution enrichment).
- * @returns {object} Enriched metadata with resolution details and a complete file reference list.
+ * @param {object} [options] - CLI options object for opt: resolution.
+ * @returns {Promise<object>} Enriched metadata with resolution details and a complete file reference list.
  */
-function enrichMetadata(
+async function enrichMetadata(
   metadata,
   resolutionTracking,
   variableSyntax,
@@ -107,11 +109,16 @@ function enrichMetadata(
   originalConfig = {},
   configPath,
   filterNames = [],
-  resolvedConfig
+  resolvedConfig,
+  options = {}
 ) {
   if (!resolutionTracking) {
     return metadata
   }
+
+  // Create resolve context early for resolving descriptions
+  const configDir = configPath ? path.dirname(configPath) : undefined
+  const resolveContext = { config: originalConfig, variableSyntax, configDir, options }
 
   const varKeys = Object.keys(metadata.variables)
 
@@ -169,7 +176,8 @@ function enrichMetadata(
         varData.type = instanceType
       }
       if (instanceDescription) {
-        varData.description = instanceDescription
+        // Resolve any variables in the description (e.g., ${allowedValues} -> actual values)
+        varData.description = await preResolveString(instanceDescription, resolveContext)
       }
     }
   }
@@ -549,7 +557,7 @@ function enrichMetadata(
   }
 
   // Aggregate types and descriptions for each uniqueVariable
-  for (const [, entry] of uniqueVariablesMap) {
+  for (const [varKey, entry] of uniqueVariablesMap) {
     // Collect unique types from occurrences
     const types = entry.occurrences
       .map(occ => occ.type)
@@ -558,12 +566,56 @@ function enrichMetadata(
       entry.types = types
     }
 
-    // Collect unique descriptions from occurrences
-    const descriptions = entry.occurrences
+    // Collect unique descriptions from occurrences and resolve any variables
+    const rawDescriptions = entry.occurrences
       .map(occ => occ.description)
       .filter((d, i, a) => d && a.indexOf(d) === i)
-    if (descriptions.length > 0) {
-      entry.descriptions = descriptions
+
+    if (rawDescriptions.length > 0) {
+      // Build map from raw -> resolved description
+      const descriptionMap = new Map()
+      await Promise.all(
+        rawDescriptions.map(async desc => {
+          // Resolve any variables in the description
+          const resolved = await preResolveString(desc, resolveContext)
+          descriptionMap.set(desc, resolved)
+        })
+      )
+
+      // Update each occurrence's description with resolved version
+      for (const occ of entry.occurrences) {
+        if (occ.description && descriptionMap.has(occ.description)) {
+          occ.description = descriptionMap.get(occ.description)
+        }
+      }
+
+      entry.descriptions = Array.from(descriptionMap.values())
+    }
+
+    // Try to resolve defaultValue for variables that can be pre-resolved
+    // This applies to git:, env:, self: variables without existing defaults
+    const firstOcc = entry.occurrences[0]
+    if (firstOcc && firstOcc.isRequired && !firstOcc.defaultValue) {
+      const resolvableTypes = ['git', 'env', 'self', 'dot.prop']
+      if (resolvableTypes.includes(entry.variableType)) {
+        try {
+          const resolved = await preResolveSingle(entry.variable, resolveContext)
+          if (resolved !== undefined) {
+            const formattedValue = Array.isArray(resolved)
+              ? resolved.join(', ')
+              : (typeof resolved === 'object' ? JSON.stringify(resolved) : String(resolved))
+
+            // Update occurrences and entry
+            entry.occurrences.forEach(occ => {
+              occ.defaultValue = formattedValue
+              occ.isRequired = false
+            })
+            entry.resolvedValue = formattedValue
+          }
+        } catch (e) {
+          // Couldn't resolve, leave as required
+        }
+      }
     }
   }
 
@@ -587,8 +639,16 @@ function enrichMetadata(
         }
       }
 
+      // Unescape any __CONFIGVAR:...__ placeholders in tracking data
+      // (resolutionTracking uses escaped config during resolution)
+      const cleanTracking = JSON.parse(
+        JSON.stringify(tracking).replace(/__CONFIGVAR:([A-Za-z0-9+/=]+)__/g, (_, encoded) => {
+          return Buffer.from(encoded, 'base64').toString('utf8')
+        })
+      )
+
       metadata.resolutionHistory[pathKey] = {
-        ...tracking,
+        ...cleanTracking,
         resolvedPropertyValue: resolvedValue
       }
     }

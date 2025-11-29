@@ -16,6 +16,32 @@ const INI = require('../parsers/ini')
 const JSON5 = require('../parsers/json5')
 
 /**
+ * Parse file contents based on file extension
+ * @param {string} content - Raw file contents
+ * @param {string} filePath - File path (used to determine extension)
+ * @returns {*} Parsed content
+ */
+function parseFileContents(content, filePath) {
+  const ext = filePath.split('.').pop().toLowerCase()
+
+  if (ext === 'json' || ext === 'json5') {
+    return JSON5.parse(content)
+  }
+  if (ext === 'yml' || ext === 'yaml') {
+    return YAML.parse(content)
+  }
+  if (ext === 'toml' || ext === 'tml') {
+    return TOML.parse(content)
+  }
+  if (ext === 'ini') {
+    return INI.parse(content)
+  }
+
+  // Return raw content for other files
+  return content
+}
+
+/**
  * Resolves a value from a file reference
  * @param {object} ctx - Context object with instance properties
  * @param {string} ctx.configPath - Base path for file resolution
@@ -362,6 +388,7 @@ Check if your ${fileType} is returning the correct data.`
 
 module.exports = {
   getValueFromFile,
+  parseFileContents,
   parseModuleReference,
   extractDeepProperties
 }

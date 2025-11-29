@@ -1,5 +1,6 @@
 /**
  * Preprocesses config to fix malformed fallback references
+ * and escape variables inside help() filter arguments
  */
 const { splitByComma } = require('./splitByComma')
 
@@ -12,6 +13,32 @@ const { splitByComma } = require('./splitByComma')
 function preProcess(configObject, variableSyntax) {
   // Known reference prefixes that should be wrapped in ${}
   const refPrefixes = ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
+
+  /**
+   * Escape variables inside help() filter arguments so main resolver skips them
+   * Uses base64 encoding to preserve exact original syntax (supports custom variable syntax)
+   * @param {string} str - String potentially containing help() with variables
+   * @returns {string} String with help() variables escaped
+   */
+  function escapeHelpVariables(str) {
+    if (typeof str !== 'string') return str
+    if (!variableSyntax) return str
+
+    // Match help('...') or help("...") containing variables
+    const helpPattern = /help\(['"]([^'"]+)['"]\)/g
+
+    return str.replace(helpPattern, (match, helpContent) => {
+      // Check if help content contains variables
+      if (!helpContent.match(variableSyntax)) return match
+
+      // Replace each variable match with base64-encoded placeholder
+      const escaped = helpContent.replace(variableSyntax, (varMatch) => {
+        const encoded = Buffer.from(varMatch).toString('base64')
+        return `__CONFIGVAR:${encoded}__`
+      })
+      return `help('${escaped}')`
+    })
+  }
 
   /**
    * Fix malformed fallback references in a string
@@ -110,7 +137,9 @@ function preProcess(configObject, variableSyntax) {
    */
   function traverseAndFix(obj) {
     if (typeof obj === 'string') {
-      return fixFallbacksInString(obj)
+      // First escape help() variables, then fix fallbacks
+      const withHelpEscaped = escapeHelpVariables(obj)
+      return fixFallbacksInString(withHelpEscaped)
     }
 
     if (Array.isArray(obj)) {

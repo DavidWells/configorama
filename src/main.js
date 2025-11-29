@@ -521,6 +521,7 @@ class Configorama {
     const configoramaOpts = this.opts
 
     const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
+  
 
     // If we have a file path but no config yet, parse it now
     if (this.configFilePath && !this.config) {
@@ -538,7 +539,10 @@ class Configorama {
       /*
       console.log('before preprocess', configObject)
       /** */
-      /* Preprocess step here */
+      // Store truly raw config before any preprocessing (for metadata display)
+      this.rawOriginalConfig = cloneDeep(configObject)
+
+      /* Preprocess step here - escapes ${} in help() args, fixes malformed fallbacks */
       configObject = preProcess(configObject, this.variableSyntax)
       /*
       console.log('after preprocess', configObject)
@@ -560,21 +564,22 @@ class Configorama {
     const variablesKnownTypes = this.variablesKnownTypes
 
     if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
-      // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
       const metadata = this.collectVariableMetadata()
 
-      const enrich = enrichMetadata(
+      const enrich = await enrichMetadata(
         metadata,
         this.resolutionTracking,
         this.variableSyntax,
         this.fileRefsFound,
         this.originalConfig,
         this.configFilePath,
-        Object.keys(this.filters)
+        Object.keys(this.filters),
+        undefined, // resolvedConfig not available yet
+        this.opts.options
       )
 
       if (showFoundVariables) {
-        /*
+        //*
         deepLog('metadata', metadata)
         fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
         deepLog('enrich', enrich)
@@ -970,7 +975,8 @@ class Configorama {
     const variableTypes = this.variableTypes
     const filterMatch = this.filterMatch
     const configFilePath = this.configFilePath
-    const originalConfig = this.originalConfig
+    // Use rawOriginalConfig for metadata display (truly original, no escaping)
+    const originalConfig = this.rawOriginalConfig || this.originalConfig
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
@@ -980,7 +986,7 @@ class Configorama {
     const referencesMap = new Map()
     let matchCount = 1
 
-    traverse(this.originalConfig).forEach(function (rawValue) {
+    traverse(originalConfig).forEach(function (rawValue) {
       if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
         const configValuePath = this.path.join('.')
         /* Skip Fn::Sub variables */

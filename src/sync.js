@@ -54,7 +54,7 @@ module.exports = function configoramaSync(variableSources = []) {
       const metadata = instance.collectVariableMetadata()
 
       // Enrich metadata with resolution tracking data collected during execution
-      const enrichedMetadata = enrichMetadata(
+      const enrichedMetadata = await enrichMetadata(
         metadata,
         instance.resolutionTracking,
         instance.variableSyntax,
@@ -62,7 +62,8 @@ module.exports = function configoramaSync(variableSources = []) {
         instance.originalConfig,
         instance.configFilePath,
         Object.keys(instance.filters),
-        result // pass resolved config for post-resolution enrichment
+        result, // pass resolved config for post-resolution enrichment
+        options
       )
 
       return {
