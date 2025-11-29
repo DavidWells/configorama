@@ -1,24 +1,76 @@
+/* Node built-ins */
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const enrichMetadata = require('./utils/parsing/enrichMetadata')
-const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
+
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
 
+/* External dependencies */
 const promiseFinallyShim = require('promise.prototype.finally').shim()
-// @TODO only import lodash we need
-
 const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
-const chalk = require('./utils/ui/chalk')
+const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
+
+/* Utils - root */
+const {
+  isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
+  isEmpty, trim, camelCase, kebabCase, capitalize, split, map, mapValues,
+  assign, set, cloneDeep
+} = require('./utils/lodash')
+const PromiseTracker = require('./utils/PromiseTracker')
+const handleSignalEvents = require('./utils/handleSignalEvents')
+
+/* Utils - encoders */
+const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
+const { decodeEncodedValue } = require('./utils/encoders')
+const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
+
+/* Utils - parsing */
+const enrichMetadata = require('./utils/parsing/enrichMetadata')
+const preProcess = require('./utils/parsing/preProcess')
+const { parseFileContents } = require('./utils/parsing/parse')
+const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
+const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
+
+/* Utils - paths */
+const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
 const { resolveAlias } = require('./utils/paths/resolveAlias')
 const { resolveFilePathFromMatch } = require('./utils/paths/getFullFilePath')
+const { findLineForKey } = require('./utils/paths/findLineForKey')
 
-/* Default Value resolvers */
+/* Utils - regex */
+const { combineRegexes, funcRegex, funcStartOfLineRegex, subFunctionRegex } = require('./utils/regex')
+
+/* Utils - strings */
+const formatFunctionArgs = require('./utils/strings/formatFunctionArgs')
+
+const { splitByComma } = require('./utils/strings/splitByComma')
+const { splitCsv } = require('./utils/strings/splitCsv')
+const { replaceAll } = require('./utils/strings/replaceAll')
+const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
+const { trimSurroundingQuotes, ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
+
+/* Utils - ui */
+const chalk = require('./utils/ui/chalk')
+const deepLog = require('./utils/ui/deep-log')
+const { logHeader } = require('./utils/ui/logs')
+const { createEditorLink } = require('./utils/ui/createEditorLink')
+const { runConfigWizard, isSensitiveVariable } = require('./utils/ui/configWizard')
+
+/* Utils - validation */
+const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
+
+/* Utils - variables */
+const cleanVariable = require('./utils/variables/cleanVariable')
+const appendDeepVariable = require('./utils/variables/appendDeepVariable')
+const { getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
+const { findNestedVariables } = require('./utils/variables/findNestedVariables')
+
+/* Resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
@@ -27,48 +79,15 @@ const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
 const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
-/* Default File Parsers */
+
+/* Parsers */
 const YAML = require('./parsers/yaml')
 const TOML = require('./parsers/toml')
 const INI = require('./parsers/ini')
 const JSON5 = require('./parsers/json5')
-/* functions */
-const md5Function = require('./functions/md5')
 
-/* Utility/helpers */
-const cleanVariable = require('./utils/variables/cleanVariable')
-const appendDeepVariable = require('./utils/variables/appendDeepVariable')
-const isValidValue = require('./utils/validation/isValidValue')
-const PromiseTracker = require('./utils/PromiseTracker')
-const handleSignalEvents = require('./utils/handleSignalEvents')
-const formatFunctionArgs = require('./utils/strings/formatFunctionArgs')
-const { trimSurroundingQuotes, ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
-const deepLog = require('./utils/ui/deep-log')
-const { splitByComma } = require('./utils/strings/splitByComma')
-const { combineRegexes, funcRegex, funcStartOfLineRegex, subFunctionRegex } = require('./utils/regex')
-const warnIfNotFound = require('./utils/validation/warnIfNotFound')
-const preProcess = require('./utils/parsing/preProcess')
-const {
-  isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
-  isEmpty, trim, camelCase, kebabCase, capitalize, split, map, mapValues,
-  assign, set, cloneDeep
-} = require('./utils/lodash')
-const { parseFileContents } = require('./utils/parsing/parse')
-const { splitCsv } = require('./utils/strings/splitCsv')
-const { replaceAll } = require('./utils/strings/replaceAll')
-const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
-const { getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
-const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
-const { decodeEncodedValue } = require('./utils/encoders')
-const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
-const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
-const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
-const { findNestedVariables } = require('./utils/variables/findNestedVariables')
-const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
-const { logHeader } = require('./utils/ui/logs')
-const { createEditorLink } = require('./utils/ui/createEditorLink')
-const { findLineForKey } = require('./utils/paths/findLineForKey')
-const { runConfigWizard, isSensitiveVariable } = require('./utils/ui/configWizard')
+/* Functions */
+const md5Function = require('./functions/md5')
 /**
  * Maintainer's notes:
  *
@@ -103,8 +122,6 @@ let SETUP_MODE = process.argv.includes('--setup') ? true : false
 // DEBUG = true
 let DEBUG_TYPE = false
 const ENABLE_FUNCTIONS = true
-
-
 
 class Configorama {
   constructor(fileOrObject, opts) {
@@ -447,7 +464,9 @@ class Configorama {
     // (\|\s*(toUpperCase|toLowerCase|toCamelCase|toKebabCase|capitalize)\s*)+$
     // Updated to support function-style filters like help('text') with nested parens
     // Use a more permissive pattern that matches anything between parens including nested parens
-    this.filterMatch = new RegExp(`(\\|\\s*(${Object.keys(this.filters).join('|')})(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?\\s*)+}?$`)
+    this.filterMatch = new RegExp(
+      `(\\|\\s*(${Object.keys(this.filters).join('|')})(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?\\s*)+}?$`
+    )
     // console.log('this.filterMatch', this.filterMatch)
 
     this.functions = {

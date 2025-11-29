@@ -54,7 +54,8 @@ test('replaceAll - should handle asterisks', () => {
 
 test('replaceAll - should handle plus signs', () => {
   const result = replaceAll('+', 'plus', 'a+b+c')
-  assert.equal(result, 'apluspbplusc')
+  console.log('result', result)
+  assert.equal(result, 'aplusbplusc')
 })
 
 test('replaceAll - should handle question marks', () => {
