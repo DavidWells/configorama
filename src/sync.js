@@ -1,8 +1,8 @@
 const path = require('path')
 const fs = require('fs')
 const Configorama = require('./main')
-const getFullPath = require('./utils/getFullFilePath')
-const enrichMetadata = require('./utils/enrichMetadata')
+const getFullPath = require('./utils/paths/getFullFilePath')
+const enrichMetadata = require('./utils/parsing/enrichMetadata')
 
 /**
  * Force synchronous invocation of async API

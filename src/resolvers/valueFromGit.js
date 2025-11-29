@@ -5,8 +5,8 @@ const path = require('path')
 const childProcess = require('child_process')
 const GitUrlParse = require('git-url-parse')
 const { functionRegex } = require('../utils/regex')
-const formatFunctionArgs = require('../utils/formatFunctionArgs')
-const { findProjectRoot } = require('../utils/find-project-root')
+const formatFunctionArgs = require('../utils/strings/formatFunctionArgs')
+const { findProjectRoot } = require('../utils/paths/findProjectRoot')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
 

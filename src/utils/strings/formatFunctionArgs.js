@@ -1,4 +1,4 @@
-const { trim } = require('./lodash')
+const { trim } = require('../lodash')
 const { trimSurroundingQuotes } = require('./quoteUtils')
 
 function formatArg(arg) {

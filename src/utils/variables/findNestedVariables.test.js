@@ -1,12 +1,12 @@
 const { test } = require('uvu');
 const assert = require('uvu/assert');
-const { findNestedVariables } = require('./find-nested-variables');
-const deepLog = require('./deep-log')
+const { findNestedVariables } = require('./findNestedVariables');
+const deepLog = require('../ui/deep-log')
 
 // Import resolvers to build variableTypes array
-const getValueFromEnv = require('../resolvers/valueFromEnv')
-const getValueFromOptions = require('../resolvers/valueFromOptions')
-const getValueFromGit = require('../resolvers/valueFromGit')
+const getValueFromEnv = require('../../resolvers/valueFromEnv')
+const getValueFromOptions = require('../../resolvers/valueFromOptions')
+const getValueFromGit = require('../../resolvers/valueFromGit')
 
 // Define the regex pattern as used in the main function
 const regex = /\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g;

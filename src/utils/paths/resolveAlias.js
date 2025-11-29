@@ -1,7 +1,7 @@
 const path = require('path')
 const fs = require('fs')
 const findUp = require('find-up')
-const JSON5 = require('../parsers/json5')
+const JSON5 = require('../../parsers/json5')
 
 const DEBUG = false
 const DEBUG_LOG = (message) => {

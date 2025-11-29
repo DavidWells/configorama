@@ -1,8 +1,8 @@
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
-const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('./filePathUtils')
-const { preResolveString, preResolveSingle } = require('./preResolveVariable')
+const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('../paths/filePathUtils')
+const { preResolveString, preResolveSingle } = require('../resolution/preResolveVariable')
 
 // Type filters that indicate expected value types
 const TYPE_FILTERS = ['Boolean', 'String', 'Number', 'Array', 'Object', 'Json']

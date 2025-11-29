@@ -1,9 +1,9 @@
-const YAML = require('../parsers/yaml')
-const TOML = require('../parsers/toml')
-const INI = require('../parsers/ini')
-const JSON5 = require('../parsers/json5')
-const { executeTypeScriptFileSync } = require('../parsers/typescript')
-const { executeESMFileSync } = require('../parsers/esm')
+const YAML = require('../../parsers/yaml')
+const TOML = require('../../parsers/toml')
+const INI = require('../../parsers/ini')
+const JSON5 = require('../../parsers/json5')
+const { executeTypeScriptFileSync } = require('../../parsers/typescript')
+const { executeESMFileSync } = require('../../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 /**

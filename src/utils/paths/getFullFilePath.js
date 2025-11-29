@@ -2,7 +2,7 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 const findUp = require('find-up')
-const { trimSurroundingQuotes } = require('./quoteUtils')
+const { trimSurroundingQuotes } = require('../strings/quoteUtils')
 const { resolveAlias } = require('./resolveAlias')
 
 /**

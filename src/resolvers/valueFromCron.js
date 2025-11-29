@@ -1,4 +1,4 @@
-const { trimSurroundingQuotes } = require('../utils/quoteUtils')
+const { trimSurroundingQuotes } = require('../utils/strings/quoteUtils')
 const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 
 /**

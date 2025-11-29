@@ -3,9 +3,9 @@
  */
 const fs = require('fs')
 const { trim } = require('../utils/lodash')
-const { splitCsv } = require('../utils/splitCsv')
-const { resolveFilePathFromMatch } = require('../utils/getFullFilePath')
-const { findNestedVariables } = require('../utils/find-nested-variables')
+const { splitCsv } = require('../utils/strings/splitCsv')
+const { resolveFilePathFromMatch } = require('../utils/paths/getFullFilePath')
+const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { makeBox } = require('@davidwells/box-logger')
 const { encodeJsSyntax } = require('../utils/encoders/js-fixes')
 

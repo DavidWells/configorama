@@ -2,7 +2,7 @@
  * Preprocesses config to fix malformed fallback references
  * and escape variables inside help() filter arguments
  */
-const { splitByComma } = require('./splitByComma')
+const { splitByComma } = require('../strings/splitByComma')
 
 /**
  * Preprocess config to fix malformed fallback references

@@ -1,6 +1,6 @@
 const Configorama = require('./main')
 const parsers = require('./parsers')
-const enrichMetadata = require('./utils/enrichMetadata')
+const enrichMetadata = require('./utils/parsing/enrichMetadata')
 
 module.exports.Configorama = Configorama
 

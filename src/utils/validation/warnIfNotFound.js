@@ -1,7 +1,14 @@
 /**
  * Warns if a variable value is not found during resolution
  */
-const isValidValue = require('./isValidValue')
+const isEmpty = require('lodash.isempty')
+
+function isValidValue(val) {
+  if (typeof val === 'object' && (val.hasOwnProperty('__internal_only_flag') || val.hasOwnProperty('__internal_metadata'))) {
+    return false
+  }
+  return val !== null && typeof val !== 'undefined' && !(typeof val === 'object' && isEmpty(val))
+}
 
 /**
  * Check if variable resolved to valid value, log warning if not
@@ -39,4 +46,7 @@ function warnIfNotFound(variableString, valueToPopulate, options = {}) {
   return valueToPopulate
 }
 
-module.exports = warnIfNotFound
+module.exports = {
+  warnIfNotFound,
+  isValidValue
+}
