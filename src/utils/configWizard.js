@@ -22,7 +22,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
   const addedVars = new Set()
 
   for (const [varKey, varData] of Object.entries(uniqueVariables)) {
-    const { variable, variableType, isRequired, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue } = varData
+    const { variable, variableType, isRequired, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue, resolvedValue } = varData
 
     // Handle top-level variables (not file/text types)
     if (variableType !== 'file' && variableType !== 'text') {
@@ -92,6 +92,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
           isRequired: hasRequiredOccurrence,
           defaultValue: availableDefault,
           hasFallback: !!availableDefault,
+          resolvedValue,
           occurrences: occurrences || [],
         }
 
@@ -479,14 +480,25 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
     p.note(noteContent, 'Environment Variables')
 
     for (const varInfo of grouped.env) {
-      const message = createPromptMessage(varInfo)
+      let message = createPromptMessage(varInfo)
       const isSensitive = isSensitiveVariable(varInfo.cleanName)
       const promptFn = isSensitive ? p.password : p.text
       const expectedType = getExpectedType(varInfo.occurrences)
 
-      const placeholder = varInfo.hasFallback
-        ? `${varInfo.defaultValue} (default)`
-        : `Enter environment variable for ${varInfo.cleanName}`
+      let placeholder
+      if (varInfo.resolvedValue !== undefined) {
+        if (isSensitive) {
+          // For sensitive vars, show hint in message since password prompts don't show placeholders
+          message += `  ${chalk.green(`(process.env.${varInfo.cleanName} set - press enter to use current value OR input a new value below)`)}`
+          placeholder = ''
+        } else {
+          placeholder = `${varInfo.resolvedValue} (current env value)`
+        }
+      } else if (varInfo.hasFallback) {
+        placeholder = `${varInfo.defaultValue} (default)`
+      } else {
+        placeholder = `Enter environment variable for ${varInfo.cleanName}`
+      }
 
       const value = await promptFn({
         message,
@@ -507,7 +519,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         process.exit(0)
       }
 
-      userInputs.env[varInfo.cleanName] = value || varInfo.defaultValue
+      userInputs.env[varInfo.cleanName] = value || varInfo.resolvedValue || varInfo.defaultValue
     }
   }
 

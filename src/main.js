@@ -773,13 +773,13 @@ class Configorama {
           }
         })
 
-        // console.log(makeStackedBoxes(boxes, {
-        //   borderText: 'Variable Details. Click on titles to open in editor.',
-        //   borderColor: 'gray',
-        //   minWidth: '96%',
-        //   borderStyle: 'bold',
-        //   disableTitleSeparator: true,
-        // }))
+        console.log(makeStackedBoxes(boxes, {
+          borderText: 'Variable Details. Click on titles to open in editor.',
+          borderColor: 'gray',
+          minWidth: '96%',
+          borderStyle: 'bold',
+          disableTitleSeparator: true,
+        }))
         // process.exit(1)
       }
 
@@ -798,8 +798,9 @@ class Configorama {
         let varMsg = ''
         let requiredMessage = ''
 
-        // Show required status - required if any occurrence is required
-        const isRequired = occurrences.some(occ => occ.isRequired)
+        // Show required status - required if any occurrence has no fallback
+        // (isRequired can be false if pre-resolved from env, but still required in config)
+        const isRequired = occurrences.some(occ => !occ.hasFallback)
         if (isRequired) {
           requiredMessage = `${chalk.red.bold('[Required]')}`
         }
@@ -817,11 +818,18 @@ class Configorama {
           varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
         }
 
-        // Show default value if available
-        if (typeof firstOcc.defaultValue !== 'undefined') {
+        // Show default value only if it's a true fallback, not a pre-resolved value
+        const hasActualDefault = firstOcc.hasFallback && typeof firstOcc.defaultValue !== 'undefined'
+        if (hasActualDefault) {
           const defaultValueRender = firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue
           const defaultValueText = `${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
           varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
+        } else if (uniqueVar.resolvedValue !== undefined) {
+          // Show pre-resolved current value (e.g., from env, git)
+          const resolvedRender = uniqueVar.resolvedValue === '' ? '""' : uniqueVar.resolvedValue
+          const resolvedText = `${keyChalk('Current value:'.padEnd(titleText.length, ' '))}`
+          const envIndicator = uniqueVar.variableType === 'env' ? ` ${chalk.red('(currently set env var)')}` : ''
+          varMsg += `${resolvedText} ${valueChalk(resolvedRender)}${envIndicator}\n`
         }
 
         // Show default value source path
@@ -870,7 +878,7 @@ class Configorama {
             width: '100%',
           },
           title: {
-            left: `▷ \${${varName}}`,
+            left: `▷ ${firstOcc.varMatch}`,
             right: `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`,
             paddingBottom: 1,
             paddingTop: (i === 0) ? 1 : 0,
@@ -887,6 +895,7 @@ class Configorama {
         borderStyle: 'bold',
         disableTitleSeparator: true,
       }))
+      console.log()
 
 
       // WALK through CLI prompt if --setup flag is set
