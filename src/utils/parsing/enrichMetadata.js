@@ -304,25 +304,36 @@ async function enrichMetadata(
     }
   }
 
+  // Add overrideFilePath to references if file was overridden
+  for (const refData of references) {
+    const details = fileDetailsMap.get(refData.resolvedPath)
+    if (details && details.wasOverridden) {
+      refData.overrideFilePath = details.filePath
+    }
+  }
+
   const byConfigPath = []
   if (references.length > 0) {
     for (const resolvedFileData of references) {
       const details = fileDetailsMap.get(resolvedFileData.resolvedPath)
       if (details) {
         for (const ref of resolvedFileData.refs) {
+          // Use original file path if overridden, otherwise use the resolved path
+          const filePath = details.wasOverridden ? details.originalFilePath : details.filePath
           const confDetails = {
             location: ref.location,
-            filePath: details.filePath,
+            filePath: filePath,
             relativePath: details.relativePath,
             originalVariableString: ref.originalVariableString,
             resolvedVariableString: details.resolvedVariableString,
             containsVariables: !!ref.hasInnerVariable,
             exists: details.exists,
-            // Get glob patterns from the individual ref, default to empty array
-            
           }
           if (ref.pattern) {
             confDetails.pattern = ref.pattern
+          }
+          if (details.wasOverridden) {
+            confDetails.overrideFilePath = details.filePath
           }
           byConfigPath.push(confDetails)
         }
@@ -337,6 +348,25 @@ async function enrichMetadata(
     }
     if (references.length > 0) {
       metadata.fileDependencies.references = references
+    }
+
+    // Collect unique overridden files from fileRefsFound
+    const overriddenFilesMap = new Map()
+    for (const ref of fileRefsFound) {
+      if (ref.wasOverridden) {
+        // Use originalFilePath as key to dedupe
+        if (!overriddenFilesMap.has(ref.originalFilePath)) {
+          overriddenFilesMap.set(ref.originalFilePath, {
+            originalPath: ref.originalFilePath,
+            overridePath: ref.filePath,
+            relativePath: ref.relativePath,
+          })
+        }
+      }
+    }
+
+    if (overriddenFilesMap.size > 0) {
+      metadata.fileDependencies.overriddenFiles = Array.from(overriddenFilesMap.values())
     }
   }
 

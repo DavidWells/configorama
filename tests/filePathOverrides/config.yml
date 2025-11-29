@@ -1,0 +1,3 @@
+# Config file that references env.yml
+envVars: ${file(./env.yml)}
+specificKey: ${file(./env.yml):dbHost}

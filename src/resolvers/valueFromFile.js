@@ -4,7 +4,7 @@
 const fs = require('fs')
 const { trim } = require('../utils/lodash')
 const { splitCsv } = require('../utils/strings/splitCsv')
-const { resolveFilePathFromMatch } = require('../utils/paths/getFullFilePath')
+const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { makeBox } = require('@davidwells/box-logger')
 const { encodeJsSyntax } = require('../utils/encoders/js-fixes')
@@ -94,19 +94,48 @@ async function getValueFromFile(ctx, variableString, options) {
   const fileDetails = resolveFilePathFromMatch(matchedFileString, syntax, ctx.configPath)
   // console.log('fileDetails', fileDetails)
 
-  const { fullFilePath, resolvedPath, relativePath } = fileDetails
+  let { fullFilePath, resolvedPath, relativePath } = fileDetails
+
+  // Check for file path overrides
+  let wasOverridden = false
+  let originalFilePath = null
+  const filePathOverrides = ctx.opts && ctx.opts.filePathOverrides
+  if (filePathOverrides) {
+    // Try matching against relativePath (e.g., './env.yml')
+    const overrideKey = Object.keys(filePathOverrides).find((key) => {
+      // Normalize paths for comparison
+      const normalizedKey = key.replace(/^\.\//, '')
+      const normalizedRelPath = relativePath.replace(/^\.\//, '')
+      return normalizedKey === normalizedRelPath || key === relativePath
+    })
+
+    if (overrideKey) {
+      originalFilePath = fullFilePath
+      const overridePath = filePathOverrides[overrideKey]
+      // Resolve the override path (could be relative or absolute)
+      fullFilePath = resolveFilePath(overridePath, ctx.configPath)
+      resolvedPath = overridePath
+      wasOverridden = true
+    }
+  }
 
   const exists = fs.existsSync(fullFilePath)
 
-  ctx.fileRefsFound.push({
-    // location: options.context.path.join('.'),
+  const fileRefEntry = {
     filePath: fullFilePath,
     relativePath,
     resolvedVariableString: options.context.value,
     originalVariableString: options.context.originalSource,
     containsVariables: options.context.value !== options.context.originalSource,
     exists,
-  })
+  }
+
+  if (wasOverridden) {
+    fileRefEntry.wasOverridden = true
+    fileRefEntry.originalFilePath = originalFilePath
+  }
+
+  ctx.fileRefsFound.push(fileRefEntry)
 
   let fileExtension = resolvedPath.split('.')
 

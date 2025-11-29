@@ -1,0 +1,4 @@
+# Override env file with different values
+dbHost: production.db.example.com
+dbPort: 5433
+apiKey: override-key

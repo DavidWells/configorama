@@ -54,4 +54,7 @@ function resolveFilePathFromMatch(matchedFileString, syntax, configPath) {
   return { fullFilePath, resolvedPath, relativePath }
 }
 
-module.exports.resolveFilePathFromMatch = resolveFilePathFromMatch
+module.exports = {
+  resolveFilePathFromMatch,
+  resolveFilePath
+}
