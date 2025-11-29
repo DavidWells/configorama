@@ -67,6 +67,7 @@ const { findNestedVariables } = require('./utils/find-nested-variables')
 const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 const { logHeader } = require('./utils/logs')
 const { createEditorLink } = require('./utils/createEditorLink')
+const { findLineForKey } = require('./utils/findLineForKey')
 const { runConfigWizard } = require('./utils/configWizard')
 /**
  * Maintainer's notes:
@@ -653,6 +654,8 @@ class Configorama {
         logHeader('Variable Details')
 
         const lines = this.configFileContents ? this.configFileContents.split('\n') : []
+        const fileType = this.configFileType
+        const configFilePath = this.configFilePath
 
         const indent = ''
         const boxes = varKeys.map((key, i) => {
@@ -692,6 +695,13 @@ class Configorama {
             varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
           }
 
+          // Show resolve order from metadata
+          if (firstInstance.resolveOrder.length > 1) {
+            varMsg += `${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
+            const resolveOrder = firstInstance.resolveOrder.join(', ')
+            varMsg += ` ${valueChalk(resolveOrder)}\n`
+          }
+
           // Show default value from metadata
           if (typeof firstInstance.defaultValue !== 'undefined') {
             const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
@@ -701,34 +711,39 @@ class Configorama {
 
           // Show default value source path from metadata
           if (firstInstance.defaultValueSrc) {
-            varMsg += `${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
-            varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
-          }
-
-          // Show resolve order from metadata
-          if (firstInstance.resolveOrder.length > 1) {
-            varMsg += `${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
-            const resolveOrder = firstInstance.resolveOrder.join(', ')
-            varMsg += ` ${valueChalk(resolveOrder)}\n`
+            varMsg += `${indent}${keyChalk('Default path:'.padEnd(titleText.length, ' '))} `
+            const defaultPathLine = findLineForKey(firstInstance.defaultValueSrc, lines, fileType)
+            if (defaultPathLine) {
+              varMsg += `${createEditorLink(configFilePath, defaultPathLine, 1, firstInstance.defaultValueSrc, 'gray')}\n`
+            } else {
+              varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
+            }
           }
 
           // Show path(s) from metadata
-          let locationRender = valueChalk(variableInstances[0].path)
+          const configPathLine = findLineForKey(variableInstances[0].path, lines, fileType)
+          let locationRender = configPathLine
+            ? createEditorLink(configFilePath, configPathLine, 1, variableInstances[0].path, 'gray')
+            : valueChalk(variableInstances[0].path)
           let locationLabel = `${indent}${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
           let typeText = ''
           if (variableInstances.length > 1) {
             const pathIndent = ' '.repeat(titleText.length + 1)
             const pathItems = variableInstances.map((v, idx) => {
+              const pathLine = findLineForKey(v.path, lines, fileType)
+              const pathLink = pathLine
+                ? createEditorLink(configFilePath, pathLine, 1, `- ${v.path}`, 'gray')
+                : valueChalk(`- ${v.path}`)
               // Show type filter per path if different
               if (uniqueVar && uniqueVar.occurrences.length > 1) {
                 const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
                 const pathType = occurrence && occurrence.type
                 typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
                 const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
-                return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
+                return `${prefix}${pathLink}${typeText}`
               }
               const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
-              return `${prefix}${valueChalk(`- ${v.path}`)}${typeText}`
+              return `${prefix}${pathLink}${typeText}`
             })
             locationRender = pathItems.join('\n')
             locationLabel = `${indent}${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
@@ -738,36 +753,7 @@ class Configorama {
           }
           varMsg += `${locationLabel} ${locationRender}`
 
-          // Find line number in config file based on format (YAML, TOML, JSON, INI)
-          const configKey = firstInstance.key
-          const line = lines.findIndex((line) => {
-            const fileType = this.configFileType
-            const escapedKey = configKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            // YAML: key: or key :
-            if (fileType === '.yml' || fileType === '.yaml') {
-              return new RegExp(`^\\s*${escapedKey}\\s*:`).test(line)
-            }
-            // TOML: key = or key=
-            if (fileType === '.toml') {
-              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
-            }
-            // JSON: "key": or "key" :
-            if (fileType === '.json' || fileType === '.json5') {
-              return new RegExp(`"${escapedKey}"\\s*:`).test(line)
-            }
-            // INI: key = or key=
-            if (fileType === '.ini') {
-              return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
-            }
-            // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
-            if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
-              return new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`).test(line)
-            }
-            // Default fallback: try YAML-style
-            return line.includes(`${configKey}:`)
-          })
-          const lineNumber = line !== -1 ? line + 1 : 0
-
+          const lineNumber = findLineForKey(firstInstance.key, lines, fileType)
 
           return {
             content: {
@@ -1027,6 +1013,21 @@ class Configorama {
 
         const key = keyWithoutFilters
 
+        // Helper to pre-resolve a variable from config
+        const preResolveFromConfig = (varString, varType) => {
+          if (!varString) return undefined
+          // Handle self: prefix
+          const varPath = varString.startsWith('self:') ? varString.slice(5) : varString
+          // Only pre-resolve dot.prop and self references
+          if (varType === 'dot.prop' || varType === 'self') {
+            const value = dotProp.get(originalConfig, varPath)
+            if (value !== undefined && typeof value !== 'object') {
+              return { resolved: value, path: varPath }
+            }
+          }
+          return undefined
+        }
+
         // Strip filters from resolveDetails
         const cleanedResolveDetails = nested.map(detail => {
           const cleaned = { ...detail }
@@ -1048,6 +1049,14 @@ class Configorama {
               cleaned.varString = cleaned.varString.replace(filterMatch, '').trim()
             }
           }
+
+          // Pre-resolve dot.prop and self references
+          const preResolved = preResolveFromConfig(cleaned.varString || cleaned.variable, cleaned.variableType)
+          if (preResolved) {
+            cleaned.varResolved = preResolved.resolved
+            cleaned.varResolvedPath = preResolved.path
+          }
+
           // Also clean fallbackValues if present
           if (cleaned.fallbackValues && Array.isArray(cleaned.fallbackValues)) {
             cleaned.fallbackValues = cleaned.fallbackValues.map(fb => {
@@ -1070,6 +1079,17 @@ class Configorama {
                   cleanedFb.stringValue = cleanedFb.stringValue.replace(filterMatch, '').trim()
                 }
               }
+
+              // Pre-resolve fallback variable references
+              if (cleanedFb.stringValue && cleanedFb.stringValue.match(/^\$\{[^}]+\}$/)) {
+                const innerVar = cleanedFb.stringValue.slice(2, -1)
+                const fbPreResolved = preResolveFromConfig(innerVar, 'dot.prop')
+                if (fbPreResolved) {
+                  cleanedFb.varResolved = fbPreResolved.resolved
+                  cleanedFb.varResolvedPath = fbPreResolved.path
+                }
+              }
+
               return cleanedFb
             })
           }
@@ -1104,35 +1124,59 @@ class Configorama {
 
           if (item && item.fallbackValues) {
             let hasResolvedFallback
+            let defaultValueSrc
+            const isSingleFallback = item.fallbackValues.length === 1
             const order = ([stripFilters(item.valueBeforeFallback)]).concat(item.fallbackValues.map((f, i) => {
               if (f.fallbackValues) {
-                const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                const [nestedOrder, nestedResolvedFallback, nestedDefaultSrc] = calculateResolveOrder(f)
                 if (!hasResolvedFallback && nestedResolvedFallback) {
                   hasResolvedFallback = nestedResolvedFallback
+                  defaultValueSrc = nestedDefaultSrc
                 }
                 return nestedOrder
               }
 
+              const valueStr = stripFilters(f.stringValue || f.variable)
+
+              // Only set default from first resolvable fallback
               if (!hasResolvedFallback && f.isResolvedFallback) {
-                hasResolvedFallback = stripFilters(f.stringValue)
-              }
-              if (f.isResolvedFallback) {
-                hasResolvedFallback = stripFilters(f.stringValue)
+                if (f.varResolved !== undefined) {
+                  hasResolvedFallback = f.varResolved
+                  defaultValueSrc = f.varResolvedPath
+                } else if (!valueStr.match(/^\$\{[^}]+\}$/)) {
+                  // Literal value - use as default
+                  hasResolvedFallback = valueStr
+                }
+                // If variable can't resolve, don't set - let next fallback try
               }
 
               if (!hasResolvedFallback && f.isVariable) {
                 defaultValueIsVar = f
               }
-              const valueStr = stripFilters(f.stringValue || f.variable)
-              return `${valueStr}${f.isResolvedFallback ? ' (default)' : ''}`
+
+              if (f.isResolvedFallback) {
+                if (isSingleFallback) {
+                  // Single fallback: show "value (default)"
+                  return `${valueStr} (default)`
+                } else {
+                  // Multiple fallbacks: show resolved value if available
+                  if (f.varResolved !== undefined) {
+                    return `${valueStr} = ${f.varResolved}`
+                  }
+                  // If can't resolve, just show the value without annotation
+                  return valueStr
+                }
+              }
+              return valueStr
             })).flat()
 
-            return [order, hasResolvedFallback]
+            return [order, hasResolvedFallback, defaultValueSrc]
           }
-          return [[stripFilters(item.variable)], undefined]
+          return [[stripFilters(item.variable)], undefined, undefined]
         }
 
-        const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
+        const lastCleanedItem = cleanedResolveDetails[cleanedResolveDetails.length - 1]
+        const [resolveOrder, hasResolvedFallback, defaultValueSrc] = calculateResolveOrder(lastCleanedItem)
         varData.resolveOrder = resolveOrder
 
         if (defaultValueIsVar) {
@@ -1141,6 +1185,10 @@ class Configorama {
 
         if (typeof hasResolvedFallback !== 'undefined') {
           varData.defaultValue = hasResolvedFallback
+        }
+
+        if (defaultValueSrc) {
+          varData.defaultValueSrc = defaultValueSrc
         }
 
         if (typeof varData.defaultValue === 'undefined') {
