@@ -164,5 +164,5 @@ subSubSubFolder: subsubsub
 nestedFilePath: ${file(./sub/subsub/subsubsub/foo.json)}
 nestedFilePathWithVar: ${file(./${subFolder}/subsub/subsubsub/foo.json)}
 
-nestedFilePathTwo: ${file(.//sub/subsub/subsubsub/foo.json)}
-nestedFilePathWithVarTwo: ${file(.//${subFolder}/subsub/subsubsub/foo.json)}
+nestedFilePathTwo: ${file(.//sub/subsub/subsubsub/foo.json) | help('Nested file path two')}
+nestedFilePathWithVarTwo: ${file(.//${subFolder}/subsub/subsubsub/foo.json) | help('Nested file path with var two')}

@@ -903,14 +903,168 @@ class Configorama {
       console.log()
 
 
+      // Unique variables that require setup (excludes readonly source types)
+      const CONFIGURABLE_SOURCES = ['user', 'config', 'remote']
+      const configurableVariables = {}
+      const configurableVarKeys = []
+
+      for (const varName of uniqueVarKeys) {
+        const uniqueVar = uniqueVariables[varName]
+        // Include if source type is user, config, or remote (not readonly)
+        if (CONFIGURABLE_SOURCES.includes(uniqueVar.variableSourceType)) {
+          configurableVariables[varName] = uniqueVar
+          configurableVarKeys.push(varName)
+        }
+      }
+
+      // Display configurable variables by source type
+      if (configurableVarKeys.length > 0) {
+        const spacing = '           '
+        const titleText = `Variable:${spacing}`
+        const VALUE_HEX = '#899499'
+        const keyChalk = chalk.whiteBright
+        const valueChalk = chalk.hex(VALUE_HEX)
+
+        // Group by source type
+        const bySource = {
+          user: [],
+          config: [],
+          remote: [],
+        }
+
+        for (const varName of configurableVarKeys) {
+          const v = configurableVariables[varName]
+          const sourceType = v.variableSourceType || 'user'
+          if (bySource[sourceType]) {
+            bySource[sourceType].push({ varName, ...v })
+          }
+        }
+
+        const sourceLabels = {
+          user: 'User Input Required',
+          config: 'Config References',
+          remote: 'Remote Services',
+        }
+
+        const sourceColors = {
+          user: 'yellow',
+          config: 'cyan',
+          remote: 'magenta',
+        }
+
+        const configurableBoxes = []
+
+        for (const [sourceType, vars] of Object.entries(bySource)) {
+          if (vars.length === 0) continue
+
+          for (let i = 0; i < vars.length; i++) {
+            const v = vars[i]
+            const occurrences = v.occurrences || []
+            const firstOcc = occurrences[0] || {}
+
+            let varMsg = ''
+            let requiredMessage = ''
+
+            // Show required status
+            const isRequired = occurrences.some(occ => !occ.hasFallback)
+            if (isRequired) {
+              requiredMessage = `${chalk.red.bold('[Required]')}`
+            }
+
+            // Show description if present (directly under title, not as key/value)
+            if (v.descriptions && v.descriptions.length > 0) {
+              varMsg += `${chalk.dim(v.descriptions.join('. '))}\n\n`
+            }
+
+            // Show type filter if defined (String, Number, etc.)
+            const varType = (v.types && v.types[0]) || firstOcc.type
+            if (varType) {
+              varMsg += `${keyChalk('Type:'.padEnd(titleText.length, ' '))} ${valueChalk(varType)}\n`
+            }
+
+            // Show current/default value
+            if (v.resolvedValue !== undefined) {
+              const resolvedRender = v.resolvedValue === '' ? '""' : v.resolvedValue
+              varMsg += `${keyChalk('Current value:'.padEnd(titleText.length, ' '))} ${valueChalk(resolvedRender)}\n`
+            } else if (firstOcc.hasFallback && firstOcc.defaultValue !== undefined) {
+              const defaultRender = firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue
+              varMsg += `${keyChalk('Default value:'.padEnd(titleText.length, ' '))} ${valueChalk(defaultRender)}\n`
+            }
+
+            // Show config path(s)
+            let locationRender
+            let locationLabel
+            if (occurrences.length > 1) {
+              const pathIndent = ' '.repeat(titleText.length + 1)
+              const pathItems = occurrences.map((occ, idx) => {
+                const pathLine = findLineForKey(occ.path, lines, fileType)
+                const pathLink = pathLine
+                  ? createEditorLink(configFilePath, pathLine, 1, `- ${occ.path}`, VALUE_HEX)
+                  : valueChalk(`- ${occ.path}`)
+                const prefix = idx === 0 ? '' : `${pathIndent}`
+                return `${prefix}${pathLink}`
+              })
+              locationRender = pathItems.join('\n')
+              locationLabel = 'Config Paths:'
+            } else {
+              const pathLine = findLineForKey(firstOcc.path, lines, fileType)
+              locationRender = pathLine
+                ? createEditorLink(configFilePath, pathLine, 1, firstOcc.path, VALUE_HEX)
+                : valueChalk(firstOcc.path)
+              locationLabel = 'Config Path:'
+            }
+            varMsg += `${keyChalk(locationLabel.padEnd(titleText.length, ' '))} ${locationRender}`
+
+            // Get type for center heading (reuse varType from above)
+            const typeText = varType ? chalk.dim(`Type: ${varType}`) : ''
+
+            // Get line number for first occurrence
+            const firstOccLine = findLineForKey(firstOcc.path, lines, fileType)
+            const varTitle = firstOcc.varMatch || v.varName
+            const requiredSuffix = requiredMessage ? ` - ${requiredMessage}` : ''
+            const titleLink = firstOccLine
+              ? createEditorLink(configFilePath, firstOccLine, 1, `▷ ${varTitle}`) + requiredSuffix
+              : `▷ ${varTitle}${requiredSuffix}`
+
+            configurableBoxes.push({
+              content: {
+                left: varMsg,
+                width: '100%',
+              },
+              title: {
+                left: titleLink,
+                // center: typeText,
+                right: chalk.dim(`${v.variableType}`),
+                paddingBottom: 1,
+                paddingTop: (configurableBoxes.length === 0) ? 1 : 0,
+                truncate: true,
+              },
+              width: '100%',
+            })
+          }
+        }
+
+        if (configurableBoxes.length > 0) {
+          console.log(makeStackedBoxes(configurableBoxes, {
+            borderText: `Configurable Variables (${configurableVarKeys.length})`,
+            borderColor: 'yellow',
+            minWidth: '96%',
+            borderStyle: 'bold',
+            disableTitleSeparator: true,
+          }))
+          console.log()
+        }
+      }
+
+
       // WALK through CLI prompt if --setup flag is set
       if (SETUP_MODE) {
         logHeader('Setup Mode')
         // deepLog('enrich', enrich)
         const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
 
-        console.log('\n')
         logHeader('User Inputs Summary')
+        console.log()
         console.log(JSON.stringify(userInputs, null, 2))
 
         // TODO set values
@@ -936,7 +1090,8 @@ class Configorama {
     
       /* Exit early if list or info flag is set */
       if (showFoundVariables) {
-        process.exit(0)
+        // TODO re-enable this
+        // process.exit(0)
       }
     }
 

@@ -5,6 +5,36 @@ const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
 
+const INVISIBLE_SPACE = '\u2800\u2800\u2800'
+
+/**
+ * Prefixes each line of multiline text with INVISIBLE_SPACE repeated a specified number of times
+ * @param {number} count - Number of times to repeat INVISIBLE_SPACE for prefix
+ * @param {string} text - Multiline text to prefix
+ * @returns {string} Text with each line prefixed with INVISIBLE_SPACE
+ */
+function prefixMultilineText(count, text) {
+  if (!text) return text
+  const prefix = INVISIBLE_SPACE.repeat(count)
+  return text.split('\n').map(line => `${prefix}${line}`).join('\n')
+}
+
+/**
+ * Formats multiline text for wizard display with leading pipe and invisible space indentation
+ * @param {number} indentCount - Number of times to repeat INVISIBLE_SPACE for indentation
+ * @param {string} text - Multiline text to format
+ * @param {boolean} addLeadingEmptyLine - Whether to add empty line with pipe before first line (default: true)
+ * @returns {string} Formatted text with pipe prefix and indentation
+ */
+function formatWizardMultilineText(indentCount, text, addLeadingEmptyLine = true) {
+  if (!text) return text
+  const indent = INVISIBLE_SPACE.repeat(indentCount)
+  const lines = text.split('\n')
+  const formattedLines = lines.map(line => `${chalk.gray('│')}${indent}${line}`)
+  const leadingLine = addLeadingEmptyLine ? `${chalk.gray('│')}\n` : '\n'
+  return leadingLine + formattedLines.join('\n') + `\n${chalk.gray('│')}`
+}
+
 /**
  * Groups variables by type for wizard flow
  * @param {object} uniqueVariables - The uniqueVariables from enriched metadata
@@ -288,6 +318,29 @@ function getHelpText(varData) {
 }
 
 /**
+ * Extracts allowed values from description text like "Deployment stage (dev, staging, production)"
+ * @param {object} varData - Variable data with descriptions array or occurrences
+ * @returns {string[]|null} Array of allowed values or null if not found
+ */
+function getAllowedValues(varData) {
+  const helpText = getHelpText(varData)
+  if (!helpText) return null
+
+  // Match pattern like (value1, value2, value3) at end of description
+  const match = helpText.match(/\(([^)]+)\)\s*$/)
+  if (!match) return null
+
+  const valuesStr = match[1]
+  const values = valuesStr.split(',').map(v => v.trim()).filter(Boolean)
+
+  // Only treat as allowed values if we have 2+ options and they look like simple values
+  if (values.length < 2) return null
+  if (values.some(v => v.includes(' ') && !v.match(/^['"].*['"]$/))) return null
+
+  return values
+}
+
+/**
  * Creates a human-readable prompt message
  * @param {object} varInfo - Variable info
  * @returns {string} Prompt message
@@ -339,8 +392,8 @@ function createPromptMessage(varInfo) {
 
       // Strip help() filter from the displayed value
       if (originalValue && typeof originalValue === 'string') {
-        // Remove | help('...') including nested parens
-        originalValue = originalValue.replace(/\s*\|\s*help\([^)]*(?:\([^)]*\))?[^)]*\)/g, '')
+        // Remove | help('...') or | help("...") - match quoted string inside help()
+        originalValue = originalValue.replace(/\s*\|\s*help\(('[^']*'|"[^"]*")\)/g, '')
       }
 
       if (keyPath && originalValue) {
@@ -372,16 +425,17 @@ function createPromptMessage(varInfo) {
       // Find longest key for alignment
       const maxKeyLength = Math.max(...parsedOccurrences.map(o => o.key.length))
 
+      // Count unique descriptions
+      const uniqueDescriptions = new Set(parsedOccurrences.map(o => o.description).filter(Boolean))
+
       // List all occurrences with bullets and aligned values (using invisible unicode for indentation)
-      const indent = '\u2800\u2800\u2800' // Braille blank pattern (invisible but not stripped)
-      const usageList = parsedOccurrences.map(({ key, value, description }, index) => {
+      const usageLines = parsedOccurrences.map(({ key, value, description }) => {
         const padding = ' '.repeat(maxKeyLength - key.length)
-        const leadingEmptyLine = index === 0 ? '│\n' : ''
-        // Only show inline description if there are multiple occurrences (otherwise it's redundant with header)
-        const descComment = description && parsedOccurrences.length > 1 ? ` - # ${description}` : ''
-        return value ? `${leadingEmptyLine}│${indent}- ${key}:${padding}    ${value}${descComment}` : `${leadingEmptyLine}│${indent}• ${key}${descComment}`
+        // Only show inline description if there are multiple unique descriptions
+        const descComment = description && uniqueDescriptions.size > 1 ? ` - # ${description}` : ''
+        return value ? `- ${key}:${padding}    ${value}${descComment}` : `• ${key}${descComment}`
       })
-      contextHint += '\n' + usageList.join('\n') + '\n│'
+      contextHint += '\n' + formatWizardMultilineText(1, usageLines.join('\n'))
     }
   }
 
@@ -430,36 +484,49 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
   // Prompt for options (CLI flags)
   if (grouped.options.length > 0) {
-    const flagsList = grouped.options.map(v => {
-      const varSyntax = `\${opt:${v.cleanName}}`
-      return `  - ${varSyntax}`
-    }).join('\n')
-    const noteContent = `Found ${grouped.options.length} CLI flag(s)\n${flagsList}`
+    const flagsList = grouped.options.map(v => `\${opt:${v.cleanName}}`)
+    const flagsDisplay = flagsList.length < 5
+      ? flagsList.join(', ')
+      : flagsList.map(f => ` - ${f}`).join('\n')
+    const addNewLine = flagsList.length > 5 ? '\n' : ' - '
+    const noteContent = `Found ${grouped.options.length} CLI flag(s)${addNewLine}${flagsDisplay}`
     p.note(noteContent, 'CLI Flags')
 
     for (const varInfo of grouped.options) {
       const message = createPromptMessage(varInfo)
       const isSensitive = isSensitiveVariable(varInfo.cleanName)
-      const promptFn = isSensitive ? p.password : p.text
       const expectedType = getExpectedType(varInfo.occurrences)
+      const allowedValues = getAllowedValues(varInfo)
 
-      const placeholder = varInfo.hasFallback
-        ? `${varInfo.defaultValue} (default)`
-        : `Enter value for --${varInfo.cleanName}`
+      let value
+      if (allowedValues && !isSensitive) {
+        // Use select picker for enumerated values
+        const options = allowedValues.map(v => ({ value: v, label: v }))
+        value = await p.select({
+          message,
+          options,
+          initialValue: varInfo.defaultValue || allowedValues[0]
+        })
+      } else {
+        const promptFn = isSensitive ? p.password : p.text
+        const placeholder = varInfo.hasFallback
+          ? `  ${varInfo.defaultValue} `
+          : `Enter value for --${varInfo.cleanName}`
 
-      const value = await promptFn({
-        message,
-        placeholder,
-        validate: (val) => {
-          // Only required if no fallback exists
-          if (!val && varInfo.isRequired && !varInfo.hasFallback) {
-            return 'This value is required'
+        value = await promptFn({
+          message,
+          placeholder,
+          validate: (val) => {
+            // Only required if no fallback exists
+            if (!val && varInfo.isRequired && !varInfo.hasFallback) {
+              return 'This value is required'
+            }
+            // Type validation
+            const typeError = validateType(val, expectedType)
+            if (typeError) return typeError
           }
-          // Type validation
-          const typeError = validateType(val, expectedType)
-          if (typeError) return typeError
-        }
-      })
+        })
+      }
 
       if (p.isCancel(value)) {
         p.cancel('Setup cancelled')
@@ -489,7 +556,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
       if (varInfo.resolvedValue !== undefined) {
         if (isSensitive) {
           // For sensitive vars, show hint in message since password prompts don't show placeholders
-          message += `  ${chalk.green(`(process.env.${varInfo.cleanName} set - press enter to use current value OR input a new value below)`)}`
+          message += formatWizardMultilineText(1, chalk.green(`Notice: process.env.${varInfo.cleanName} set\nPress enter to use current value OR input a new value below`), false)
           placeholder = ''
         } else {
           placeholder = `${varInfo.resolvedValue} (current env value)`
@@ -588,5 +655,8 @@ module.exports = {
   createPromptMessage,
   getExpectedType,
   getHelpText,
+  getAllowedValues,
   validateType,
+  prefixMultilineText,
+  formatWizardMultilineText,
 }

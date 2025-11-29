@@ -19,8 +19,10 @@ dbPort: ${env:DB_PORT_TWO, 5432 | help('The Postgres Port')}
 dbPortTyped: ${env:DB_PORT_TWO, 5432 | Number | help('Second helper text')}
 
 # With multiple filters
-stage: ${opt:stage | toUpperCase | help('Deployment stage (${allowedValues})')}
+stage: ${opt:stage | toUpperCase | help('Deployment stage (${allowedValues}, funky)')}
 
 other: foo-${opt:stage, ${one}, ${two}}
 
 final: foo-${opt:stage, ${nah}, 'yea'}
+
+branch: ${git:branch | help('The current branch')}
