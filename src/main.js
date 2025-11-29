@@ -1566,50 +1566,58 @@ class Configorama {
       const instances = variableData[key]
       const firstInstance = instances[0]
 
-      // Check if truly required using same logic as display code
-      let isTrulyRequired = false
-      if (typeof firstInstance.defaultValue === 'undefined') {
-        // Check for self-references that resolve to config values
-        let dotPropArr = []
-        if (firstInstance.defaultValueIsVar && (
-          firstInstance.defaultValueIsVar.variableType === 'self:' ||
-          firstInstance.defaultValueIsVar.variableType === 'dot.prop'
-        )) {
-          dotPropArr = [firstInstance.defaultValueIsVar]
-        }
+      // Extract variable name from key (e.g. "${self:service}" -> "self:service")
+      const keyVarName = key.slice(2, -1).split(',')[0].trim()
 
-        const hasDotPropOrSelf = instances.reduce((acc, v) => {
-          // Only check the outermost variable (last in resolveDetails)
-          if (v.resolveDetails && v.resolveDetails.length > 0) {
-            const outermostDetail = v.resolveDetails[v.resolveDetails.length - 1]
-            if (outermostDetail.variableType === 'dot.prop' || outermostDetail.variableType === 'self') {
-              acc.push(outermostDetail)
-            }
-          }
-          return acc
-        }, dotPropArr)
-
-        if (!hasDotPropOrSelf.length) {
-          isTrulyRequired = true
-        } else {
-          // Check if the self-reference resolves to a value
-          const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
-          const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
-          if (typeof dotPropValue === 'undefined') {
-            isTrulyRequired = true
-          } else {
-            // Enrich with default value from self-reference
-            firstInstance.defaultValueSrc = cleanPath
-            const niceString = typeof dotPropValue === 'object' ? JSON.stringify(dotPropValue) : dotPropValue
-            const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
-            firstInstance.defaultValue = truncatedString
-            firstInstance.isRequired = false
+      // Find the resolveDetail that matches THIS variable (not any self-ref in the string)
+      let matchingDetail = null
+      for (const instance of instances) {
+        if (instance.resolveDetails && instance.resolveDetails.length > 0) {
+          const found = instance.resolveDetails.find((detail) => {
+            const detailVar = detail.valueBeforeFallback || detail.variable
+            return detailVar === keyVarName
+          })
+          if (found && (found.variableType === 'dot.prop' || found.variableType === 'self')) {
+            matchingDetail = found
+            break
           }
         }
       }
 
+      // Also check defaultValueIsVar
+      if (!matchingDetail && firstInstance.defaultValueIsVar && (
+        firstInstance.defaultValueIsVar.variableType === 'self:' ||
+        firstInstance.defaultValueIsVar.variableType === 'dot.prop'
+      )) {
+        matchingDetail = firstInstance.defaultValueIsVar
+      }
+
+      // Check if truly required
+      let isTrulyRequired = false
+      if (matchingDetail) {
+        // Check if the self-reference resolves to a value
+        // Use valueBeforeFallback if present (strips inline fallback like ", false")
+        const varPath = matchingDetail.valueBeforeFallback || matchingDetail.variable
+        const cleanPath = varPath.replace('self:', '')
+        const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
+        if (typeof dotPropValue === 'undefined') {
+          isTrulyRequired = true
+        } else {
+          // Enrich ALL instances with resolved self-reference value (overrides inline fallbacks)
+          instances.forEach((instance) => {
+            instance.defaultValueSrc = cleanPath
+            instance.defaultValue = dotPropValue
+            instance.isRequired = false
+          })
+        }
+      } else if (typeof firstInstance.defaultValue === 'undefined') {
+        isTrulyRequired = true
+      }
+
       // Update isRequired based on computed isTrulyRequired
-      firstInstance.isRequired = isTrulyRequired
+      instances.forEach((instance) => {
+        instance.isRequired = isTrulyRequired
+      })
 
       if (isTrulyRequired) {
         requiredCount++

@@ -346,11 +346,32 @@ async function enrichMetadata(
   for (const key of varKeys) {
     const varInstances = metadata.variables[key]
     const firstInstance = varInstances[0]
-    const lastResolveDetail = firstInstance.resolveDetails[firstInstance.resolveDetails.length - 1]
+
+    // Extract variable name from key (e.g. "${self:service}" -> "self:service")
+    const keyVarName = key.slice(2, -1).split(',')[0].trim()
+
+    // Find the resolveDetail that matches THIS key's variable (not just outermost)
+    let matchingDetail = null
+    for (const instance of varInstances) {
+      if (instance.resolveDetails && instance.resolveDetails.length > 0) {
+        const found = instance.resolveDetails.find((detail) => {
+          const detailVar = detail.valueBeforeFallback || detail.variable
+          return detailVar === keyVarName
+        })
+        if (found) {
+          matchingDetail = found
+          break
+        }
+      }
+    }
+    // Fallback to last resolveDetail if no match found
+    if (!matchingDetail) {
+      matchingDetail = firstInstance.resolveDetails[firstInstance.resolveDetails.length - 1]
+    }
 
     // Get the base variable name without fallback
     // Use valueBeforeFallback if present, otherwise use the variable string
-    let baseVar = lastResolveDetail.valueBeforeFallback || lastResolveDetail.variable
+    let baseVar = matchingDetail.valueBeforeFallback || matchingDetail.variable
 
     // Strip filters from baseVar using known filter names
     // e.g., "opt:stage | toUpperCase | help(...)" -> "opt:stage"
@@ -373,8 +394,8 @@ async function enrichMetadata(
     if (!uniqueVariablesMap.has(baseVar)) {
       uniqueVariablesMap.set(baseVar, {
         variable: baseVar,
-        variableType: lastResolveDetail.variableType,
-        variableSourceType: getSourceForType(lastResolveDetail.variableType, variableTypes),
+        variableType: matchingDetail.variableType,
+        variableSourceType: getSourceForType(matchingDetail.variableType, variableTypes),
         occurrences: [],
         innerVariables: [],
       })
@@ -440,11 +461,29 @@ async function enrichMetadata(
             const siblingEntry = uniqueVariablesMap.get(normalizedSiblingVar)
 
             // Add occurrence for this sibling variable
+            // Check if this self-reference resolves to a value in originalConfig
+            let siblingDefaultValue = detail.hasFallback ? (detail.fallbackValues?.[0]?.stringValue || detail.fallbackValues?.[0]?.variable) : undefined
+            let siblingDefaultValueSrc
+            let siblingIsRequired = !detail.hasFallback
+
+            if (detail.variableType === 'self' || detail.variableType === 'dot.prop') {
+              const varPath = (detail.valueBeforeFallback || detail.variable).replace('self:', '')
+              const resolvedValue = dotProp.get(originalConfig, varPath)
+              if (resolvedValue !== undefined) {
+                siblingDefaultValue = resolvedValue
+                siblingDefaultValueSrc = varPath
+                siblingIsRequired = false
+              }
+            }
+
             const siblingOccurrence = createOccurrence(instance, detail.varMatch, {
-              isRequired: !detail.hasFallback,
+              isRequired: siblingIsRequired,
               hasFallback: !!detail.hasFallback,
-              defaultValue: detail.hasFallback ? (detail.fallbackValues?.[0]?.stringValue || detail.fallbackValues?.[0]?.variable) : undefined,
+              defaultValue: siblingDefaultValue,
             })
+            if (siblingDefaultValueSrc) {
+              siblingOccurrence.defaultValueSrc = siblingDefaultValueSrc
+            }
 
             // Check if this exact occurrence already exists
             const occurrenceExists = siblingEntry.occurrences.some(occ =>
