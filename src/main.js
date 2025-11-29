@@ -623,6 +623,10 @@ class Configorama {
         console.log()
       }
 
+      const lines = this.configFileContents ? this.configFileContents.split('\n') : []
+      const fileType = this.configFileType
+      const configFilePath = this.configFilePath
+
       if (varKeys.length > 0) {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
 
@@ -652,10 +656,6 @@ class Configorama {
         }
 
         logHeader('Variable Details')
-
-        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
-        const fileType = this.configFileType
-        const configFilePath = this.configFilePath
 
         const indent = ''
         const boxes = varKeys.map((key, i) => {
@@ -773,15 +773,120 @@ class Configorama {
           }
         })
 
-        console.log(makeStackedBoxes(boxes, {
-          borderText: 'Variable Details. Click on titles to open in editor.',
-          borderColor: 'gray',
-          minWidth: '96%',
-          borderStyle: 'bold',
-          disableTitleSeparator: true,
-        }))
+        // console.log(makeStackedBoxes(boxes, {
+        //   borderText: 'Variable Details. Click on titles to open in editor.',
+        //   borderColor: 'gray',
+        //   minWidth: '96%',
+        //   borderStyle: 'bold',
+        //   disableTitleSeparator: true,
+        // }))
         // process.exit(1)
       }
+
+      // New unique variable makeStackedBoxes display
+      const uniqueBoxes = uniqueVarKeys.map((varName, i) => {
+        const uniqueVar = uniqueVariables[varName]
+        const occurrences = uniqueVar.occurrences || []
+        const firstOcc = occurrences[0] || {}
+
+        const spacing = '           '
+        const titleText = `Variable:${spacing}`
+        const VALUE_HEX = '#899499'
+        const keyChalk = chalk.whiteBright
+        const valueChalk = chalk.hex(VALUE_HEX)
+
+        let varMsg = ''
+        let requiredMessage = ''
+
+        // Show required status - required if any occurrence is required
+        const isRequired = occurrences.some(occ => occ.isRequired)
+        if (isRequired) {
+          requiredMessage = `${chalk.red.bold('[Required]')}`
+        }
+
+        // Show type filter if present
+        if (uniqueVar.types && uniqueVar.types.length > 0) {
+          const typeLabel = `${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
+          varMsg += `${typeLabel} ${valueChalk(uniqueVar.types.join(', '))}\n`
+        }
+
+        // Show description
+        if (uniqueVar.descriptions && uniqueVar.descriptions.length > 0) {
+          const descText = `${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+          const combinedDesc = uniqueVar.descriptions.join('. ')
+          varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
+        }
+
+        // Show default value if available
+        if (typeof firstOcc.defaultValue !== 'undefined') {
+          const defaultValueRender = firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue
+          const defaultValueText = `${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
+          varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
+        }
+
+        // Show default value source path
+        if (firstOcc.defaultValueSrc) {
+          varMsg += `${keyChalk('Default path:'.padEnd(titleText.length, ' '))} `
+          const defaultPathLine = findLineForKey(firstOcc.defaultValueSrc, lines, fileType)
+          if (defaultPathLine) {
+            varMsg += `${createEditorLink(configFilePath, defaultPathLine, 1, firstOcc.defaultValueSrc, 'gray')}\n`
+          } else {
+            varMsg += `${valueChalk(firstOcc.defaultValueSrc)}\n`
+          }
+        }
+
+        // Show config path(s) from occurrences
+        let locationRender
+        let locationLabel
+        if (occurrences.length > 1) {
+          const pathIndent = ' '.repeat(titleText.length + 1)
+          const pathItems = occurrences.map((occ, idx) => {
+            const pathLine = findLineForKey(occ.path, lines, fileType)
+            const pathLink = pathLine
+              ? createEditorLink(configFilePath, pathLine, 1, `- ${occ.path}`, 'gray')
+              : valueChalk(`- ${occ.path}`)
+            const typeText = occ.type ? ` ${chalk.dim(`Type: ${occ.type}`)}` : ''
+            const prefix = idx === 0 ? '' : `${pathIndent}`
+            return `${prefix}${pathLink}${typeText}`
+          })
+          locationRender = pathItems.join('\n')
+          locationLabel = `${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
+        } else {
+          const pathLine = findLineForKey(firstOcc.path, lines, fileType)
+          locationRender = pathLine
+            ? createEditorLink(configFilePath, pathLine, 1, firstOcc.path, 'gray')
+            : valueChalk(firstOcc.path)
+          locationLabel = `${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
+        }
+        varMsg += `${locationLabel} ${locationRender}`
+
+        // Find first line number for title
+        const lineNumber = findLineForKey(firstOcc.path, lines, fileType)
+
+        return {
+          content: {
+            left: varMsg,
+            backgroundColor: 'red',
+            width: '100%',
+          },
+          title: {
+            left: `▷ \${${varName}}`,
+            right: `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`,
+            paddingBottom: 1,
+            paddingTop: (i === 0) ? 1 : 0,
+            truncate: true,
+          },
+          width: '100%',
+        }
+      })
+
+      console.log(makeStackedBoxes(uniqueBoxes, {
+        borderText: 'Unique Variables',
+        borderColor: 'gray',
+        minWidth: '96%',
+        borderStyle: 'bold',
+        disableTitleSeparator: true,
+      }))
 
 
       // WALK through CLI prompt if --setup flag is set
