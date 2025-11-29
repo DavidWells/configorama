@@ -3,8 +3,8 @@
 const fs = require('fs')
 const minimist = require('minimist')
 const Configorama = require('./src/main')
-const deepLog = require('./src/utils/deep-log')
-const { logHeader } = require('./src/utils/logs')
+const deepLog = require('./src/utils/ui/deep-log')
+const { logHeader } = require('./src/utils/ui/logs')
 const configorama = require('./src')
 const { makeBox } = require('@davidwells/box-logger')
 

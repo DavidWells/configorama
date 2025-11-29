@@ -22,6 +22,10 @@ fun: ${self:noExist}
 
 rad: ${fake.my.fake.var | String}
 
+fake: 
+  my:
+    thing: here
+
 ok: ${rad | String}
 
 # With multiple filters
