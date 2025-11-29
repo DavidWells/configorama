@@ -1,4 +1,4 @@
-const { trim } = require('../lodash')
+const { trim } = require('./lodash')
 
 // Track promise resolution
 class PromiseTracker {
