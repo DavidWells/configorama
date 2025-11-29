@@ -63,7 +63,8 @@ module.exports = function configoramaSync(variableSources = []) {
         instance.configFilePath,
         Object.keys(instance.filters),
         result, // pass resolved config for post-resolution enrichment
-        options
+        options,
+        instance.variableTypes
       )
 
       return {

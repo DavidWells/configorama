@@ -245,6 +245,7 @@ Examples:
 
 module.exports = {
   type: 'cron',
+  source: 'readonly',
   prefix: 'cron',
   syntax: '${cron(expression)}',
   description: 'Resolves cron expressions. Examples: ${cron("every 5 minutes"}, ${cron("weekdays")}, ${cron("at 9:30")}',

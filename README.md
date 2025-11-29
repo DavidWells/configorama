@@ -561,6 +561,16 @@ There are 2 ways to resolve variables from custom sources.
     ```js
     const config = configorama('path/to/configFile', {
       variableSources: [{
+        // Variable type name (used in metadata)
+        type: 'consul',
+        // Source type for config wizard behavior (see table below)
+        source: 'remote',
+        // Prefix shown in syntax examples
+        prefix: 'consul',
+        // Example syntax for documentation
+        syntax: '${consul:path/to/key}',
+        // Description for help text
+        description: 'Resolves values from Consul KV store',
         // Match variables ${consul:xyz}
         match: RegExp(/^consul:/g),
         // Custom variable source. Must return a promise
@@ -578,6 +588,30 @@ There are 2 ways to resolve variables from custom sources.
     ```yml
     key: ${consul:xyz}
     ```
+
+### Variable Source Types
+
+The `source` property defines how the config wizard handles each variable type:
+
+| Source | Description | Wizard Behavior | Examples |
+|--------|-------------|-----------------|----------|
+| `'user'` | Values provided by user at runtime | Prompt user for value | `env`, `opt` |
+| `'config'` | Values from config files or self-references | Check existence, can create | `self`, `file`, `text` |
+| `'remote'` | Values from external services | Fetch, prompt if missing, can write back | `ssm`, `vault`, `consul` |
+| `'readonly'` | Computed or system-derived values | Display only, cannot modify | `git`, `cron`, `eval` |
+
+**Built-in variable sources and their types:**
+
+| Variable | Source Type | Description |
+|----------|-------------|-------------|
+| `${env:VAR}` | `user` | Environment variables |
+| `${opt:flag}` | `user` | CLI option flags |
+| `${self:key}` | `config` | Self references |
+| `${file(path)}` | `config` | File references |
+| `${text(path)}` | `config` | Raw text file references |
+| `${git:branch}` | `readonly` | Git repository data |
+| `${cron(expr)}` | `readonly` | Cron expression conversion |
+| `${eval(expr)}` | `readonly` | Math/logic evaluation |
 
 ## Options
 

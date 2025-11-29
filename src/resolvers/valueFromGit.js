@@ -330,6 +330,7 @@ async function getGitRemote(name = 'origin') {
 module.exports = function createGitResolver(cwd) {
   return {
     type: 'git',
+    source: 'readonly',
     prefix: 'git',
     syntax: '${git:valueType}',
     description: `Resolves Git variables. Available valueTypes: ${Object.values(GIT_KEYS).join(', ')}`,

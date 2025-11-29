@@ -228,6 +228,7 @@ class Configorama {
        */
       {
         type: 'self',
+        source: 'config',
         prefix: 'self',
         syntax: '${self:pathToKeyInConfig}',
         description: `Resolves values from the current config object. Supports sub-properties via :key lookup.`,
@@ -244,6 +245,7 @@ class Configorama {
        */
       {
         type: 'file',
+        source: 'config',
         prefix: 'file',
         syntax: '${file(pathToFile.json)}',
         description: `Resolves values from files. Supports sub-properties via :key or .key lookup.`,
@@ -256,6 +258,7 @@ class Configorama {
 
       {
         type: 'text',
+        source: 'config',
         prefix: 'text',
         match: textRefSyntax,
         resolver: (varString, o, x, pathValue) => {
@@ -291,6 +294,7 @@ class Configorama {
     /* Nicer self: references. Match key in object */
     const fallThroughSelfMatcher = {
       type: 'dot.prop',
+      source: 'config',
       match: (varString, fullObject, valueObject) => {
         /*
         console.log('fallThroughSelfMatcher varString', varString)
@@ -576,7 +580,8 @@ class Configorama {
         this.configFilePath,
         Object.keys(this.filters),
         undefined, // resolvedConfig not available yet
-        this.opts.options
+        this.opts.options,
+        this.variableTypes
       )
 
       if (showFoundVariables) {

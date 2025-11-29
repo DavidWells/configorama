@@ -89,6 +89,18 @@ function createOccurrence(instance, varMatch, options = {}) {
 }
 
 /**
+ * Get source type for a variable type
+ * @param {string} variableType - The variable type (e.g., 'env', 'opt', 'git')
+ * @param {Array} variableTypes - Array of variable type definitions
+ * @returns {string|undefined} The source type ('user', 'config', 'readonly', 'remote')
+ */
+function getSourceForType(variableType, variableTypes) {
+  if (!variableTypes || !variableType) return undefined
+  const typeDef = variableTypes.find(vt => vt.type === variableType)
+  return typeDef?.source
+}
+
+/**
  * Enriches variable metadata with resolution tracking data.
  * @param {object} metadata - The metadata object from collectVariableMetadata.
  * @param {object} resolutionTracking - The resolution tracking data from Configorama instance.
@@ -99,6 +111,7 @@ function createOccurrence(instance, varMatch, options = {}) {
  * @param {Array} filterNames - Array of known filter names.
  * @param {object} [resolvedConfig] - The resolved config object (optional, for post-resolution enrichment).
  * @param {object} [options] - CLI options object for opt: resolution.
+ * @param {Array} [variableTypes] - Array of variable type definitions with source info.
  * @returns {Promise<object>} Enriched metadata with resolution details and a complete file reference list.
  */
 async function enrichMetadata(
@@ -110,7 +123,8 @@ async function enrichMetadata(
   configPath,
   filterNames = [],
   resolvedConfig,
-  options = {}
+  options = {},
+  variableTypes = []
 ) {
   if (!resolutionTracking) {
     return metadata
@@ -133,6 +147,11 @@ async function enrichMetadata(
         // For each resolveDetail, find the matching resolution history entry
         for (let i = 0; i < varData.resolveDetails.length; i++) {
           const detail = varData.resolveDetails[i]
+          // Add source type for this variable type
+          const sourceType = getSourceForType(detail.variableType, variableTypes)
+          if (sourceType) {
+            detail.variableSourceType = sourceType
+          }
           const isOutermost = i === varData.resolveDetails.length - 1
 
           if (isOutermost && trackingData.resolutionHistory.length > 0) {
@@ -355,6 +374,7 @@ async function enrichMetadata(
       uniqueVariablesMap.set(baseVar, {
         variable: baseVar,
         variableType: lastResolveDetail.variableType,
+        variableSourceType: getSourceForType(lastResolveDetail.variableType, variableTypes),
         occurrences: [],
         innerVariables: [],
       })
@@ -375,8 +395,24 @@ async function enrichMetadata(
         // The outermost variable is the last one in resolveDetails
         const outermostDetail = instance.resolveDetails[instance.resolveDetails.length - 1]
 
+        // Find position of first | (filter separator) in the outermost variable's original string
+        // Variables after this position are filter-internal (e.g., inside help('...${var}...'))
+        const originalStr = outermostDetail.originalStringValue || ''
+        const outerVarStart = outermostDetail.start || 0
+        // Find first | that's inside the outermost variable (after its opening ${)
+        const filterSeparatorPos = originalStr.indexOf('|', outerVarStart + 2)
+
         for (let i = 0; i < instance.resolveDetails.length - 1; i++) {
           const detail = instance.resolveDetails[i]
+
+          // Check if this variable is inside filter arguments (after the first |)
+          // These are meta-variables used to build filter values, not user-configurable variables
+          const isInsideFilter = filterSeparatorPos !== -1 && detail.start > filterSeparatorPos
+          if (isInsideFilter) {
+            // Mark this detail as filter-internal and skip adding to uniqueVariables
+            detail.isFilterInnerVariable = true
+            continue
+          }
 
           // Check if this variable is actually INSIDE the outermost variable's boundaries
           // A variable is "inner" only if it's contained within the parent's start/end range
@@ -395,6 +431,7 @@ async function enrichMetadata(
               uniqueVariablesMap.set(normalizedSiblingVar, {
                 variable: normalizedSiblingVar,
                 variableType: detail.variableType,
+                variableSourceType: getSourceForType(detail.variableType, variableTypes),
                 occurrences: [],
                 innerVariables: [],
               })

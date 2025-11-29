@@ -38,7 +38,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.configFilePath,
       Object.keys(instance.filters),
       config, // pass resolved config for post-resolution enrichment
-      options
+      options,
+      instance.variableTypes
     )
 
     return {
