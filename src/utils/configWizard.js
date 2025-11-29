@@ -557,7 +557,8 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         if (isSensitive) {
           // For sensitive vars, show hint in message since password prompts don't show placeholders
           message += formatWizardMultilineText(1, chalk.green(`Notice: process.env.${varInfo.cleanName} set\nPress enter to use current value OR input a new value below`), false)
-          placeholder = ''
+          // placeholder doesn't work with password prompts
+          placeholder = ' enter to use current value or input a new value'
         } else {
           placeholder = `${varInfo.resolvedValue} (current env value)`
         }

@@ -18,6 +18,10 @@ dbPort: ${env:DB_PORT_TWO, 5432 | help('The Postgres Port')}
 # With type filter
 dbPortTyped: ${env:DB_PORT_TWO, 5432 | Number | help('Second helper text')}
 
+fun: ${self:noExist}
+
+rad: ${fake.my.fake.var | String}
+
 # With multiple filters
 stage: ${opt:stage | toUpperCase | help('Deployment stage (${allowedValues}, funky)')}
 

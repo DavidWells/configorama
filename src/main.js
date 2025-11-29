@@ -68,7 +68,7 @@ const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 const { logHeader } = require('./utils/logs')
 const { createEditorLink } = require('./utils/createEditorLink')
 const { findLineForKey } = require('./utils/findLineForKey')
-const { runConfigWizard } = require('./utils/configWizard')
+const { runConfigWizard, isSensitiveVariable } = require('./utils/configWizard')
 /**
  * Maintainer's notes:
  *
@@ -803,9 +803,8 @@ class Configorama {
         let varMsg = ''
         let requiredMessage = ''
 
-        // Show required status - required if any occurrence has no fallback
-        // (isRequired can be false if pre-resolved from env, but still required in config)
-        const isRequired = occurrences.some(occ => !occ.hasFallback)
+        // Show required status from computed isRequired (accounts for resolved self-refs)
+        const isRequired = occurrences.some(occ => occ.isRequired)
         if (isRequired) {
           requiredMessage = `${chalk.red.bold('[Required]')}`
         }
@@ -824,14 +823,16 @@ class Configorama {
         }
 
         // Show default value only if it's a true fallback, not a pre-resolved value
+        // Redact sensitive values like API keys, secrets, tokens
+        const isSensitive = isSensitiveVariable(varName)
         const hasActualDefault = firstOcc.hasFallback && typeof firstOcc.defaultValue !== 'undefined'
         if (hasActualDefault) {
-          const defaultValueRender = firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue
+          const defaultValueRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
           const defaultValueText = `${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
           varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
         } else if (uniqueVar.resolvedValue !== undefined) {
           // Show pre-resolved current value (e.g., from env, git)
-          const resolvedRender = uniqueVar.resolvedValue === '' ? '""' : uniqueVar.resolvedValue
+          const resolvedRender = isSensitive ? '********' : (uniqueVar.resolvedValue === '' ? '""' : uniqueVar.resolvedValue)
           const resolvedText = `${keyChalk('Current value:'.padEnd(titleText.length, ' '))}`
           const envIndicator = uniqueVar.variableType === 'env' ? ` ${chalk.red('(currently set env var)')}` : ''
           varMsg += `${resolvedText} ${valueChalk(resolvedRender)}${envIndicator}\n`
@@ -965,8 +966,8 @@ class Configorama {
             let varMsg = ''
             let requiredMessage = ''
 
-            // Show required status
-            const isRequired = occurrences.some(occ => !occ.hasFallback)
+            // Show required status from computed isRequired (accounts for resolved self-refs)
+            const isRequired = occurrences.some(occ => occ.isRequired)
             if (isRequired) {
               requiredMessage = `${chalk.red.bold('[Required]')}`
             }
@@ -982,12 +983,13 @@ class Configorama {
               varMsg += `${keyChalk('Type:'.padEnd(titleText.length, ' '))} ${valueChalk(varType)}\n`
             }
 
-            // Show current/default value
+            // Show current/default value (redact sensitive values)
+            const isSensitive = isSensitiveVariable(v.varName)
             if (v.resolvedValue !== undefined) {
-              const resolvedRender = v.resolvedValue === '' ? '""' : v.resolvedValue
+              const resolvedRender = isSensitive ? '********' : (v.resolvedValue === '' ? '""' : v.resolvedValue)
               varMsg += `${keyChalk('Current value:'.padEnd(titleText.length, ' '))} ${valueChalk(resolvedRender)}\n`
             } else if (firstOcc.hasFallback && firstOcc.defaultValue !== undefined) {
-              const defaultRender = firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue
+              const defaultRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
               varMsg += `${keyChalk('Default value:'.padEnd(titleText.length, ' '))} ${valueChalk(defaultRender)}\n`
             }
 
@@ -1076,7 +1078,10 @@ class Configorama {
         if (userInputs.env) {
           Object.assign(process.env, userInputs.env)
         }
-        // Note: self references are in the config, so no need to apply them
+
+        if (userInputs.self) {
+          Object.assign(this.config, userInputs.self)
+        }
 
         console.log()
         logHeader('Resolving Configuration')
