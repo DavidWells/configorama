@@ -18,7 +18,8 @@ const setup = async () => {
   try {
     const configFile = path.join(__dirname, 'help-filter.yml')
     const rawConfig = await configorama(configFile, {
-      options: args
+      options: args,
+      allowUnresolvedVariables: true
     })
     config = createTrackingProxy(rawConfig)
     console.log(`-------------`)
