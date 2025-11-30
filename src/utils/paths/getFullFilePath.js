@@ -29,7 +29,7 @@ function resolveFilePath(pathToResolve, basePath) {
   return fullFilePath
 }
 
-module.exports = function getFullPath(fileString, cwd) {
+function getFullPath(fileString, cwd) {
   const configPath = cwd || process.cwd()
   const relativePath = fileString.replace('~', os.homedir())
   return resolveFilePath(relativePath, configPath)
@@ -54,7 +54,6 @@ function resolveFilePathFromMatch(matchedFileString, syntax, configPath) {
   return { fullFilePath, resolvedPath, relativePath }
 }
 
-module.exports = {
-  resolveFilePathFromMatch,
-  resolveFilePath
-}
+module.exports = getFullPath
+module.exports.resolveFilePathFromMatch = resolveFilePathFromMatch
+module.exports.resolveFilePath = resolveFilePath

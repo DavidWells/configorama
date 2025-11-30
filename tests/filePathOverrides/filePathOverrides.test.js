@@ -65,4 +65,33 @@ test('with absolute path override', async () => {
   assert.equal(result.envVars.dbHost, 'production.db.example.com')
 })
 
+// text() variable tests
+test('text() without overrides - uses original file', async () => {
+  const result = await configorama(configFile)
+
+  assert.ok(result.readmeContent.includes('original readme'))
+})
+
+test('text() with filePathOverrides - uses override file', async () => {
+  const result = await configorama(configFile, {
+    filePathOverrides: {
+      './readme.txt': './readme-override.txt'
+    }
+  })
+
+  assert.ok(result.readmeContent.includes('OVERRIDE readme'))
+})
+
+test('text() and file() overrides together', async () => {
+  const result = await configorama(configFile, {
+    filePathOverrides: {
+      './env.yml': './env-override.yml',
+      './readme.txt': './readme-override.txt'
+    }
+  })
+
+  assert.equal(result.envVars.dbHost, 'production.db.example.com')
+  assert.ok(result.readmeContent.includes('OVERRIDE readme'))
+})
+
 test.run()
