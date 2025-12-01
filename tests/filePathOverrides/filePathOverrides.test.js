@@ -94,4 +94,33 @@ test('text() and file() overrides together', async () => {
   assert.ok(result.readmeContent.includes('OVERRIDE readme'))
 })
 
+// Path normalization tests - ./ prefix handling
+test('override key with ./ matches config without ./', async () => {
+  // Config has: ${file(env.yml)} (no ./)
+  // Override key: ./env.yml
+  const result = await configorama(configFile, {
+    filePathOverrides: {
+      './env.yml': './env-override.yml'
+    }
+  })
+
+  // envVarsNoDotSlash uses ${file(env.yml)} without ./
+  assert.equal(result.envVarsNoDotSlash.dbHost, 'production.db.example.com')
+})
+
+test('override key without ./ matches config with ./', async () => {
+  // Config has: ${file(./env.yml)} (with ./)
+  // Override key: env.yml (no ./)
+  const result = await configorama(configFile, {
+    filePathOverrides: {
+      'env.yml': './env-override.yml'
+    }
+  })
+
+  // envVars uses ${file(./env.yml)} with ./
+  assert.equal(result.envVars.dbHost, 'production.db.example.com')
+  // envVarsNoDotSlash uses ${file(env.yml)} without ./
+  assert.equal(result.envVarsNoDotSlash.dbHost, 'production.db.example.com')
+})
+
 test.run()

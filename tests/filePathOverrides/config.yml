@@ -4,3 +4,6 @@ specificKey: ${file(./env.yml):dbHost}
 
 # Text file reference
 readmeContent: ${text(./readme.txt)}
+
+# Without ./ prefix
+envVarsNoDotSlash: ${file(env.yml)}
