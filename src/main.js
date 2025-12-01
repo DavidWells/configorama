@@ -549,13 +549,12 @@ class Configorama {
 
     // If we have a file path but no config yet, parse it now
     if (this.configFilePath && !this.config) {
-      let configObject = await parseFileContents(
-        this.originalString,
-        this.configFileType,
-        this.configFilePath,
-        this.variableSyntax,
-        this.opts
-      )
+      let configObject = await parseFileContents({
+        contents: this.originalString,
+        filePath: this.configFilePath,
+        varRegex: this.variableSyntax,
+        dynamicArgs: this.opts.dynamicArgs
+      })
       this.configFileContents = ''
       if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
