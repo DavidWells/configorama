@@ -4,6 +4,10 @@
   "description": "Variable support for configuration files",
   "main": "src/index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./parse-file-contents": "./src/utils/parsing/parse.js"
+  },
   "files": [
     "cli.js",
     "src",

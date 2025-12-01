@@ -1,0 +1,6 @@
+name = "toml-config"
+version = 2
+
+[database]
+host = "localhost"
+port = 5432
