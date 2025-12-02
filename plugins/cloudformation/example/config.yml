@@ -1,0 +1,17 @@
+service: my-service
+
+provider:
+  stage: ${opt:stage, dev}
+  region: ${opt:region, us-east-1}
+
+  environment:
+    # Basic CF reference
+    RBAC_TABLE_ARN: ${cf:rbac-service-v2-${self:provider.stage}.RBACTableArn}
+
+    # Cross-region reference
+    # WEST_API_URL: ${cf(us-west-2):api-service-${self:provider.stage}.ApiUrl}
+
+custom:
+  # Multiple outputs from same stack
+  database:
+    arn: ${cf(us-east-1):rbac-service-v2-${self:provider.stage}.RBACTableArn}

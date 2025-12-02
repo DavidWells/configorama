@@ -39,13 +39,12 @@ function createCloudFormationResolver(options = {}) {
 
     // Lazy load AWS SDK
     const { CloudFormationClient } = await import('@aws-sdk/client-cloudformation')
+    const { fromNodeProviderChain } = await import('@aws-sdk/credential-providers')
 
     const clientConfig = {
       region,
+      credentials: credentials || fromNodeProviderChain(),
       ...clientOptions
-    }
-    if (credentials) {
-      clientConfig.credentials = credentials
     }
 
     const client = new CloudFormationClient(clientConfig)
@@ -71,7 +70,19 @@ function createCloudFormationResolver(options = {}) {
 
     const command = new DescribeStacksCommand({ StackName: stackName })
 
-    const response = await client.send(command)
+    let response
+    try {
+      response = await client.send(command)
+    } catch (err) {
+      const code = err.Code || err.name
+      const messages = {
+        ExpiredToken: `AWS credentials expired. Refresh your credentials and try again.`,
+        AccessDenied: `Access denied to CloudFormation stack "${stackName}" in ${region}. Check IAM permissions.`,
+        ValidationError: `Stack "${stackName}" not found in ${region}.`,
+        CredentialsProviderError: `No AWS credentials found. Configure credentials via environment, ~/.aws/credentials, or pass explicitly.`,
+      }
+      throw new Error(messages[code] || `CloudFormation error: ${err.message}`)
+    }
 
     if (!response.Stacks || response.Stacks.length === 0) {
       throw new Error(`CloudFormation stack "${stackName}" not found in region "${region}"`)
@@ -154,6 +165,16 @@ function createCloudFormationResolver(options = {}) {
       cfReferences.length = 0
     }
   }
+}
+
+if (require.main === module) {
+  const instance = createCloudFormationResolver()
+  instance.resolver(
+    'cf:rbac-service-v2-dev.RBACTableArn',
+    {}, // opts
+    {}, // currentObject
+    { originalSource: '${cf:rbac-service-v2-dev.RBACTableArn}', path: ['provider', 'rbacTableArn'] }
+  ).then(console.log).catch(console.error)
 }
 
 module.exports = createCloudFormationResolver
