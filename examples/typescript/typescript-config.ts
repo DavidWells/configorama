@@ -19,6 +19,7 @@ interface ConfigObject {
     enableNewFeature: boolean;
     debugMode: boolean;
   };
+  timestamp: number;
 }
 
 function createConfig(): ConfigObject {
@@ -38,8 +39,9 @@ function createConfig(): ConfigObject {
     features: {
       enableNewFeature: ('${opt:stage}' as any) === 'production',
       debugMode: ('${env:DEBUG, "false"}' as any) === 'true'
-    }
+    },
+    timestamp: Date.now()
   }
 }
 
-export = createConfig
+export default createConfig

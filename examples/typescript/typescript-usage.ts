@@ -1,5 +1,5 @@
 // TypeScript usage example for configorama variable validation
-import type { DeepResolved, VariableToken, ObjectPaths } from '../src/types'
+import type { DeepResolved, VariableToken, ObjectPaths } from '../../src/types'
 
 // Define your configuration interface
 interface DatabaseConfig {

@@ -229,8 +229,14 @@ ${JSON.stringify(options.context, null, 2)}`,
     try {
       const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
       let returnValueFunction = tsFile.config || tsFile.default || tsFile
-      if (moduleName) {
+      // For default export functions with :property syntax, keep the function and use deep properties
+      // For named exports (non-function module), look up the named export
+      let includeFirstProperty = false
+      if (moduleName && typeof returnValueFunction !== 'function') {
         returnValueFunction = tsFile[moduleName]
+      } else if (moduleName && typeof returnValueFunction === 'function') {
+        // Default export function with property access - include first property in path
+        includeFirstProperty = true
       }
 
       return processExecutableFile({
@@ -242,7 +248,8 @@ ${JSON.stringify(options.context, null, 2)}`,
         matchedFileString,
         relativePath,
         fileType: 'TypeScript',
-        getDeeperValue: ctx.getDeeperValue
+        getDeeperValue: ctx.getDeeperValue,
+        includeFirstProperty
       })
     } catch (err) {
       return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
@@ -256,8 +263,14 @@ ${JSON.stringify(options.context, null, 2)}`,
     try {
       const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
       let returnValueFunction = esmFile.config || esmFile.default || esmFile
-      if (moduleName) {
+      // For default export functions with :property syntax, keep the function and use deep properties
+      // For named exports (non-function module), look up the named export
+      let includeFirstProperty = false
+      if (moduleName && typeof returnValueFunction !== 'function') {
         returnValueFunction = esmFile[moduleName]
+      } else if (moduleName && typeof returnValueFunction === 'function') {
+        // Default export function with property access - include first property in path
+        includeFirstProperty = true
       }
 
       return processExecutableFile({
@@ -269,7 +282,8 @@ ${JSON.stringify(options.context, null, 2)}`,
         matchedFileString,
         relativePath,
         fileType: 'ESM',
-        getDeeperValue: ctx.getDeeperValue
+        getDeeperValue: ctx.getDeeperValue,
+        includeFirstProperty
       })
     } catch (err) {
       return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
@@ -359,13 +373,21 @@ function parseModuleReference(variableString, matchedFileString) {
  * Extracts deep properties from variable string after file match
  * @param {string} variableString - The full variable string
  * @param {string} matchedFileString - The matched file path portion
+ * @param {boolean} [includeFirstProperty=false] - Include first property (for default exports)
  * @returns {string[]} Array of property keys to traverse
  */
-function extractDeepProperties(variableString, matchedFileString) {
+function extractDeepProperties(variableString, matchedFileString, includeFirstProperty = false) {
   const deepPropertiesStr = variableString.replace(matchedFileString, '')
+  if (!deepPropertiesStr || deepPropertiesStr === '') {
+    return []
+  }
   const deepProperties = deepPropertiesStr.slice(1).split('.')
-  deepProperties.splice(0, 1)
-  return deepProperties.map((prop) => trim(prop))
+  // For named exports, skip first property (it's the module name)
+  // For default exports, keep all properties
+  if (!includeFirstProperty) {
+    deepProperties.splice(0, 1)
+  }
+  return deepProperties.map((prop) => trim(prop)).filter(Boolean)
 }
 
 /**
@@ -380,6 +402,7 @@ function extractDeepProperties(variableString, matchedFileString) {
  * @param {string} params.relativePath - Relative file path for errors
  * @param {string} params.fileType - Type of file (javascript/TypeScript/ESM)
  * @param {Function} params.getDeeperValue - Function to resolve nested values
+ * @param {boolean} [params.includeFirstProperty=false] - Include first property in path (for default exports)
  * @returns {Promise<any>}
  */
 async function processExecutableFile({
@@ -391,7 +414,8 @@ async function processExecutableFile({
   matchedFileString,
   relativePath,
   fileType,
-  getDeeperValue
+  getDeeperValue,
+  includeFirstProperty = false
 }) {
   if (typeof returnValueFunction !== 'function') {
     const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
@@ -402,7 +426,7 @@ Check if your ${fileType} is exporting a function that returns a value.`
   const valueToPopulate = returnValueFunction.call(fileModule, valueForFunction, ...argsToPass)
 
   return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-    const deepProperties = extractDeepProperties(variableString, matchedFileString)
+    const deepProperties = extractDeepProperties(variableString, matchedFileString, includeFirstProperty)
     return getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
       if (typeof deepValueToPopulateResolved === 'undefined') {
         const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".

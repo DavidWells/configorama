@@ -2,14 +2,16 @@
 # JavaScript file references
 ########################
 # Import JavaScript async function
-jsAsyncValue: ${file(./_js-async1.js)}
+jsAsyncValue: ${file(./_async-javascript.js)}
+
 ########################
 # TypeScript file references
 ########################
 # Import TypeScript async function
-tsAsyncValue: ${file(./_ts-async1.ts)}
+tsAsyncValue: ${file(./_async-typescript.ts)}
+
 ########################
 # ESM file references
 ########################
 # Import ESM async function
-esmAsyncValue: ${file(./_esm-async1.mjs)}
+esmAsyncValue: ${file(./_async-esm-module.mjs)}

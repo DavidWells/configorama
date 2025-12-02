@@ -2,7 +2,7 @@ const path = require('path')
 
 const args = require('minimist')(process.argv.slice(2))
 const configorama = require('../src')
-const deepLog = require('../src/utils/deep-log')
+const deepLog = require('../src/utils/ui/deep-log')
 
 async function getConfig() {
   const settings = {

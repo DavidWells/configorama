@@ -46,6 +46,29 @@ export interface ConfigoramaResult<T = any> {
   resolutionHistory: any
 }
 
+/**
+ * Context passed to JS/TS/ESM config file functions
+ * Used when config files export a function: `export default function(ctx) { ... }`
+ */
+export interface ConfigContext<T = any> {
+  /** The original unresolved configuration object */
+  originalConfig: T
+  /** The current (partially resolved) configuration object */
+  config: T
+  /** Configorama options and settings */
+  opts: {
+    allowUnknownVariables: boolean
+    allowUndefinedValues: boolean
+    allowUnknownFileRefs: boolean
+    allowUnresolvedVariables: boolean
+    returnMetadata: boolean
+    returnPreResolvedVariableDetails: boolean
+    allowUnknownVars?: boolean
+    dynamicArgs?: any
+    options: Record<string, any>
+  }
+}
+
 /** Configorama async API - returns resolved config */
 declare function configorama<T = any>(
   configPathOrObject: string | object,
