@@ -2372,6 +2372,31 @@ class Configorama {
         }
       }
 
+      // If allowUnresolvedVariables and there are fallbacks, use the fallback
+      if (this.opts.allowUnresolvedVariables && splitVars.length > 1) {
+        const nextFallback = splitVars[1].trim()
+        const isStaticValue = /^['"].*['"]$/.test(nextFallback) || /^-?\d+(\.\d+)?$/.test(nextFallback)
+        if (isStaticValue) {
+          const staticValue = nextFallback.replace(/^['"]|['"]$/g, '').replace(/}$/, '')
+          return {
+            value: staticValue,
+            path: valueObject.path,
+            originalSource: valueObject.originalSource,
+            resolutionHistory: valueObject.resolutionHistory || [],
+          }
+        }
+        // Next fallback is another variable
+        const remainingFallbacks = '${' + splitVars.slice(1).join(', ').replace(/}$/, '') + '}'
+        return {
+          value: remainingFallbacks,
+          path: valueObject.path,
+          originalSource: valueObject.originalSource,
+          resolutionHistory: valueObject.resolutionHistory || [],
+          __internal_only_flag: true,
+          caller: 'allowUnresolvedVariables-fallback',
+        }
+      }
+
       const currentPath = valueObject.path.join('.')
 
       const errorMessage = `
@@ -2809,6 +2834,16 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           if (this.opts.allowUnresolvedVariables) {
+            // Check if outer expression has fallbacks we can use
+            // valueCount[0] is the primary var, valueCount[1+] are fallbacks
+            if (valueCount.length > 1) {
+              const primaryVar = valueCount[0]
+              // If the unresolvable variableString is used INSIDE the primary var,
+              // return undefined to trigger the outer fallback mechanism
+              if (primaryVar.includes(variableString)) {
+                return Promise.resolve(undefined)
+              }
+            }
             // Encode unresolved variable to pass through resolution
             return Promise.resolve(encodeUnknown(propertyString))
           }

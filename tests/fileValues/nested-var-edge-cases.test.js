@@ -432,12 +432,110 @@ test('graceful handling of missing nested file with fallback', async () => {
 test('graceful handling of missing nested file with fallback missing ${self:stage}', async () => {
   const config = await configorama({
     value: '${file(./config.${self:stage}.json):KEY, "gracefulFallback"}'
-  }, { 
-    options: {}, 
-    allowUnresolvedVariables: true 
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
   })
 
   assert.equal(config.value, 'gracefulFallback')
+})
+
+// ============================================
+// allowUnresolvedVariables fallback variations
+// ============================================
+
+test('allowUnresolvedVariables - missing opt: inner var uses fallback', async () => {
+  const config = await configorama({
+    value: '${file(./config.${opt:stage}.json):KEY, "optFallback"}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'optFallback')
+})
+
+test('allowUnresolvedVariables - missing env: inner var uses fallback', async () => {
+  const config = await configorama({
+    value: '${file(./config.${env:MISSING_ENV_VAR_12345}.json):KEY, "envFallback"}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'envFallback')
+})
+
+test('allowUnresolvedVariables - multiple missing inner vars uses fallback', async () => {
+  const config = await configorama({
+    value: '${file(./config.${self:stage}.${self:region}.json):KEY, "multiFallback"}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'multiFallback')
+})
+
+// NOTE: Variable fallbacks with allowUnresolvedVariables require the fallback var to exist
+// This test verifies that a resolvable variable fallback works when stage IS defined
+test('allowUnresolvedVariables - fallback is a variable (stage defined, file missing)', async () => {
+  const config = await configorama({
+    stage: 'nonexistent',
+    backup: 'backupValue',
+    value: '${file(./config.${self:stage}.json):KEY, ${self:backup}}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'backupValue')
+})
+
+// Fallback chain: first static fallback is used when inner var unresolved
+test('allowUnresolvedVariables - fallback chain uses first static value', async () => {
+  const config = await configorama({
+    value: '${file(./config.${self:stage}.json):KEY, "firstFallback", "secondFallback"}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'firstFallback')
+})
+
+test('allowUnresolvedVariables - no fallback passes through', async () => {
+  const config = await configorama({
+    value: '${file(./config.${self:stage}.json):KEY}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  // No fallback - should pass through the unresolved expression
+  assert.ok(config.value.includes('self:stage') || config.value.includes('file('))
+})
+
+test('allowUnresolvedVariables - numeric fallback', async () => {
+  const config = await configorama({
+    value: '${file(./config.${self:stage}.json):KEY, 42}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 42)
+})
+
+test('allowUnresolvedVariables - self ref in file path with opt fallback', async () => {
+  const config = await configorama({
+    value: '${file(./env.${opt:env}.yml):KEY, "defaultEnv"}'
+  }, {
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'defaultEnv')
 })
 
 test.run()
