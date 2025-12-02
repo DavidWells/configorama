@@ -34,6 +34,7 @@ async function executeTypeScriptFile(filePath, opts = {}) {
   let tsFile
   if (useTsx) {
     // Use tsx for modern, fast TypeScript execution
+    // @ts-ignore - tsx doesn't have type declarations
     const { register } = require('tsx/cjs/api')
     const restore = register()
     try {
@@ -46,6 +47,7 @@ async function executeTypeScriptFile(filePath, opts = {}) {
   } else {
     // Fallback to ts-node
     try {
+      // @ts-ignore - ts-node is optional peer dependency
       require('ts-node/register')
       tsFile = require(filePath)
     } catch (err) {
@@ -109,6 +111,7 @@ function executeTypeScriptFileSync(filePath, opts = {}) {
   let tsFile
   if (useTsx) {
     // Use tsx for modern, fast TypeScript execution
+    // @ts-ignore - tsx doesn't have type declarations
     const { register } = require('tsx/cjs/api')
     const restore = register()
     try {
@@ -121,6 +124,7 @@ function executeTypeScriptFileSync(filePath, opts = {}) {
   } else {
     // Fallback to ts-node
     try {
+      // @ts-ignore - ts-node is optional peer dependency
       require('ts-node/register')
       tsFile = require(filePath)
     } catch (err) {

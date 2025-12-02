@@ -11,7 +11,8 @@ coverage
 repomix-output.xml
 # node sdk
 vendor
-
+tests/_fixtures/serverless.yml
+metadata-*.*.json
 # osx
 .DS_STORE
 .vscode

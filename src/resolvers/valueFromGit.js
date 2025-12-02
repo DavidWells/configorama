@@ -10,13 +10,19 @@ const { findProjectRoot } = require('../utils/paths/findProjectRoot')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
 
+/**
+ * Execute a shell command
+ * @param {string} cmd - Command to execute
+ * @param {import('child_process').ExecOptions} [options] - Exec options
+ * @returns {Promise<string>}
+ */
 async function _exec(cmd, options = { timeout: 1000 }) {
   return new Promise((resolve, reject) => {
     childProcess.exec(cmd, options, (err, stdout) => {
       if (err) {
         return reject(err)
       }
-      return resolve(stdout.trim())
+      return resolve(String(stdout).trim())
     })
   })
 }
@@ -213,8 +219,10 @@ const cache = new Map()
 
 /**
  * Gets the last Git commit timestamp for a file
- * @param {string} file - Path to the file to check
- * @returns {Promise<Date|undefined>} The commit timestamp or undefined if not in Git
+ * @param {string} _file - Path to the file to check
+ * @param {string} cwd - Working directory
+ * @param {boolean} [throwOnMissing] - Whether to throw on missing file
+ * @returns {Promise<string|undefined>} The commit timestamp ISO string or undefined if not in Git
  */
 async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
   // Validate file path to prevent command injection

@@ -31,12 +31,12 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
 
   if (fileType.match(/\.(yml|yaml)/i)) {
     try {
-      const ymlText = YAML.preProcess(contents, regex)
+      const ymlText = YAML.preProcess(contents)
       configObject = YAML.parse(ymlText)
     } catch (err) {
       // Attempt to fix cloudformation refs
       if (err.message.match(/YAMLException/)) {
-        const ymlText = YAML.preProcess(contents, regex)
+        const ymlText = YAML.preProcess(contents)
         const result = YAML.load(ymlText, {
           filename: filePath,
           schema: cloudFormationSchema.schema,

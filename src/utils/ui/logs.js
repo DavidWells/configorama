@@ -2,10 +2,10 @@ const { makeHeader, logHeader : logHeaderBox } = require('@davidwells/box-logger
 
 function logHeader(message) {
   logHeaderBox({
-    content: message, 
-    rightBorder: true, 
-    minWidth: 80, 
-    textStyle: 'bold',
+    content: message,
+    borderRight: true,
+    minWidth: 80,
+    fontStyle: 'bold',
     borderStyle: 'bold',
     borderColor: 'cyanBright',
   })

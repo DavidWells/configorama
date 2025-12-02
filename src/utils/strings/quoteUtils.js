@@ -43,8 +43,8 @@ function endChar(str, char) {
 /**
  * Ensures a value (string or array of strings) has quotes around it
  * @param {string|string[]} value - The value to quote
- * @param {string} open - Opening quote character (default: '"')
- * @param {string} close - Closing quote character (default: same as open)
+ * @param {string} [open] - Opening quote character (default: '"')
+ * @param {string} [close] - Closing quote character (default: same as open)
  * @returns {string|string[]} The quoted value(s)
  */
 function ensureQuote(value, open = '"', close) {

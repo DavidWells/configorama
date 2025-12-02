@@ -375,11 +375,13 @@ class Configorama {
     }
 
     /* attach self matcher last */
-    this.variableTypes = this.variableTypes.concat(fallThroughSelfMatcher)
+    this.variableTypes = this.variableTypes.concat(/** @type {any} */ (fallThroughSelfMatcher))
 
     // const variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
     const variablesKnownTypes = combineRegexes(
-      this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match)
+      /** @type {RegExp[]} */ (this.variableTypes
+        .filter((v) => v.type !== 'string' && v.match instanceof RegExp)
+        .map((v) => v.match))
     )
     this.variablesKnownTypes = variablesKnownTypes
 
@@ -547,7 +549,7 @@ class Configorama {
    * Populate all variables in the service, conveniently remove and restore the service attributes
    * that confuse the population methods.
    * @param cliOpts An options hive to use for ${opt:...} variables.
-   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
+   * @returns {Promise<any>} A promise resolving to the populated service.
    */
   async init(cliOpts) {
     this.options = cliOpts || {}
@@ -644,7 +646,7 @@ class Configorama {
         if (varTypes.length) {
           const exclude = ['dot.prop', 'deep']
           console.log('\nAllowed variable types:')
-          varTypes.filter((v) => v.type !== 'dot.prop').forEach((v) => {
+          varTypes.forEach((v) => {
             const vData = this.variableTypes[v]
             if (exclude.includes(vData.type)) {
               return
@@ -1244,8 +1246,8 @@ class Configorama {
         .then(() => {
           // console.log('this.config', this.config)
           /* Final post-processing here */
-          if (this.mergeKeys && this.config) {
-            this.config = mergeByKeys(this.config, '', this.mergeKeys)
+          if (this.opts.mergeKeys && this.config) {
+            this.config = mergeByKeys(this.config, '', this.opts.mergeKeys)
           }
           if (VERBOSE) {
             logHeader('Resolved Configuration value')
@@ -1409,6 +1411,7 @@ class Configorama {
         })
 
         const varData = {
+          filters: foundFilters.length > 0 ? foundFilters : undefined,
           path: configValuePath,
           key: itemKey,
           originalStringValue: rawValue,
@@ -1416,10 +1419,12 @@ class Configorama {
           variableWithFilters: originalSrc,
           isRequired: false,
           defaultValue: undefined,
+          defaultValueIsVar: undefined,
+          defaultValueSrc: undefined,
+          hasFallback: false,
           matchIndex: matchCount++,
           resolveOrder: [],
           resolveDetails: cleanedResolveDetails,
-          ...(foundFilters.length > 0 && { filters: foundFilters }),
         }
         let defaultValueIsVar = false
 
@@ -1691,7 +1696,7 @@ class Configorama {
   /**
    * Populate the variables in the given object.
    * @param objectToPopulate The object to populate variables within.
-   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
+   * @returns {Promise<any>} A promise resolving to the in-place populated object.
    */
   populateObject(objectToPopulate) {
     return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
@@ -1741,7 +1746,7 @@ class Configorama {
    * ]
    * @typedef {Object} TerminalProperty
    * @property {String[]} path The path to the terminal property
-   * @property {Date|RegEx|String} The value of the terminal property
+   * @property {Date|RegExp|String} value The value of the terminal property
    */
   /**
    * Generate an array of objects noting the terminal properties of the given root object and their
@@ -1857,8 +1862,7 @@ class Configorama {
    * Assign the populated values back to the target object
    * @param target The object to which the given populated terminal properties should be applied
    * @param populations The fully populated terminal properties
-   * @returns {Promise<number>} resolving with the number of changes that were applied to the given
-   * target
+   * @returns {Promise<void>} resolving when changes have been applied to the given target
    */
   assignProperties(target, populations) {
     // eslint-disable-line class-methods-use-this
@@ -2098,7 +2102,7 @@ class Configorama {
    * @param valueObject The value to populate variables within
    * @param root Whether the caller is the root populater and thereby whether to recursively
    * populate
-   * @returns {PromiseLike<T>} A promise that resolves to the populated value, recursively if root
+   * @returns {Promise<any>} A promise that resolves to the populated value, recursively if root
    * is true
    */
   populateValue(valueObject, root, caller) {
@@ -2181,11 +2185,14 @@ class Configorama {
   /**
    * Populate a given property, given the matched string to replace and the value to replace the
    * matched string with.
-   * @param valueObject.value The property to replace the matched string with the value.
+   * @param {object} valueObject The value object containing the property to populate
+   * @param {any} valueObject.value The property to replace the matched string with the value.
+   * @param {string[]} [valueObject.path] The path to the value in the config.
+   * @param {string} [valueObject.originalSource] The original source string.
+   * @param {Array} [valueObject.resolutionHistory] History of resolution steps.
    * @param matchedString The string in the given property that was matched and is to be replaced.
    * @param valueToPopulate The value to replace the given matched string in the property with.
-   * @returns {Promise.<TResult>|*} A promise resolving to the property populated with the given
-   *  value for all instances of the given matched string.
+   * @returns {{value: any, path?: string[], originalSource?: string, resolutionHistory?: Array, __internal_only_flag?: boolean, caller?: string, count?: number}} The populated property object
    */
   populateVariable(valueObject, matchedString, valueToPopulate) {
     let property = valueObject.value
@@ -2389,11 +2396,10 @@ class Configorama {
         const isQuotedString = /^['"].*['"]$/.test(nextFallbackClean)
         const isNumeric = /^-?\d+(\.\d+)?$/.test(nextFallbackClean)
         if (isQuotedString || isNumeric) {
-          let staticValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
+          const strValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
           // Convert to number if it's a numeric fallback
-          if (isNumeric) {
-            staticValue = Number(staticValue)
-          }
+          /** @type {string|number} */
+          const staticValue = isNumeric ? Number(strValue) : strValue
           return {
             value: staticValue,
             path: valueObject.path,
@@ -2573,8 +2579,10 @@ Missing Value ${missingValue} - ${matchedString}
   /**
    * Resolve the given variable string that expresses a series of fallback values in case the
    * initial values are not valid, resolving each variable and resolving to the first valid value.
-   * @param variableStringsString The overwrite string of variables to populate and choose from.
-   * @returns {Promise.<TResult>|*} A promise resolving to the first validly populating variable
+   * @param variableStrings The overwrite string of variables to populate and choose from.
+   * @param valueObject The value object
+   * @param originalVar The original variable string
+   * @returns {Promise<any>} A promise resolving to the first validly populating variable
    *  in the given variable strings string.
    */
   overwrite(variableStrings, valueObject, originalVar) {
@@ -2650,7 +2658,10 @@ Missing Value ${missingValue} - ${matchedString}
   /**
    * Given any variable string, return the value it should be populated with.
    * @param variableString The variable string to retrieve a value for.
-   * @returns {Promise.<TResult>|*} A promise resolving to the given variables value.
+   * @param valueObject The value object
+   * @param caller The caller name
+   * @param originalVar The original variable string
+   * @returns {Promise<any>} A promise resolving to the given variables value.
    */
   getValueFromSource(variableString, valueObject, caller, originalVar) {
     // console.log('getValueFromSrc caller', caller)
@@ -2749,6 +2760,7 @@ Missing Value ${missingValue} - ${matchedString}
       variableString = trim(t[0])
     }
 
+    /** @type {Function|undefined} */
     let resolverFunction
     let resolverType
     /* Loop over variables and set getterFunction when match found. */

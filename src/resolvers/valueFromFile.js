@@ -137,9 +137,8 @@ async function getValueFromFile(ctx, variableString, options) {
 
   ctx.fileRefsFound.push(fileRefEntry)
 
-  let fileExtension = resolvedPath.split('.')
-
-  fileExtension = fileExtension[fileExtension.length - 1].toLowerCase()
+  const fileExtParts = resolvedPath.split('.')
+  const fileExtension = fileExtParts[fileExtParts.length - 1].toLowerCase()
 
   // Validate file exists
   if (!exists) {
@@ -168,14 +167,14 @@ async function getValueFromFile(ctx, variableString, options) {
       const errorMsg = makeBox({
         title: `File Not Found in ${originalVar}`,
         minWidth: '100%',
-        text: `Variable ${variableString} cannot resolve due to missing file.
+        content: `Variable ${variableString} cannot resolve due to missing file.
 
 File not found ${fullFilePath}
 
 Default fallback value will be used if provided.
 
 ${JSON.stringify(options.context, null, 2)}`,
-  })
+      })
       console.log(errorMsg)
     }
     // TODO maybe reject. YAML does not allow for null/undefined values
@@ -295,15 +294,15 @@ ${JSON.stringify(options.context, null, 2)}`,
       }
       // console.log('deep', variableString)
       // console.log('matchedFileString', matchedFileString)
-      let deepProperties = variableString.replace(matchedFileString, '')
+      const deepPropertiesStr = variableString.replace(matchedFileString, '')
       // Support both : and . as the separator for sub properties
-      const firstChar = deepProperties.substring(0, 1)
+      const firstChar = deepPropertiesStr.substring(0, 1)
       if (firstChar !== ':' && firstChar !== '.') {
         const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" or "." to reference sub properties. ${deepProperties}`
+Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
         return Promise.reject(new Error(errorMessage))
       }
-      deepProperties = deepProperties.slice(1).split('.')
+      const deepProperties = deepPropertiesStr.slice(1).split('.')
       return ctx.getDeeperValue(deepProperties, valueToPopulate)
     }
 
@@ -363,8 +362,8 @@ function parseModuleReference(variableString, matchedFileString) {
  * @returns {string[]} Array of property keys to traverse
  */
 function extractDeepProperties(variableString, matchedFileString) {
-  let deepProperties = variableString.replace(matchedFileString, '')
-  deepProperties = deepProperties.slice(1).split('.')
+  const deepPropertiesStr = variableString.replace(matchedFileString, '')
+  const deepProperties = deepPropertiesStr.slice(1).split('.')
   deepProperties.splice(0, 1)
   return deepProperties.map((prop) => trim(prop))
 }

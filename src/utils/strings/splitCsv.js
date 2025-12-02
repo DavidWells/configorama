@@ -5,7 +5,7 @@ const { splitByComma } = require('./splitByComma')
  * NOTE: This is a simpler version that delegates to splitByComma for consistency.
  * For advanced use cases with bracket depth tracking and regex protection, use splitByComma directly.
  * @param {string} str - String to split
- * @param {string} splitter - Optional custom splitter (defaults to ',')
+ * @param {string} [splitter] - Optional custom splitter (defaults to ',')
  * @returns {string[]} Array of split strings
  */
 function splitCsv(str, splitter) {

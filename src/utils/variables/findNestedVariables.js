@@ -338,10 +338,10 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
 
   // Replace the `__REPLACED_${iteration - 1}__` with the original match
   matches = matches.map((match, index) => {
-    const indexOfReplaced = match.varMatch.match(/__REPLACED_(\d+)__/)
+    const indexOfReplaced = match.fullMatch.match(/__REPLACED_(\d+)__/)
     if (indexOfReplaced) {
       const replacedIndex = parseInt(indexOfReplaced[1])
-      match.varMatch = match.varMatch.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
+      match.fullMatch = match.fullMatch.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
       match.variable = match.variable.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
     }
     return match
