@@ -1,10 +1,14 @@
 {
-  "name": "@configorama/plugin-cloudformation",
+  "name": "configorama-cloudformation",
   "version": "0.1.0",
   "description": "CloudFormation variable source plugin for configorama",
   "main": "index.js",
   "scripts": {
-    "test": "node index.test.js"
+    "test": "node index.test.js",
+    "publish": "git push origin && git push origin --tags",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish"
   },
   "keywords": ["configorama", "cloudformation", "aws", "serverless"],
   "license": "MIT",
