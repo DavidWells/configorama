@@ -2,6 +2,7 @@ foo: bar
 baz: 
   qux: quux
 
+fun: ${foo}
 ########################
 # JavaScript file references
 ########################

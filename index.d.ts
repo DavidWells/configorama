@@ -55,19 +55,8 @@ export interface ConfigContext<T = any> {
   originalConfig: T
   /** The current (partially resolved) configuration object */
   currentConfig: T
-  /** Configorama settings */
-  settings: {
-    allowUnknownVariables: boolean
-    allowUndefinedValues: boolean
-    allowUnknownFileRefs: boolean
-    allowUnresolvedVariables: boolean
-    returnMetadata: boolean
-    returnPreResolvedVariableDetails: boolean
-    allowUnknownVars?: boolean
-    dynamicArgs?: any
-    /** CLI options/flags passed to configorama */
-    options: Record<string, any>
-  }
+  /** Options passed to configorama (populates ${opt:xyz} variables) */
+  options: Record<string, any>
 }
 
 /** Configorama async API - returns resolved config */

@@ -16,6 +16,29 @@ const INI = require('../parsers/ini')
 const JSON5 = require('../parsers/json5')
 
 /**
+ * Recursively clean encoded JSON from an object
+ * @param {*} obj - Object to clean
+ * @returns {*} Cleaned object
+ */
+function cleanEncodedJson(obj) {
+  if (!obj) return obj
+  if (typeof obj === 'string') {
+    return decodeJsonInVariable(obj)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanEncodedJson)
+  }
+  if (typeof obj === 'object') {
+    const cleaned = {}
+    for (const key of Object.keys(obj)) {
+      cleaned[key] = cleanEncodedJson(obj[key])
+    }
+    return cleaned
+  }
+  return obj
+}
+
+/**
  * Parse file contents based on file extension
  * @param {string} content - Raw file contents
  * @param {string} filePath - File path (used to determine extension)
@@ -207,11 +230,17 @@ ${JSON.stringify(options.context, null, 2)}`,
     return Promise.resolve(valueToPopulate)
   }
 
+  // Clean encoded JSON from currentConfig for cleaner context
+  const cleanedCurrentConfig = cleanEncodedJson(ctx.config)
+
   // Build context for executable files
   const valueForFunction = {
+    options: ctx.opts.options || {},
     originalConfig: ctx.originalConfig,
-    currentConfig: ctx.config,
-    settings: ctx.opts,
+    currentConfig: cleanedCurrentConfig,
+    argsToPass,
+    // maybe helper fns
+    // maybe the lib instance itself for nested lookups
   }
 
   // Process JS files
