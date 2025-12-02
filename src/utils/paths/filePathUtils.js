@@ -34,20 +34,44 @@ function normalizePath(filePath) {
 }
 
 /**
- * Extract file path from a file() or text() variable string
+ * Extract file path from a file() or text() variable string using balanced paren matching
  * @param {string} variableString - The variable string (with or without ${} wrapper)
  * @returns {object|null} Object with filePath, or null if no match
  */
 function extractFilePath(variableString) {
-  // Match both ${file(...)} and file(...) formats
-  const fileMatch = variableString.match(/^(?:\$\{)?(?:file|text)\((.*?)\)/)
-  if (!fileMatch || !fileMatch[1]) {
+  // Match the file( or text( prefix
+  const prefixMatch = variableString.match(/^(?:\$\{)?(file|text)\(/)
+  if (!prefixMatch) {
+    return null
+  }
+
+  // Find matching closing paren using depth tracking
+  const startIndex = prefixMatch[0].length - 1 // Position of opening (
+  let depth = 1
+  let i = startIndex + 1
+
+  while (i < variableString.length && depth > 0) {
+    if (variableString[i] === '(') {
+      depth++
+    } else if (variableString[i] === ')') {
+      depth--
+    }
+    i++
+  }
+
+  if (depth !== 0) {
+    return null
+  }
+
+  // Extract content between balanced parens
+  const fileContent = variableString.substring(startIndex + 1, i - 1).trim()
+  if (!fileContent) {
     return null
   }
 
   const { trimSurroundingQuotes } = require('../strings/quoteUtils')
-  const fileContent = fileMatch[1].trim()
-  const parts = splitCsv(fileContent)
+  // Protect ${} variables from being split (e.g., file paths with default values)
+  const parts = splitCsv(fileContent, undefined, { protectVariables: true })
   let filePath = parts[0].trim()
 
   // Remove quotes if present

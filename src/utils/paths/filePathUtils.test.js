@@ -103,6 +103,22 @@ test('extractFilePath - handles bare filename', () => {
   assert.is(result.filePath, 'config.json')
 })
 
+test('extractFilePath - handles nested variable with default value in path', () => {
+  // This is the bug case: ${self:provider.stage, 'dev'} has a comma inside
+  const result = extractFilePath("file(./env.${self:provider.stage, 'dev'}.yml):FOO")
+  assert.is(result.filePath, "./env.${self:provider.stage, 'dev'}.yml")
+})
+
+test('extractFilePath - handles nested variable without default in path', () => {
+  const result = extractFilePath("file(./env.${self:provider.stage}.yml):FOO")
+  assert.is(result.filePath, "./env.${self:provider.stage}.yml")
+})
+
+test('extractFilePath - handles multiple nested variables in path', () => {
+  const result = extractFilePath("file(./config-${self:stage, 'dev'}-${self:region}.yml)")
+  assert.is(result.filePath, "./config-${self:stage, 'dev'}-${self:region}.yml")
+})
+
 // normalizeFileVariable tests
 
 test('normalizeFileVariable - returns non-file strings unchanged', () => {
