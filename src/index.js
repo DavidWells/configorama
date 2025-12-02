@@ -42,6 +42,20 @@ module.exports = async (configPathOrObject, settings = {}) => {
       instance.variableTypes
     )
 
+    // Collect custom metadata from variable sources that have collectMetadata
+    if (settings.variableSources && Array.isArray(settings.variableSources)) {
+      for (const source of settings.variableSources) {
+        if (typeof source.collectMetadata === 'function') {
+          const customData = source.collectMetadata()
+          if (customData !== undefined && customData !== null) {
+            // Use source.metadataKey if specified, otherwise default to `${type}References`
+            const metadataKey = source.metadataKey || `${source.type}References`
+            enrichedMetadata[metadataKey] = customData
+          }
+        }
+      }
+    }
+
     return {
       variableSyntax: instance.variableSyntax,
       variableTypes: instance.variableTypes,

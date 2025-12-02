@@ -1,0 +1,14 @@
+{
+  "name": "@configorama/plugin-cloudformation",
+  "version": "0.1.0",
+  "description": "CloudFormation variable source plugin for configorama",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.test.js"
+  },
+  "keywords": ["configorama", "cloudformation", "aws", "serverless"],
+  "license": "MIT",
+  "peerDependencies": {
+    "@aws-sdk/client-cloudformation": "^3.0.0"
+  }
+}
