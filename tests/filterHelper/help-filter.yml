@@ -12,6 +12,9 @@ allowedValues:
 # Basic help filter - should act as identity function
 apiKey: ${env:API_KEY | String | help('The Stripe Live Secret Key')}
 
+# Basic help filter - should act as identity function
+apiKeyTwo: ${env:API_KEY_TWO, "fallback-value" | String | help('The Stripe Live Secret Key')}
+
 # With default value
 dbPort: ${env:DB_PORT_TWO, 5432 | help('The Postgres Port')}
 

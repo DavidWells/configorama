@@ -44,6 +44,10 @@ test('help filter acts as identity - returns value unchanged', () => {
   assert.is(config.apiKey, 'secret-key-123')
 })
 
+test('help filter with fallback value', () => {
+  assert.is(config.apiKeyTwo, 'fallback-value')
+})
+
 test('help filter with env value', () => {
   // dbPort has no Number filter, so it stays as string from env
   assert.is(config.dbPort, '9999')
