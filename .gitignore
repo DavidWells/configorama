@@ -3,14 +3,23 @@
 /.nyc_output
 /dist
 /tmp
+/types
 node_modules
+
+# Stray generated .d.ts files (should only be in /types)
+/parsers
+/resolvers
+/functions
+/utils
+/main.d.ts
 misc
 coverage
 .netlify
 repomix-output.xml
 # node sdk
 vendor
-
+tests/_fixtures/serverless.yml
+metadata-*.*.json
 # osx
 .DS_STORE
 .vscode

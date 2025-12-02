@@ -7,7 +7,7 @@ const { splitCsv } = require('../utils/strings/splitCsv')
 const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { makeBox } = require('@davidwells/box-logger')
-const { encodeJsSyntax } = require('../utils/encoders/js-fixes')
+const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 
 /* File Parsers */
 const YAML = require('../parsers/yaml')
@@ -86,6 +86,17 @@ async function getValueFromFile(ctx, variableString, options) {
       matchedFileString = argsFound[0]
       argsToPass = argsFound.filter((arg, i) => {
         return i !== 0
+      }).map((arg) => {
+        // Decode base64-encoded JSON objects passed as args
+        if (hasEncodedJson(arg)) {
+          const decoded = decodeJsonInVariable(arg)
+          try {
+            return JSON.parse(decoded)
+          } catch (e) {
+            return decoded
+          }
+        }
+        return arg
       })
     }
   }
@@ -137,9 +148,8 @@ async function getValueFromFile(ctx, variableString, options) {
 
   ctx.fileRefsFound.push(fileRefEntry)
 
-  let fileExtension = resolvedPath.split('.')
-
-  fileExtension = fileExtension[fileExtension.length - 1].toLowerCase()
+  const fileExtParts = resolvedPath.split('.')
+  const fileExtension = fileExtParts[fileExtParts.length - 1].toLowerCase()
 
   // Validate file exists
   if (!exists) {
@@ -168,14 +178,14 @@ async function getValueFromFile(ctx, variableString, options) {
       const errorMsg = makeBox({
         title: `File Not Found in ${originalVar}`,
         minWidth: '100%',
-        text: `Variable ${variableString} cannot resolve due to missing file.
+        content: `Variable ${variableString} cannot resolve due to missing file.
 
 File not found ${fullFilePath}
 
 Default fallback value will be used if provided.
 
 ${JSON.stringify(options.context, null, 2)}`,
-  })
+      })
       console.log(errorMsg)
     }
     // TODO maybe reject. YAML does not allow for null/undefined values
@@ -200,8 +210,8 @@ ${JSON.stringify(options.context, null, 2)}`,
   // Build context for executable files
   const valueForFunction = {
     originalConfig: ctx.originalConfig,
-    config: ctx.config,
-    opts: ctx.opts,
+    currentConfig: ctx.config,
+    settings: ctx.opts,
   }
 
   // Process JS files
@@ -230,8 +240,14 @@ ${JSON.stringify(options.context, null, 2)}`,
     try {
       const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
       let returnValueFunction = tsFile.config || tsFile.default || tsFile
-      if (moduleName) {
+      // For default export functions with :property syntax, keep the function and use deep properties
+      // For named exports (non-function module), look up the named export
+      let includeFirstProperty = false
+      if (moduleName && typeof returnValueFunction !== 'function') {
         returnValueFunction = tsFile[moduleName]
+      } else if (moduleName && typeof returnValueFunction === 'function') {
+        // Default export function with property access - include first property in path
+        includeFirstProperty = true
       }
 
       return processExecutableFile({
@@ -243,7 +259,8 @@ ${JSON.stringify(options.context, null, 2)}`,
         matchedFileString,
         relativePath,
         fileType: 'TypeScript',
-        getDeeperValue: ctx.getDeeperValue
+        getDeeperValue: ctx.getDeeperValue,
+        includeFirstProperty
       })
     } catch (err) {
       return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
@@ -257,8 +274,14 @@ ${JSON.stringify(options.context, null, 2)}`,
     try {
       const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
       let returnValueFunction = esmFile.config || esmFile.default || esmFile
-      if (moduleName) {
+      // For default export functions with :property syntax, keep the function and use deep properties
+      // For named exports (non-function module), look up the named export
+      let includeFirstProperty = false
+      if (moduleName && typeof returnValueFunction !== 'function') {
         returnValueFunction = esmFile[moduleName]
+      } else if (moduleName && typeof returnValueFunction === 'function') {
+        // Default export function with property access - include first property in path
+        includeFirstProperty = true
       }
 
       return processExecutableFile({
@@ -270,7 +293,8 @@ ${JSON.stringify(options.context, null, 2)}`,
         matchedFileString,
         relativePath,
         fileType: 'ESM',
-        getDeeperValue: ctx.getDeeperValue
+        getDeeperValue: ctx.getDeeperValue,
+        includeFirstProperty
       })
     } catch (err) {
       return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
@@ -295,15 +319,15 @@ ${JSON.stringify(options.context, null, 2)}`,
       }
       // console.log('deep', variableString)
       // console.log('matchedFileString', matchedFileString)
-      let deepProperties = variableString.replace(matchedFileString, '')
+      const deepPropertiesStr = variableString.replace(matchedFileString, '')
       // Support both : and . as the separator for sub properties
-      const firstChar = deepProperties.substring(0, 1)
+      const firstChar = deepPropertiesStr.substring(0, 1)
       if (firstChar !== ':' && firstChar !== '.') {
         const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" or "." to reference sub properties. ${deepProperties}`
+Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
         return Promise.reject(new Error(errorMessage))
       }
-      deepProperties = deepProperties.slice(1).split('.')
+      const deepProperties = deepPropertiesStr.slice(1).split('.')
       return ctx.getDeeperValue(deepProperties, valueToPopulate)
     }
 
@@ -360,13 +384,21 @@ function parseModuleReference(variableString, matchedFileString) {
  * Extracts deep properties from variable string after file match
  * @param {string} variableString - The full variable string
  * @param {string} matchedFileString - The matched file path portion
+ * @param {boolean} [includeFirstProperty=false] - Include first property (for default exports)
  * @returns {string[]} Array of property keys to traverse
  */
-function extractDeepProperties(variableString, matchedFileString) {
-  let deepProperties = variableString.replace(matchedFileString, '')
-  deepProperties = deepProperties.slice(1).split('.')
-  deepProperties.splice(0, 1)
-  return deepProperties.map((prop) => trim(prop))
+function extractDeepProperties(variableString, matchedFileString, includeFirstProperty = false) {
+  const deepPropertiesStr = variableString.replace(matchedFileString, '')
+  if (!deepPropertiesStr || deepPropertiesStr === '') {
+    return []
+  }
+  const deepProperties = deepPropertiesStr.slice(1).split('.')
+  // For named exports, skip first property (it's the module name)
+  // For default exports, keep all properties
+  if (!includeFirstProperty) {
+    deepProperties.splice(0, 1)
+  }
+  return deepProperties.map((prop) => trim(prop)).filter(Boolean)
 }
 
 /**
@@ -381,6 +413,7 @@ function extractDeepProperties(variableString, matchedFileString) {
  * @param {string} params.relativePath - Relative file path for errors
  * @param {string} params.fileType - Type of file (javascript/TypeScript/ESM)
  * @param {Function} params.getDeeperValue - Function to resolve nested values
+ * @param {boolean} [params.includeFirstProperty=false] - Include first property in path (for default exports)
  * @returns {Promise<any>}
  */
 async function processExecutableFile({
@@ -392,7 +425,8 @@ async function processExecutableFile({
   matchedFileString,
   relativePath,
   fileType,
-  getDeeperValue
+  getDeeperValue,
+  includeFirstProperty = false
 }) {
   if (typeof returnValueFunction !== 'function') {
     const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
@@ -400,10 +434,10 @@ Check if your ${fileType} is exporting a function that returns a value.`
     return Promise.reject(new Error(errorMessage))
   }
 
-  const valueToPopulate = returnValueFunction.call(fileModule, valueForFunction, ...argsToPass)
+  const valueToPopulate = returnValueFunction.call(fileModule, ...argsToPass, valueForFunction)
 
   return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-    const deepProperties = extractDeepProperties(variableString, matchedFileString)
+    const deepProperties = extractDeepProperties(variableString, matchedFileString, includeFirstProperty)
     return getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
       if (typeof deepValueToPopulateResolved === 'undefined') {
         const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".

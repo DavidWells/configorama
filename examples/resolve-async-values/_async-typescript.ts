@@ -1,7 +1,4 @@
-interface ConfigArgs {
-  secret?: string;
-  key?: string;
-}
+import type { ConfigContext } from '../../index'
 
 function delay(ms: number): Promise<string> {
   return new Promise((resolve) => {
@@ -10,8 +7,8 @@ function delay(ms: number): Promise<string> {
   })
 }
 
-async function fetchSecretsFromRemoteStore(config?: ConfigArgs): Promise<string> {
-  console.log('TypeScript async function called with:', config)
+async function fetchSecretsFromRemoteStore(ctx: ConfigContext): Promise<string> {
+  console.log('TypeScript async function called with:', ctx)
   await delay(200)
   return 'async-ts-value'
 }

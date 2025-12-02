@@ -184,6 +184,7 @@ configorama(inputFile, options)
       content: error.message,
       type: 'error',
     })
+    console.log('error', error)
     console.log(errorMsg)
     if (argv.debug) {
       console.error(error.stack)

@@ -21,4 +21,4 @@ async function fetchSecretsFromVault(): Promise<SecretStore> {
   }
 }
 
-export = fetchSecretsFromVault
+export default fetchSecretsFromVault

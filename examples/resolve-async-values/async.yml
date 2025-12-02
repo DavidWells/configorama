@@ -1,0 +1,21 @@
+foo: bar
+baz: 
+  qux: quux
+
+########################
+# JavaScript file references
+########################
+# Import JavaScript async function
+jsAsyncValue: ${file(./_async-javascript.js, ${self:foo}, ${self:baz})}
+
+# ########################
+# # TypeScript file references
+# ########################
+# # Import TypeScript async function
+# tsAsyncValue: ${file(./_async-typescript.ts)}
+
+# ########################
+# # ESM file references
+# ########################
+# # Import ESM async function
+# esmAsyncValue: ${file(./_async-esm-module.mjs)}

@@ -40,7 +40,7 @@ function getFullPath(fileString, cwd) {
  * @param {string} matchedFileString - The matched file string (e.g., "file(path/to/file.js)")
  * @param {RegExp} syntax - The regex pattern used to match the file string (e.g., fileRefSyntax or textRefSyntax)
  * @param {string} configPath - The base directory path for resolving relative paths
- * @returns {{fullFilePath: string|null, resolvedPath: string}} - Object containing the resolved full file path and the resolved path (after alias resolution)
+ * @returns {{fullFilePath: string, resolvedPath: string, relativePath: string}} - Object containing the resolved full file path, resolved path (after alias resolution), and relative path
  */
 function resolveFilePathFromMatch(matchedFileString, syntax, configPath) {
   const relativePath = trimSurroundingQuotes(

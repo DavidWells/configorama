@@ -27,7 +27,7 @@ const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
-const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
+const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable } = require('./utils/encoders/js-fixes')
 
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
@@ -106,8 +106,8 @@ const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
-const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
-const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
+const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const envRefSyntax = RegExp(/^env:/g)
@@ -132,7 +132,7 @@ class Configorama {
   
     const options = opts || {}
     // Set opts to pass into JS file calls
-    this.opts = Object.assign({}, {
+    this.settings = Object.assign({}, {
       // Allow for unknown variable syntax to pass through without throwing errors
       allowUnknownVariables: false,
       // Allow undefined to be an end result.
@@ -149,7 +149,7 @@ class Configorama {
 
     // Backward compat: allowUnknownVars -> allowUnknownVariables
     if (options.allowUnknownVars !== undefined && options.allowUnknownVariables === undefined) {
-      this.opts.allowUnknownVariables = options.allowUnknownVars
+      this.settings.allowUnknownVariables = options.allowUnknownVars
     }
 
     this.filterCache = {}
@@ -375,11 +375,13 @@ class Configorama {
     }
 
     /* attach self matcher last */
-    this.variableTypes = this.variableTypes.concat(fallThroughSelfMatcher)
+    this.variableTypes = this.variableTypes.concat(/** @type {any} */ (fallThroughSelfMatcher))
 
     // const variablesKnownTypes = new RegExp(`^(${this.variableTypes.map((v) => v.prefix || v.type).join('|')}):`)
     const variablesKnownTypes = combineRegexes(
-      this.variableTypes.filter((v) => v.type !== 'string').map((v) => v.match)
+      /** @type {RegExp[]} */ (this.variableTypes
+        .filter((v) => v.type !== 'string' && v.match instanceof RegExp)
+        .map((v) => v.match))
     )
     this.variablesKnownTypes = variablesKnownTypes
 
@@ -547,11 +549,11 @@ class Configorama {
    * Populate all variables in the service, conveniently remove and restore the service attributes
    * that confuse the population methods.
    * @param cliOpts An options hive to use for ${opt:...} variables.
-   * @returns {Promise.<TResult>|*} A promise resolving to the populated service.
+   * @returns {Promise<any>} A promise resolving to the populated service.
    */
   async init(cliOpts) {
     this.options = cliOpts || {}
-    const configoramaOpts = this.opts
+    const configoramaOpts = this.settings
 
     const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
   
@@ -562,10 +564,10 @@ class Configorama {
         contents: this.originalString,
         filePath: this.configFilePath,
         varRegex: this.variableSyntax,
-        dynamicArgs: this.opts.dynamicArgs
+        dynamicArgs: this.settings.dynamicArgs
       })
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
+      if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
@@ -595,7 +597,7 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
+    if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
       const metadata = this.collectVariableMetadata()
 
       const enrich = await enrichMetadata(
@@ -607,7 +609,7 @@ class Configorama {
         this.configFilePath,
         Object.keys(this.filters),
         undefined, // resolvedConfig not available yet
-        this.opts.options,
+        this.settings.options,
         this.variableTypes
       )
 
@@ -625,7 +627,7 @@ class Configorama {
       const varKeys = Object.keys(variableData)
       const uniqueVarKeys = Object.keys(uniqueVariables)
 
-      if (this.opts.returnPreResolvedVariableDetails) {
+      if (this.settings.returnPreResolvedVariableDetails) {
         return Object.assign({}, {
           resolved: false,
           originalConfig: this.originalConfig 
@@ -644,7 +646,7 @@ class Configorama {
         if (varTypes.length) {
           const exclude = ['dot.prop', 'deep']
           console.log('\nAllowed variable types:')
-          varTypes.filter((v) => v.type !== 'dot.prop').forEach((v) => {
+          varTypes.forEach((v) => {
             const vData = this.variableTypes[v]
             if (exclude.includes(vData.type)) {
               return
@@ -1141,7 +1143,7 @@ class Configorama {
     }
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
-    if ((useDotEnv && useDotEnv === true) || this.opts.useDotEnvFiles) {
+    if ((useDotEnv && useDotEnv === true) || this.settings.useDotEnvFiles) {
       let providerStage
       /* has hardcoded stage */
       if (
@@ -1244,8 +1246,8 @@ class Configorama {
         .then(() => {
           // console.log('this.config', this.config)
           /* Final post-processing here */
-          if (this.mergeKeys && this.config) {
-            this.config = mergeByKeys(this.config, '', this.mergeKeys)
+          if (this.settings.mergeKeys && this.config) {
+            this.config = mergeByKeys(this.config, '', this.settings.mergeKeys)
           }
           if (VERBOSE) {
             logHeader('Resolved Configuration value')
@@ -1409,6 +1411,7 @@ class Configorama {
         })
 
         const varData = {
+          filters: foundFilters.length > 0 ? foundFilters : undefined,
           path: configValuePath,
           key: itemKey,
           originalStringValue: rawValue,
@@ -1416,10 +1419,12 @@ class Configorama {
           variableWithFilters: originalSrc,
           isRequired: false,
           defaultValue: undefined,
+          defaultValueIsVar: undefined,
+          defaultValueSrc: undefined,
+          hasFallback: false,
           matchIndex: matchCount++,
           resolveOrder: [],
           resolveDetails: cleanedResolveDetails,
-          ...(foundFilters.length > 0 && { filters: foundFilters }),
         }
         let defaultValueIsVar = false
 
@@ -1691,7 +1696,7 @@ class Configorama {
   /**
    * Populate the variables in the given object.
    * @param objectToPopulate The object to populate variables within.
-   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
+   * @returns {Promise<any>} A promise resolving to the in-place populated object.
    */
   populateObject(objectToPopulate) {
     return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
@@ -1741,7 +1746,7 @@ class Configorama {
    * ]
    * @typedef {Object} TerminalProperty
    * @property {String[]} path The path to the terminal property
-   * @property {Date|RegEx|String} The value of the terminal property
+   * @property {Date|RegExp|String} value The value of the terminal property
    */
   /**
    * Generate an array of objects noting the terminal properties of the given root object and their
@@ -1857,8 +1862,7 @@ class Configorama {
    * Assign the populated values back to the target object
    * @param target The object to which the given populated terminal properties should be applied
    * @param populations The fully populated terminal properties
-   * @returns {Promise<number>} resolving with the number of changes that were applied to the given
-   * target
+   * @returns {Promise<void>} resolving when changes have been applied to the given target
    */
   assignProperties(target, populations) {
     // eslint-disable-line class-methods-use-this
@@ -2098,7 +2102,7 @@ class Configorama {
    * @param valueObject The value to populate variables within
    * @param root Whether the caller is the root populater and thereby whether to recursively
    * populate
-   * @returns {PromiseLike<T>} A promise that resolves to the populated value, recursively if root
+   * @returns {Promise<any>} A promise that resolves to the populated value, recursively if root
    * is true
    */
   populateValue(valueObject, root, caller) {
@@ -2181,11 +2185,14 @@ class Configorama {
   /**
    * Populate a given property, given the matched string to replace and the value to replace the
    * matched string with.
-   * @param valueObject.value The property to replace the matched string with the value.
+   * @param {object} valueObject The value object containing the property to populate
+   * @param {any} valueObject.value The property to replace the matched string with the value.
+   * @param {string[]} [valueObject.path] The path to the value in the config.
+   * @param {string} [valueObject.originalSource] The original source string.
+   * @param {Array} [valueObject.resolutionHistory] History of resolution steps.
    * @param matchedString The string in the given property that was matched and is to be replaced.
    * @param valueToPopulate The value to replace the given matched string in the property with.
-   * @returns {Promise.<TResult>|*} A promise resolving to the property populated with the given
-   *  value for all instances of the given matched string.
+   * @returns {{value: any, path?: string[], originalSource?: string, resolutionHistory?: Array, __internal_only_flag?: boolean, caller?: string, count?: number}} The populated property object
    */
   populateVariable(valueObject, matchedString, valueToPopulate) {
     let property = valueObject.value
@@ -2324,23 +2331,30 @@ class Configorama {
 
       const objStr = JSON.stringify(valueToPopulate)
       /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
-      if (
+      const isNestedInVariable = (
         property.trim() !== matchedString.trim() &&
         property.indexOf(matchedString) !== -1 &&
         matchedString.match(this.variableSyntax) &&
         property.match(this.variableSyntax)
-      ) {
+      )
+      // Only encode for file() or text() references where JSON braces break regex matching
+      const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
+      if (isNestedInVariable && isFileOrTextRef) {
+        // Encode object as base64 to avoid breaking variable syntax with nested braces
+        const encodedObj = encodeJsonForVariable(valueToPopulate)
+        property = replaceAll(matchedString, encodedObj, property)
+      } else if (isNestedInVariable) {
         const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
         if (isVar) {
-          // console.log('INSIDE', property, matchedString)
-          // console.log('isVar', isVar)
           throw new Error(
             `Invalid variable syntax "${property}" resolves to "${replaceAll(matchedString, objStr, property)}"`,
           )
         }
+        property = replaceAll(matchedString, objStr, property)
+      } else {
+        // console.log('OBJECT MATCH', `"${objStr}"`)
+        property = replaceAll(matchedString, objStr, property)
       }
-      // console.log('OBJECT MATCH', `"${objStr}"`)
-      property = replaceAll(matchedString, objStr, property) // .replace(/}$/, '').replace(/^\$\{/, '')
       // console.log('property', property)
       // TODO run functions here
       // console.log('other new prop', property)
@@ -2366,7 +2380,7 @@ class Configorama {
 
       if (nestedVar) {
         const fallbackStr = getFallbackString(splitVars, nestedVar)
-        if (!this.opts.allowUnknownVariables) {
+        if (!this.settings.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
@@ -2382,18 +2396,17 @@ class Configorama {
       }
 
       // If allowUnresolvedVariables and there are fallbacks, use the fallback
-      if (this.opts.allowUnresolvedVariables && splitVars.length > 1) {
+      if (this.settings.allowUnresolvedVariables && splitVars.length > 1) {
         const nextFallback = splitVars[1].trim()
         // Strip trailing variable suffix (handles }, }}, >, ]], etc.)
         const nextFallbackClean = nextFallback.replace(this.varSuffixPattern, '')
         const isQuotedString = /^['"].*['"]$/.test(nextFallbackClean)
         const isNumeric = /^-?\d+(\.\d+)?$/.test(nextFallbackClean)
         if (isQuotedString || isNumeric) {
-          let staticValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
+          const strValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
           // Convert to number if it's a numeric fallback
-          if (isNumeric) {
-            staticValue = Number(staticValue)
-          }
+          /** @type {string|number} */
+          const staticValue = isNumeric ? Number(strValue) : strValue
           return {
             value: staticValue,
             path: valueObject.path,
@@ -2484,7 +2497,7 @@ Missing Value ${missingValue} - ${matchedString}
         !prop.match(this.variableSyntax)
         &&
         /* Not file or text refs */
-        !prop.match(fileRefSyntax) 
+        !prop.match(fileRefSyntax)
         && !prop.match(textRefSyntax)
         /* Not eval refs */
         && !prop.match(getValueFromEval.match) 
@@ -2573,8 +2586,10 @@ Missing Value ${missingValue} - ${matchedString}
   /**
    * Resolve the given variable string that expresses a series of fallback values in case the
    * initial values are not valid, resolving each variable and resolving to the first valid value.
-   * @param variableStringsString The overwrite string of variables to populate and choose from.
-   * @returns {Promise.<TResult>|*} A promise resolving to the first validly populating variable
+   * @param variableStrings The overwrite string of variables to populate and choose from.
+   * @param valueObject The value object
+   * @param originalVar The original variable string
+   * @returns {Promise<any>} A promise resolving to the first validly populating variable
    *  in the given variable strings string.
    */
   overwrite(variableStrings, valueObject, originalVar) {
@@ -2650,7 +2665,10 @@ Missing Value ${missingValue} - ${matchedString}
   /**
    * Given any variable string, return the value it should be populated with.
    * @param variableString The variable string to retrieve a value for.
-   * @returns {Promise.<TResult>|*} A promise resolving to the given variables value.
+   * @param valueObject The value object
+   * @param caller The caller name
+   * @param originalVar The original variable string
+   * @returns {Promise<any>} A promise resolving to the given variables value.
    */
   getValueFromSource(variableString, valueObject, caller, originalVar) {
     // console.log('getValueFromSrc caller', caller)
@@ -2749,6 +2767,7 @@ Missing Value ${missingValue} - ${matchedString}
       variableString = trim(t[0])
     }
 
+    /** @type {Function|undefined} */
     let resolverFunction
     let resolverType
     /* Loop over variables and set getterFunction when match found. */
@@ -2845,12 +2864,12 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
 
-          if (this.opts.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
+          if (this.settings.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
             // Encode the unknown file variable to pass through resolution
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
-          if (this.opts.allowUnresolvedVariables) {
+          if (this.settings.allowUnresolvedVariables) {
             // Check if outer expression has fallbacks we can use
             // valueCount[0] is the primary var, valueCount[1+] are fallbacks
             if (valueCount.length > 1) {
@@ -3027,7 +3046,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
-        if (!this.opts.allowUnknownVariables) {
+        if (!this.settings.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
         const fallbackStr = getFallbackString(split, nestedVar)
@@ -3105,7 +3124,7 @@ Missing Value ${missingValue} - ${matchedString}
     let allowSpecialCase = false
     /* handle special cases for cloudformation ${Sub} values */
     if (this.originalConfig && key.endsWith('Fn::Sub')) {
-      if (this.opts.verifySubReferences) {
+      if (this.settings.verifySubReferences) {
         const params = this.originalConfig.Parameters || (this.originalConfig.resources || {}).Parameters
         const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
         /* Cloudformation Resource References */
@@ -3130,7 +3149,7 @@ Missing Value ${missingValue} - ${matchedString}
 
 
     /* Pass through unknown variables */
-    if (this.opts.allowUnknownVariables || allowSpecialCase) {
+    if (this.settings.allowUnknownVariables || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
@@ -3188,7 +3207,7 @@ Missing Value ${missingValue} - ${matchedString}
       variableSyntax: this.variableSyntax,
       variablesKnownTypes: this.variablesKnownTypes,
       variableTypes: this.variableTypes,
-      opts: this.opts,
+      opts: this.settings,
       originalConfig: this.originalConfig,
       config: this.config,
       getDeeperValue: this.getDeeperValue.bind(this),
@@ -3346,7 +3365,7 @@ Missing Value ${missingValue} - ${matchedString}
     })
   }
   runFunction(variableString) {
-    // console.log('runFunction', variableString)
+    console.log('runFunction', variableString)
     /* If json object value return it */
     if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
       return variableString
@@ -3378,7 +3397,9 @@ Missing Value ${missingValue} - ${matchedString}
     // TODO check for camelCase version. | toUpperCase messes with function name
     const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
 
-    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
+    if (!theFunction) {
+      throw new Error(`Function "${functionName}" not found`)
+    }
 
     const funcValue = theFunction(...argsToPass)
     // console.log('funcValue', funcValue)

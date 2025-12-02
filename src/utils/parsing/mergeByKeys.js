@@ -3,9 +3,10 @@
  */
 function mergeByKeys(data, path, keysToMerge) {
   if (!data) return {}
-  
-  const items = path.split('.').reduce((obj, key) => obj?.[key], data)
-  if (!Array.isArray(items)) return {}
+
+  // Handle empty path - operate on root data
+  const items = path ? path.split('.').reduce((obj, key) => obj?.[key], data) : data
+  if (!Array.isArray(items)) return data
   
   const result = {}
   const mergeAll = !keysToMerge || !Array.isArray(keysToMerge) || keysToMerge.length === 0

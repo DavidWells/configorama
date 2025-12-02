@@ -31,12 +31,12 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
 
   if (fileType.match(/\.(yml|yaml)/i)) {
     try {
-      const ymlText = YAML.preProcess(contents, regex)
+      const ymlText = YAML.preProcess(contents)
       configObject = YAML.parse(ymlText)
     } catch (err) {
       // Attempt to fix cloudformation refs
       if (err.message.match(/YAMLException/)) {
-        const ymlText = YAML.preProcess(contents, regex)
+        const ymlText = YAML.preProcess(contents)
         const result = YAML.load(ymlText, {
           filename: filePath,
           schema: cloudFormationSchema.schema,
@@ -82,6 +82,8 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
         configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
       } else if (configObject.default) {
         configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+      } else if (typeof configObject === 'function') {
+        configObject = configObject(jsArgs)
       }
       // console.log('parseFileContents configObject', configObject)
     } catch (err) {

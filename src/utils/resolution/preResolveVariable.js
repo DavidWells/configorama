@@ -36,6 +36,7 @@ function hasUnresolvedVars(str, variableSyntax) {
  * @param {object} context.config - Original config object
  * @param {string} context.configDir - Config file directory
  * @param {RegExp} context.variableSyntax - Variable syntax regex
+ * @param {object} [context.options] - CLI options
  * @returns {Promise<*>} Resolved value or undefined if can't pre-resolve
  */
 async function preResolveSingle(varString, context) {

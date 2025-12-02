@@ -14,9 +14,9 @@ function isValidValue(val) {
  * Check if variable resolved to valid value, log warning if not
  * @param {string} variableString - The variable being resolved
  * @param {*} valueToPopulate - The resolved value
- * @param {object} options - Configuration options
- * @param {object} options.patterns - Regex patterns for variable types
- * @param {boolean} options.debug - Whether to log warnings
+ * @param {object} [options] - Configuration options
+ * @param {object} [options.patterns] - Regex patterns for variable types
+ * @param {boolean} [options.debug] - Whether to log warnings
  * @returns {*} The valueToPopulate unchanged
  */
 function warnIfNotFound(variableString, valueToPopulate, options = {}) {
