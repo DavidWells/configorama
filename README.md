@@ -266,7 +266,7 @@ async function fetchSecrets(foo, baz, ctx) {
   console.log(baz)  // { qux: 'quux' }
   console.log(ctx.originalConfig)  // Original unresolved config
   console.log(ctx.currentConfig)   // Current partially-resolved config
-  console.log(ctx.opts)            // Configorama options
+  console.log(ctx.settings)        // Configorama settings
 
   return { secret: 'value' }
 }
@@ -282,7 +282,7 @@ The `ctx` parameter (always the last argument) provides access to:
 |----------|-------------|
 | `originalConfig` | The original unresolved configuration object |
 | `currentConfig` | The current (partially resolved) configuration |
-| `opts` | Configorama options including `options`, `dynamicArgs`, etc. |
+| `settings` | Configorama settings including `options` (CLI flags), `dynamicArgs`, etc. |
 
 TypeScript users can import the type:
 
@@ -308,7 +308,7 @@ If you don't need arguments, the function still receives `ctx` as its only param
 ```js
 // No args - ctx is the only parameter
 async function getSecrets(ctx) {
-  return ctx.opts.options.stage === 'prod'
+  return ctx.settings.options.stage === 'prod'
     ? 'prod-secret'
     : 'dev-secret'
 }

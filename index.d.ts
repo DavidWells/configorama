@@ -55,8 +55,8 @@ export interface ConfigContext<T = any> {
   originalConfig: T
   /** The current (partially resolved) configuration object */
   currentConfig: T
-  /** Configorama options and settings */
-  opts: {
+  /** Configorama settings */
+  settings: {
     allowUnknownVariables: boolean
     allowUndefinedValues: boolean
     allowUnknownFileRefs: boolean
@@ -65,6 +65,7 @@ export interface ConfigContext<T = any> {
     returnPreResolvedVariableDetails: boolean
     allowUnknownVars?: boolean
     dynamicArgs?: any
+    /** CLI options/flags passed to configorama */
     options: Record<string, any>
   }
 }

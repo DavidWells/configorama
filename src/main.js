@@ -132,7 +132,7 @@ class Configorama {
   
     const options = opts || {}
     // Set opts to pass into JS file calls
-    this.opts = Object.assign({}, {
+    this.settings = Object.assign({}, {
       // Allow for unknown variable syntax to pass through without throwing errors
       allowUnknownVariables: false,
       // Allow undefined to be an end result.
@@ -149,7 +149,7 @@ class Configorama {
 
     // Backward compat: allowUnknownVars -> allowUnknownVariables
     if (options.allowUnknownVars !== undefined && options.allowUnknownVariables === undefined) {
-      this.opts.allowUnknownVariables = options.allowUnknownVars
+      this.settings.allowUnknownVariables = options.allowUnknownVars
     }
 
     this.filterCache = {}
@@ -553,7 +553,7 @@ class Configorama {
    */
   async init(cliOpts) {
     this.options = cliOpts || {}
-    const configoramaOpts = this.opts
+    const configoramaOpts = this.settings
 
     const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
   
@@ -564,10 +564,10 @@ class Configorama {
         contents: this.originalString,
         filePath: this.configFilePath,
         varRegex: this.variableSyntax,
-        dynamicArgs: this.opts.dynamicArgs
+        dynamicArgs: this.settings.dynamicArgs
       })
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
+      if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
@@ -597,7 +597,7 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
+    if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
       const metadata = this.collectVariableMetadata()
 
       const enrich = await enrichMetadata(
@@ -609,7 +609,7 @@ class Configorama {
         this.configFilePath,
         Object.keys(this.filters),
         undefined, // resolvedConfig not available yet
-        this.opts.options,
+        this.settings.options,
         this.variableTypes
       )
 
@@ -627,7 +627,7 @@ class Configorama {
       const varKeys = Object.keys(variableData)
       const uniqueVarKeys = Object.keys(uniqueVariables)
 
-      if (this.opts.returnPreResolvedVariableDetails) {
+      if (this.settings.returnPreResolvedVariableDetails) {
         return Object.assign({}, {
           resolved: false,
           originalConfig: this.originalConfig 
@@ -1143,7 +1143,7 @@ class Configorama {
     }
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
-    if ((useDotEnv && useDotEnv === true) || this.opts.useDotEnvFiles) {
+    if ((useDotEnv && useDotEnv === true) || this.settings.useDotEnvFiles) {
       let providerStage
       /* has hardcoded stage */
       if (
@@ -1246,8 +1246,8 @@ class Configorama {
         .then(() => {
           // console.log('this.config', this.config)
           /* Final post-processing here */
-          if (this.opts.mergeKeys && this.config) {
-            this.config = mergeByKeys(this.config, '', this.opts.mergeKeys)
+          if (this.settings.mergeKeys && this.config) {
+            this.config = mergeByKeys(this.config, '', this.settings.mergeKeys)
           }
           if (VERBOSE) {
             logHeader('Resolved Configuration value')
@@ -2380,7 +2380,7 @@ class Configorama {
 
       if (nestedVar) {
         const fallbackStr = getFallbackString(splitVars, nestedVar)
-        if (!this.opts.allowUnknownVariables) {
+        if (!this.settings.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
@@ -2396,7 +2396,7 @@ class Configorama {
       }
 
       // If allowUnresolvedVariables and there are fallbacks, use the fallback
-      if (this.opts.allowUnresolvedVariables && splitVars.length > 1) {
+      if (this.settings.allowUnresolvedVariables && splitVars.length > 1) {
         const nextFallback = splitVars[1].trim()
         // Strip trailing variable suffix (handles }, }}, >, ]], etc.)
         const nextFallbackClean = nextFallback.replace(this.varSuffixPattern, '')
@@ -2864,12 +2864,12 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
 
-          if (this.opts.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
+          if (this.settings.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
             // Encode the unknown file variable to pass through resolution
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
-          if (this.opts.allowUnresolvedVariables) {
+          if (this.settings.allowUnresolvedVariables) {
             // Check if outer expression has fallbacks we can use
             // valueCount[0] is the primary var, valueCount[1+] are fallbacks
             if (valueCount.length > 1) {
@@ -3046,7 +3046,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
-        if (!this.opts.allowUnknownVariables) {
+        if (!this.settings.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
         const fallbackStr = getFallbackString(split, nestedVar)
@@ -3124,7 +3124,7 @@ Missing Value ${missingValue} - ${matchedString}
     let allowSpecialCase = false
     /* handle special cases for cloudformation ${Sub} values */
     if (this.originalConfig && key.endsWith('Fn::Sub')) {
-      if (this.opts.verifySubReferences) {
+      if (this.settings.verifySubReferences) {
         const params = this.originalConfig.Parameters || (this.originalConfig.resources || {}).Parameters
         const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
         /* Cloudformation Resource References */
@@ -3149,7 +3149,7 @@ Missing Value ${missingValue} - ${matchedString}
 
 
     /* Pass through unknown variables */
-    if (this.opts.allowUnknownVariables || allowSpecialCase) {
+    if (this.settings.allowUnknownVariables || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
@@ -3207,7 +3207,7 @@ Missing Value ${missingValue} - ${matchedString}
       variableSyntax: this.variableSyntax,
       variablesKnownTypes: this.variablesKnownTypes,
       variableTypes: this.variableTypes,
-      opts: this.opts,
+      opts: this.settings,
       originalConfig: this.originalConfig,
       config: this.config,
       getDeeperValue: this.getDeeperValue.bind(this),

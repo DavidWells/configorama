@@ -211,7 +211,7 @@ ${JSON.stringify(options.context, null, 2)}`,
   const valueForFunction = {
     originalConfig: ctx.originalConfig,
     currentConfig: ctx.config,
-    opts: ctx.opts,
+    settings: ctx.opts,
   }
 
   // Process JS files

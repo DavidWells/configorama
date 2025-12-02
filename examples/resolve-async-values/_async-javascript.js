@@ -16,7 +16,7 @@ function delay(ms) {
 async function fetchSecretsFromRemoteStore(foo, baz, ctx) {
   console.log('foo', foo)
   console.log('baz', baz)
-  console.log('ctx', ctx)
+  console.log('settings', ctx.settings)
   await delay(200)
   return 'async-js-value'
 }
