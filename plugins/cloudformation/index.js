@@ -9,6 +9,7 @@ const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-]+\))?:/i)
  * @param {object} options - Configuration options
  * @param {object} [options.credentials] - AWS credentials
  * @param {string} [options.defaultRegion] - Default region if not specified in variable
+ * @param {boolean} [options.skipResolution] - Skip AWS calls, just collect metadata
  * @param {object} [options.clientOptions] - Additional options passed to CloudFormation client
  * @returns {object} Variable source configuration with resolver and metadata collector
  */
@@ -16,6 +17,7 @@ function createCloudFormationResolver(options = {}) {
   const {
     credentials,
     defaultRegion = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+    skipResolution = false,
     clientOptions = {}
   } = options
 
@@ -139,6 +141,11 @@ function createCloudFormationResolver(options = {}) {
       region,
       configPath: valueObject.path.join('.')
     })
+
+    // Skip AWS call if skipResolution is enabled
+    if (skipResolution) {
+      return `[CF:${stackName}.${outputKey}]`
+    }
 
     const value = await getStackOutput(stackName, outputKey, region)
 

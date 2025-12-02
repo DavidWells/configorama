@@ -246,4 +246,37 @@ test('createCloudFormationResolver exports correct structure', () => {
   assert.is(resolver.metadataKey, 'cfReferences')
 })
 
+test('skipResolution collects metadata without calling AWS', async () => {
+  const cfResolver = createCloudFormationResolver({ skipResolution: true })
+
+  const object = {
+    stage: 'prod',
+    apiEndpoint: '${cf:api-service-${self:stage}.ApiEndpoint}',
+    dbHost: '${cf(us-west-2):database-stack.DbHost}',
+  }
+
+  const result = await configorama(object, {
+    configDir: dirname,
+    returnMetadata: true,
+    variableSources: [cfResolver]
+  })
+
+  // Values should be placeholders, not resolved
+  assert.is(result.config.apiEndpoint, '[CF:api-service-prod.ApiEndpoint]')
+  assert.is(result.config.dbHost, '[CF:database-stack.DbHost]')
+
+  // But metadata should still be collected
+  assert.ok(result.metadata.cfReferences)
+  assert.is(result.metadata.cfReferences.length, 2)
+
+  const apiRef = result.metadata.cfReferences.find(r => r.stackName === 'api-service-prod')
+  assert.ok(apiRef)
+  assert.is(apiRef.outputKey, 'ApiEndpoint')
+  assert.is(apiRef.region, 'us-east-1')
+
+  const dbRef = result.metadata.cfReferences.find(r => r.stackName === 'database-stack')
+  assert.ok(dbRef)
+  assert.is(dbRef.region, 'us-west-2')
+})
+
 test.run()
