@@ -3,8 +3,8 @@
 const fs = require('fs')
 const minimist = require('minimist')
 const Configorama = require('./src/main')
-const deepLog = require('./src/utils/deep-log')
-const { logHeader } = require('./src/utils/logs')
+const deepLog = require('./src/utils/ui/deep-log')
+const { logHeader } = require('./src/utils/ui/logs')
 const configorama = require('./src')
 const { makeBox } = require('@davidwells/box-logger')
 
@@ -81,7 +81,7 @@ const options = {
   allowUndefinedValues: argv['allow-undefined'] || false,
   allowUnknownFileRefs: argv['allow-unknown-file-refs'] || false,
   returnMetadata: argv['return-metadata'] || false,
-  returnPreResolvedVariableDetails: argv['setup'] || false,
+  returnPreResolvedVariableDetails: false,
   dynamicArgs: argv
 }
 
@@ -181,7 +181,7 @@ configorama(inputFile, options)
     const errorMsg = makeBox({
       title: `Error Processing Configuration: ${inputFile}`,
       minWidth: '100%',
-      text: error.message,
+      content: error.message,
       type: 'error',
     })
     console.log(errorMsg)

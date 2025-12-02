@@ -1,0 +1,5 @@
+{
+  // JSON5 supports comments
+  name: 'json5-config',
+  trailing: 'comma',
+}

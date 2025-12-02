@@ -77,7 +77,11 @@ test('deep equality', () => {
     fooInLowerCase: 'foo',
     fooInCapitalize: 'Foo',
     fooInCamelCase: 'foo',
-    fooInKebabCase: 'foo'
+    fooInKebabCase: 'foo',
+    chainedFiltersTwo: 'dev',
+    chainedFiltersThree: 'Hello-world',
+    chainedNumberToString: '42',
+    chainedWithHelp: 'TESTVALUE'
   })
 })
 
@@ -123,6 +127,28 @@ test('fooInCaps', () => {
 
 test('fooInLowerCase', () => {
   assert.is(config.fooInLowerCase, 'foo')
+})
+
+// Multiple chained filters - regression tests
+test('chainedFiltersTwo - two filters applied', () => {
+  // dev -> DEV -> dev (toUpperCase then toKebabCase)
+  assert.is(config.chainedFiltersTwo, 'dev')
+})
+
+test('chainedFiltersThree - three filters applied in order', () => {
+  // helloWorld -> hello-world -> HELLO-WORLD -> Hello-world
+  assert.is(config.chainedFiltersThree, 'Hello-world')
+})
+
+test('chainedNumberToString - Number then toString', () => {
+  // '42' -> 42 (Number) -> '42' (toString)
+  assert.is(config.chainedNumberToString, '42')
+  assert.type(config.chainedNumberToString, 'string')
+})
+
+test('chainedWithHelp - filter before help() is applied', () => {
+  // testValue -> TESTVALUE (toUpperCase) -> TESTVALUE (help is identity)
+  assert.is(config.chainedWithHelp, 'TESTVALUE')
 })
 
 test.run()

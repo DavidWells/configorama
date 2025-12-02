@@ -1,3 +1,4 @@
+const { trimSurroundingQuotes } = require('../utils/strings/quoteUtils')
 const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 
 /**
@@ -226,7 +227,7 @@ Examples:
   }
   
   // Remove surrounding quotes if present
-  const cleanExpression = cronExpression.replace(/^['"`](.*)['"`]$/, '$1')
+  const cleanExpression = trimSurroundingQuotes(cronExpression, true)
   
   // If already a cron expression, return it
   if (cleanExpression.match(/^[\*\/,\-\d]+$/)) {
@@ -244,6 +245,7 @@ Examples:
 
 module.exports = {
   type: 'cron',
+  source: 'readonly',
   prefix: 'cron',
   syntax: '${cron(expression)}',
   description: 'Resolves cron expressions. Examples: ${cron("every 5 minutes"}, ${cron("weekdays")}, ${cron("at 9:30")}',

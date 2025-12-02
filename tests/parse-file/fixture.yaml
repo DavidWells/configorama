@@ -1,0 +1,6 @@
+name: yaml-config
+enabled: true
+items:
+  - one
+  - two
+  - three

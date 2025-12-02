@@ -1,0 +1,41 @@
+########################
+# Help Filter Test
+########################
+
+one: hi
+two: bye
+allowedValues:
+  - dev
+  - staging
+  - production
+
+# Basic help filter - should act as identity function
+apiKey: ${env:API_KEY | String | help('The Stripe Live Secret Key')}
+
+# Basic help filter - should act as identity function
+apiKeyTwo: ${env:API_KEY_TWO, "fallback-value" | String | help('The Stripe Live Secret Key')}
+
+# With default value
+dbPort: ${env:DB_PORT_TWO, 5432 | help('The Postgres Port')}
+
+# With type filter
+dbPortTyped: ${env:DB_PORT_TWO, 5432 | Number | help('Second helper text')}
+
+fun: ${self:noExist}
+
+rad: ${fake.my.fake.var | String}
+
+fake: 
+  my:
+    thing: here
+
+ok: ${rad | String}
+
+# With multiple filters
+stage: ${opt:stage | toUpperCase | help('Deployment stage (${allowedValues}, funky)')}
+
+other: foo-${opt:stage, ${one}, ${two}}
+
+final: foo-${opt:stage, ${nah}, 'yea'}
+
+branch: ${git:branch | help('The current branch')}

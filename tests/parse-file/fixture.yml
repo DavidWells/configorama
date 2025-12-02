@@ -1,0 +1,5 @@
+name: test-config
+version: 1
+nested:
+  key: value
+  number: 42

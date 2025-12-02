@@ -68,4 +68,17 @@ test('asyncJSValueReference', () => {
   assert.is(config.asyncJSValueReference, 'asyncValueFromObject')
 })
 
+// Test . syntax for JS files
+test('Object return with . syntax ${file(./asyncValueObject.js).func.key}', () => {
+  assert.is(config.asyncKeyDot, 'asyncValueFromObject')
+})
+
+test('Object return with . syntax ${file(./asyncValueObject.js).func.keyTwo}', () => {
+  assert.is(config.asyncKeyTwoDot, 'asyncValueFromObjectTwo')
+})
+
+test('Object return with . syntax ${file(./asyncValueObject.js).func.keyThree}', () => {
+  assert.is(config.asyncKeyThreeDot, 'Testing')
+})
+
 test.run()

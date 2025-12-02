@@ -24,6 +24,7 @@ Example: \${env:MY_ENV_VAR}
 
 module.exports = {
   type: 'env',
+  source: 'user',
   syntax: '${env:ENV_VAR}',
   description: 'Resolves environment variables. Examples: ${env:MY_ENV_VAR}, ${env:MY_ENV_VAR_TWO, "fallbackValue"}',
   match: envRefSyntax,

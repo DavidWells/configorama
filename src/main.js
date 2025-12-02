@@ -1,23 +1,76 @@
+/* Node built-ins */
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-const enrichMetadata = require('./utils/enrichMetadata')
+
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
 
+/* External dependencies */
 const promiseFinallyShim = require('promise.prototype.finally').shim()
-// @TODO only import lodash we need
-
 const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
-const chalk = require('./utils/chalk')
-const { resolveAlias } = require('./utils/resolveAlias')
-const { resolveFilePathFromMatch } = require('./utils/getFullFilePath')
+const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
 
-/* Default Value resolvers */
+/* Utils - root */
+const {
+  isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
+  isEmpty, trim, camelCase, kebabCase, capitalize, split, map, mapValues,
+  assign, set, cloneDeep
+} = require('./utils/lodash')
+const PromiseTracker = require('./utils/PromiseTracker')
+const handleSignalEvents = require('./utils/handleSignalEvents')
+
+/* Utils - encoders */
+const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
+const { decodeEncodedValue } = require('./utils/encoders')
+const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
+
+/* Utils - parsing */
+const enrichMetadata = require('./utils/parsing/enrichMetadata')
+const preProcess = require('./utils/parsing/preProcess')
+const { parseFileContents } = require('./utils/parsing/parse')
+const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
+const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
+
+/* Utils - paths */
+const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
+const { resolveAlias } = require('./utils/paths/resolveAlias')
+const { resolveFilePathFromMatch } = require('./utils/paths/getFullFilePath')
+const { findLineForKey } = require('./utils/paths/findLineForKey')
+
+/* Utils - regex */
+const { combineRegexes, funcRegex, funcStartOfLineRegex, subFunctionRegex } = require('./utils/regex')
+
+/* Utils - strings */
+const formatFunctionArgs = require('./utils/strings/formatFunctionArgs')
+
+const { splitByComma } = require('./utils/strings/splitByComma')
+const { splitCsv } = require('./utils/strings/splitCsv')
+const { replaceAll } = require('./utils/strings/replaceAll')
+const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
+const { trimSurroundingQuotes, ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
+
+/* Utils - ui */
+const chalk = require('./utils/ui/chalk')
+const deepLog = require('./utils/ui/deep-log')
+const { logHeader } = require('./utils/ui/logs')
+const { createEditorLink } = require('./utils/ui/createEditorLink')
+const { runConfigWizard, isSensitiveVariable } = require('./utils/ui/configWizard')
+
+/* Utils - validation */
+const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
+
+/* Utils - variables */
+const cleanVariable = require('./utils/variables/cleanVariable')
+const appendDeepVariable = require('./utils/variables/appendDeepVariable')
+const { extractVariableWrapper, getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
+const { findNestedVariables } = require('./utils/variables/findNestedVariables')
+
+/* Resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
@@ -25,44 +78,16 @@ const getValueFromOptions = require('./resolvers/valueFromOptions')
 const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
-/* Default File Parsers */
+const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
+
+/* Parsers */
 const YAML = require('./parsers/yaml')
 const TOML = require('./parsers/toml')
 const INI = require('./parsers/ini')
 const JSON5 = require('./parsers/json5')
-/* functions */
-const md5Function = require('./functions/md5')
 
-/* Utility/helpers */
-const cleanVariable = require('./utils/cleanVariable')
-const appendDeepVariable = require('./utils/appendDeepVariable')
-const isValidValue = require('./utils/isValidValue')
-const PromiseTracker = require('./utils/PromiseTracker')
-const handleSignalEvents = require('./utils/handleSignalEvents')
-const formatFunctionArgs = require('./utils/formatFunctionArgs')
-const trimSurroundingQuotes = require('./utils/trimSurroundingQuotes')
-const deepLog = require('./utils/deep-log')
-const { splitByComma } = require('./utils/splitByComma')
-const {
-  isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
-  isEmpty, trim, camelCase, kebabCase, capitalize, split, map, mapValues,
-  assign, set, cloneDeep
-} = require('./utils/lodash')
-const { parseFileContents } = require('./utils/parse')
-const { splitCsv } = require('./utils/splitCsv')
-const { replaceAll } = require('./utils/replaceAll')
-const { getTextAfterOccurrence, findNestedVariable } = require('./utils/textUtils')
-const { getFallbackString, verifyVariable } = require('./utils/variableUtils')
-const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
-const { decodeEncodedValue } = require('./utils/encoders')
-const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
-const { mergeByKeys } = require('./utils/mergeByKeys')
-const { arrayToJsonPath } = require('./utils/arrayToJsonPath')
-const { findNestedVariables } = require('./utils/find-nested-variables')
-const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
-const { logHeader } = require('./utils/logs')
-const { createEditorLink } = require('./utils/createEditorLink')
-const { runConfigWizard } = require('./utils/configWizard')
+/* Functions */
+const md5Function = require('./functions/md5')
 /**
  * Maintainer's notes:
  *
@@ -88,9 +113,6 @@ const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 const envRefSyntax = RegExp(/^env:/g)
 const optRefSyntax = RegExp(/^opt:/g)
 const selfRefSyntax = RegExp(/^self:/g)
-const funcRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const funcStartOfLineRegex = /^(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const subFunctionRegex = /(\w+):(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
 const base64WrapperRegex = /\[_\[([A-Za-z0-9+/=\s]*)\]_\]/g
 const logLines = '─────────────────────────────────────────────────'
 
@@ -100,147 +122,6 @@ let SETUP_MODE = process.argv.includes('--setup') ? true : false
 // DEBUG = true
 let DEBUG_TYPE = false
 const ENABLE_FUNCTIONS = true
-
-function combineRegexes(regexes) {
-  // Extract the pattern from each RegExp and join with OR operator
-  const patterns = regexes.map(regex => {
-    // Get source pattern string without flags
-    return regex.source
-  }).filter(Boolean)
-  // Join patterns with the OR operator and create new RegExp
-  return new RegExp(`(${patterns.join('|')})`)
-}
-
-/**
- * Preprocess config to fix malformed fallback references
- * @param {Object} configObject - The parsed configuration object
- * @param {RegExp} variableSyntax - The variable syntax regex to use
- * @returns {Object} The preprocessed configuration object
- */
-function preProcess(configObject, variableSyntax) {
-  // Known reference prefixes that should be wrapped in ${}
-  const refPrefixes = ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
-
-  /**
-   * Fix malformed fallback references in a string
-   * @param {string} str - String potentially containing variables
-   * @returns {string} String with fixed fallback references
-   */
-  function fixFallbacksInString(str) {
-    if (typeof str !== 'string') return str
-
-    let result = str
-    // result = result.replace(/\$\{self:/g, '${')
-    let changed = true
-
-    // Keep iterating until no more changes (to handle nested variables)
-    while (changed) {
-      changed = false
-
-      // Find innermost ${...} blocks (ones that don't contain other ${)
-      let i = 0
-      while (i < result.length) {
-        if (result[i] === '$' && result[i + 1] === '{') {
-          const start = i
-          let braceCount = 1
-          let j = i + 2
-
-          // Find the matching closing brace by counting { and }
-          while (j < result.length && braceCount > 0) {
-            if (result[j] === '{') {
-              braceCount++
-            } else if (result[j] === '}') {
-              braceCount--
-            }
-            j++
-          }
-
-          if (braceCount === 0) {
-            const end = j
-            const match = result.substring(start, end)
-            const content = result.substring(start + 2, end - 1)
-
-            // Only process if there's a comma (indicating fallback syntax)
-            if (content.includes(',')) {
-              // Split by comma
-              const parts = splitByComma(content, variableSyntax)
-
-              if (parts.length > 1) {
-                // Check if the first part has nested ${} - if so, skip this (process inner ones first)
-                const firstPart = parts[0]
-                if (firstPart.includes('${')) {
-                  i = start + 2 // Move past ${ to find inner variables
-                  continue
-                }
-
-                // Check each part after the first (these are fallback values)
-                const fixed = parts.map((part, index) => {
-                  if (index === 0) {
-                    return part // Keep the main reference as-is
-                  }
-
-                  const trimmed = part.trim()
-
-                  // Check if this looks like a reference but is not wrapped
-                  const looksLikeRef = refPrefixes.some(prefix => trimmed.startsWith(prefix))
-                  const alreadyWrapped = trimmed.startsWith('${') && trimmed.endsWith('}')
-
-                  if (looksLikeRef && !alreadyWrapped) {
-                    return ` \${${trimmed}}`
-                  }
-
-                  return ` ${trimmed}`
-                })
-
-                const replacement = `\${${fixed.join(',')}}`
-                if (replacement !== match) {
-                  result = result.substring(0, start) + replacement + result.substring(end)
-                  changed = true
-                  break // Restart search from beginning
-                }
-              }
-            }
-
-            i = start + 2 // Move past ${ to continue searching for nested variables
-          } else {
-            i++
-          }
-        } else {
-          i++
-        }
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Recursively traverse and fix the config object
-   */
-  function traverseAndFix(obj) {
-    if (typeof obj === 'string') {
-      return fixFallbacksInString(obj)
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map(item => traverseAndFix(item))
-    }
-
-    if (obj !== null && typeof obj === 'object') {
-      const result = {}
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          result[key] = traverseAndFix(obj[key])
-        }
-      }
-      return result
-    }
-
-    return obj
-  }
-
-  return traverseAndFix(configObject)
-}
 
 class Configorama {
   constructor(fileOrObject, opts) {
@@ -253,16 +134,23 @@ class Configorama {
     // Set opts to pass into JS file calls
     this.opts = Object.assign({}, {
       // Allow for unknown variable syntax to pass through without throwing errors
-      allowUnknownVars: false,
+      allowUnknownVariables: false,
       // Allow undefined to be an end result.
       allowUndefinedValues: false,
       // Allow unknown file refs to pass through without throwing errors
       allowUnknownFileRefs: false,
+      // Allow known variable types that can't be resolved to pass through
+      allowUnresolvedVariables: false,
       // Return metadata
       returnMetadata: false,
       // Return preResolvedVariableDetails
       returnPreResolvedVariableDetails: false,
     }, options)
+
+    // Backward compat: allowUnknownVars -> allowUnknownVariables
+    if (options.allowUnknownVars !== undefined && options.allowUnknownVariables === undefined) {
+      this.opts.allowUnknownVariables = options.allowUnknownVars
+    }
 
     this.filterCache = {}
 
@@ -285,6 +173,15 @@ class Configorama {
     // console.log('varRegex', varRegex)
     const variableSyntax = varRegex
     this.variableSyntax = variableSyntax
+
+    // Extract variable prefix/suffix from syntax regex for reconstructing variables
+    const syntaxWrapper = extractVariableWrapper(variableSyntax.source)
+    this.varPrefix = syntaxWrapper.prefix
+    this.varSuffix = syntaxWrapper.suffix
+    const escapedSuffix = this.varSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    this.varPrefixPattern = new RegExp('^' + this.varPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    this.varSuffixPattern = new RegExp(escapedSuffix + '$')
+    this.varSuffixWithSpacePattern = new RegExp('\\s+' + escapedSuffix + '$')
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
@@ -357,6 +254,7 @@ class Configorama {
        */
       {
         type: 'self',
+        source: 'config',
         prefix: 'self',
         syntax: '${self:pathToKeyInConfig}',
         description: `Resolves values from the current config object. Supports sub-properties via :key lookup.`,
@@ -373,9 +271,10 @@ class Configorama {
        */
       {
         type: 'file',
+        source: 'config',
         prefix: 'file',
         syntax: '${file(pathToFile.json)}',
-        description: `Resolves values from files. Supports sub-properties via :key lookup.`,
+        description: `Resolves values from files. Supports sub-properties via :key or .key lookup.`,
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           return this.getValueFromFile(varString, { context: pathValue })
@@ -385,6 +284,7 @@ class Configorama {
 
       {
         type: 'text',
+        source: 'config',
         prefix: 'text',
         match: textRefSyntax,
         resolver: (varString, o, x, pathValue) => {
@@ -420,6 +320,7 @@ class Configorama {
     /* Nicer self: references. Match key in object */
     const fallThroughSelfMatcher = {
       type: 'dot.prop',
+      source: 'config',
       match: (varString, fullObject, valueObject) => {
         /*
         console.log('fallThroughSelfMatcher varString', varString)
@@ -461,11 +362,11 @@ class Configorama {
       // ensure each variable source has a type
       options.variableSources.forEach((v) => {
         if (!v.type) {
-          console.log('v', v)
+          console.log('Variable', v)
           throw new Error('Variable source must have a type')
         }
         if (!v.match || !v.resolver) {
-          console.log('v', v)
+          console.log('Variable', v)
           throw new Error('Variable source must have a match and resolver functions')
         }
       })
@@ -541,8 +442,8 @@ class Configorama {
       Boolean: (value) => {
         if (typeof value === 'boolean') return value
         const v = String(value).toLowerCase()
-        if (['true', '1', 'yes', 'on'].includes(v)) return true
-        if (['false', '0', 'no', 'off'].includes(v)) return false
+        if (['true', '1', 'yes', 'on', 'enabled'].includes(v)) return true
+        if (['false', '0', 'no', 'off', 'disabled'].includes(v)) return false
         throw new Error(`Configorama Error: Expected Boolean, got "${value}"`)
       },
       String: (value) => {
@@ -572,7 +473,9 @@ class Configorama {
     // (\|\s*(toUpperCase|toLowerCase|toCamelCase|toKebabCase|capitalize)\s*)+$
     // Updated to support function-style filters like help('text') with nested parens
     // Use a more permissive pattern that matches anything between parens including nested parens
-    this.filterMatch = new RegExp(`(\\|\\s*(${Object.keys(this.filters).join('|')})(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?\\s*)+}?$`)
+    this.filterMatch = new RegExp(
+      `(\\|\\s*(${Object.keys(this.filters).join('|')})(?:\\s*\\([^)]*(?:\\([^)]*\\))?[^)]*\\))?\\s*)+}?$`
+    )
     // console.log('this.filterMatch', this.filterMatch)
 
     this.functions = {
@@ -637,15 +540,9 @@ class Configorama {
     this.callCount = 0
   }
 
-  initialCall(func) {
-    this.deep = []
-    this.tracker.start()
-    return func().finally(() => {
-      this.tracker.stop()
-      this.deep = []
-    })
-  }
-
+  // ################
+  // ## PUBLIC API ##
+  // ################
   /**
    * Populate all variables in the service, conveniently remove and restore the service attributes
    * that confuse the population methods.
@@ -657,25 +554,28 @@ class Configorama {
     const configoramaOpts = this.opts
 
     const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
+  
 
     // If we have a file path but no config yet, parse it now
     if (this.configFilePath && !this.config) {
-      let configObject = await parseFileContents(
-        this.originalString,
-        this.configFileType,
-        this.configFilePath,
-        this.variableSyntax,
-        this.opts
-      )
+      let configObject = await parseFileContents({
+        contents: this.originalString,
+        filePath: this.configFilePath,
+        varRegex: this.variableSyntax,
+        dynamicArgs: this.opts.dynamicArgs
+      })
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
+      if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
       console.log('before preprocess', configObject)
       /** */
-      /* Preprocess step here */
-      configObject = preProcess(configObject, this.variableSyntax)
+      // Store truly raw config before any preprocessing (for metadata display)
+      this.rawOriginalConfig = cloneDeep(configObject)
+
+      /* Preprocess step here - escapes ${} in help() args, fixes malformed fallbacks */
+      configObject = preProcess(configObject, this.variableSyntax, this.variableTypes)
       /*
       console.log('after preprocess', configObject)
       /** */
@@ -695,67 +595,42 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails) {
-      // Use collectVariableMetadata to get variable info (DRY - don't duplicate logic)
+    if (VERBOSE || showFoundVariables || this.opts.returnPreResolvedVariableDetails || SETUP_MODE) {
       const metadata = this.collectVariableMetadata()
 
-      const enrich = enrichMetadata(
+      const enrich = await enrichMetadata(
         metadata,
         this.resolutionTracking,
         this.variableSyntax,
         this.fileRefsFound,
         this.originalConfig,
         this.configFilePath,
-        Object.keys(this.filters)
+        Object.keys(this.filters),
+        undefined, // resolvedConfig not available yet
+        this.opts.options,
+        this.variableTypes
       )
 
       if (showFoundVariables) {
         //*
         deepLog('metadata', metadata)
         fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
-
         deepLog('enrich', enrich)
         // process.exit(1)
         /** */
       }
 
-      // WALK through CLI prompt if --setup flag is set
-      if (SETUP_MODE) {
-        deepLog('enrich', enrich)
-        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
-
-        console.log('\n')
-        logHeader('User Inputs Summary')
-        console.log(JSON.stringify(userInputs, null, 2))
-
-        // TODO set values
-
-        // Apply user inputs to options and environment
-        if (userInputs.options) {
-          Object.assign(this.opts, userInputs.options)
-        }
-        if (userInputs.env) {
-          Object.assign(process.env, userInputs.env)
-        }
-        // Note: self references are in the config, so no need to apply them
-
-        console.log()
-        logHeader('Resolving Configuration')
-        console.log()
-
-        process.exit(1)
-
-        // Continue with normal resolution flow using the new values
-        // Don't exit - let it fall through to resolve the config
-      }
-
-
       const variableData = metadata.variables
+      const uniqueVariables = metadata.uniqueVariables
       const varKeys = Object.keys(variableData)
+      const uniqueVarKeys = Object.keys(uniqueVariables)
 
-      // if (this.opts.returnPreResolvedVariableDetails) {
-      //   return metadata
-      // }
+      if (this.opts.returnPreResolvedVariableDetails) {
+        return Object.assign({}, {
+          resolved: false,
+          originalConfig: this.originalConfig 
+        }, enrich)
+      }
 
       if (!varKeys.length) {
         logHeader('No Variables Found in Config')
@@ -780,8 +655,15 @@ class Configorama {
         console.log()
       }
 
+      const lines = this.configFileContents ? this.configFileContents.split('\n') : []
+      const fileType = this.configFileType
+      const configFilePath = this.configFilePath
+
       if (varKeys.length > 0) {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
+
+        // Extract base variable name from varMatch key (e.g., '${env:FOO, default}' -> 'env:FOO')
+        const getBaseVarName = (key) => key.replace(this.varPrefixPattern, '').replace(this.varSuffixPattern, '').split(',')[0].trim()
 
         logHeader(`Found ${varKeys.length} Variables${fileName}`)
 
@@ -792,32 +674,12 @@ class Configorama {
           const longestKey = varKeys.reduce((acc, k) => {
             return Math.max(acc, k.length)
           }, 0)
-          // Count all references including nested ones within other variables
-          const countAllReferences = (targetVariable) => {
-            // Start with direct references
-            let count = variableData[targetVariable].length
 
-            // Check all other variables for nested references to this variable
-            varKeys.forEach((otherKey) => {
-              if (otherKey === targetVariable) return
-
-              variableData[otherKey].forEach((instance) => {
-                if (instance.resolveDetails) {
-                  instance.resolveDetails.forEach((detail) => {
-                    // Check if this resolveDetail references our target variable
-                    if (detail.varMatch === targetVariable) {
-                      count++
-                    }
-                  })
-                }
-              })
-            })
-
-            return count
-          }
-
+          // Use uniqueVariables for simpler reference counting
           const referenceData = varKeys.map((k) => {
-            const refCount = countAllReferences(k)
+            const varName = getBaseVarName(k)
+            const uniqueVar = uniqueVariables[varName]
+            const refCount = uniqueVar ? uniqueVar.occurrences.length : variableData[k].length
             const placesWord = refCount > 1 ? 'places' : 'place'
             return `- ${k.padEnd(longestKey).padEnd(longestKey + 10)} referenced ${refCount} ${placesWord}`
           }).join('\n')
@@ -827,12 +689,15 @@ class Configorama {
 
         logHeader('Variable Details')
 
-        const lines = this.configFileContents ? this.configFileContents.split('\n') : []
-    
         const indent = ''
         const boxes = varKeys.map((key, i) => {
           const variableInstances = variableData[key]
+          // console.log('variableInstances', variableInstances)
           const firstInstance = variableInstances[0]
+
+          // Get uniqueVariable data for description and other metadata
+          const varName = getBaseVarName(key)
+          const uniqueVar = uniqueVariables[varName]
 
           // Build display message from enriched metadata
           const spacing = '           '
@@ -849,63 +714,422 @@ class Configorama {
             requiredMessage = `${chalk.red.bold('[Required]')}`
           }
 
-          // Show default value from metadata
-          if (typeof firstInstance.defaultValue !== 'undefined') {
-            const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
-            const defaultValueText = `${indent}${keyChalk(`Default value:`.padEnd(titleText.length, ' '))}`
-            varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}`
+          // Show type filter if present (Boolean, String, Number, etc.)
+          if (uniqueVar && uniqueVar.types && uniqueVar.types.length > 0) {
+            const typeLabel = `${indent}${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${typeLabel} ${valueChalk(uniqueVar.types.join(', '))}\n`
           }
 
-          // Show default value source path from metadata
-          if (firstInstance.defaultValueSrc) {
-            varMsg += `\n${indent}${keyChalk('Default value path:'.padEnd(titleText.length, ' '))} `
-            varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
+          // Show description from uniqueVariables if available
+          if (uniqueVar && uniqueVar.descriptions && uniqueVar.descriptions.length > 0) {
+            const descText = `${indent}${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+            const combinedDesc = uniqueVar.descriptions.join('. ')
+            varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
           }
 
           // Show resolve order from metadata
           if (firstInstance.resolveOrder.length > 1) {
-            varMsg += `\n${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${indent}${keyChalk('Resolve Order:'.padEnd(titleText.length, ' '))}`
             const resolveOrder = firstInstance.resolveOrder.join(', ')
             varMsg += ` ${valueChalk(resolveOrder)}\n`
           }
 
+          // Show default value from metadata
+          if (typeof firstInstance.defaultValue !== 'undefined') {
+            const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
+            const defaultValueText = `${indent}${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
+            varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
+          }
+
+          // Show default value source path from metadata
+          if (firstInstance.defaultValueSrc) {
+            varMsg += `${indent}${keyChalk('Default path:'.padEnd(titleText.length, ' '))} `
+            const defaultPathLine = findLineForKey(firstInstance.defaultValueSrc, lines, fileType)
+            if (defaultPathLine) {
+              varMsg += `${createEditorLink(configFilePath, defaultPathLine, 1, firstInstance.defaultValueSrc, 'gray')}\n`
+            } else {
+              varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
+            }
+          }
+
           // Show path(s) from metadata
-          let locationRender = valueChalk(variableInstances[0].path)
-          let locationLabel = `${indent}${keyChalk('Path:'.padEnd(titleText.length, ' '))}`
+          const configPathLine = findLineForKey(variableInstances[0].path, lines, fileType)
+          let locationRender = configPathLine
+            ? createEditorLink(configFilePath, configPathLine, 1, variableInstances[0].path, 'gray')
+            : valueChalk(variableInstances[0].path)
+          let locationLabel = `${indent}${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
+          let typeText = ''
           if (variableInstances.length > 1) {
-            locationRender = `\n${variableInstances.map((v) => valueChalk(`${indent}- ${v.path}`)).join('\n')}`
-            locationLabel = `${indent}${keyChalk('Paths:')}`
+            const pathIndent = ' '.repeat(titleText.length + 1)
+            const pathItems = variableInstances.map((v, idx) => {
+              const pathLine = findLineForKey(v.path, lines, fileType)
+              const pathLink = pathLine
+                ? createEditorLink(configFilePath, pathLine, 1, `- ${v.path}`, 'gray')
+                : valueChalk(`- ${v.path}`)
+              // Show type filter per path if different
+              if (uniqueVar && uniqueVar.occurrences.length > 1) {
+                const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
+                const pathType = occurrence && occurrence.type
+                typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
+                const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+                return `${prefix}${pathLink}${typeText}`
+              }
+              const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
+              return `${prefix}${pathLink}${typeText}`
+            })
+            locationRender = pathItems.join('\n')
+            locationLabel = `${indent}${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
+          } else {
+            const pathType = firstInstance.type
+            typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
           }
           varMsg += `${locationLabel} ${locationRender}`
 
-          // Find line number in config file
-          const line = lines.findIndex((line) => line.includes(key))
-          const lineNumber = line + 1
-          
+          const lineNumber = findLineForKey(firstInstance.key, lines, fileType)
 
           return {
-            text: varMsg,
-            title: {
-              left: `▶ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
-              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
+            content: {
+              left: varMsg,
+              backgroundColor: 'red',
+              width: '100%',
             },
+            title: {
+              left: `▷ ${lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, key) : key}`,
+              right: lineNumber ? createEditorLink(this.configFilePath, lineNumber, 1, `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`, 'gray') : '',
+              center: typeText,
+              paddingBottom: 1,
+              paddingTop: (i === 0) ? 1 : 0,
+              truncate: true,
+            },
+            width: '100%',
           }
         })
 
-        // console.log('boxes', boxes)
-        // process.exit(1)
-
         console.log(makeStackedBoxes(boxes, {
+          borderText: 'Variable Details. Click on titles to open in editor.',
           borderColor: 'gray',
-          minWidth: '90%',
+          minWidth: '96%',
           borderStyle: 'bold',
+          disableTitleSeparator: true,
         }))
         // process.exit(1)
+      }
+
+      // New unique variable makeStackedBoxes display
+      const uniqueBoxes = uniqueVarKeys.map((varName, i) => {
+        const uniqueVar = uniqueVariables[varName]
+        const occurrences = uniqueVar.occurrences || []
+        const firstOcc = occurrences[0] || {}
+
+        const spacing = '           '
+        const titleText = `Variable:${spacing}`
+        const VALUE_HEX = '#899499'
+        const keyChalk = chalk.whiteBright
+        const valueChalk = chalk.hex(VALUE_HEX)
+
+        let varMsg = ''
+        let requiredMessage = ''
+
+        // Show required status from computed isRequired (accounts for resolved self-refs)
+        const isRequired = occurrences.some(occ => occ.isRequired)
+        if (isRequired) {
+          requiredMessage = `${chalk.red.bold('[Required]')}`
+        }
+
+        // Show type filter if present
+        if (uniqueVar.types && uniqueVar.types.length > 0) {
+          const typeLabel = `${keyChalk('Type:'.padEnd(titleText.length, ' '))}`
+          varMsg += `${typeLabel} ${valueChalk(uniqueVar.types.join(', '))}\n`
+        }
+
+        // Show description
+        if (uniqueVar.descriptions && uniqueVar.descriptions.length > 0) {
+          const descText = `${keyChalk('Description:'.padEnd(titleText.length, ' '))}`
+          const combinedDesc = uniqueVar.descriptions.join('. ')
+          varMsg += `${descText} ${valueChalk(combinedDesc)}\n`
+        }
+
+        // Show default value only if it's a true fallback, not a pre-resolved value
+        // Redact sensitive values like API keys, secrets, tokens
+        const isSensitive = isSensitiveVariable(varName)
+        const hasActualDefault = firstOcc.hasFallback && typeof firstOcc.defaultValue !== 'undefined'
+        if (hasActualDefault) {
+          const defaultValueRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
+          const defaultValueText = `${keyChalk('Default value:'.padEnd(titleText.length, ' '))}`
+          varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
+        } else if (uniqueVar.resolvedValue !== undefined) {
+          // Show pre-resolved current value (e.g., from env, git)
+          const resolvedRender = isSensitive ? '********' : (uniqueVar.resolvedValue === '' ? '""' : uniqueVar.resolvedValue)
+          const resolvedText = `${keyChalk('Current value:'.padEnd(titleText.length, ' '))}`
+          const envIndicator = uniqueVar.variableType === 'env' ? ` ${chalk.red('(currently set env var)')}` : ''
+          varMsg += `${resolvedText} ${valueChalk(resolvedRender)}${envIndicator}\n`
+        }
+
+        // Show default value source path
+        if (firstOcc.defaultValueSrc) {
+          varMsg += `${keyChalk('Default path:'.padEnd(titleText.length, ' '))} `
+          const defaultPathLine = findLineForKey(firstOcc.defaultValueSrc, lines, fileType)
+          if (defaultPathLine) {
+            varMsg += `${createEditorLink(configFilePath, defaultPathLine, 1, firstOcc.defaultValueSrc, 'gray')}\n`
+          } else {
+            varMsg += `${valueChalk(firstOcc.defaultValueSrc)}\n`
+          }
+        }
+
+        // Show config path(s) from occurrences
+        let locationRender
+        let locationLabel
+        if (occurrences.length > 1) {
+          const pathIndent = ' '.repeat(titleText.length + 1)
+          const pathItems = occurrences.map((occ, idx) => {
+            const pathLine = findLineForKey(occ.path, lines, fileType)
+            const pathLink = pathLine
+              ? createEditorLink(configFilePath, pathLine, 1, `- ${occ.path}`, 'gray')
+              : valueChalk(`- ${occ.path}`)
+            const typeText = occ.type ? ` ${chalk.dim(`Type: ${occ.type}`)}` : ''
+            const prefix = idx === 0 ? '' : `${pathIndent}`
+            return `${prefix}${pathLink}${typeText}`
+          })
+          locationRender = pathItems.join('\n')
+          locationLabel = `${keyChalk('Config Paths:'.padEnd(titleText.length, ' '))}`
+        } else {
+          const pathLine = findLineForKey(firstOcc.path, lines, fileType)
+          locationRender = pathLine
+            ? createEditorLink(configFilePath, pathLine, 1, firstOcc.path, 'gray')
+            : valueChalk(firstOcc.path)
+          locationLabel = `${keyChalk('Config Path:'.padEnd(titleText.length, ' '))}`
+        }
+        varMsg += `${locationLabel} ${locationRender}`
+
+        // Find first line number for title
+        const lineNumber = findLineForKey(firstOcc.path, lines, fileType)
+
+        return {
+          content: {
+            left: varMsg,
+            backgroundColor: 'red',
+            width: '100%',
+          },
+          title: {
+            left: `▷ ${firstOcc.varMatch}`,
+            right: `${requiredMessage} ${lineNumber ? `Line: ${lineNumber.toString().padEnd(2, ' ')}` : ''}`,
+            paddingBottom: 1,
+            paddingTop: (i === 0) ? 1 : 0,
+            truncate: true,
+          },
+          width: '100%',
+        }
+      })
+
+      console.log(makeStackedBoxes(uniqueBoxes, {
+        borderText: 'Unique Variables',
+        borderColor: 'gray',
+        minWidth: '96%',
+        borderStyle: 'bold',
+        disableTitleSeparator: true,
+      }))
+      console.log()
+
+
+      // Unique variables that require setup (excludes readonly source types)
+      const CONFIGURABLE_SOURCES = ['user', 'config', 'remote']
+      const configurableVariables = {}
+      const configurableVarKeys = []
+
+      for (const varName of uniqueVarKeys) {
+        const uniqueVar = uniqueVariables[varName]
+        // Include if source type is user, config, or remote (not readonly)
+        if (CONFIGURABLE_SOURCES.includes(uniqueVar.variableSourceType)) {
+          configurableVariables[varName] = uniqueVar
+          configurableVarKeys.push(varName)
+        }
+      }
+
+      // Display configurable variables by source type
+      if (configurableVarKeys.length > 0) {
+        const spacing = '           '
+        const titleText = `Variable:${spacing}`
+        const VALUE_HEX = '#899499'
+        const keyChalk = chalk.whiteBright
+        const valueChalk = chalk.hex(VALUE_HEX)
+
+        // Group by source type
+        const bySource = {
+          user: [],
+          config: [],
+          remote: [],
+        }
+
+        for (const varName of configurableVarKeys) {
+          const v = configurableVariables[varName]
+          const sourceType = v.variableSourceType || 'user'
+          if (bySource[sourceType]) {
+            bySource[sourceType].push({ varName, ...v })
+          }
+        }
+
+        const sourceLabels = {
+          user: 'User Input Required',
+          config: 'Config References',
+          remote: 'Remote Services',
+        }
+
+        const sourceColors = {
+          user: 'yellow',
+          config: 'cyan',
+          remote: 'magenta',
+        }
+
+        const configurableBoxes = []
+
+        for (const [sourceType, vars] of Object.entries(bySource)) {
+          if (vars.length === 0) continue
+
+          for (let i = 0; i < vars.length; i++) {
+            const v = vars[i]
+            const occurrences = v.occurrences || []
+            const firstOcc = occurrences[0] || {}
+
+            let varMsg = ''
+            let requiredMessage = ''
+
+            // Show required status from computed isRequired (accounts for resolved self-refs)
+            const isRequired = occurrences.some(occ => occ.isRequired)
+            if (isRequired) {
+              requiredMessage = `${chalk.red.bold('[Required]')}`
+            }
+
+            // Show description if present (directly under title, not as key/value)
+            if (v.descriptions && v.descriptions.length > 0) {
+              varMsg += `${chalk.dim(v.descriptions.join('. '))}\n\n`
+            }
+
+            // Show type filter if defined (String, Number, etc.)
+            const varType = (v.types && v.types[0]) || firstOcc.type
+            if (varType) {
+              varMsg += `${keyChalk('Type:'.padEnd(titleText.length, ' '))} ${valueChalk(varType)}\n`
+            }
+
+            // Show current/default value (redact sensitive values)
+            const isSensitive = isSensitiveVariable(v.varName)
+            if (v.resolvedValue !== undefined) {
+              const resolvedRender = isSensitive ? '********' : (v.resolvedValue === '' ? '""' : v.resolvedValue)
+              varMsg += `${keyChalk('Current value:'.padEnd(titleText.length, ' '))} ${valueChalk(resolvedRender)}\n`
+            } else if (firstOcc.hasFallback && firstOcc.defaultValue !== undefined) {
+              const defaultRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
+              varMsg += `${keyChalk('Default value:'.padEnd(titleText.length, ' '))} ${valueChalk(defaultRender)}\n`
+            }
+
+            // Show config path(s)
+            let locationRender
+            let locationLabel
+            if (occurrences.length > 1) {
+              const pathIndent = ' '.repeat(titleText.length + 1)
+              const pathItems = occurrences.map((occ, idx) => {
+                const pathLine = findLineForKey(occ.path, lines, fileType)
+                const pathLink = pathLine
+                  ? createEditorLink(configFilePath, pathLine, 1, `- ${occ.path}`, VALUE_HEX)
+                  : valueChalk(`- ${occ.path}`)
+                const prefix = idx === 0 ? '' : `${pathIndent}`
+                return `${prefix}${pathLink}`
+              })
+              locationRender = pathItems.join('\n')
+              locationLabel = 'Config Paths:'
+            } else {
+              const pathLine = findLineForKey(firstOcc.path, lines, fileType)
+              locationRender = pathLine
+                ? createEditorLink(configFilePath, pathLine, 1, firstOcc.path, VALUE_HEX)
+                : valueChalk(firstOcc.path)
+              locationLabel = 'Config Path:'
+            }
+            varMsg += `${keyChalk(locationLabel.padEnd(titleText.length, ' '))} ${locationRender}`
+
+            // Get type for center heading (reuse varType from above)
+            const typeText = varType ? chalk.dim(`Type: ${varType}`) : ''
+
+            // Get line number for first occurrence
+            const firstOccLine = findLineForKey(firstOcc.path, lines, fileType)
+            const varTitle = firstOcc.varMatch || v.varName
+            const requiredSuffix = requiredMessage ? ` - ${requiredMessage}` : ''
+            const titleLink = firstOccLine
+              ? createEditorLink(configFilePath, firstOccLine, 1, `▷ ${varTitle}`) + requiredSuffix
+              : `▷ ${varTitle}${requiredSuffix}`
+
+            configurableBoxes.push({
+              content: {
+                left: varMsg,
+                width: '100%',
+              },
+              title: {
+                left: titleLink,
+                // center: typeText,
+                right: chalk.dim(`${v.variableType}`),
+                paddingBottom: 1,
+                paddingTop: (configurableBoxes.length === 0) ? 1 : 0,
+                truncate: true,
+              },
+              width: '100%',
+            })
+          }
+        }
+
+        if (configurableBoxes.length > 0) {
+          console.log(makeStackedBoxes(configurableBoxes, {
+            borderText: `Configurable Variables (${configurableVarKeys.length})`,
+            borderColor: 'yellow',
+            minWidth: '96%',
+            borderStyle: 'bold',
+            disableTitleSeparator: true,
+          }))
+          console.log()
+        }
+      }
+
+
+      // WALK through CLI prompt if --setup flag is set
+      if (SETUP_MODE) {
+        logHeader('Setup Mode')
+        // deepLog('enrich', enrich)
+        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
+
+        logHeader('User Inputs Summary')
+        console.log()
+        console.log(JSON.stringify(userInputs, null, 2))
+
+        // TODO set values
+
+        // Apply user inputs to options and environment
+        if (userInputs.options) {
+          Object.assign(this.options, userInputs.options)
+        }
+        if (userInputs.env) {
+          Object.assign(process.env, userInputs.env)
+        }
+
+        if (userInputs.self) {
+          Object.assign(this.config, userInputs.self)
+        }
+
+        if (userInputs.dotProp) {
+          for (const [key, value] of Object.entries(userInputs.dotProp)) {
+            dotProp.set(this.config, key, value)
+          }
+        }
+
+        console.log()
+        logHeader('Resolving Configuration')
+        console.log()
+
+        // process.exit(1)
+
+        // Continue with normal resolution flow using the new values
+        // Don't exit - let it fall through to resolve the config
       }
     
       /* Exit early if list or info flag is set */
       if (showFoundVariables) {
-        process.exit(0)
+        // TODO re-enable this
+        // process.exit(0)
       }
     }
 
@@ -1039,17 +1263,28 @@ class Configorama {
    * @returns {object} Metadata object containing variables, fileRefs, and summary
    */
   collectVariableMetadata() {
+    // Return cached metadata if already computed
+    if (this._cachedMetadata) {
+      return this._cachedMetadata
+    }
+
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
     const variableTypes = this.variableTypes
     const filterMatch = this.filterMatch
+    const configFilePath = this.configFilePath
+    // Use rawOriginalConfig for metadata display (truly original, no escaping)
+    const originalConfig = this.rawOriginalConfig || this.originalConfig
     const foundVariables = []
     const variableData = {}
     const fileRefs = []
     const fileGlobPatterns = []
+    const preResolvedPaths = new Set()
+    const byConfigPath = []
+    const referencesMap = new Map()
     let matchCount = 1
 
-    traverse(this.originalConfig).forEach(function (rawValue) {
+    traverse(originalConfig).forEach(function (rawValue) {
       if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
         const configValuePath = this.path.join('.')
         /* Skip Fn::Sub variables */
@@ -1083,12 +1318,27 @@ class Configorama {
             .map((filter) => filter.trim())
             .filter(Boolean)
 
-          // Remove filters from the key (replace "| String}" with "}")
+          // Remove filters from the key (replace "| String}" with suffix)
           // Also clean up any trailing whitespace before the closing brace
-          keyWithoutFilters = originalSrc.replace(filterMatch, '}').replace(/\s+}$/, '}')
+          keyWithoutFilters = originalSrc.replace(filterMatch, this.varSuffix).replace(this.varSuffixWithSpacePattern, this.varSuffix)
         }
 
         const key = keyWithoutFilters
+
+        // Helper to pre-resolve a variable from config
+        const preResolveFromConfig = (varString, varType) => {
+          if (!varString) return undefined
+          // Handle self: prefix
+          const varPath = varString.startsWith('self:') ? varString.slice(5) : varString
+          // Only pre-resolve dot.prop and self references
+          if (varType === 'dot.prop' || varType === 'self') {
+            const value = dotProp.get(originalConfig, varPath)
+            if (value !== undefined && typeof value !== 'object') {
+              return { resolved: value, path: varPath }
+            }
+          }
+          return undefined
+        }
 
         // Strip filters from resolveDetails
         const cleanedResolveDetails = nested.map(detail => {
@@ -1096,7 +1346,7 @@ class Configorama {
           if (cleaned.varMatch && filterMatch) {
             const match = cleaned.varMatch.match(filterMatch)
             if (match) {
-              cleaned.varMatch = cleaned.varMatch.replace(filterMatch, '').replace(/\s+$/, '') + '}'
+              cleaned.varMatch = cleaned.varMatch.replace(filterMatch, '').replace(/\s+$/, '') + this.varSuffix
             }
           }
           if (cleaned.variable && filterMatch) {
@@ -1111,6 +1361,14 @@ class Configorama {
               cleaned.varString = cleaned.varString.replace(filterMatch, '').trim()
             }
           }
+
+          // Pre-resolve dot.prop and self references
+          const preResolved = preResolveFromConfig(cleaned.varString || cleaned.variable, cleaned.variableType)
+          if (preResolved) {
+            cleaned.varResolved = preResolved.resolved
+            cleaned.varResolvedPath = preResolved.path
+          }
+
           // Also clean fallbackValues if present
           if (cleaned.fallbackValues && Array.isArray(cleaned.fallbackValues)) {
             cleaned.fallbackValues = cleaned.fallbackValues.map(fb => {
@@ -1133,6 +1391,17 @@ class Configorama {
                   cleanedFb.stringValue = cleanedFb.stringValue.replace(filterMatch, '').trim()
                 }
               }
+
+              // Pre-resolve fallback variable references
+              if (cleanedFb.stringValue && cleanedFb.stringValue.match(/^\$\{[^}]+\}$/)) {
+                const innerVar = cleanedFb.stringValue.slice(2, -1)
+                const fbPreResolved = preResolveFromConfig(innerVar, 'dot.prop')
+                if (fbPreResolved) {
+                  cleanedFb.varResolved = fbPreResolved.resolved
+                  cleanedFb.varResolvedPath = fbPreResolved.path
+                }
+              }
+
               return cleanedFb
             })
           }
@@ -1167,35 +1436,59 @@ class Configorama {
 
           if (item && item.fallbackValues) {
             let hasResolvedFallback
+            let defaultValueSrc
+            const isSingleFallback = item.fallbackValues.length === 1
             const order = ([stripFilters(item.valueBeforeFallback)]).concat(item.fallbackValues.map((f, i) => {
               if (f.fallbackValues) {
-                const [nestedOrder, nestedResolvedFallback] = calculateResolveOrder(f)
+                const [nestedOrder, nestedResolvedFallback, nestedDefaultSrc] = calculateResolveOrder(f)
                 if (!hasResolvedFallback && nestedResolvedFallback) {
                   hasResolvedFallback = nestedResolvedFallback
+                  defaultValueSrc = nestedDefaultSrc
                 }
                 return nestedOrder
               }
 
+              const valueStr = stripFilters(f.stringValue || f.variable)
+
+              // Only set default from first resolvable fallback
               if (!hasResolvedFallback && f.isResolvedFallback) {
-                hasResolvedFallback = stripFilters(f.stringValue)
-              }
-              if (f.isResolvedFallback) {
-                hasResolvedFallback = stripFilters(f.stringValue)
+                if (f.varResolved !== undefined) {
+                  hasResolvedFallback = f.varResolved
+                  defaultValueSrc = f.varResolvedPath
+                } else if (!valueStr.match(/^\$\{[^}]+\}$/)) {
+                  // Literal value - use as default
+                  hasResolvedFallback = valueStr
+                }
+                // If variable can't resolve, don't set - let next fallback try
               }
 
               if (!hasResolvedFallback && f.isVariable) {
                 defaultValueIsVar = f
               }
-              const valueStr = stripFilters(f.stringValue || f.variable)
-              return `${valueStr}${f.isResolvedFallback ? ' (Resolved default fallback)' : ''}`
+
+              if (f.isResolvedFallback) {
+                if (isSingleFallback) {
+                  // Single fallback: show "value (default)"
+                  return `${valueStr} (default)`
+                } else {
+                  // Multiple fallbacks: show resolved value if available
+                  if (f.varResolved !== undefined) {
+                    return `${valueStr} = ${f.varResolved}`
+                  }
+                  // If can't resolve, just show the value without annotation
+                  return valueStr
+                }
+              }
+              return valueStr
             })).flat()
 
-            return [order, hasResolvedFallback]
+            return [order, hasResolvedFallback, defaultValueSrc]
           }
-          return [[stripFilters(item.variable)], undefined]
+          return [[stripFilters(item.variable)], undefined, undefined]
         }
 
-        const [resolveOrder, hasResolvedFallback] = calculateResolveOrder(lastItem)
+        const lastCleanedItem = cleanedResolveDetails[cleanedResolveDetails.length - 1]
+        const [resolveOrder, hasResolvedFallback, defaultValueSrc] = calculateResolveOrder(lastCleanedItem)
         varData.resolveOrder = resolveOrder
 
         if (defaultValueIsVar) {
@@ -1204,6 +1497,10 @@ class Configorama {
 
         if (typeof hasResolvedFallback !== 'undefined') {
           varData.defaultValue = hasResolvedFallback
+        }
+
+        if (defaultValueSrc) {
+          varData.defaultValueSrc = defaultValueSrc
         }
 
         if (typeof varData.defaultValue === 'undefined') {
@@ -1218,46 +1515,75 @@ class Configorama {
         nested.forEach((detail) => {
           // console.log('detail', detail)
           if (detail.variableType && (detail.variableType === 'file' || detail.variableType === 'text')) {
-            const fileMatch = detail.variable.match(/^(?:file|text)\((.*?)\)/)
-            if (fileMatch && fileMatch[1]) {
-              let fileContent = fileMatch[1].trim()
-              
-              // Split by comma to separate file path from parameters/fallback values
-              const parts = splitCsv(fileContent)
-              let filePath = parts[0].trim()
-              
-              // Remove quotes if present
-              filePath = filePath.replace(/^['"]|['"]$/g, '')
-              
-              // Normalize path: ensure relative paths start with ./
-              let normalizedPath = filePath
-              if (
-                !filePath.startsWith('./') && 
-                !filePath.startsWith('../') && 
-                !filePath.startsWith('/') && 
-                !filePath.startsWith('~')
-              ) {
-                normalizedPath = './' + filePath
-              }
+            const extracted = extractFilePath(detail.variable)
+            if (extracted) {
+              const normalizedPath = normalizePath(extracted.filePath)
+              if (!normalizedPath) return
 
-              // file .// 
-              if (normalizedPath.startsWith('.//')) {
-                normalizedPath = normalizedPath.replace('.//', './')
-              }
-              
               // Handle variables in file paths - just record the pattern
               if (!fileRefs.includes(normalizedPath)) {
                 fileRefs.push(normalizedPath)
               }
-              
+
               // Check if path contains variables and create glob pattern
-              if (normalizedPath.match(variableSyntax)) {
+              const containsVariables = !!normalizedPath.match(variableSyntax)
+              let globPattern
+              if (containsVariables) {
                 // Replace variable syntax ${...} with * for glob pattern
-                const globPattern = normalizedPath.replace(variableSyntax, '*')
+                globPattern = normalizedPath.replace(variableSyntax, '*')
                 if (!fileGlobPatterns.includes(globPattern)) {
                   fileGlobPatterns.push(globPattern)
                 }
               }
+
+              // Try to pre-resolve inner variables from originalConfig
+              let resolvedPath = normalizedPath
+              let resolvedVarString = rawValue
+              if (containsVariables) {
+                const pathResult = resolveInnerVariables(normalizedPath, variableSyntax, originalConfig, dotProp.get)
+                const varStringResult = resolveInnerVariables(rawValue, variableSyntax, originalConfig, dotProp.get)
+
+                if (pathResult.didResolve) {
+                  resolvedPath = normalizePath(pathResult.resolved) || pathResult.resolved
+                  resolvedVarString = varStringResult.resolved
+                  preResolvedPaths.add(resolvedPath)
+                }
+              }
+
+              // Build byConfigPath entry
+              const absolutePath = configFilePath
+                ? path.resolve(path.dirname(configFilePath), resolvedPath)
+                : resolvedPath
+              const fileExists = configFilePath ? fs.existsSync(absolutePath) : false
+
+              const configPathEntry = {
+                location: configValuePath,
+                filePath: absolutePath,
+                relativePath: resolvedPath,
+                originalVariableString: rawValue,
+                resolvedVariableString: resolvedVarString,
+                containsVariables,
+                exists: fileExists,
+              }
+              if (globPattern) {
+                configPathEntry.pattern = globPattern
+              }
+              byConfigPath.push(configPathEntry)
+
+              // Build references entry (use resolvedPath as key when available)
+              const refKey = resolvedPath
+              if (!referencesMap.has(refKey)) {
+                referencesMap.set(refKey, {
+                  resolvedPath: refKey,
+                  refs: [],
+                })
+              }
+              const refEntry = referencesMap.get(refKey)
+              refEntry.refs.push({
+                location: configValuePath,
+                value: normalizedPath,
+                originalVariableString: rawValue,
+              })
             }
           }
         })
@@ -1278,50 +1604,58 @@ class Configorama {
       const instances = variableData[key]
       const firstInstance = instances[0]
 
-      // Check if truly required using same logic as display code
-      let isTrulyRequired = false
-      if (typeof firstInstance.defaultValue === 'undefined') {
-        // Check for self-references that resolve to config values
-        let dotPropArr = []
-        if (firstInstance.defaultValueIsVar && (
-          firstInstance.defaultValueIsVar.variableType === 'self:' ||
-          firstInstance.defaultValueIsVar.variableType === 'dot.prop'
-        )) {
-          dotPropArr = [firstInstance.defaultValueIsVar]
-        }
+      // Extract variable name from key (e.g. "${self:service}" -> "self:service")
+      const keyVarName = key.slice(2, -1).split(',')[0].trim()
 
-        const hasDotPropOrSelf = instances.reduce((acc, v) => {
-          // Only check the outermost variable (last in resolveDetails)
-          if (v.resolveDetails && v.resolveDetails.length > 0) {
-            const outermostDetail = v.resolveDetails[v.resolveDetails.length - 1]
-            if (outermostDetail.variableType === 'dot.prop' || outermostDetail.variableType === 'self') {
-              acc.push(outermostDetail)
-            }
-          }
-          return acc
-        }, dotPropArr)
-
-        if (!hasDotPropOrSelf.length) {
-          isTrulyRequired = true
-        } else {
-          // Check if the self-reference resolves to a value
-          const cleanPath = hasDotPropOrSelf[0].variable.replace('self:', '')
-          const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
-          if (typeof dotPropValue === 'undefined') {
-            isTrulyRequired = true
-          } else {
-            // Enrich with default value from self-reference
-            firstInstance.defaultValueSrc = cleanPath
-            const niceString = typeof dotPropValue === 'object' ? JSON.stringify(dotPropValue) : dotPropValue
-            const truncatedString = niceString.length > 100 ? niceString.substring(0, 90) + '...' : niceString
-            firstInstance.defaultValue = truncatedString
-            firstInstance.isRequired = false
+      // Find the resolveDetail that matches THIS variable (not any self-ref in the string)
+      let matchingDetail = null
+      for (const instance of instances) {
+        if (instance.resolveDetails && instance.resolveDetails.length > 0) {
+          const found = instance.resolveDetails.find((detail) => {
+            const detailVar = detail.valueBeforeFallback || detail.variable
+            return detailVar === keyVarName
+          })
+          if (found && (found.variableType === 'dot.prop' || found.variableType === 'self')) {
+            matchingDetail = found
+            break
           }
         }
       }
 
+      // Also check defaultValueIsVar
+      if (!matchingDetail && firstInstance.defaultValueIsVar && (
+        firstInstance.defaultValueIsVar.variableType === 'self:' ||
+        firstInstance.defaultValueIsVar.variableType === 'dot.prop'
+      )) {
+        matchingDetail = firstInstance.defaultValueIsVar
+      }
+
+      // Check if truly required
+      let isTrulyRequired = false
+      if (matchingDetail) {
+        // Check if the self-reference resolves to a value
+        // Use valueBeforeFallback if present (strips inline fallback like ", false")
+        const varPath = matchingDetail.valueBeforeFallback || matchingDetail.variable
+        const cleanPath = varPath.replace('self:', '')
+        const dotPropValue = dotProp.get(this.originalConfig, cleanPath)
+        if (typeof dotPropValue === 'undefined') {
+          isTrulyRequired = true
+        } else {
+          // Enrich ALL instances with resolved self-reference value (overrides inline fallbacks)
+          instances.forEach((instance) => {
+            instance.defaultValueSrc = cleanPath
+            instance.defaultValue = dotPropValue
+            instance.isRequired = false
+          })
+        }
+      } else if (typeof firstInstance.defaultValue === 'undefined') {
+        isTrulyRequired = true
+      }
+
       // Update isRequired based on computed isTrulyRequired
-      firstInstance.isRequired = isTrulyRequired
+      instances.forEach((instance) => {
+        instance.isRequired = isTrulyRequired
+      })
 
       if (isTrulyRequired) {
         requiredCount++
@@ -1330,19 +1664,20 @@ class Configorama {
       }
     })
 
-    return {
+    this._cachedMetadata = {
       variables: variableData,
       uniqueVariables: {},
       fileDependencies: {
         globPatterns: fileGlobPatterns,
         // all: fileRefs,
         dynamicPaths: fileRefs.filter(ref => ref.indexOf('*') !== -1 || ref.match(variableSyntax)),
-        // resolve files are those that are paths with no * and no inner variables
-        resolvedPaths: fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
-        // Set in enrichMetadata
-        byConfigPath: undefined,
-        // Set in enrichMetadata
-        references: undefined,
+        // Resolved paths: static paths + pre-resolved dynamic paths
+        resolvedPaths: [
+          ...fileRefs.filter(ref => ref.indexOf('*') === -1 && !ref.match(variableSyntax)),
+          ...preResolvedPaths
+        ],
+        byConfigPath,
+        references: Array.from(referencesMap.values()),
       },
       summary: {
         totalVariables: varKeys.length,
@@ -1350,61 +1685,44 @@ class Configorama {
         variablesWithDefaults: withDefaultsCount
       },
     }
+
+    return this._cachedMetadata
   }
-  runFunction(variableString) {
-    // console.log('runFunction', variableString)
-    /* If json object value return it */
-    if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
-      return variableString
-    }
-    // console.log('runFunction', variableString)
-    var hasFunc = funcRegex.exec(variableString)
-    // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
-    // console.log('hasFunc', hasFunc)
-    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
-      return variableString
-    }
-    // test for object
-    const functionName = hasFunc[1]
-    const rawArgs = hasFunc[2]
-    // TODO @DWELLS. Loop through all raw args and parse to correct datatype
-    // argument is object
-    let argsToPass
-    if (rawArgs && rawArgs.match(/^{([^}]+)}$/)) {
-      // console.log('OBJECT', hasFunc[2])
-      // TODO use JSON5
-      argsToPass = [JSON.parse(rawArgs)]
-    } else {
-      // TODO fix how commas + spaces are ned
-      const splitter = splitCsv(rawArgs, ', ')
-      // console.log('splitter', splitter)
-      argsToPass = formatFunctionArgs(splitter)
-    }
-    // console.log('argsToPass runFunction', argsToPass)
-    // TODO check for camelCase version. | toUpperCase messes with function name
-    const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
-
-    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
-
-    const funcValue = theFunction(...argsToPass)
-    // console.log('funcValue', funcValue)
-    // console.log('typeof funcValue', typeof funcValue)
-    let replaceVal = funcValue
-    if (typeof funcValue === 'string') {
-      const replaceIt = variableString.replace(hasFunc[0], funcValue)
-      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
-    }
-
-    // If wrapped in outer function, recurse
-    const hasMoreFunctions = funcRegex.exec(replaceVal)
-    if (hasMoreFunctions) {
-      return this.runFunction(replaceVal)
-    }
-    return replaceVal
+  /**
+   * Populate the variables in the given object.
+   * @param objectToPopulate The object to populate variables within.
+   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
+   */
+  populateObject(objectToPopulate) {
+    return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
   }
-  // ############
-  // ## OBJECT ##
-  // ############
+  populateObjectImpl(objectToPopulate) {
+    this.callCount = this.callCount + 1
+
+    if (DEBUG) {
+      deepLog(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
+      // process.exit(0)
+    }
+
+    const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
+    this.leaves = leaves
+    // console.log('leaves', leaves)
+    const populations = this.populateVariables(leaves)
+    // console.log("FILL LEAVES", populations)
+
+    if (populations.length === 0) {
+      if (DEBUG) console.log('Config Population Finished')
+      return Promise.resolve(objectToPopulate)
+    }
+
+    return this.assignProperties(objectToPopulate, populations).then(() => {
+      return this.populateObjectImpl(objectToPopulate)
+    })
+  }
+
+  // #######################
+  // ## PROPERTY HANDLING ##
+  // #######################
   /**
    * The declaration of a terminal property.  This declaration includes the path and value of the
    * property.
@@ -1552,40 +1870,9 @@ class Configorama {
       })
     })
   }
-  /**
-   * Populate the variables in the given object.
-   * @param objectToPopulate The object to populate variables within.
-   * @returns {Promise.<TResult>|*} A promise resolving to the in-place populated object.
-   */
-  populateObject(objectToPopulate) {
-    return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
-  }
-  populateObjectImpl(objectToPopulate) {
-    this.callCount = this.callCount + 1
-
-    if (DEBUG) {
-      deepLog(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
-      // process.exit(0)
-    }
-
-    const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
-    this.leaves = leaves
-    // console.log('leaves', leaves)
-    const populations = this.populateVariables(leaves)
-    // console.log("FILL LEAVES", populations)
-
-    if (populations.length === 0) {
-      if (DEBUG) console.log('Config Population Finished')
-      return Promise.resolve(objectToPopulate)
-    }
-
-    return this.assignProperties(objectToPopulate, populations).then(() => {
-      return this.populateObjectImpl(objectToPopulate)
-    })
-  }
-  // ##############
-  // ## PROPERTY ##
-  // ##############
+  // ##################
+  // ## MATCH/RENDER ##
+  // ##################
   /**
    * @typedef {Object} MatchResult
    * @property {String} match The original property value that matched the variable syntax
@@ -1648,7 +1935,17 @@ class Configorama {
 
     let result = valueObject.value
     for (let i = 0; i < matches.length; i += 1) {
-      this.warnIfNotFound(matches[i].variable, results[i])
+      warnIfNotFound(matches[i].variable, results[i], {
+        patterns: {
+          env: envRefSyntax,
+          opt: optRefSyntax,
+          self: selfRefSyntax,
+          file: fileRefSyntax,
+          deep: deepRefSyntax,
+          text: textRefSyntax
+        },
+        debug: DEBUG
+      })
 
       // Extract metadata from result if present
       let actualResult = results[i]
@@ -1792,6 +2089,10 @@ class Configorama {
 
     return result
   }
+
+  // ######################
+  // ## VALUE RESOLUTION ##
+  // ######################
   /**
    * Populate the given value, recursively if root is true
    * @param valueObject The value to populate variables within
@@ -1909,7 +2210,8 @@ class Configorama {
     const hasFilters = originalSrc.match(this.filterMatch)
     let foundFilters = []
     if (hasFilters) {
-      foundFilters = hasFilters[1]
+      foundFilters = hasFilters[0]
+        .replace(this.varSuffixPattern, '')
         .split('|')
         .map((filter) => filter.trim())
         .filter(Boolean)
@@ -1994,13 +2296,13 @@ class Configorama {
       console.log('isString currentMatchedString', currentMatchedString)
       console.log('>------')
       /** */
-      // Handle comma ${opt:stage, dev} and remove extra }
+      // Handle comma ${opt:stage, dev} and remove extra suffix
       if (
         currentMatchedString.match(this.variableSyntax) &&
         !valueToPopulate.match(this.variableSyntax) &&
-        valueToPopulate.match(/}$/)
+        valueToPopulate.match(this.varSuffixPattern)
       ) {
-        valueToPopulate = valueToPopulate.replace(/}$/, '')
+        valueToPopulate = valueToPopulate.replace(this.varSuffixPattern, '')
       }
 
       property = replaceAll(currentMatchedString, valueToPopulate, property)
@@ -2047,7 +2349,7 @@ class Configorama {
       let missingValue = matchedString
 
       if (matchedString.match(deepRefSyntax)) {
-        const deepIndex = matchedString.split(':')[1].replace('}', '')
+        const deepIndex = matchedString.split(':')[1].replace(this.varSuffixPattern, '')
         const i = Number(deepIndex)
         missingValue = this.deep[i]
       }
@@ -2064,7 +2366,7 @@ class Configorama {
 
       if (nestedVar) {
         const fallbackStr = getFallbackString(splitVars, nestedVar)
-        if (!this.opts.allowUnknownVars) {
+        if (!this.opts.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
@@ -2076,6 +2378,39 @@ class Configorama {
           // set __internal_only_flag to note this is object we make not a resolved value
           __internal_only_flag: true,
           caller: 'nestedVar',
+        }
+      }
+
+      // If allowUnresolvedVariables and there are fallbacks, use the fallback
+      if (this.opts.allowUnresolvedVariables && splitVars.length > 1) {
+        const nextFallback = splitVars[1].trim()
+        // Strip trailing variable suffix (handles }, }}, >, ]], etc.)
+        const nextFallbackClean = nextFallback.replace(this.varSuffixPattern, '')
+        const isQuotedString = /^['"].*['"]$/.test(nextFallbackClean)
+        const isNumeric = /^-?\d+(\.\d+)?$/.test(nextFallbackClean)
+        if (isQuotedString || isNumeric) {
+          let staticValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
+          // Convert to number if it's a numeric fallback
+          if (isNumeric) {
+            staticValue = Number(staticValue)
+          }
+          return {
+            value: staticValue,
+            path: valueObject.path,
+            originalSource: valueObject.originalSource,
+            resolutionHistory: valueObject.resolutionHistory || [],
+          }
+        }
+        // Next fallback is another variable
+        const remainingContent = splitVars.slice(1).join(', ').replace(this.varSuffixPattern, '')
+        const remainingFallbacks = this.varPrefix + remainingContent + this.varSuffix
+        return {
+          value: remainingFallbacks,
+          path: valueObject.path,
+          originalSource: valueObject.originalSource,
+          resolutionHistory: valueObject.resolutionHistory || [],
+          __internal_only_flag: true,
+          caller: 'allowUnresolvedVariables-fallback',
         }
       }
 
@@ -2101,7 +2436,7 @@ Missing Value ${missingValue} - ${matchedString}
       )
       
       // Double processing needed for `${eval(${self:three} > ${self:four})}`
-      if (prop.startsWith('${')) {
+      if (prop.startsWith(this.varPrefix)) {
         prop = cleanVariable(prop, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
       }
       
@@ -2176,14 +2511,13 @@ Missing Value ${missingValue} - ${matchedString}
     if (typeof valueToPopulate === 'number' && foundFilters.length) {
       runFilters = true
     } else if (
-      typeof valueToPopulate === 'string' && 
-      !valueToPopulate.match(deepRefSyntax) && 
-      foundFilters.length && 
+      typeof valueToPopulate === 'string' &&
+      !valueToPopulate.match(deepRefSyntax) &&
+      foundFilters.length &&
       !property.match(this.variableSyntax)
     ) {
       runFilters = true
     }
-
     /* Apply filters if found */
     //console.log('> property', property)
     if (runFilters) {
@@ -2274,7 +2608,6 @@ Missing Value ${missingValue} - ${matchedString}
 
     // console.log('variableValues', variableValues)
     return Promise.all(variableValues).then((values) => {
-      let deepPropertyStr = propertyString
       let deepProperties = 0
       // console.log('overwrite values', valuesToUse)
       // Extract actual values from metadata objects
@@ -2284,6 +2617,10 @@ Missing Value ${missingValue} - ${matchedString}
         }
         return value
       })
+
+      // Build deep variable parts for reconstruction
+      const deepVariableParts = variableStrings.slice()
+
       extractedValues.forEach((value, index) => {
         // console.log('───────────────────────────────> value', value)
         if (isString(value) && value.match(this.variableSyntax)) {
@@ -2293,16 +2630,23 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('deepVariable', deepVariable)
           const newValue = cleanVariable(deepVariable, this.variableSyntax, true, `overwrite ${this.callCount}`)
           // console.log(`overwrite newValue ${variableStrings[index]}`, newValue)
-          // console.log('variableStrings', variableStrings)
-          deepPropertyStr = deepPropertyStr.replace(variableStrings[index], newValue)
-          // console.log('deepPropertyString', deepPropertyStr)
+          // Store the deep ref for this part
+          deepVariableParts[index] = newValue
         }
       })
-      return deepProperties > 0
-        ? Promise.resolve(deepPropertyStr) // return deep variable replacement of original
-        : Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
+
+      if (deepProperties > 0) {
+        // Reconstruct a minimal variable string with deep refs, not the full outer string
+        const reconstructed = this.varPrefix + deepVariableParts.join(', ') + this.varSuffix
+        return Promise.resolve(reconstructed)
+      }
+      return Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
     })
   }
+
+  // ####################
+  // ## SOURCE GETTERS ##
+  // ####################
   /**
    * Given any variable string, return the value it should be populated with.
    * @param variableString The variable string to retrieve a value for.
@@ -2392,7 +2736,7 @@ Missing Value ${missingValue} - ${matchedString}
         .map((f) => {
           return trim(f)
           // TODO refactor this. This is a temp fix for filters with nested vars.
-          .replace(/}$/, '')
+          .replace(this.varSuffixPattern, '')
         })
       // console.log('filters to run', _filter)
 
@@ -2506,11 +2850,28 @@ Missing Value ${missingValue} - ${matchedString}
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
+          if (this.opts.allowUnresolvedVariables) {
+            // Check if outer expression has fallbacks we can use
+            // valueCount[0] is the primary var, valueCount[1+] are fallbacks
+            if (valueCount.length > 1) {
+              const primaryVar = valueCount[0]
+              // If the unresolvable variableString is used INSIDE the primary var,
+              // return undefined to trigger the outer fallback mechanism
+              if (primaryVar.includes(variableString)) {
+                return Promise.resolve(undefined)
+              }
+            }
+            // Encode unresolved variable to pass through resolution
+            return Promise.resolve(encodeUnknown(propertyString))
+          }
+
           if (valueCount.length === 1 && noNestedVars) {
-            const configFilePath = (this.configFilePath) ? `\nin file ${this.configFilePath}` : ''
+            const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
 
-            throw new Error(`Unable to resolve configuration "${propertyString}" variable at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${configFilePath}${fromLine}
+
+
+            throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
@@ -2576,7 +2937,7 @@ Missing Value ${missingValue} - ${matchedString}
         if (typeof val === 'string' && val.match(/deep:/)) {
           // TODO refactor the deep filter logic here. match | filter | filter..
           const allFilters = propertyString
-            .replace(/}$/, '')
+            .replace(this.varSuffixPattern, '')
             .split('|')
             .reduce((acc, currentFilter, i) => {
               if (i === 0) {
@@ -2586,7 +2947,7 @@ Missing Value ${missingValue} - ${matchedString}
               return acc
             }, '')
           // add filters to deep references if filter is used
-          const deepValueWithFilters = newHasFilter[1] ? val.replace(/}$/, ` ${allFilters}}`) : val
+          const deepValueWithFilters = newHasFilter[1] ? val.replace(this.varSuffixPattern, ` ${allFilters}${this.varSuffix}`) : val
           // console.log('deepValueWithFilters', deepValueWithFilters)
           // console.log('RESOLVER RETURN newValue 4', deepValueWithFilters)
           return Promise.resolve(deepValueWithFilters)
@@ -2666,7 +3027,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
-        if (!this.opts.allowUnknownVars) {
+        if (!this.opts.allowUnknownVariables) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
         const fallbackStr = getFallbackString(split, nestedVar)
@@ -2769,7 +3130,7 @@ Missing Value ${missingValue} - ${matchedString}
 
 
     /* Pass through unknown variables */
-    if (this.opts.allowUnknownVars || allowSpecialCase) {
+    if (this.opts.allowUnknownVariables || allowSpecialCase) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
@@ -2821,331 +3182,20 @@ Missing Value ${missingValue} - ${matchedString}
     })
   }
   async getValueFromFile(variableString, options) {
-    const opts = options || {}
-    const syntax = opts.asRawText ? textRefSyntax : fileRefSyntax
-    // console.log('From file', `"${variableString}"`)
-    let matchedFileString = variableString.match(syntax)[0]
-    // console.log('matchedFileString', matchedFileString)
-
-    // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
-    // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
-    var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)/g
-    // tighter (?<![.\w-])\b(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*
-    var hasParams = funcParamsRegex.exec(matchedFileString)
-
-    let argsToPass = []
-    if (hasParams) {
-      const splitter = splitCsv(hasParams[2])
-      const argsFound = splitter.map((arg) => {
-        const cleanArg = trim(arg).replace(/^'|"/, '').replace(/'|"$/, '')
-        return cleanArg
-      })
-      // console.log('argsFound', argsFound)
-
-      // If function has more arguments than file path
-      if (argsFound.length && argsFound.length > 1) {
-        matchedFileString = argsFound[0]
-        argsToPass = argsFound.filter((arg, i) => {
-          return i !== 0
-        })
-      }
+    const ctx = {
+      configPath: this.configPath,
+      fileRefsFound: this.fileRefsFound,
+      variableSyntax: this.variableSyntax,
+      variablesKnownTypes: this.variablesKnownTypes,
+      variableTypes: this.variableTypes,
+      opts: this.opts,
+      originalConfig: this.originalConfig,
+      config: this.config,
+      getDeeperValue: this.getDeeperValue.bind(this),
+      fileRefSyntax: fileRefSyntax,
+      textRefSyntax: textRefSyntax
     }
-    // console.log('argsToPass', argsToPass)
-
-    const fileDetails = resolveFilePathFromMatch(matchedFileString, syntax, this.configPath)
-    // console.log('fileDetails', fileDetails)
-
-    const { fullFilePath, resolvedPath, relativePath } = fileDetails
-
-    const exists = fs.existsSync(fullFilePath)
-
-    this.fileRefsFound.push({
-      // location: options.context.path.join('.'),
-      filePath: fullFilePath,
-      relativePath,
-      resolvedVariableString: options.context.value,
-      originalVariableString: options.context.originalSource,
-      containsVariables: options.context.value !== options.context.originalSource,
-      exists,
-    })
-
-    let fileExtension = resolvedPath.split('.')
-
-    fileExtension = fileExtension[fileExtension.length - 1]
-
-    // Validate file exists
-    if (!exists) {
-      const originalVar = options.context && options.context.originalSource
-
-      const findNestedResult = findNestedVariables(
-        originalVar,
-        this.variableSyntax,
-        this.variablesKnownTypes,
-        options.context.path,
-        this.variableTypes
-      )
-      // console.log('findNestedResult', findNestedResult)
-      let hasFallback = false
-      if (findNestedResult) {
-        const varDetails = findNestedResult[0]
-        // console.log('varDetails', varDetails)
-        hasFallback = varDetails.hasFallback
-      }
-
-      // check if original var has fallback value
-      // console.log('NO FILE FOUND', fullFilePath)
-      // console.log('variableString', variableString)
-
-      if (!hasFallback && !this.opts.allowUnknownFileRefs) {
-        const errorMsg = makeBox({
-          title: `File Not Found in ${originalVar}`,
-          minWidth: '100%',
-          text: `Variable ${variableString} cannot resolve due to missing file.
-
-File not found ${fullFilePath}
-
-Default fallback value will be used if provided.
-
-${JSON.stringify(options.context, null, 2)}`,
-    })
-        console.log(errorMsg)
-      }
-      // TODO maybe reject. YAML does not allow for null/undefined values
-      // return Promise.reject(new Error(errorMsg))
-      return Promise.resolve(undefined)
-    }
-
-  
-
-    let valueToPopulate
-
-    const variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
-
-    /* handle case for referencing raw JS files to inline them */
-    if (argsToPass.length 
-      && (argsToPass && argsToPass[0] && argsToPass[0].toLowerCase() === 'raw') 
-      || opts.asRawText
-    ) {
-      // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
-      valueToPopulate = encodeJsSyntax(variableFileContents)
-      return Promise.resolve(valueToPopulate)
-    }
-
-    // Process JS files
-    if (fileExtension === 'js' || fileExtension === 'cjs') {
-      // Possible alt importer tool https://github.com/humanwhocodes/module-importer
-      const jsFile = require(fullFilePath)
-      let returnValueFunction = jsFile
-      // TODO change how exported functions are referenced
-      const variableArray = variableString.split(':')
-
-      if (variableArray[1]) {
-        let jsModule = variableArray[1]
-        jsModule = jsModule.split('.')[0]
-        returnValueFunction = jsFile[jsModule]
-      }
-
-      if (typeof returnValueFunction !== 'function') {
-        const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your javascript is exporting a function that returns a value.`
-        return Promise.reject(new Error(errorMessage))
-      }
-      // TODO update what is passed into function
-
-      const valueForFunction = {
-        originalConfig: this.originalConfig,
-        config: this.config,
-        opts: this.opts,
-      }
-    
-      valueToPopulate = returnValueFunction.call(jsFile, valueForFunction, ...argsToPass)
-
-      return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-        let deepProperties = variableString.replace(matchedFileString, '')
-        deepProperties = deepProperties.slice(1).split('.')
-        deepProperties.splice(0, 1)
-        // Trim prop keys for starting/trailing spaces
-        deepProperties = deepProperties.map((prop) => {
-          return trim(prop)
-        })
-        return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
-          if (typeof deepValueToPopulateResolved === 'undefined') {
-            const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your javascript is returning the correct data.`
-            return Promise.reject(new Error(errorMessage))
-          }
-          return Promise.resolve(deepValueToPopulateResolved)
-        })
-      })
-    }
-
-    if (fileExtension === 'ts') {
-      const { executeTypeScriptFile } = require('./parsers/typescript')
-      let returnValueFunction
-      const variableArray = variableString.split(':')
-
-      try {
-        const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
-        // console.log('fullFilePath', fullFilePath)
-        // console.log('tsFile', tsFile)
-        returnValueFunction = tsFile.config || tsFile.default || tsFile
-
-        if (variableArray[1]) {
-          let tsModule = variableArray[1]
-          tsModule = tsModule.split('.')[0]
-          returnValueFunction = tsFile[tsModule]
-        }
-
-        if (typeof returnValueFunction !== 'function') {
-          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your TypeScript is exporting a function that returns a value.`
-          return Promise.reject(new Error(errorMessage))
-        }
-
-        const valueForFunction = {
-          originalConfig: this.originalConfig,
-          config: this.config,
-          opts: this.opts,
-        }
-
-        valueToPopulate = returnValueFunction.call(tsFile, valueForFunction, ...argsToPass)
-
-        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-          let deepProperties = variableString.replace(matchedFileString, '')
-          deepProperties = deepProperties.slice(1).split('.')
-          deepProperties.splice(0, 1)
-          // Trim prop keys for starting/trailing spaces
-          deepProperties = deepProperties.map((prop) => {
-            return trim(prop)
-          })
-          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
-            if (typeof deepValueToPopulateResolved === 'undefined') {
-              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your TypeScript is returning the correct data.`
-              return Promise.reject(new Error(errorMessage))
-            }
-            return Promise.resolve(deepValueToPopulateResolved)
-          })
-        })
-      } catch (err) {
-        return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
-      }
-    }
-
-    if (fileExtension === 'mjs' || fileExtension === 'esm') {
-      // Possible alt importer tool https://github.com/humanwhocodes/module-importer
-      const { executeESMFile } = require('./parsers/esm')
-      let returnValueFunction
-      const variableArray = variableString.split(':')
-
-      try {
-        const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
-        // console.log('ESM fullFilePath', fullFilePath)
-        // console.log('ESM esmFile', esmFile, 'type:', typeof esmFile)
-        returnValueFunction = esmFile.config || esmFile.default || esmFile
-
-        if (variableArray[1]) {
-          let esmModule = variableArray[1]
-          esmModule = esmModule.split('.')[0]
-          returnValueFunction = esmFile[esmModule]
-        }
-
-        if (typeof returnValueFunction !== 'function') {
-          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your ESM is exporting a function that returns a value.`
-          return Promise.reject(new Error(errorMessage))
-        }
-
-        const valueForFunction = {
-          originalConfig: this.originalConfig,
-          config: this.config,
-          opts: this.opts,
-        }
-
-        valueToPopulate = returnValueFunction.call(esmFile, valueForFunction, ...argsToPass)
-
-        return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
-          let deepProperties = variableString.replace(matchedFileString, '')
-          deepProperties = deepProperties.slice(1).split('.')
-          deepProperties.splice(0, 1)
-          // Trim prop keys for starting/trailing spaces
-          deepProperties = deepProperties.map((prop) => {
-            return trim(prop)
-          })
-          return this.getDeeperValue(deepProperties, valueToPopulateResolved).then((deepValueToPopulateResolved) => {
-            if (typeof deepValueToPopulateResolved === 'undefined') {
-              const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your ESM is returning the correct data.`
-              return Promise.reject(new Error(errorMessage))
-            }
-            return Promise.resolve(deepValueToPopulateResolved)
-          })
-        })
-      } catch (err) {
-        return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
-      }
-    }
-
-    // Process everything except JS, TS, and ESM
-    if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
-      /* Read initial file */
-      valueToPopulate = variableFileContents
-
-      // File reference has :subKey lookup. Must dig deeper
-      if (matchedFileString !== variableString) {
-        if (fileExtension === 'yml' || fileExtension === 'yaml') {
-          valueToPopulate = JSON.stringify(YAML.parse(valueToPopulate))
-        }
-        if (fileExtension === 'toml') {
-          valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
-        }
-        if (fileExtension === 'ini') {
-          valueToPopulate = INI.toJson(valueToPopulate)
-        }
-        // console.log('deep', variableString)
-        // console.log('matchedFileString', matchedFileString)
-        let deepProperties = variableString.replace(matchedFileString, '')
-        // TODO 2025-11-12 add file.path.support instead of just : 
-        if (deepProperties.substring(0, 1) !== ':') {
-          const errorMessage = `Invalid variable syntax when referencing file "${relativePath}" sub properties
-Please use ":" to reference sub properties. ${deepProperties}`
-          return Promise.reject(new Error(errorMessage))
-        }
-        deepProperties = deepProperties.slice(1).split('.')
-        return this.getDeeperValue(deepProperties, valueToPopulate)
-      }
-
-      if (fileExtension === 'yml' || fileExtension === 'yaml') {
-        valueToPopulate = YAML.parse(valueToPopulate)
-        return Promise.resolve(valueToPopulate)
-      }
-
-      if (fileExtension === 'toml') {
-        valueToPopulate = TOML.parse(valueToPopulate)
-        return Promise.resolve(valueToPopulate)
-      }
-
-      if (fileExtension === 'ini') {
-        valueToPopulate = INI.parse(valueToPopulate)
-        return Promise.resolve(valueToPopulate)
-      }
-
-      if (fileExtension === 'json') {
-        valueToPopulate = JSON.parse(valueToPopulate)
-        return Promise.resolve(valueToPopulate)
-      }
-    }
-    // console.log('fall thru', valueToPopulate)
-    return Promise.resolve(valueToPopulate)
-  }
-  getVariableFromDeep(variableString) {
-    const index = variableString.replace(deepIndexReplacePattern, '')
-    // const index = this.getDeepIndex(variableString)
-    /*
-    console.log('FIND INDEX', index)
-    console.log(this.deep, this.deep[index])
-    /** */
-    return this.deep[index]
+    return getValueFromFileResolver(ctx, variableString, options)
   }
   getValueFromDeep(variableString, pathValue) {
     const variable = this.getVariableFromDeep(variableString)
@@ -3177,6 +3227,19 @@ Please use ":" to reference sub properties. ${deepProperties}`
     }
     return ret
   }
+
+  // ############################
+  // ## DEEP VARIABLE HANDLING ##
+  // ############################
+  getVariableFromDeep(variableString) {
+    const index = variableString.replace(deepIndexReplacePattern, '')
+    // const index = this.getDeepIndex(variableString)
+    /*
+    console.log('FIND INDEX', index)
+    console.log(this.deep, this.deep[index])
+    /** */
+    return this.deep[index]
+  }
   makeDeepVariable(variable, caller) {
     // variable = variable.replace("dev", '"dev"')
     let index = this.deep.findIndex((item) => variable === item)
@@ -3201,8 +3264,6 @@ Please use ":" to reference sub properties. ${deepProperties}`
     console.log('deepVar', deepVar)
     // process.exit(1)
     /** */
-    // TODO debugging space removal. Seems like this helps
-    // const deepVar = variableContainer.replace(/\s/g, '').replace(variableString, `deep:${index}`)
     return deepVar
   }
   /**
@@ -3273,66 +3334,68 @@ Please use ":" to reference sub properties. ${deepProperties}`
     return veryDeep
   }
 
-  warnIfNotFound(variableString, valueToPopulate) {
-    let variableTypeText
-    if (variableString.match(envRefSyntax)) {
-      variableTypeText = 'environment variable'
-    } else if (variableString.match(optRefSyntax)) {
-      variableTypeText = 'option'
-    } else if (variableString.match(selfRefSyntax)) {
-      variableTypeText = 'config attribute'
-    } else if (variableString.match(fileRefSyntax)) {
-      variableTypeText = 'file'
-    } else if (variableString.match(deepRefSyntax)) {
-      variableTypeText = 'deep'
-    } else if (variableString.match(textRefSyntax)) {
-      variableTypeText = 'text'
+  // ###############
+  // ## UTILITIES ##
+  // ###############
+  initialCall(func) {
+    this.deep = []
+    this.tracker.start()
+    return func().finally(() => {
+      this.tracker.stop()
+      this.deep = []
+    })
+  }
+  runFunction(variableString) {
+    // console.log('runFunction', variableString)
+    /* If json object value return it */
+    if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
+      return variableString
     }
-    if (!isValidValue(valueToPopulate)) {
-      // console.log("MISSING", variableString)
-      // console.log(this.deep)
-      // console.log(valueToPopulate)
-      const notFoundMsg = `No ${variableTypeText} found to satisfy the '\${${variableString}}' variable. Attempting fallback value`
-      if (DEBUG) {
-        console.log(notFoundMsg)
-      }
-      // errors make fallbacks not function. throw new Error(errorMsg)
+    // console.log('runFunction', variableString)
+    var hasFunc = funcRegex.exec(variableString)
+    // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
+    // console.log('hasFunc', hasFunc)
+    if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval')) {
+      return variableString
     }
-    return valueToPopulate
+    // test for object
+    const functionName = hasFunc[1]
+    const rawArgs = hasFunc[2]
+    // TODO @DWELLS. Loop through all raw args and parse to correct datatype
+    // argument is object
+    let argsToPass
+    if (rawArgs && rawArgs.match(/^{([^}]+)}$/)) {
+      // console.log('OBJECT', hasFunc[2])
+      // TODO use JSON5
+      argsToPass = [JSON.parse(rawArgs)]
+    } else {
+      // TODO fix how commas + spaces are ned
+      const splitter = splitCsv(rawArgs, ', ')
+      // console.log('splitter', splitter)
+      argsToPass = formatFunctionArgs(splitter)
+    }
+    // console.log('argsToPass runFunction', argsToPass)
+    // TODO check for camelCase version. | toUpperCase messes with function name
+    const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
+
+    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
+
+    const funcValue = theFunction(...argsToPass)
+    // console.log('funcValue', funcValue)
+    // console.log('typeof funcValue', typeof funcValue)
+    let replaceVal = funcValue
+    if (typeof funcValue === 'string') {
+      const replaceIt = variableString.replace(hasFunc[0], funcValue)
+      replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
+    }
+
+    // If wrapped in outer function, recurse
+    const hasMoreFunctions = funcRegex.exec(replaceVal)
+    if (hasMoreFunctions) {
+      return this.runFunction(replaceVal)
+    }
+    return replaceVal
   }
-}
-
-function ensureQuote(value, open = '"', close) {
-  let i = -1
-  const result = []
-  const end = close || open
-  if (typeof value === 'string') {
-    return startChar(value, open) + value + endChar(value, end)
-  }
-  while (++i < value.length) {
-    result[i] = startChar(value[i], open) + value[i] + endChar(value[i], end)
-  }
-  return result
-}
-
-function startChar(str, char) {
-  return (str[0] === char) ? '' : char
-}
-
-function endChar(str, char) {
-  return (str[str.length -1] === char) ? '' : char
-}
-
-function isSurroundedByQuotes(str) {
-  if (!str || str.length < 2) return false
-  const firstChar = str[0]
-  const lastChar = str[str.length - 1]
-  return (firstChar === "'" && lastChar === "'") || (firstChar === '"' && lastChar === '"')
-}
-
-function startsWithQuotedPipe(str) {
-  // Matches either 'xyz' | or "xyz" |
-  return /^(['"])(.*?)\1\s*\|/.test(str)
 }
 
 module.exports = Configorama

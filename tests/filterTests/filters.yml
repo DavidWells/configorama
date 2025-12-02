@@ -70,3 +70,13 @@ fooInLowerCase: ${fallbackTest | toLowerCase}
 fooInCapitalize: ${fallbackTest | capitalize}
 fooInCamelCase: ${fallbackTest | toCamelCase}
 fooInKebabCase: ${fallbackTest | toKebabCase}
+
+########################
+# Multiple chained filters
+# Regression test: all filters must be applied, not just the last one
+########################
+
+chainedFiltersTwo: ${opt:stage | toUpperCase | toKebabCase}
+chainedFiltersThree: ${'helloWorld' | toKebabCase | toUpperCase | capitalize}
+chainedNumberToString: ${env:TEST_NUM, '42' | Number | toString}
+chainedWithHelp: ${env:CHAIN_TEST, 'testValue' | toUpperCase | help('Test chained with help')}

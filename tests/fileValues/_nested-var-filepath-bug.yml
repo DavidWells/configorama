@@ -1,0 +1,6 @@
+# Test config for nested variable in file path bug
+provider:
+  stage: ${opt:stage, 'dev'}
+
+# This is the problematic pattern - inner variable resolves to another variable
+testValue: ${file(./env.${self:provider.stage, 'dev'}.yml):FOO}
