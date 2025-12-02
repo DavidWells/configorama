@@ -2566,7 +2566,6 @@ Missing Value ${missingValue} - ${matchedString}
 
     // console.log('variableValues', variableValues)
     return Promise.all(variableValues).then((values) => {
-      let deepPropertyStr = propertyString
       let deepProperties = 0
       // console.log('overwrite values', valuesToUse)
       // Extract actual values from metadata objects
@@ -2576,6 +2575,10 @@ Missing Value ${missingValue} - ${matchedString}
         }
         return value
       })
+
+      // Build deep variable parts for reconstruction
+      const deepVariableParts = variableStrings.slice()
+
       extractedValues.forEach((value, index) => {
         // console.log('───────────────────────────────> value', value)
         if (isString(value) && value.match(this.variableSyntax)) {
@@ -2585,14 +2588,17 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('deepVariable', deepVariable)
           const newValue = cleanVariable(deepVariable, this.variableSyntax, true, `overwrite ${this.callCount}`)
           // console.log(`overwrite newValue ${variableStrings[index]}`, newValue)
-          // console.log('variableStrings', variableStrings)
-          deepPropertyStr = deepPropertyStr.replace(variableStrings[index], newValue)
-          // console.log('deepPropertyString', deepPropertyStr)
+          // Store the deep ref for this part
+          deepVariableParts[index] = newValue
         }
       })
-      return deepProperties > 0
-        ? Promise.resolve(deepPropertyStr) // return deep variable replacement of original
-        : Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
+
+      if (deepProperties > 0) {
+        // Reconstruct a minimal variable string with deep refs, not the full outer string
+        const reconstructed = '${' + deepVariableParts.join(', ') + '}'
+        return Promise.resolve(reconstructed)
+      }
+      return Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
     })
   }
 
