@@ -538,4 +538,59 @@ test('allowUnresolvedVariables - self ref in file path with opt fallback', async
   assert.equal(config.value, 'defaultEnv')
 })
 
+// ============================================
+// Custom variable syntax tests
+// ============================================
+
+test('custom syntax ${{}} - missing inner var uses fallback', async () => {
+  const config = await configorama({
+    value: '${{file(./config.${{self:stage}}.json):KEY, "doubleBraceFallback"}}'
+  }, {
+    syntax: '\\${{([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)}}',
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'doubleBraceFallback')
+})
+
+test('custom syntax #{} - missing inner var uses fallback', async () => {
+  const config = await configorama({
+    value: '#{file(./config.#{self:stage}.json):KEY, "hashFallback"}'
+  }, {
+    syntax: '\\#{([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)}',
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'hashFallback')
+})
+
+test('custom syntax <> - missing inner var uses fallback', async () => {
+  const config = await configorama({
+    value: '<file(./config.<self:stage>.json):KEY, "angleFallback">'
+  }, {
+    syntax: '\\<([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)>',
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 'angleFallback')
+})
+
+// NOTE: [[]] syntax doesn't support nesting because the syntax regex
+// doesn't include [ in allowed chars. This is a syntax limitation, not a bug.
+
+test('custom syntax ${{}} - numeric fallback', async () => {
+  const config = await configorama({
+    value: '${{file(./config.${{self:stage}}.json):KEY, 99}}'
+  }, {
+    syntax: '\\${{([ ~:a-zA-Z0-9._\\\'",\\-\\/\\(\\)]+?)}}',
+    options: {},
+    allowUnresolvedVariables: true
+  })
+
+  assert.equal(config.value, 99)
+})
+
 test.run()

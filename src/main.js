@@ -67,7 +67,7 @@ const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFo
 /* Utils - variables */
 const cleanVariable = require('./utils/variables/cleanVariable')
 const appendDeepVariable = require('./utils/variables/appendDeepVariable')
-const { getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
+const { extractVariableWrapper, getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
 
 /* Resolvers */
@@ -173,6 +173,15 @@ class Configorama {
     // console.log('varRegex', varRegex)
     const variableSyntax = varRegex
     this.variableSyntax = variableSyntax
+
+    // Extract variable prefix/suffix from syntax regex for reconstructing variables
+    const syntaxWrapper = extractVariableWrapper(variableSyntax.source)
+    this.varPrefix = syntaxWrapper.prefix
+    this.varSuffix = syntaxWrapper.suffix
+    const escapedSuffix = this.varSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    this.varPrefixPattern = new RegExp('^' + this.varPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    this.varSuffixPattern = new RegExp(escapedSuffix + '$')
+    this.varSuffixWithSpacePattern = new RegExp('\\s+' + escapedSuffix + '$')
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
@@ -566,7 +575,7 @@ class Configorama {
       this.rawOriginalConfig = cloneDeep(configObject)
 
       /* Preprocess step here - escapes ${} in help() args, fixes malformed fallbacks */
-      configObject = preProcess(configObject, this.variableSyntax)
+      configObject = preProcess(configObject, this.variableSyntax, this.variableTypes)
       /*
       console.log('after preprocess', configObject)
       /** */
@@ -654,7 +663,7 @@ class Configorama {
         const fileName = this.configFilePath ? ` in ${this.configFilePath}` : ''
 
         // Extract base variable name from varMatch key (e.g., '${env:FOO, default}' -> 'env:FOO')
-        const getBaseVarName = (key) => key.replace(/^\$\{/, '').replace(/\}$/, '').split(',')[0].trim()
+        const getBaseVarName = (key) => key.replace(this.varPrefixPattern, '').replace(this.varSuffixPattern, '').split(',')[0].trim()
 
         logHeader(`Found ${varKeys.length} Variables${fileName}`)
 
@@ -1309,9 +1318,9 @@ class Configorama {
             .map((filter) => filter.trim())
             .filter(Boolean)
 
-          // Remove filters from the key (replace "| String}" with "}")
+          // Remove filters from the key (replace "| String}" with suffix)
           // Also clean up any trailing whitespace before the closing brace
-          keyWithoutFilters = originalSrc.replace(filterMatch, '}').replace(/\s+}$/, '}')
+          keyWithoutFilters = originalSrc.replace(filterMatch, this.varSuffix).replace(this.varSuffixWithSpacePattern, this.varSuffix)
         }
 
         const key = keyWithoutFilters
@@ -1337,7 +1346,7 @@ class Configorama {
           if (cleaned.varMatch && filterMatch) {
             const match = cleaned.varMatch.match(filterMatch)
             if (match) {
-              cleaned.varMatch = cleaned.varMatch.replace(filterMatch, '').replace(/\s+$/, '') + '}'
+              cleaned.varMatch = cleaned.varMatch.replace(filterMatch, '').replace(/\s+$/, '') + this.varSuffix
             }
           }
           if (cleaned.variable && filterMatch) {
@@ -2202,7 +2211,7 @@ class Configorama {
     let foundFilters = []
     if (hasFilters) {
       foundFilters = hasFilters[0]
-        .replace(/}$/, '') // remove trailing }
+        .replace(this.varSuffixPattern, '')
         .split('|')
         .map((filter) => filter.trim())
         .filter(Boolean)
@@ -2287,13 +2296,13 @@ class Configorama {
       console.log('isString currentMatchedString', currentMatchedString)
       console.log('>------')
       /** */
-      // Handle comma ${opt:stage, dev} and remove extra }
+      // Handle comma ${opt:stage, dev} and remove extra suffix
       if (
         currentMatchedString.match(this.variableSyntax) &&
         !valueToPopulate.match(this.variableSyntax) &&
-        valueToPopulate.match(/}$/)
+        valueToPopulate.match(this.varSuffixPattern)
       ) {
-        valueToPopulate = valueToPopulate.replace(/}$/, '')
+        valueToPopulate = valueToPopulate.replace(this.varSuffixPattern, '')
       }
 
       property = replaceAll(currentMatchedString, valueToPopulate, property)
@@ -2340,7 +2349,7 @@ class Configorama {
       let missingValue = matchedString
 
       if (matchedString.match(deepRefSyntax)) {
-        const deepIndex = matchedString.split(':')[1].replace('}', '')
+        const deepIndex = matchedString.split(':')[1].replace(this.varSuffixPattern, '')
         const i = Number(deepIndex)
         missingValue = this.deep[i]
       }
@@ -2375,9 +2384,16 @@ class Configorama {
       // If allowUnresolvedVariables and there are fallbacks, use the fallback
       if (this.opts.allowUnresolvedVariables && splitVars.length > 1) {
         const nextFallback = splitVars[1].trim()
-        const isStaticValue = /^['"].*['"]$/.test(nextFallback) || /^-?\d+(\.\d+)?$/.test(nextFallback)
-        if (isStaticValue) {
-          const staticValue = nextFallback.replace(/^['"]|['"]$/g, '').replace(/}$/, '')
+        // Strip trailing variable suffix (handles }, }}, >, ]], etc.)
+        const nextFallbackClean = nextFallback.replace(this.varSuffixPattern, '')
+        const isQuotedString = /^['"].*['"]$/.test(nextFallbackClean)
+        const isNumeric = /^-?\d+(\.\d+)?$/.test(nextFallbackClean)
+        if (isQuotedString || isNumeric) {
+          let staticValue = nextFallbackClean.replace(/^['"]|['"]$/g, '')
+          // Convert to number if it's a numeric fallback
+          if (isNumeric) {
+            staticValue = Number(staticValue)
+          }
           return {
             value: staticValue,
             path: valueObject.path,
@@ -2386,7 +2402,8 @@ class Configorama {
           }
         }
         // Next fallback is another variable
-        const remainingFallbacks = '${' + splitVars.slice(1).join(', ').replace(/}$/, '') + '}'
+        const remainingContent = splitVars.slice(1).join(', ').replace(this.varSuffixPattern, '')
+        const remainingFallbacks = this.varPrefix + remainingContent + this.varSuffix
         return {
           value: remainingFallbacks,
           path: valueObject.path,
@@ -2419,7 +2436,7 @@ Missing Value ${missingValue} - ${matchedString}
       )
       
       // Double processing needed for `${eval(${self:three} > ${self:four})}`
-      if (prop.startsWith('${')) {
+      if (prop.startsWith(this.varPrefix)) {
         prop = cleanVariable(prop, this.variableSyntax, true, `populateVariable string ${this.callCount}`)
       }
       
@@ -2620,7 +2637,7 @@ Missing Value ${missingValue} - ${matchedString}
 
       if (deepProperties > 0) {
         // Reconstruct a minimal variable string with deep refs, not the full outer string
-        const reconstructed = '${' + deepVariableParts.join(', ') + '}'
+        const reconstructed = this.varPrefix + deepVariableParts.join(', ') + this.varSuffix
         return Promise.resolve(reconstructed)
       }
       return Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
@@ -2719,7 +2736,7 @@ Missing Value ${missingValue} - ${matchedString}
         .map((f) => {
           return trim(f)
           // TODO refactor this. This is a temp fix for filters with nested vars.
-          .replace(/}$/, '')
+          .replace(this.varSuffixPattern, '')
         })
       // console.log('filters to run', _filter)
 
@@ -2920,7 +2937,7 @@ Missing Value ${missingValue} - ${matchedString}
         if (typeof val === 'string' && val.match(/deep:/)) {
           // TODO refactor the deep filter logic here. match | filter | filter..
           const allFilters = propertyString
-            .replace(/}$/, '')
+            .replace(this.varSuffixPattern, '')
             .split('|')
             .reduce((acc, currentFilter, i) => {
               if (i === 0) {
@@ -2930,7 +2947,7 @@ Missing Value ${missingValue} - ${matchedString}
               return acc
             }, '')
           // add filters to deep references if filter is used
-          const deepValueWithFilters = newHasFilter[1] ? val.replace(/}$/, ` ${allFilters}}`) : val
+          const deepValueWithFilters = newHasFilter[1] ? val.replace(this.varSuffixPattern, ` ${allFilters}${this.varSuffix}`) : val
           // console.log('deepValueWithFilters', deepValueWithFilters)
           // console.log('RESOLVER RETURN newValue 4', deepValueWithFilters)
           return Promise.resolve(deepValueWithFilters)

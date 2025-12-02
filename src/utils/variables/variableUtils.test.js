@@ -1,6 +1,6 @@
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { getFallbackString, verifyVariable } = require('./variableUtils')
+const { extractVariableWrapper, getFallbackString, verifyVariable } = require('./variableUtils')
 
 // Tests for getFallbackString
 test('getFallbackString - should reconstruct variable from split array', () => {
@@ -111,6 +111,43 @@ test('verifyVariable - should match with function and config param', () => {
   const valueObject = { path: ['config'], originalSource: '${stage:name}' }
   const result = verifyVariable('stage:name', valueObject, variableTypes, config)
   assert.is(result, true)
+})
+
+// Tests for extractVariableWrapper
+test('extractVariableWrapper - standard ${} syntax', () => {
+  const result = extractVariableWrapper('\\$\\{([^}]+)\\}')
+  assert.equal(result.prefix, '${')
+  assert.equal(result.suffix, '}')
+})
+
+test('extractVariableWrapper - double brace ${{}} syntax', () => {
+  const result = extractVariableWrapper('\\$\\{\\{([^}]+)\\}\\}')
+  assert.equal(result.prefix, '${{')
+  assert.equal(result.suffix, '}}')
+})
+
+test('extractVariableWrapper - hash #{} syntax', () => {
+  const result = extractVariableWrapper('\\#\\{([^}]+)\\}')
+  assert.equal(result.prefix, '#{')
+  assert.equal(result.suffix, '}')
+})
+
+test('extractVariableWrapper - angle bracket <> syntax', () => {
+  const result = extractVariableWrapper('\\<([^>]+)\\>')
+  assert.equal(result.prefix, '<')
+  assert.equal(result.suffix, '>')
+})
+
+test('extractVariableWrapper - double bracket [[]] syntax', () => {
+  const result = extractVariableWrapper('\\[\\[([^\\]]+)\\]\\]')
+  assert.equal(result.prefix, '[[')
+  assert.equal(result.suffix, ']]')
+})
+
+test('extractVariableWrapper - strips non-capturing group prefix', () => {
+  const result = extractVariableWrapper('(?:prefix)\\$\\{([^}]+)\\}')
+  assert.equal(result.prefix, '${')
+  assert.equal(result.suffix, '}')
 })
 
 // Run all tests

@@ -3,16 +3,27 @@
  * and escape variables inside help() filter arguments
  */
 const { splitByComma } = require('../strings/splitByComma')
+const { extractVariableWrapper } = require('../variables/variableUtils')
 
 /**
  * Preprocess config to fix malformed fallback references
  * @param {Object} configObject - The parsed configuration object
  * @param {RegExp} variableSyntax - The variable syntax regex to use
+ * @param {Array} [variableTypes] - Array of variable type definitions with type/prefix fields
  * @returns {Object} The preprocessed configuration object
  */
-function preProcess(configObject, variableSyntax) {
-  // Known reference prefixes that should be wrapped in ${}
-  const refPrefixes = ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
+function preProcess(configObject, variableSyntax, variableTypes) {
+  // Extract prefix/suffix from variable syntax for reconstructing variables
+  const { prefix: varPrefix, suffix: varSuffix } = variableSyntax
+    ? extractVariableWrapper(variableSyntax.source)
+    : { prefix: '${', suffix: '}' }
+
+  // Extract reference prefixes from variable types, or use defaults
+  const refPrefixes = variableTypes && variableTypes.length > 0
+    ? variableTypes
+        .map(v => (v.prefix || v.type) + ':')
+        .filter(p => p !== 'dot.prop:' && p !== 'string:' && p !== 'number:')
+    : ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
 
   /**
    * Escape variables inside help() filter arguments so main resolver skips them
@@ -52,31 +63,37 @@ function preProcess(configObject, variableSyntax) {
     let changed = true
 
     // Keep iterating until no more changes (to handle nested variables)
+    const prefixLen = varPrefix.length
+    const suffixLen = varSuffix.length
+
     while (changed) {
       changed = false
 
-      // Find innermost ${...} blocks (ones that don't contain other ${)
+      // Find innermost variable blocks (ones that don't contain other variables)
       let i = 0
       while (i < result.length) {
-        if (result[i] === '$' && result[i + 1] === '{') {
+        if (result.substring(i, i + prefixLen) === varPrefix) {
           const start = i
-          let braceCount = 1
-          let j = i + 2
+          let depth = 1
+          let j = i + prefixLen
 
-          // Find the matching closing brace by counting { and }
-          while (j < result.length && braceCount > 0) {
-            if (result[j] === '{') {
-              braceCount++
-            } else if (result[j] === '}') {
-              braceCount--
+          // Find the matching suffix by counting full prefix/suffix occurrences
+          while (j < result.length && depth > 0) {
+            if (result.substring(j, j + prefixLen) === varPrefix) {
+              depth++
+              j += prefixLen
+            } else if (result.substring(j, j + suffixLen) === varSuffix) {
+              depth--
+              if (depth > 0) j += suffixLen
+            } else {
+              j++
             }
-            j++
           }
 
-          if (braceCount === 0) {
-            const end = j
+          if (depth === 0) {
+            const end = j + suffixLen
             const match = result.substring(start, end)
-            const content = result.substring(start + 2, end - 1)
+            const content = result.substring(start + prefixLen, end - suffixLen)
 
             // Only process if there's a comma (indicating fallback syntax)
             if (content.includes(',')) {
@@ -84,10 +101,10 @@ function preProcess(configObject, variableSyntax) {
               const parts = splitByComma(content, variableSyntax)
 
               if (parts.length > 1) {
-                // Check if the first part has nested ${} - if so, skip this (process inner ones first)
+                // Check if the first part has nested variables - if so, skip this (process inner ones first)
                 const firstPart = parts[0]
-                if (firstPart.includes('${')) {
-                  i = start + 2 // Move past ${ to find inner variables
+                if (firstPart.includes(varPrefix)) {
+                  i = start + prefixLen // Move past prefix to find inner variables
                   continue
                 }
 
@@ -101,16 +118,16 @@ function preProcess(configObject, variableSyntax) {
 
                   // Check if this looks like a reference but is not wrapped
                   const looksLikeRef = refPrefixes.some(prefix => trimmed.startsWith(prefix))
-                  const alreadyWrapped = trimmed.startsWith('${') && trimmed.endsWith('}')
+                  const alreadyWrapped = trimmed.startsWith(varPrefix) && trimmed.endsWith(varSuffix)
 
                   if (looksLikeRef && !alreadyWrapped) {
-                    return ` \${${trimmed}}`
+                    return ` ${varPrefix}${trimmed}${varSuffix}`
                   }
 
                   return ` ${trimmed}`
                 })
 
-                const replacement = `\${${fixed.join(',')}}`
+                const replacement = `${varPrefix}${fixed.join(',')}${varSuffix}`
                 if (replacement !== match) {
                   result = result.substring(0, start) + replacement + result.substring(end)
                   changed = true
@@ -119,7 +136,7 @@ function preProcess(configObject, variableSyntax) {
               }
             }
 
-            i = start + 2 // Move past ${ to continue searching for nested variables
+            i = start + prefixLen // Move past prefix to continue searching for nested variables
           } else {
             i++
           }
