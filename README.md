@@ -229,15 +229,91 @@ asyncJSValue: ${file(./async-value.js)}
 # resolves to 'asyncval'
 ```
 
-`${file(./asyncValue.js)}` will call into `async-value` and run/resolve the async function with values. These values can be strings, objects, arrays, whatever.
+`${file(./async-value.js)}` will call into `async-value` and run/resolve the async function. Return values can be strings, objects, arrays, etc.
 
 ```js
-async function fetchSecretsFromRemoteStore(config) {
+async function fetchSecretsFromRemoteStore() {
   await delay(1000)
   return 'asyncval'
 }
 
 module.exports = fetchSecretsFromRemoteStore
+```
+
+#### Passing arguments to functions
+
+You can pass arguments from your config to JavaScript/TypeScript functions:
+
+```yml
+foo: bar
+baz:
+  qux: quux
+
+# Pass resolved values as arguments
+secrets: ${file(./fetch-secrets.js, ${self:foo}, ${self:baz})}
+```
+
+Arguments are passed in order, with the config context always last:
+
+```js
+/**
+ * @param {string} foo - First arg from YAML ('bar')
+ * @param {object} baz - Second arg from YAML ({ qux: 'quux' })
+ * @param {import('configorama').ConfigContext} ctx - Config context (always last)
+ */
+async function fetchSecrets(foo, baz, ctx) {
+  console.log(foo)  // 'bar'
+  console.log(baz)  // { qux: 'quux' }
+  console.log(ctx.originalConfig)  // Original unresolved config
+  console.log(ctx.currentConfig)   // Current partially-resolved config
+  console.log(ctx.opts)            // Configorama options
+
+  return { secret: 'value' }
+}
+
+module.exports = fetchSecrets
+```
+
+#### ConfigContext
+
+The `ctx` parameter (always the last argument) provides access to:
+
+| Property | Description |
+|----------|-------------|
+| `originalConfig` | The original unresolved configuration object |
+| `currentConfig` | The current (partially resolved) configuration |
+| `opts` | Configorama options including `options`, `dynamicArgs`, etc. |
+
+TypeScript users can import the type:
+
+```typescript
+import type { ConfigContext } from 'configorama'
+
+async function fetchSecrets(
+  foo: string,
+  baz: { qux: string },
+  ctx: ConfigContext
+): Promise<string> {
+  // Full type support for ctx properties
+  return 'secret-value'
+}
+
+export = fetchSecrets
+```
+
+#### Functions without arguments
+
+If you don't need arguments, the function still receives `ctx` as its only parameter:
+
+```js
+// No args - ctx is the only parameter
+async function getSecrets(ctx) {
+  return ctx.opts.options.stage === 'prod'
+    ? 'prod-secret'
+    : 'dev-secret'
+}
+
+module.exports = getSecrets
 ```
 
 ### TypeScript file references

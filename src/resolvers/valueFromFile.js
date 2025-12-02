@@ -434,7 +434,7 @@ Check if your ${fileType} is exporting a function that returns a value.`
     return Promise.reject(new Error(errorMessage))
   }
 
-  const valueToPopulate = returnValueFunction.call(fileModule, valueForFunction, ...argsToPass)
+  const valueToPopulate = returnValueFunction.call(fileModule, ...argsToPass, valueForFunction)
 
   return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
     const deepProperties = extractDeepProperties(variableString, matchedFileString, includeFirstProperty)
