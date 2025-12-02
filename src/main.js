@@ -27,7 +27,7 @@ const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
-const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder } = require('./utils/encoders/js-fixes')
+const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable } = require('./utils/encoders/js-fixes')
 
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
@@ -106,8 +106,8 @@ const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
-const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
-const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
+const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
+const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const envRefSyntax = RegExp(/^env:/g)
@@ -2331,23 +2331,30 @@ class Configorama {
 
       const objStr = JSON.stringify(valueToPopulate)
       /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
-      if (
+      const isNestedInVariable = (
         property.trim() !== matchedString.trim() &&
         property.indexOf(matchedString) !== -1 &&
         matchedString.match(this.variableSyntax) &&
         property.match(this.variableSyntax)
-      ) {
+      )
+      // Only encode for file() or text() references where JSON braces break regex matching
+      const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
+      if (isNestedInVariable && isFileOrTextRef) {
+        // Encode object as base64 to avoid breaking variable syntax with nested braces
+        const encodedObj = encodeJsonForVariable(valueToPopulate)
+        property = replaceAll(matchedString, encodedObj, property)
+      } else if (isNestedInVariable) {
         const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
         if (isVar) {
-          // console.log('INSIDE', property, matchedString)
-          // console.log('isVar', isVar)
           throw new Error(
             `Invalid variable syntax "${property}" resolves to "${replaceAll(matchedString, objStr, property)}"`,
           )
         }
+        property = replaceAll(matchedString, objStr, property)
+      } else {
+        // console.log('OBJECT MATCH', `"${objStr}"`)
+        property = replaceAll(matchedString, objStr, property)
       }
-      // console.log('OBJECT MATCH', `"${objStr}"`)
-      property = replaceAll(matchedString, objStr, property) // .replace(/}$/, '').replace(/^\$\{/, '')
       // console.log('property', property)
       // TODO run functions here
       // console.log('other new prop', property)
@@ -2490,7 +2497,7 @@ Missing Value ${missingValue} - ${matchedString}
         !prop.match(this.variableSyntax)
         &&
         /* Not file or text refs */
-        !prop.match(fileRefSyntax) 
+        !prop.match(fileRefSyntax)
         && !prop.match(textRefSyntax)
         /* Not eval refs */
         && !prop.match(getValueFromEval.match) 
@@ -3358,7 +3365,7 @@ Missing Value ${missingValue} - ${matchedString}
     })
   }
   runFunction(variableString) {
-    // console.log('runFunction', variableString)
+    console.log('runFunction', variableString)
     /* If json object value return it */
     if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
       return variableString
@@ -3390,7 +3397,9 @@ Missing Value ${missingValue} - ${matchedString}
     // TODO check for camelCase version. | toUpperCase messes with function name
     const theFunction = this.functions[functionName] || this.functions[functionName.toLowerCase()]
 
-    if (!theFunction) throw new Error(`Function "${functionName}" not found`)
+    if (!theFunction) {
+      throw new Error(`Function "${functionName}" not found`)
+    }
 
     const funcValue = theFunction(...argsToPass)
     // console.log('funcValue', funcValue)

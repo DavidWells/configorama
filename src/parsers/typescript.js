@@ -2,10 +2,10 @@ const path = require('path')
 const fs = require('fs')
 
 /**
- * Execute TypeScript file and return its export
+ * Load TypeScript file and return its export (without executing)
  * @param {string} filePath - Full path to the TypeScript file
- * @param {Object} opts - Additional options including dynamicArgs
- * @returns {Promise<*>} The result of executing the TypeScript file
+ * @param {Object} opts - Additional options (unused, kept for API compat)
+ * @returns {Promise<*>} The exported module from the TypeScript file
  */
 async function executeTypeScriptFile(filePath, opts = {}) {
   // Check if tsx is available first (preferred)
@@ -55,34 +55,19 @@ async function executeTypeScriptFile(filePath, opts = {}) {
     }
   }
 
-  if (typeof tsFile !== 'function') {
-    return tsFile
-  } else {
-    let tsArgs = opts.dynamicArgs || {}
-    if (tsArgs && typeof tsArgs === 'function') {
-      tsArgs = tsArgs()
-    }
-    
-    try {
-      const result = tsFile(tsArgs)
-      
-      // Handle promises
-      if (result && typeof result.then === 'function') {
-        return await result
-      }
-      
-      return result
-    } catch (err) {
-      throw new Error(`Error executing TypeScript function: ${err.message}`)
-    }
+  // Handle ES module default exports
+  if (tsFile && typeof tsFile === 'object' && 'default' in tsFile) {
+    tsFile = tsFile.default
   }
+
+  return tsFile
 }
 
 /**
- * Synchronous TypeScript file execution (using tsx with sync API)
+ * Load TypeScript file synchronously and return its export
  * @param {string} filePath - Full path to the TypeScript file
- * @param {Object} opts - Additional options including dynamicArgs
- * @returns {*} The result of executing the TypeScript file
+ * @param {Object} opts - Additional options (unused, kept for API compat)
+ * @returns {*} The exported module from the TypeScript file
  */
 function executeTypeScriptFileSync(filePath, opts = {}) {
   // Check if tsx is available first (preferred)
@@ -132,24 +117,12 @@ function executeTypeScriptFileSync(filePath, opts = {}) {
     }
   }
 
-  if (typeof tsFile !== 'function') {
-    return tsFile
-  } else {
-    let tsArgs = opts.dynamicArgs || {}
-    if (tsArgs && typeof tsArgs === 'function') {
-      tsArgs = tsArgs()
-    }
-    
-    try {
-      const result = tsFile(tsArgs)
-      
-      // Note: For sync execution, we don't await promises
-      // If the function returns a promise, it will be resolved by the calling code
-      return result
-    } catch (err) {
-      throw new Error(`Error executing TypeScript function: ${err.message}`)
-    }
+  // Handle ES module default exports
+  if (tsFile && typeof tsFile === 'object' && 'default' in tsFile) {
+    tsFile = tsFile.default
   }
+
+  return tsFile
 }
 
 module.exports = {

@@ -7,7 +7,7 @@ const { splitCsv } = require('../utils/strings/splitCsv')
 const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { makeBox } = require('@davidwells/box-logger')
-const { encodeJsSyntax } = require('../utils/encoders/js-fixes')
+const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 
 /* File Parsers */
 const YAML = require('../parsers/yaml')
@@ -86,6 +86,17 @@ async function getValueFromFile(ctx, variableString, options) {
       matchedFileString = argsFound[0]
       argsToPass = argsFound.filter((arg, i) => {
         return i !== 0
+      }).map((arg) => {
+        // Decode base64-encoded JSON objects passed as args
+        if (hasEncodedJson(arg)) {
+          const decoded = decodeJsonInVariable(arg)
+          try {
+            return JSON.parse(decoded)
+          } catch (e) {
+            return decoded
+          }
+        }
+        return arg
       })
     }
   }
@@ -199,7 +210,7 @@ ${JSON.stringify(options.context, null, 2)}`,
   // Build context for executable files
   const valueForFunction = {
     originalConfig: ctx.originalConfig,
-    config: ctx.config,
+    currentConfig: ctx.config,
     opts: ctx.opts,
   }
 

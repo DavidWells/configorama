@@ -54,7 +54,7 @@ export interface ConfigContext<T = any> {
   /** The original unresolved configuration object */
   originalConfig: T
   /** The current (partially resolved) configuration object */
-  config: T
+  currentConfig: T
   /** Configorama options and settings */
   opts: {
     allowUnknownVariables: boolean
