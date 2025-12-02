@@ -5,6 +5,13 @@
 /tmp
 /types
 node_modules
+
+# Stray generated .d.ts files (should only be in /types)
+/parsers
+/resolvers
+/functions
+/utils
+/main.d.ts
 misc
 coverage
 .netlify

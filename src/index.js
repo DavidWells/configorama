@@ -16,13 +16,16 @@ module.exports.Configorama = Configorama
  * @property {boolean} [allowUndefinedValues] - allow undefined values to pass through without throwing errors
  * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
  * @property {boolean} [returnMetadata] - return both config and metadata about variables found
+ * @property {string[]} [mergeKeys] - keys to merge in arrays of objects
+ * @property {Object.<string, string>} [filePathOverrides] - map of file paths to override
  */
 
 /**
+ * @template [T=any]
  * @typedef {Object} ConfigoramaResult
- * @property {string} variableSyntax - The variable syntax pattern used
- * @property {Object.<string, string>} variableTypes - Map of variable types found
- * @property {Object} config - The resolved configuration object
+ * @property {RegExp} variableSyntax - The variable syntax pattern used
+ * @property {Object.<string, any>} variableTypes - Map of variable types found
+ * @property {T} config - The resolved configuration object
  * @property {Object} originalConfig - The original unresolved configuration
  * @property {Object} metadata - Metadata about variables found and resolved
  * @property {Object} resolutionHistory - Resolution history per path for debugging
@@ -30,9 +33,10 @@ module.exports.Configorama = Configorama
 
 /**
  * Configorama async API
+ * @template [T=any]
  * @param {string|Object} configPathOrObject - Path to config file or raw javascript config object
- * @param {ConfigoramaSettings} [settings={}] - Configuration settings
- * @returns {Promise<Object|ConfigoramaResult>} resolved configuration or {config, metadata} if returnMetadata is true
+ * @param {ConfigoramaSettings} [settings] - Configuration settings
+ * @returns {Promise<T | ConfigoramaResult<T>>} resolved configuration or {config, metadata} if returnMetadata is true
  */
 module.exports = async (configPathOrObject, settings = {}) => {
   const instance = new Configorama(configPathOrObject, settings)
@@ -85,9 +89,10 @@ module.exports = async (configPathOrObject, settings = {}) => {
 
 /**
  * Configorama sync API
+ * @template [T=any]
  * @param {string|Object} configPathOrObject - Path to config file or raw javascript config object
- * @param {ConfigoramaSettings} [settings={}] - Configuration settings
- * @returns {Object} resolved configuration object
+ * @param {ConfigoramaSettings} [settings] - Configuration settings
+ * @returns {T} resolved configuration object
  */
 module.exports.sync = (configPathOrObject, settings = {}) => {
   const _settings = settings || {}
