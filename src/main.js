@@ -75,6 +75,7 @@ const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
+const getValueFromParam = require('./resolvers/valueFromParam')
 const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
@@ -228,6 +229,14 @@ class Configorama {
        * ${opt:other, "fallbackValue"}
        */
       getValueFromOptions,
+
+      /**
+       * Parameters
+       * Usage:
+       * ${param:domain}
+       * ${param:key, "fallbackValue"}
+       */
+      getValueFromParam,
 
       /**
        * Cron expressions
