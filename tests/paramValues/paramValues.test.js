@@ -88,11 +88,8 @@ test('Nested param in URL: config.fullUrl', () => {
   assert.is(config.config.fullUrl, 'https://cli-override.com/app')
 })
 
-test('Special characters - param not resolved due to special chars in value', () => {
-  // Note: The param with special chars in the value might not resolve properly
-  // This is a known limitation with special characters in CLI param values
-  // For now we'll skip this test or check for the unresolved variable
-  assert.ok(config.specialChars.includes('param:special') || config.specialChars === 'cli-special-!@#$%')
+test('Special characters in param value: ${param:special}', () => {
+  assert.is(config.specialChars, 'cli-special-!@#$%')
 })
 
 test('Multiple params in connection string', () => {

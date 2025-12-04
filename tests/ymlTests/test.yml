@@ -36,9 +36,9 @@ key:
   - string6
 
 ## Preprocessor fixes nested variable reference
-y: !Not [!Equals [!Join ['', ${param:xyz}]]]
+y: !Not [!Equals [!Join ['', ${fakeThing:xyz}]]]
 
-Test: !Not [!Equals ["", !Join ['', ${param:githubActionsAllowedAwsActions}]]]
+Test: !Not [!Equals ["", !Join ['', ${fakeThing:githubActionsAllowedAwsActions}]]]
 
 TestTwo: !Not [!Equals ["", !Join ['', ${opt:otherFlag}]]]
 

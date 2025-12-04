@@ -161,7 +161,7 @@ class Configorama {
     // Track variable resolutions for metadata (keyed by path)
     this.resolutionTracking = {}
 
-    const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
+    const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#$%^&;`*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
   
     const varSyntax = options.syntax || defaultSyntax
     let varRegex

@@ -68,7 +68,7 @@ test('yml fix nested array var syntax', () => {
   assert.equal(config.y, {
     'Fn::Not': [
       {
-        'Fn::Equals': [ { 'Fn::Join': [ '', '${param:xyz}' ] } ]
+        'Fn::Equals': [ { 'Fn::Join': [ '', '${fakeThing:xyz}' ] } ]
       }
     ]
   })
@@ -81,7 +81,7 @@ test('yml fix nested array var syntax 2', () => {
         'Fn::Equals': [
           '',
           {
-            'Fn::Join': [ '', '${param:githubActionsAllowedAwsActions}' ]
+            'Fn::Join': [ '', '${fakeThing:githubActionsAllowedAwsActions}' ]
           }
         ]
       }
