@@ -1,0 +1,26 @@
+# Test config for allowUnknownParams option
+
+# Resolvable params (defined in stages)
+appDomain: ${param:domain}
+dbHost: ${param:dbHost}
+
+# Unresolvable params (would come from Serverless Dashboard)
+dashboardSecret: ${param:dashboardSecret}
+anotherDashboardParam: ${param:anotherDashboardParam}
+
+# Mixed resolved and unresolved
+mixedValue: domain=${param:domain},secret=${param:dashboardSecret}
+
+# Param with fallback - should use fallback even with allowUnknownParams
+paramWithFallback: ${param:notDefined, 'fallback-value'}
+
+# Stage params
+stages:
+  prod:
+    params:
+      domain: myapp.com
+      dbHost: prod-db.myapp.com
+  default:
+    params:
+      domain: default.myapp.com
+      dbHost: default-db.myapp.com

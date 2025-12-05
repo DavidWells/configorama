@@ -197,7 +197,13 @@ async function getValueFromFile(ctx, variableString, options) {
     // console.log('NO FILE FOUND', fullFilePath)
     // console.log('variableString', variableString)
 
-    if (!hasFallback && !ctx.opts.allowUnknownFileRefs) {
+    // Check if file refs are allowed to pass through unresolved
+    const allowUnresolved = ctx.opts.allowUnresolvedVariables
+    const isFileAllowed = allowUnresolved === true ||
+      (Array.isArray(allowUnresolved) && allowUnresolved.includes('file')) ||
+      ctx.opts.allowUnknownFileRefs // backward compat
+
+    if (!hasFallback && !isFileAllowed) {
       const errorMsg = makeBox({
         title: `File Not Found in ${originalVar}`,
         minWidth: '100%',

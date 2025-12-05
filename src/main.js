@@ -2,19 +2,16 @@
 const os = require('os')
 const path = require('path')
 const fs = require('fs')
-
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
-
 /* External dependencies */
 const promiseFinallyShim = require('promise.prototype.finally').shim()
 const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const { makeBox, makeStackedBoxes } = require('@davidwells/box-logger')
-
 /* Utils - root */
 const {
   isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
@@ -23,53 +20,41 @@ const {
 } = require('./utils/lodash')
 const PromiseTracker = require('./utils/PromiseTracker')
 const handleSignalEvents = require('./utils/handleSignalEvents')
-
 /* Utils - encoders */
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
-const { encodeJsSyntax, decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable } = require('./utils/encoders/js-fixes')
-
+const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable } = require('./utils/encoders/js-fixes')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
 const { parseFileContents } = require('./utils/parsing/parse')
 const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
-
 /* Utils - paths */
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
-const { resolveAlias } = require('./utils/paths/resolveAlias')
-const { resolveFilePathFromMatch } = require('./utils/paths/getFullFilePath')
 const { findLineForKey } = require('./utils/paths/findLineForKey')
-
 /* Utils - regex */
-const { combineRegexes, funcRegex, funcStartOfLineRegex, subFunctionRegex } = require('./utils/regex')
-
+const { combineRegexes, funcRegex } = require('./utils/regex')
 /* Utils - strings */
 const formatFunctionArgs = require('./utils/strings/formatFunctionArgs')
-
 const { splitByComma } = require('./utils/strings/splitByComma')
 const { splitCsv } = require('./utils/strings/splitCsv')
 const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
-const { trimSurroundingQuotes, ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
-
+const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 /* Utils - ui */
 const chalk = require('./utils/ui/chalk')
 const deepLog = require('./utils/ui/deep-log')
 const { logHeader } = require('./utils/ui/logs')
 const { createEditorLink } = require('./utils/ui/createEditorLink')
 const { runConfigWizard, isSensitiveVariable } = require('./utils/ui/configWizard')
-
 /* Utils - validation */
 const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
-
 /* Utils - variables */
 const cleanVariable = require('./utils/variables/cleanVariable')
 const appendDeepVariable = require('./utils/variables/appendDeepVariable')
 const { extractVariableWrapper, getFallbackString, verifyVariable, buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
-
 /* Resolvers */
 const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
@@ -80,15 +65,11 @@ const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
 const createGitResolver = require('./resolvers/valueFromGit')
 const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
-
 /* Parsers */
-const YAML = require('./parsers/yaml')
-const TOML = require('./parsers/toml')
-const INI = require('./parsers/ini')
 const JSON5 = require('./parsers/json5')
-
 /* Functions */
 const md5Function = require('./functions/md5')
+
 /**
  * Maintainer's notes:
  *
@@ -103,6 +84,7 @@ const md5Function = require('./functions/md5')
  *   pause population, noting the continued depth to traverse.  This motivated "deep" variables.
  *   Original issue #4687
  */
+
 const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
@@ -111,8 +93,6 @@ const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
 const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
-const envRefSyntax = RegExp(/^env:/g)
-const optRefSyntax = RegExp(/^opt:/g)
 const selfRefSyntax = RegExp(/^self:/g)
 const base64WrapperRegex = /\[_\[([A-Za-z0-9+/=\s]*)\]_\]/g
 const logLines = '─────────────────────────────────────────────────'
@@ -134,13 +114,13 @@ class Configorama {
     const options = opts || {}
     // Set opts to pass into JS file calls
     this.settings = Object.assign({}, {
-      // Allow for unknown variable syntax to pass through without throwing errors
-      allowUnknownVariables: false,
-      // Allow undefined to be an end result.
+      // Allow unknown ${xyz:...} syntax where xyz is not a registered resolver
+      // Can be: false | true | ['ssm', 'cf', ...]
+      allowUnknownVariableTypes: false,
+      // Allow undefined to be an end result
       allowUndefinedValues: false,
-      // Allow unknown file refs to pass through without throwing errors
-      allowUnknownFileRefs: false,
       // Allow known variable types that can't be resolved to pass through
+      // Can be: false | true | ['param', 'file', 'env', ...]
       allowUnresolvedVariables: false,
       // Return metadata
       returnMetadata: false,
@@ -148,10 +128,26 @@ class Configorama {
       returnPreResolvedVariableDetails: false,
     }, options)
 
-    // Backward compat: allowUnknownVars -> allowUnknownVariables
-    if (options.allowUnknownVars !== undefined && options.allowUnknownVariables === undefined) {
-      this.settings.allowUnknownVariables = options.allowUnknownVars
+    // Backward compat: allowUnknownVars -> allowUnknownVariableTypes
+    if (options.allowUnknownVars !== undefined && options.allowUnknownVariableTypes === undefined) {
+      this.settings.allowUnknownVariableTypes = options.allowUnknownVars
     }
+    // Backward compat: allowUnknownVariables -> allowUnknownVariableTypes
+    if (options.allowUnknownVariables !== undefined && options.allowUnknownVariableTypes === undefined) {
+      this.settings.allowUnknownVariableTypes = options.allowUnknownVariables
+    }
+
+    // Merge legacy allowUnknownParams and allowUnknownFileRefs into allowUnresolvedVariables
+    let unresolvedSetting = this.settings.allowUnresolvedVariables
+    if (unresolvedSetting !== true) {
+      const specificTypes = Array.isArray(unresolvedSetting) ? [...unresolvedSetting] : []
+      if (options.allowUnknownParams) specificTypes.push('param')
+      if (options.allowUnknownFileRefs) specificTypes.push('file')
+      if (specificTypes.length > 0) {
+        unresolvedSetting = [...new Set(specificTypes)]
+      }
+    }
+    this.settings.allowUnresolvedVariables = unresolvedSetting
 
     this.filterCache = {}
 
@@ -549,6 +545,56 @@ class Configorama {
     this.deep = []
     this.leaves = []
     this.callCount = 0
+  }
+
+  /**
+   * Check if unresolved variables of a given type should pass through
+   * @param {string} type - The resolver type (e.g., 'param', 'file', 'env')
+   * @returns {boolean}
+   */
+  isUnresolvedAllowed(type) {
+    const setting = this.settings.allowUnresolvedVariables
+    if (setting === true) return true
+    if (setting === false || setting === undefined) return false
+    if (Array.isArray(setting) && setting.includes(type)) return true
+    return false
+  }
+
+  /**
+   * Extract type prefix from a variable string
+   * @param {string} varString - Variable string like 'ssm:path/to/thing' or 'custom:value'
+   * @returns {string|null} The type prefix or null if not found
+   */
+  extractTypePrefix(varString) {
+    if (!varString || typeof varString !== 'string') return null
+    const colonIndex = varString.indexOf(':')
+    if (colonIndex === -1) return null
+    return varString.substring(0, colonIndex)
+  }
+
+  /**
+   * Check if unknown variable types should pass through
+   * @param {string} varString - Variable string like 'ssm:path' or full '${ssm:path}'
+   * @returns {boolean}
+   */
+  isUnknownTypeAllowed(varString) {
+    const setting = this.settings.allowUnknownVariableTypes
+    if (setting === true) return true
+    if (setting === false || setting === undefined) return false
+    if (Array.isArray(setting)) {
+      // Extract type prefix from variable string
+      // Handle both 'ssm:path' and '${ssm:path}' formats
+      let cleanVar = varString
+      if (cleanVar.startsWith(this.varPrefix)) {
+        cleanVar = cleanVar.slice(this.varPrefix.length)
+      }
+      if (cleanVar.endsWith(this.varSuffix)) {
+        cleanVar = cleanVar.slice(0, -this.varSuffix.length)
+      }
+      const typePrefix = this.extractTypePrefix(cleanVar)
+      if (typePrefix && setting.includes(typePrefix)) return true
+    }
+    return false
   }
 
   // ################
@@ -1950,8 +1996,8 @@ class Configorama {
     for (let i = 0; i < matches.length; i += 1) {
       warnIfNotFound(matches[i].variable, results[i], {
         patterns: {
-          env: envRefSyntax,
-          opt: optRefSyntax,
+          env: getValueFromEnv.match,
+          opt: getValueFromOptions.match,
           self: selfRefSyntax,
           file: fileRefSyntax,
           deep: deepRefSyntax,
@@ -2389,7 +2435,7 @@ class Configorama {
 
       if (nestedVar) {
         const fallbackStr = getFallbackString(splitVars, nestedVar)
-        if (!this.settings.allowUnknownVariables) {
+        if (!this.isUnknownTypeAllowed(nestedVar)) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
@@ -2873,14 +2919,21 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('nestedVars', nestedVars)
           const noNestedVars = nestedVars.length < 2
 
-          if (this.settings.allowUnknownFileRefs && variableString.match(fileRefSyntax)) {
-            // Encode the unknown file variable to pass through resolution
+          // Check if this unresolved variable type should pass through
+          const isFileRef = variableString.match(fileRefSyntax)
+          const isParamRef = variableString.match(getValueFromParam.match)
+
+          if (isFileRef && this.isUnresolvedAllowed('file')) {
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
-          if (this.settings.allowUnresolvedVariables) {
+          if (isParamRef && this.isUnresolvedAllowed('param')) {
+            return Promise.resolve(encodeUnknown(propertyString))
+          }
+
+          // Check for general allowUnresolvedVariables (true = allow all)
+          if (this.settings.allowUnresolvedVariables === true) {
             // Check if outer expression has fallbacks we can use
-            // valueCount[0] is the primary var, valueCount[1+] are fallbacks
             if (valueCount.length > 1) {
               const primaryVar = valueCount[0]
               // If the unresolvable variableString is used INSIDE the primary var,
@@ -2889,7 +2942,6 @@ Missing Value ${missingValue} - ${matchedString}
                 return Promise.resolve(undefined)
               }
             }
-            // Encode unresolved variable to pass through resolution
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
@@ -3055,7 +3107,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
-        if (!this.settings.allowUnknownVariables) {
+        if (!this.isUnknownTypeAllowed(nestedVar)) {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
         const fallbackStr = getFallbackString(split, nestedVar)
@@ -3157,8 +3209,8 @@ Missing Value ${missingValue} - ${matchedString}
 
 
 
-    /* Pass through unknown variables */
-    if (this.settings.allowUnknownVariables || allowSpecialCase) {
+    /* Pass through unknown variable types */
+    if (allowSpecialCase || this.isUnknownTypeAllowed(propertyString)) {
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
