@@ -1,8 +1,7 @@
 const Configorama = require('./main')
 const parsers = require('./parsers')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
-
-module.exports.Configorama = Configorama
+const { buildVariableSyntax } = require('./utils/variables/variableUtils')
 
 /**
  * @typedef {Object} ConfigoramaSettings
@@ -130,3 +129,17 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
  * @type {Object}
  */
 module.exports.format = parsers
+
+/**
+ * Configorama class for advanced usage
+ */
+module.exports.Configorama = Configorama
+
+/**
+ * Build variable syntax regex with proper character escaping
+ * @param {string} [prefix='${'] - Variable prefix (e.g., '${', '{{', '[[')
+ * @param {string} [suffix='}'] - Variable suffix (e.g., '}', '}}', ']]')
+ * @param {string[]} [excludePatterns] - Patterns to exclude via negative lookahead
+ * @returns {string} Regex source string for use with syntax option
+ */
+module.exports.buildVariableSyntax = buildVariableSyntax

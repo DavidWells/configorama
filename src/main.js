@@ -67,7 +67,7 @@ const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFo
 /* Utils - variables */
 const cleanVariable = require('./utils/variables/cleanVariable')
 const appendDeepVariable = require('./utils/variables/appendDeepVariable')
-const { extractVariableWrapper, getFallbackString, verifyVariable } = require('./utils/variables/variableUtils')
+const { extractVariableWrapper, getFallbackString, verifyVariable, buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
 
 /* Resolvers */
@@ -161,8 +161,8 @@ class Configorama {
     // Track variable resolutions for metadata (keyed by path)
     this.resolutionTracking = {}
 
-    const defaultSyntax = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#$%^&;`*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
-  
+    const defaultSyntax = buildVariableSyntax('${', '}', ['AWS', 'stageVariables'])
+
     const varSyntax = options.syntax || defaultSyntax
     let varRegex
     if (typeof varSyntax === 'string') {

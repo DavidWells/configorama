@@ -48,8 +48,8 @@ config:
   url: ${param:domain}
   fullUrl: https://${param:domain}/app
 
-# Parameter with special characters
-specialChars: ${param:special, 'default-!@#$%'}
+# Parameter with special characters (note: $ not allowed in fallback - breaks nesting)
+specialChars: ${param:special, 'default-!@#%^&'}
 
 # Multiple params in one string
 connectionString: Host=${param:dbHost};Port=${param:dbPort, 5432};Database=myapp

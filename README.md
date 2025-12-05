@@ -694,12 +694,39 @@ The `source` property defines how the config wizard handles each variable type:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `options` | object | `{}` | CLI options/flags to populate `${opt:xyz}` variables |
+| `syntax` | string/RegExp | `${...}` | Custom variable syntax regex pattern |
 | `allowUnknownVariables` | boolean | `false` | Allow unknown variable types to pass through (e.g., `${custom:thing}`) |
 | `allowUnresolvedVariables` | boolean | `false` | Allow known variable types that can't be resolved to pass through instead of throwing |
 | `allowUndefinedValues` | boolean | `false` | Allow undefined to be an end result |
 | `variableSources` | array | `[]` | Custom variable sources (see above) |
 
 > **Note:** `allowUnknownVars` is deprecated, use `allowUnknownVariables` instead.
+
+### Custom Variable Syntax
+
+Use the `syntax` option to change the variable delimiters. You can provide a regex string directly or use `buildVariableSyntax()` to generate one with proper character escaping:
+
+```js
+const configorama = require('configorama')
+const { buildVariableSyntax } = require('configorama')
+
+// Using buildVariableSyntax helper (recommended)
+const config = await configorama(configFile, {
+  syntax: buildVariableSyntax('{{', '}}'),  // Mustache-style: {{env:FOO}}
+  options: { stage: 'dev' }
+})
+
+// Other examples:
+buildVariableSyntax('${{', '}}')   // ${{env:FOO}}
+buildVariableSyntax('#{', '}')     // #{env:FOO}
+buildVariableSyntax('[[', ']]')    // [[env:FOO]]
+buildVariableSyntax('<', '>')      // <env:FOO>
+```
+
+The `buildVariableSyntax(prefix, suffix, excludePatterns)` function:
+- Automatically excludes suffix characters from the allowed character class (prevents parsing issues)
+- Supports nested variables by excluding `$` and `{` from values
+- Third parameter `excludePatterns` is an array of strings to exclude via negative lookahead (default: `['AWS', 'stageVariables']`)
 
 ### allowUnknownVariables
 

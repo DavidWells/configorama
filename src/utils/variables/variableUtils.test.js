@@ -150,5 +150,49 @@ test('extractVariableWrapper - strips non-capturing group prefix', () => {
   assert.equal(result.suffix, '}')
 })
 
+// Tests for buildVariableSyntax
+const { buildVariableSyntax } = require('./variableUtils')
+
+test('buildVariableSyntax - default ${} syntax excludes $ {', () => {
+  const syntax = buildVariableSyntax('${', '}')
+  const regex = new RegExp(syntax, 'g')
+  // $ and { in value cause no match (they're not in character class)
+  assert.not.ok("${env:FOO, 'test$value'}".match(regex))
+  assert.not.ok("${env:FOO, 'test{value'}".match(regex))
+  // } causes partial match (ends early at the } in value)
+  const partialMatch = "${env:FOO, 'test}value'}".match(regex)
+  assert.ok(partialMatch)
+  assert.is(partialMatch[0], "${env:FOO, 'test}")
+})
+
+test('buildVariableSyntax - supports backslash in values', () => {
+  const syntax = buildVariableSyntax('${', '}')
+  const regex = new RegExp(syntax, 'g')
+  const match = "${env:FOO, 'path\\to\\file'}".match(regex)
+  assert.is(match[0], "${env:FOO, 'path\\to\\file'}")
+})
+
+test('buildVariableSyntax - double brace ${{}} syntax excludes }', () => {
+  const syntax = buildVariableSyntax('${{', '}}')
+  const regex = new RegExp(syntax, 'g')
+  const match = "${{env:FOO, 'value'}}".match(regex)
+  assert.is(match[0], "${{env:FOO, 'value'}}")
+})
+
+test('buildVariableSyntax - angle bracket <> syntax excludes >', () => {
+  const syntax = buildVariableSyntax('<', '>')
+  const regex = new RegExp(syntax, 'g')
+  // > in value causes partial match
+  const match = "<env:FOO, 'a>b'>".match(regex)
+  assert.is(match[0], "<env:FOO, 'a>")
+})
+
+test('buildVariableSyntax - bracket [[]] syntax excludes ]', () => {
+  const syntax = buildVariableSyntax('[[', ']]')
+  const regex = new RegExp(syntax, 'g')
+  const match = "[[env:FOO, 'value']]".match(regex)
+  assert.is(match[0], "[[env:FOO, 'value']]")
+})
+
 // Run all tests
 test.run()
