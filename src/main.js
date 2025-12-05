@@ -2923,16 +2923,16 @@ Missing Value ${missingValue} - ${matchedString}
           const isFileRef = variableString.match(fileRefSyntax)
           const isParamRef = variableString.match(getValueFromParam.match)
 
-          if (isFileRef && this.isUnresolvedAllowed('file')) {
-            return Promise.resolve(encodeUnknown(propertyString))
-          }
-
+          // Params pass through entirely (including fallbacks) for third-party resolution
           if (isParamRef && this.isUnresolvedAllowed('param')) {
             return Promise.resolve(encodeUnknown(propertyString))
           }
 
-          // Check for general allowUnresolvedVariables (true = allow all)
-          if (this.settings.allowUnresolvedVariables === true) {
+          const isUnresolvedAllowed =
+            this.settings.allowUnresolvedVariables === true ||
+            (isFileRef && this.isUnresolvedAllowed('file'))
+
+          if (isUnresolvedAllowed) {
             // Check if outer expression has fallbacks we can use
             if (valueCount.length > 1) {
               const primaryVar = valueCount[0]

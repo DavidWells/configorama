@@ -38,11 +38,11 @@ test('allowUnknownParams: true - passes through unresolved param variables', asy
   assert.is(config.mixedValue, 'domain=myapp.com,secret=${param:dashboardSecret}')
 })
 
-test('allowUnknownParams: true - param with fallback passes through for third-party resolution', async () => {
+test('allowUnresolvedVariables: ["param"] - param with fallback passes through for third-party resolution', async () => {
   const configFile = path.join(__dirname, 'allowUnknownParams.yml')
   const config = await configorama(configFile, {
     options: { stage: 'prod' },
-    allowUnknownParams: true
+    allowUnresolvedVariables: ['param']
   })
 
   // Entire expression passes through for third-party resolver (e.g., Serverless Dashboard)
