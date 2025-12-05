@@ -17,10 +17,43 @@ export interface ConfigoramaSettings {
   filters?: Record<string, Function>
   /** Object of custom functions */
   functions?: Record<string, Function>
-  /** Allow unknown variables to pass through without throwing errors */
-  allowUnknownVars?: boolean
-  /** Allow undefined values to pass through without throwing errors */
+  /** Parameters to populate for ${param:xyz} */
+  params?: Record<string, any>
+
+  // === Variable Resolution Options ===
+
+  /**
+   * Allow unknown variable types (unregistered resolvers) to pass through.
+   * - `true`: All unknown types pass through (e.g., ${ssm:path}, ${cf:stack})
+   * - `false`: Throws on unknown types
+   * - `string[]`: Only specified types pass through (e.g., ['ssm', 'cf'])
+   */
+  allowUnknownVariableTypes?: boolean | string[]
+
+  /**
+   * Allow known variable types that can't resolve to pass through.
+   * - `true`: All unresolved variables pass through
+   * - `false`: Throws when resolution fails
+   * - `string[]`: Only specified types pass through (e.g., ['param', 'file'])
+   */
+  allowUnresolvedVariables?: boolean | string[]
+
+  /** Allow undefined values as final results */
   allowUndefinedValues?: boolean
+
+  // === Legacy Options (deprecated, use above instead) ===
+
+  /** @deprecated Use allowUnknownVariableTypes instead */
+  allowUnknownVars?: boolean
+  /** @deprecated Use allowUnknownVariableTypes instead */
+  allowUnknownVariables?: boolean
+  /** @deprecated Use allowUnresolvedVariables: ['param'] instead */
+  allowUnknownParams?: boolean
+  /** @deprecated Use allowUnresolvedVariables: ['file'] instead */
+  allowUnknownFileRefs?: boolean
+
+  // === Other Options ===
+
   /** Values passed into .js config files if user using javascript config */
   dynamicArgs?: object | Function
   /** Return both config and metadata about variables found */

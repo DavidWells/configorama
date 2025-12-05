@@ -29,14 +29,18 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
 <summary>Click to expand</summary>
 
 - [About](#about)
-- [How it works](#how-it-works)
 - [Usage](#usage)
+- [How it works](#how-it-works)
 - [Variable Sources](#variable-sources)
   - [Environment variables](#environment-variables)
   - [CLI option flags](#cli-option-flags)
+  - [Parameter values](#parameter-values)
   - [Self references](#self-references)
   - [File references](#file-references)
   - [Sync/Async file references](#syncasync-file-references)
+    - [Passing arguments to functions](#passing-arguments-to-functions)
+    - [ConfigContext](#configcontext)
+    - [Functions without arguments](#functions-without-arguments)
   - [TypeScript file references](#typescript-file-references)
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
@@ -45,7 +49,11 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [Functions (experimental)](#functions-experimental)
   - [More Examples](#more-examples)
 - [Custom Variable Sources](#custom-variable-sources)
+  - [Variable Source Types](#variable-source-types)
 - [Options](#options)
+  - [Custom Variable Syntax](#custom-variable-syntax)
+  - [allowUnknownVariableTypes](#allowunknownvariabletypes)
+  - [allowUnresolvedVariables](#allowunresolvedvariables)
 - [FAQ](#faq)
 - [Whats new](#whats-new)
 - [Alt libs](#alt-libs)
@@ -136,6 +144,7 @@ console.log(result.resolutionHistory) // Step-by-step resolution for each path
 |----------|-----------------------|------------------------|
 | env      | ${env:VAR}            | Environment variables  |
 | opt      | ${opt:flag}           | CLI option flags       |
+| param    | ${param:key}          | Parameter values       |
 | self     | ${key} or ${self:key} | Self references        |
 | file     | ${file(path)}         | File references        |
 | git      | ${git:value}          | Git data               |
@@ -166,6 +175,58 @@ foo: ${opt:stage}-hello
 
 # You can also provide a default value. If no --stage flag is provided, it will use 'dev'
 foo: ${opt:stage, 'dev'}
+```
+
+### Parameter values
+
+Access parameter values via `${param:key}`. Parameters follow a resolution hierarchy:
+
+1. **CLI params** (`--param="key=value"`) - highest priority
+2. **Stage-specific params** (`stages.<stage>.params`)
+3. **Default params** (`stages.default.params`)
+
+```yml
+# Direct parameter reference
+appDomain: ${param:domain}
+
+# Parameter with fallback
+apiKey: ${param:apiKey, 'default-api-key'}
+
+# Stage-specific parameters defined in config
+stages:
+  dev:
+    params:
+      domain: dev.myapp.com
+      dbHost: localhost
+  prod:
+    params:
+      domain: myapp.com
+      dbHost: prod-db.myapp.com
+  default:
+    params:
+      domain: default.myapp.com
+      dbPort: 3306
+```
+
+**CLI Usage:**
+
+```bash
+# Single param
+node app.js --param="domain=example.com"
+
+# Multiple params
+node app.js --param="domain=example.com" --param="apiKey=secret123"
+```
+
+**Code Usage:**
+
+```js
+const config = await configorama('config.yml', {
+  options: {
+    stage: 'prod',
+    param: ['domain=cli-override.com', 'apiKey=secret']
+  }
+})
 ```
 
 ### Self references
@@ -682,6 +743,7 @@ The `source` property defines how the config wizard handles each variable type:
 |----------|-------------|-------------|
 | `${env:VAR}` | `user` | Environment variables |
 | `${opt:flag}` | `user` | CLI option flags |
+| `${param:key}` | `user` | Parameter values |
 | `${self:key}` | `config` | Self references |
 | `${file(path)}` | `config` | File references |
 | `${text(path)}` | `config` | Raw text file references |
@@ -694,42 +756,125 @@ The `source` property defines how the config wizard handles each variable type:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `options` | object | `{}` | CLI options/flags to populate `${opt:xyz}` variables |
-| `allowUnknownVariables` | boolean | `false` | Allow unknown variable types to pass through (e.g., `${custom:thing}`) |
-| `allowUnresolvedVariables` | boolean | `false` | Allow known variable types that can't be resolved to pass through instead of throwing |
+| `syntax` | string/RegExp | `${...}` | Custom variable syntax regex pattern |
+| `allowUnknownVariableTypes` | boolean \| string[] | `false` | Allow unknown variable types to pass through (e.g., `${ssm:path}`) |
+| `allowUnresolvedVariables` | boolean \| string[] | `false` | Allow known variable types that can't be resolved to pass through |
 | `allowUndefinedValues` | boolean | `false` | Allow undefined to be an end result |
 | `variableSources` | array | `[]` | Custom variable sources (see above) |
 
-> **Note:** `allowUnknownVars` is deprecated, use `allowUnknownVariables` instead.
+> **Note:** Legacy options `allowUnknownVars`, `allowUnknownVariables`, `allowUnknownParams`, and `allowUnknownFileRefs` are deprecated. Use `allowUnknownVariableTypes` and `allowUnresolvedVariables` instead.
 
-### allowUnknownVariables
+<details>
+<summary><strong>Migration Guide</strong></summary>
 
-When `allowUnknownVariables: true`, unknown variable types (not registered resolvers) pass through as-is:
+**From legacy options to new API:**
 
 ```js
+// OLD → NEW
+
+// Unknown variable types (unregistered resolvers)
+{ allowUnknownVars: true }        → { allowUnknownVariableTypes: true }
+{ allowUnknownVariables: true }   → { allowUnknownVariableTypes: true }
+
+// Unresolved params
+{ allowUnknownParams: true }      → { allowUnresolvedVariables: ['param'] }
+
+// Unresolved file refs
+{ allowUnknownFileRefs: true }    → { allowUnresolvedVariables: ['file'] }
+
+// Both params and files
+{ allowUnknownParams: true, allowUnknownFileRefs: true }
+→ { allowUnresolvedVariables: ['param', 'file'] }
+
+// All unresolved (env, opt, file, param, etc.)
+{ allowUnresolvedVariables: true }  // unchanged, now also accepts arrays
+```
+
+**New array syntax allows granular control:**
+
+```js
+// Only allow specific unknown types
+{ allowUnknownVariableTypes: ['ssm', 'cf', 's3'] }
+
+// Only allow specific resolver types to fail gracefully
+{ allowUnresolvedVariables: ['param'] }  // only params, env/file/opt still throw
+```
+
+Legacy options still work but will be removed in a future major version.
+
+</details>
+
+### Custom Variable Syntax
+
+Use the `syntax` option to change the variable delimiters. You can provide a regex string directly or use `buildVariableSyntax()` to generate one with proper character escaping:
+
+```js
+const configorama = require('configorama')
+const { buildVariableSyntax } = require('configorama')
+
+// Using buildVariableSyntax helper (recommended)
 const config = await configorama(configFile, {
-  allowUnknownVariables: true,
+  syntax: buildVariableSyntax('{{', '}}'),  // Mustache-style: {{env:FOO}}
   options: { stage: 'dev' }
 })
 
-// Input:  { key: '${ssm:/path/to/secret}' }  // ssm: not a registered type
-// Output: { key: '${ssm:/path/to/secret}' }  // passes through instead of throwing
+// Other examples:
+buildVariableSyntax('${{', '}}')   // ${{env:FOO}}
+buildVariableSyntax('#{', '}')     // #{env:FOO}
+buildVariableSyntax('[[', ']]')    // [[env:FOO]]
+buildVariableSyntax('<', '>')      // <env:FOO>
+```
+
+The `buildVariableSyntax(prefix, suffix, excludePatterns)` function:
+- Automatically excludes suffix characters from the allowed character class (prevents parsing issues)
+- Supports nested variables by excluding `$` and `{` from values
+- Third parameter `excludePatterns` is an array of strings to exclude via negative lookahead (default: `['AWS', 'stageVariables']`)
+
+### allowUnknownVariableTypes
+
+Controls what happens when encountering unregistered variable types (e.g., `${ssm:path}` when `ssm` isn't a registered resolver).
+
+```js
+// Allow ALL unknown types to pass through
+const config = await configorama(configFile, {
+  allowUnknownVariableTypes: true,
+  options: { stage: 'dev' }
+})
+// Input:  { key: '${ssm:/path/to/secret}' }
+// Output: { key: '${ssm:/path/to/secret}' }
+
+// Allow only SPECIFIC unknown types
+const config = await configorama(configFile, {
+  allowUnknownVariableTypes: ['ssm', 'cf'],  // only these pass through
+  options: { stage: 'dev' }
+})
+// ${ssm:path} and ${cf:stack.output} pass through
+// ${custom:thing} throws an error
 ```
 
 ### allowUnresolvedVariables
 
-When `allowUnresolvedVariables: true`, variables that can't be resolved (missing env vars, missing files, etc.) pass through as-is instead of throwing an error:
+Controls what happens when a known resolver can't find a value (missing env vars, missing files, etc.).
 
 ```js
+// Allow ALL unresolved variables to pass through
 const config = await configorama(configFile, {
   allowUnresolvedVariables: true,
   options: { stage: 'dev' }
 })
-
 // Input:  { key: '${env:MISSING_VAR}' }
-// Output: { key: '${env:MISSING_VAR}' }  // passes through instead of throwing
+// Output: { key: '${env:MISSING_VAR}' }
+
+// Allow only SPECIFIC types to be unresolved
+const config = await configorama(configFile, {
+  allowUnresolvedVariables: ['param', 'file'],  // only these pass through
+  options: { stage: 'prod' }
+})
+// Unresolved ${param:x} and ${file(missing.yml)} pass through
+// Unresolved ${env:MISSING} throws an error
 ```
 
-This is useful for multi-stage resolution or when you want to analyze config structure without providing all values.
+This is useful for multi-stage resolution (e.g., Serverless Dashboard resolves params after local resolution).
 
 ## FAQ
 

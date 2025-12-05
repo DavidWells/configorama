@@ -10,7 +10,7 @@ const { makeBox } = require('@davidwells/box-logger')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
-  string: ['output', 'o', 'format', 'f'],
+  string: ['output', 'o', 'format', 'f', 'param'],
   boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify'],
   alias: {
     h: 'help',
@@ -41,6 +41,7 @@ Options:
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -v, --verify              Verify the config
+  --param <key=value>       Pass parameter values (can be used multiple times)
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
 
@@ -49,6 +50,7 @@ Examples:
   configorama --info config.yml
   configorama --format yaml config.json
   configorama --output resolved.json config.yml
+  configorama --param="domain=myapp.com" --param="key=value" config.yml
   configorama --allow-unknown config.toml
   `)
   process.exit(0)

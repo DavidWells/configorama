@@ -1,0 +1,18 @@
+# Test fixture for allowUnknownFileRefs feature
+foo: bar
+stage: dev
+
+# Real file that exists
+realFile: ${file(./real.yml)}
+
+# Missing file - no fallback
+missingFile: ${file(./missing.yml)}
+
+# Missing file with static fallback
+missingWithFallback: ${file(./missing.yml), 'fallback-value'}
+
+# Missing file with variable in path
+missingDynamic: ${file(./missing.${self:stage}.yml)}
+
+# Missing file with variable in path and fallback
+missingDynamicWithFallback: ${file(./missing.${self:stage}.yml), 'dynamic-fallback'}

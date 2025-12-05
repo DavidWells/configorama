@@ -88,8 +88,61 @@ Remove or update the \${${variableString}} to fix
   return isRealVariable
 }
 
+/**
+ * Build default variable syntax regex with dynamic character class
+ * Excludes suffix characters from the allowed set to prevent parsing issues
+ * @param {string} [prefix='${'] - Variable prefix
+ * @param {string} [suffix='}'] - Variable suffix
+ * @param {string[]} [excludePatterns=['AWS', 'stageVariables']] - Patterns to exclude via negative lookahead
+ * @returns {string} Regex source string
+ */
+function buildVariableSyntax(prefix = '${', suffix = '}', excludePatterns = ['AWS', 'stageVariables']) {
+  // All allowed characters, stored as individual escaped entries for regex character class
+  // Each entry is how it appears in a regex character class
+  // NOTE: { and } are intentionally excluded - they break nested variable matching
+  // NOTE: $ is intentionally excluded - it's part of variable prefix and breaks nesting
+  const allChars = [
+    ' ', '~', ':', 'a-z', 'A-Z', '0-9', '=', '+', '!', '@', '#', '%',
+    '\\^', '&', ';', '`', '\\*', '<', '>', '\\?', '\\.', '_', "'", '"', ',',
+    '\\|', '\\-', '\\/', '\\(', '\\)', '\\[', '\\]', '\\\\'
+  ]
+
+  // Map of unescaped char to its escaped form in regex character class
+  const charEscapeMap = {
+    '^': '\\^', '*': '\\*', '?': '\\?', '.': '\\.', '|': '\\|',
+    '-': '\\-', '/': '\\/', '(': '\\(', ')': '\\)', '[': '\\[', ']': '\\]',
+    '\\': '\\\\'
+  }
+
+  // Get unique characters from suffix that need to be excluded
+  const suffixChars = [...new Set(suffix.split(''))]
+
+  // Filter out chars that appear in suffix
+  const allowedChars = allChars.filter(charEntry => {
+    for (const sc of suffixChars) {
+      const escaped = charEscapeMap[sc] || sc
+      if (charEntry === escaped || charEntry === sc) {
+        return false
+      }
+    }
+    return true
+  })
+
+  // Escape prefix and suffix for regex
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedSuffix = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  // Build negative lookahead for excluded patterns
+  const lookahead = excludePatterns.length > 0
+    ? `(?!${excludePatterns.join('|')})`
+    : ''
+
+  return `${escapedPrefix}(${lookahead}[${allowedChars.join('')}]+?)${escapedSuffix}`
+}
+
 module.exports = {
   extractVariableWrapper,
   getFallbackString,
-  verifyVariable
+  verifyVariable,
+  buildVariableSyntax
 } 

@@ -1,0 +1,3 @@
+value: from-real-file
+nested:
+  key: nested-value

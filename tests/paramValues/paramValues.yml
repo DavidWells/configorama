@@ -1,0 +1,55 @@
+# Parameter Variables Test Configuration
+
+# Direct parameter reference
+appDomain: ${param:domain}
+
+# Parameter with fallback
+apiKey: ${param:apiKey, 'default-api-key'}
+
+# Parameter in different contexts
+database:
+  host: ${param:dbHost}
+  port: ${param:dbPort, 5432}
+  name: myapp_${opt:stage}
+
+# Using params in combination with other variables
+baseUrl: https://${param:domain}
+apiUrl: ${baseUrl}/api
+envSpecific: ${param:environment}-specific-value
+
+# Stage-specific parameters defined in config
+stages:
+  dev:
+    params:
+      domain: dev.myapp.com
+      dbHost: localhost
+      environment: development
+  prod:
+    params:
+      domain: myapp.com
+      dbHost: prod-db.myapp.com
+      environment: production
+  default:
+    params:
+      domain: default.myapp.com
+      dbHost: default-db.myapp.com
+      dbPort: 3306
+      environment: default
+
+# Alternative params property (backwards compatibility)
+params:
+  staging:
+    domain: staging.myapp.com
+    dbHost: staging-db.myapp.com
+    environment: staging
+
+# Nested parameter usage
+config:
+  url: ${param:domain}
+  fullUrl: https://${param:domain}/app
+
+# Parameter with special characters (note: $ not allowed in fallback - breaks nesting)
+specialChars: ${param:special, 'default-!@#%^&'}
+
+# Multiple params in one string
+connectionString: Host=${param:dbHost};Port=${param:dbPort, 5432};Database=myapp
