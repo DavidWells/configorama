@@ -764,6 +764,46 @@ The `source` property defines how the config wizard handles each variable type:
 
 > **Note:** Legacy options `allowUnknownVars`, `allowUnknownVariables`, `allowUnknownParams`, and `allowUnknownFileRefs` are deprecated. Use `allowUnknownVariableTypes` and `allowUnresolvedVariables` instead.
 
+<details>
+<summary><strong>Migration Guide</strong></summary>
+
+**From legacy options to new API:**
+
+```js
+// OLD → NEW
+
+// Unknown variable types (unregistered resolvers)
+{ allowUnknownVars: true }        → { allowUnknownVariableTypes: true }
+{ allowUnknownVariables: true }   → { allowUnknownVariableTypes: true }
+
+// Unresolved params
+{ allowUnknownParams: true }      → { allowUnresolvedVariables: ['param'] }
+
+// Unresolved file refs
+{ allowUnknownFileRefs: true }    → { allowUnresolvedVariables: ['file'] }
+
+// Both params and files
+{ allowUnknownParams: true, allowUnknownFileRefs: true }
+→ { allowUnresolvedVariables: ['param', 'file'] }
+
+// All unresolved (env, opt, file, param, etc.)
+{ allowUnresolvedVariables: true }  // unchanged, now also accepts arrays
+```
+
+**New array syntax allows granular control:**
+
+```js
+// Only allow specific unknown types
+{ allowUnknownVariableTypes: ['ssm', 'cf', 's3'] }
+
+// Only allow specific resolver types to fail gracefully
+{ allowUnresolvedVariables: ['param'] }  // only params, env/file/opt still throw
+```
+
+Legacy options still work but will be removed in a future major version.
+
+</details>
+
 ### Custom Variable Syntax
 
 Use the `syntax` option to change the variable delimiters. You can provide a regex string directly or use `buildVariableSyntax()` to generate one with proper character escaping:
