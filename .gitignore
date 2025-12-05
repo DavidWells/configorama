@@ -20,6 +20,7 @@ repomix-output.xml
 vendor
 tests/_fixtures/serverless.yml
 metadata-*.*.json
+tests/_result.json
 # osx
 .DS_STORE
 .vscode
