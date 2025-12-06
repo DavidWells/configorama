@@ -889,6 +889,30 @@ This is useful for multi-stage resolution (e.g., Downstream Serverless Dashboard
 
 ## FAQ
 
+**Q: What happens with circular variable dependencies?**
+
+Configorama detects circular dependencies and throws a helpful error instead of hanging forever.
+
+```yml
+# Direct cycle - throws error
+a: ${self:b}
+b: ${self:a}
+# Error: Circular variable dependency detected: b → a → b
+
+# Indirect cycle - also detected
+a: ${self:b}
+b: ${self:c}
+c: ${self:a}
+# Error: Circular variable dependency detected: c → a → b → c
+
+# Works with shorthand syntax too
+foo:
+  bar: ${baz.qux}
+baz:
+  qux: ${foo.bar}
+# Error: Circular variable dependency detected: baz.qux → foo.bar → baz.qux
+```
+
 **Q: Why should I use this?**
 
 Never rendering a stale configuration file again!
