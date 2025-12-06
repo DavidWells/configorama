@@ -8,6 +8,8 @@ class PromiseTracker {
   reset() {
     this.promiseList = []
     this.promiseMap = {}
+    // Track which variables depend on which (for cycle detection)
+    this.dependencyGraph = {}
     this.startTime = Date.now()
     this.cursor = 0
   }
@@ -80,6 +82,58 @@ class PromiseTracker {
     const promise = this.promiseMap[variable]
     promise.waitList += ` ${specifier}`
     return promise
+  }
+  // Add a dependency edge: "from" depends on "to"
+  addDependency(from, to) {
+    if (!this.dependencyGraph[from]) {
+      this.dependencyGraph[from] = new Set()
+    }
+    this.dependencyGraph[from].add(to)
+  }
+  // Check if adding dependency from → to would create a cycle
+  wouldCreateCycle(from, to) {
+    // Check if "to" can reach "from" (meaning from → to would close a cycle)
+    const visited = new Set()
+    const stack = [to]
+    while (stack.length > 0) {
+      const current = stack.pop()
+      if (current === from) {
+        return true
+      }
+      if (visited.has(current)) {
+        continue
+      }
+      visited.add(current)
+      const deps = this.dependencyGraph[current]
+      if (deps) {
+        for (const dep of deps) {
+          stack.push(dep)
+        }
+      }
+    }
+    return false
+  }
+  // Get the cycle path for error reporting
+  getCyclePath(from, to) {
+    const path = [from, to]
+    const visited = new Set([from, to])
+    let current = to
+    while (current !== from) {
+      const deps = this.dependencyGraph[current]
+      if (!deps) break
+      let found = false
+      for (const dep of deps) {
+        if (dep === from || !visited.has(dep)) {
+          path.push(dep)
+          visited.add(dep)
+          current = dep
+          found = true
+          break
+        }
+      }
+      if (!found) break
+    }
+    return path
   }
   getPending() {
     return this.promiseList.filter(p => (p.state === 'pending'))

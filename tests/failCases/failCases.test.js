@@ -93,6 +93,79 @@ const failConfig = {
   unresolvable: '${unknown:}'
 }
 
+test('circular variable dependency - direct', async () => {
+  const object = {
+    a: '${self:b}',
+    b: '${self:a}',
+  }
+
+  try {
+    await configorama(object, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown - circular dependency')
+  } catch (error) {
+    assert.match(error.message, /Circular variable dependency detected/)
+  }
+})
+
+test('circular variable dependency - indirect chain', async () => {
+  const object = {
+    a: '${self:b}',
+    b: '${self:c}',
+    c: '${self:a}',
+  }
+
+  try {
+    await configorama(object, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown - circular dependency')
+  } catch (error) {
+    assert.match(error.message, /Circular variable dependency detected/)
+  }
+})
+
+test('circular variable dependency - shorthand syntax (without self:)', async () => {
+  const object = {
+    a: '${b}',
+    b: '${c}',
+    c: '${a}',
+  }
+
+  try {
+    await configorama(object, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown - circular dependency')
+  } catch (error) {
+    assert.match(error.message, /Circular variable dependency detected/)
+  }
+})
+
+test('circular variable dependency - nested dotProp paths', async () => {
+  const object = {
+    foo: {
+      bar: '${baz.qux}'
+    },
+    baz: {
+      qux: '${config.value}'
+    },
+    config: {
+      value: '${foo.bar}'
+    }
+  }
+
+  try {
+    await configorama(object, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown - circular dependency')
+  } catch (error) {
+    assert.match(error.message, /Circular variable dependency detected/)
+  }
+})
+
 test('failConfig', async () => {
   try {
     await configorama(failConfig, {

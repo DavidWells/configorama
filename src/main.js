@@ -121,6 +121,7 @@ class Configorama {
       allowUndefinedValues: false,
       // Allow known variable types that can't be resolved to pass through
       // Can be: false | true | ['param', 'file', 'env', ...]
+      // Note: Does not apply to self: or dotprop refs - those always error
       allowUnresolvedVariables: false,
       // Return metadata
       returnMetadata: false,
@@ -2767,6 +2768,25 @@ Missing Value ${missingValue} - ${matchedString}
 
     // console.log('getValueFromSrc propertyString', propertyString)
     // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
+
+    // Cycle detection: track dependencies and check for cycles
+    const fromPath = valueObject.path ? valueObject.path.join('.') : null
+    // Extract target path from variableString (e.g., 'self:b' → 'b', 'b.c' → 'b.c')
+    let toPath = variableString
+    if (variableString.startsWith('self:')) {
+      toPath = variableString.slice(5)
+    }
+    // For cycle detection, only track self-references
+    if (fromPath && (variableString.startsWith('self:') || !variableString.includes(':'))) {
+      if (this.tracker.wouldCreateCycle(fromPath, toPath)) {
+        const cyclePath = this.tracker.getCyclePath(fromPath, toPath)
+        return Promise.reject(new Error(
+          `Circular variable dependency detected: ${cyclePath.join(' → ')}`
+        ))
+      }
+      this.tracker.addDependency(fromPath, toPath)
+    }
+
     if (this.tracker.contains(variableString)) {
       // console.log('try to get', variableString)
       return this.tracker.get(variableString, propertyString)
@@ -3253,6 +3273,7 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('self fixed deepProperties', deepProperties)
       }
     }
+
     return this.getDeeperValue(deepProperties, valueToPopulate).then((res) => {
       /*
       console.log('self getDeeperValue variableString', variableString)

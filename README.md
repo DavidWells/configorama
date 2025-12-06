@@ -870,11 +870,22 @@ const config = await configorama(configFile, {
   allowUnresolvedVariables: ['param', 'file'],  // only these pass through
   options: { stage: 'prod' }
 })
-// Unresolved ${param:x} and ${file(missing.yml)} pass through
-// Unresolved ${env:MISSING} throws an error
+// Input:  { paramKey: '${param:x}', fileKey: '${file(missing.yml)}' }
+// Output: { paramKey: '${param:x}', fileKey: '${file(missing.yml)}' }
+
+// Allow only SPECIFIC types to be unresolved
+const config = await configorama(configFile, {
+  allowUnresolvedVariables: ['param', 'file'],  // only these pass through
+  options: { stage: 'prod' }
+})
+// Input:  { key: '${env:MISSING_VAR}', paramKey: '${param:x}', fileKey: '${file(missing.yml)}' }
+// Unresolved ${param:x} and ${file(missing.yml)} pass through but
+// Output error thrown because ${env:MISSING_VAR} throws an error
 ```
 
-This is useful for multi-stage resolution (e.g., Serverless Dashboard resolves params after local resolution).
+This is useful for multi-stage resolution (e.g., Downstream Serverless Dashboard resolves params after local resolution).
+
+> **Note:** This option does NOT apply to `self:` or dotProp variables (e.g., `${foo.bar.baz}`). These are local references that configorama fully owns—if they can't be resolved, it's a config error, not something to defer to another system.
 
 ## FAQ
 
