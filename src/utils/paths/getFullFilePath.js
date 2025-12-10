@@ -17,8 +17,8 @@ function resolveFilePath(pathToResolve, basePath) {
   if (fs.existsSync(fullFilePath)) {
     // Get real path to handle potential symlinks (but don't fatal error)
     fullFilePath = fs.realpathSync(fullFilePath)
-  // Only match files that are relative
-  } else if (pathToResolve.match(/\.\//)) {
+  // Only use findUp for relative paths (not absolute paths)
+  } else if (!path.isAbsolute(pathToResolve)) {
     const cleanName = path.basename(pathToResolve)
     const findUpResult = findUp.sync(cleanName, { cwd: basePath })
     if (findUpResult) {
