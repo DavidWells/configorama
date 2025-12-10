@@ -129,4 +129,83 @@ test('parseFileContents: parses toml content', () => {
   assert.is(result.port, 8080)
 })
 
+// ==========================================
+// Error handling tests (bug fix)
+// Previously, non-YAMLException errors were silently swallowed
+// ==========================================
+
+test('parseFileContents: throws error for null YAML contents', () => {
+  let errorThrown = false
+  let errorMessage = ''
+  
+  try {
+    parseFileContents({
+      contents: null,
+      filePath: 'test.yml'
+    })
+  } catch (err) {
+    errorThrown = true
+    errorMessage = err.message
+  }
+  
+  assert.is(errorThrown, true, 'Should throw error for null contents')
+  assert.ok(errorMessage.length > 0, 'Error should have a message')
+})
+
+test('parseFileContents: handles undefined YAML contents gracefully', () => {
+  // Note: undefined is valid input to js-yaml - it returns undefined
+  // This is different from null which throws a TypeError
+  const result = parseFileContents({
+    contents: undefined,
+    filePath: 'test.yaml'
+  })
+  
+  assert.is(result, undefined, 'Should return undefined for undefined contents')
+})
+
+test('parseFileContents: throws error for invalid YAML syntax', () => {
+  let errorThrown = false
+  
+  try {
+    parseFileContents({
+      contents: 'invalid: yaml: syntax: [unclosed',
+      filePath: 'test.yml'
+    })
+  } catch (err) {
+    errorThrown = true
+  }
+  
+  assert.is(errorThrown, true, 'Should throw error for invalid YAML syntax')
+})
+
+test('parseFileContents: throws error for invalid JSON syntax', () => {
+  let errorThrown = false
+  
+  try {
+    parseFileContents({
+      contents: '{ invalid json }',
+      filePath: 'test.json'
+    })
+  } catch (err) {
+    errorThrown = true
+  }
+  
+  assert.is(errorThrown, true, 'Should throw error for invalid JSON syntax')
+})
+
+test('parseFileContents: throws error for invalid TOML syntax', () => {
+  let errorThrown = false
+  
+  try {
+    parseFileContents({
+      contents: 'invalid = [unclosed',
+      filePath: 'test.toml'
+    })
+  } catch (err) {
+    errorThrown = true
+  }
+  
+  assert.is(errorThrown, true, 'Should throw error for invalid TOML syntax')
+})
+
 test.run()

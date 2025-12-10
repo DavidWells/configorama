@@ -34,8 +34,8 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       const ymlText = YAML.preProcess(contents)
       configObject = YAML.parse(ymlText)
     } catch (err) {
-      // Attempt to fix cloudformation refs
-      if (err.message.match(/YAMLException/)) {
+      // Attempt to fix cloudformation refs for YAML syntax errors
+      if (err.message && err.message.match(/YAMLException/)) {
         const ymlText = YAML.preProcess(contents)
         const result = YAML.load(ymlText, {
           filename: filePath,
@@ -45,6 +45,9 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
           throw result.error
         }
         configObject = result.data
+      } else {
+        // Re-throw non-YAML errors (e.g., TypeError from null/undefined contents)
+        throw err
       }
     }
   } else if (fileType.match(/\.(toml|tml)/i)) {
