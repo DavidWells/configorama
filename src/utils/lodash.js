@@ -32,14 +32,15 @@ function set(object, path, value) {
   const lastIndex = keys.length - 1;
   
   for (let i = 0; i < lastIndex; i++) {
-    const key = keys[i];
+    const key = keys[i]
     
-    if (current[key] === undefined) {
+    // Check if value is undefined, null, or not an object (primitives can't have properties)
+    if (current[key] == null || typeof current[key] !== 'object') {
       // Create appropriate container based on next key type
-      current[key] = Number.isInteger(keys[i + 1]) && keys[i + 1] >= 0 ? [] : {};
+      current[key] = Number.isInteger(keys[i + 1]) && keys[i + 1] >= 0 ? [] : {}
     }
     
-    current = current[key];
+    current = current[key]
   }
   
   current[keys[lastIndex]] = value;
