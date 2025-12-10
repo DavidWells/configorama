@@ -170,4 +170,67 @@ test('!Condition - basic condition', () => {
   assert.is(parsed.Value['Condition'], 'IsProduction')
 })
 
+// ==========================================
+// !Transform - Macro processing
+// ==========================================
+
+test('!Transform - basic transform', () => {
+  const yaml = `Value: !Transform { Name: 'AWS::Include', Parameters: { Location: 's3://bucket/file.yaml' } }`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::Transform'], {
+    Name: 'AWS::Include',
+    Parameters: { Location: 's3://bucket/file.yaml' }
+  })
+})
+
+// ==========================================
+// AWS::LanguageExtensions functions
+// ==========================================
+
+test('!Length - array length', () => {
+  const yaml = `Value: !Length [a, b, c]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::Length'], ['a', 'b', 'c'])
+})
+
+test('!ToJsonString - convert to JSON', () => {
+  const yaml = `Value: !ToJsonString { key: value }`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::ToJsonString'], { key: 'value' })
+})
+
+test('!ForEach - iteration', () => {
+  const yaml = `Value: !ForEach [Identifier, [a, b, c], Content]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::ForEach'], ['Identifier', ['a', 'b', 'c'], 'Content'])
+})
+
+// ==========================================
+// Rule-specific functions
+// ==========================================
+
+test('!ValueOf - rule value lookup', () => {
+  const yaml = `Value: !ValueOf [ParameterLogicalId, AttributeKey]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::ValueOf'], ['ParameterLogicalId', 'AttributeKey'])
+})
+
+test('!ValueOfAll - all values lookup', () => {
+  const yaml = `Value: !ValueOfAll ['AWS::EC2::VPC::Id', Tags.Name]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::ValueOfAll'], ['AWS::EC2::VPC::Id', 'Tags.Name'])
+})
+
+test('!EachMemberEquals - member equality check', () => {
+  const yaml = `Value: !EachMemberEquals [[a, b], value]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::EachMemberEquals'], [['a', 'b'], 'value'])
+})
+
+test('!EachMemberIn - member inclusion check', () => {
+  const yaml = `Value: !EachMemberIn [[a, b], [a, b, c]]`
+  const parsed = parseCfYaml(yaml)
+  assert.equal(parsed.Value['Fn::EachMemberIn'], [['a', 'b'], ['a', 'b', 'c']])
+})
+
 test.run()

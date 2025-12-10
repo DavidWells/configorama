@@ -6,6 +6,7 @@ const flatten = require('lodash.flatten');
 const map = require('lodash.map');
 
 const functionNames = [
+  // Standard intrinsic functions
   'And',
   'Base64',
   'Cidr',
@@ -23,6 +24,16 @@ const functionNames = [
   'Select',
   'Split',
   'Sub',
+  'Transform',
+  // AWS::LanguageExtensions functions
+  'ForEach',
+  'Length',
+  'ToJsonString',
+  // Rule-specific functions (valid in Rules section)
+  'EachMemberEquals',
+  'EachMemberIn',
+  'ValueOf',
+  'ValueOfAll',
 ];
 
 const yamlType = (name, kind) => {
