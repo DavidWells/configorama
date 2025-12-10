@@ -1,0 +1,15 @@
+# YAML nested file with falsy values
+# Using unique names to avoid collision with JSON nested file
+ymlZero: 0
+ymlRefZero: ${self:ymlZero}
+
+ymlFalseBool: false
+ymlRefFalseBool: ${self:ymlFalseBool}
+
+ymlEmptyString: ""
+ymlRefEmptyString: ${self:ymlEmptyString}
+
+ymlTruthyValue: "I exist in YML"
+ymlRefTruthyValue: ${self:ymlTruthyValue}
+
+ymlParentValueNoChild: ${self:parentValueNoChild}

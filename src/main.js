@@ -2893,7 +2893,7 @@ Missing Value ${missingValue} - ${matchedString}
             // Find the most recent call for this variableString
             for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
               if (this.resolutionTracking[pathKey].calls[i].variableString === variableString) {
-                const v = (typeof val === 'object' && val.__internal_only_flag) ? val.value : val
+                const v = (val && typeof val === 'object' && val.__internal_only_flag) ? val.value : val
                 this.resolutionTracking[pathKey].calls[i].resolvedValue = v
                 this.resolutionTracking[pathKey].calls[i].resolverType = resolverType
                 break
@@ -3264,14 +3264,14 @@ Missing Value ${missingValue} - ${matchedString}
 
     /* its file ref so we need to shift lookup for self in nested files */
     if (data.isFileRef) {
-      const dotPropPath = deepProperties.length > 1 ? deepProperties.join('.') : deepProperties[0]
-      const exists = dotProp.get(valueToPopulate, dotPropPath)
-      // console.log('self exists', exists)
-      if (!exists) {
-        // @ Todo make recursive
-        deepProperties = [data.path[0]].concat(deepProperties)
-        // console.log('self fixed deepProperties', deepProperties)
+      // First check if property exists in the nested file's context (preferred for file refs)
+      const nestedPath = [data.path[0]].concat(deepProperties)
+      const nestedDotPath = nestedPath.join('.')
+      if (dotProp.has(valueToPopulate, nestedDotPath)) {
+        // Property exists in nested context, prefer it over top-level
+        deepProperties = nestedPath
       }
+      // Otherwise, keep deepProperties as-is to try top-level lookup
     }
 
     return this.getDeeperValue(deepProperties, valueToPopulate).then((res) => {

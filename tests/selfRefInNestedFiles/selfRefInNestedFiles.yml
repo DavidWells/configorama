@@ -1,0 +1,19 @@
+########################
+# Test self: references to falsy values in nested files
+# Bug: self: refs in nested files would incorrectly fall back to parent config
+# when the nested file's value was falsy (0, false, "", null)
+########################
+
+# Parent values - should NOT be used when nested file has its own values
+zero: "PARENT_ZERO"
+falseBool: "PARENT_FALSE"
+emptyString: "PARENT_EMPTY"
+truthyValue: "PARENT_TRUTHY"
+
+parentValueNoChild: "PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF"
+
+# Nested file reference - contains falsy values and self-refs to them
+nested: ${file(./nested-falsy-values.json)}
+
+# Also test with YAML nested file
+nestedYml: ${file(./nested-falsy-values.yml)}

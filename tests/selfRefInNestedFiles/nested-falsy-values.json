@@ -1,0 +1,11 @@
+{
+  "zero": 0,
+  "refZero": "${self:zero}",
+  "falseBool": false,
+  "refFalseBool": "${self:falseBool}",
+  "emptyString": "",
+  "refEmptyString": "${self:emptyString}",
+  "truthyValue": "I exist",
+  "refTruthyValue": "${self:truthyValue}",
+  "jsonParentValueNoChild": "${self:parentValueNoChild}"
+}
