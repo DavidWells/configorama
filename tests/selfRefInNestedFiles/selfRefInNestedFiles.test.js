@@ -47,7 +47,7 @@ test.before(setup)
 test.after(teardown)
 
 // ==========================================
-// JSON nested file tests
+// JSON nested file tests - ${self:...} syntax
 // ==========================================
 
 test('nested JSON: zero (0) should resolve from nested file, not parent', () => {
@@ -58,12 +58,20 @@ test('nested JSON: ${self:zero} should resolve to 0 from nested file', () => {
   assert.is(config.nested.refZero, 0)
 })
 
+test('nested JSON: ${zero} shorthand should resolve to 0 from nested file', () => {
+  assert.is(config.nested.refZeroShorthand, 0)
+})
+
 test('nested JSON: falseBool (false) should resolve from nested file, not parent', () => {
   assert.is(config.nested.falseBool, false)
 })
 
 test('nested JSON: ${self:falseBool} should resolve to false from nested file', () => {
   assert.is(config.nested.refFalseBool, false)
+})
+
+test('nested JSON: ${falseBool} shorthand should resolve to false from nested file', () => {
+  assert.is(config.nested.refFalseBoolShorthand, false)
 })
 
 test('nested JSON: emptyString ("") should resolve from nested file, not parent', () => {
@@ -74,6 +82,10 @@ test('nested JSON: ${self:emptyString} should resolve to "" from nested file', (
   assert.is(config.nested.refEmptyString, '')
 })
 
+test('nested JSON: ${emptyString} shorthand should resolve to "" from nested file', () => {
+  assert.is(config.nested.refEmptyStringShorthand, '')
+})
+
 test('nested JSON: truthyValue should resolve from nested file', () => {
   assert.is(config.nested.truthyValue, 'I exist')
 })
@@ -82,12 +94,36 @@ test('nested JSON: ${self:truthyValue} should resolve to truthy value from neste
   assert.is(config.nested.refTruthyValue, 'I exist')
 })
 
-test('nested JSON: parentValueNoChild should resolve from nested file from its parent', () => {
-  assert.is(config.nested.jsonParentValueNoChild, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
+test('nested JSON: ${truthyValue} shorthand should resolve to truthy value from nested file', () => {
+  assert.is(config.nested.refTruthyValueShorthand, 'I exist')
 })
 
 // ==========================================
-// YAML nested file tests (using unique property names)
+// JSON nested file tests - nested deep value (dot.prop with self:)
+// ==========================================
+
+test('nested JSON: deepNested.level.falsyZero should be 0', () => {
+  assert.is(config.nested.deepNested.level.falsyZero, 0)
+})
+
+test('nested JSON: ${self:deepNested.level.falsyZero} should resolve to 0 from nested file', () => {
+  assert.is(config.nested.refDeepNestedValue, 0)
+})
+
+// ==========================================
+// JSON nested file tests - parent fallback
+// ==========================================
+
+test('nested JSON: ${self:parentValueNoChild} should resolve from parent config', () => {
+  assert.is(config.nested.jsonParentValueNoChild, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
+})
+
+test('nested JSON: ${parentValueNoChild} shorthand should resolve from parent config', () => {
+  assert.is(config.nested.jsonParentValueNoChildShorthand, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
+})
+
+// ==========================================
+// YAML nested file tests - ${self:...} syntax
 // ==========================================
 
 test('nested YAML: ymlZero (0) should resolve from nested file, not parent', () => {
@@ -98,12 +134,20 @@ test('nested YAML: ${self:ymlZero} should resolve to 0 from nested file', () => 
   assert.is(config.nestedYml.ymlRefZero, 0)
 })
 
+test('nested YAML: ${ymlZero} shorthand should resolve to 0 from nested file', () => {
+  assert.is(config.nestedYml.ymlRefZeroShorthand, 0)
+})
+
 test('nested YAML: ymlFalseBool (false) should resolve from nested file, not parent', () => {
   assert.is(config.nestedYml.ymlFalseBool, false)
 })
 
 test('nested YAML: ${self:ymlFalseBool} should resolve to false from nested file', () => {
   assert.is(config.nestedYml.ymlRefFalseBool, false)
+})
+
+test('nested YAML: ${ymlFalseBool} shorthand should resolve to false from nested file', () => {
+  assert.is(config.nestedYml.ymlRefFalseBoolShorthand, false)
 })
 
 test('nested YAML: ymlEmptyString ("") should resolve from nested file, not parent', () => {
@@ -114,6 +158,10 @@ test('nested YAML: ${self:ymlEmptyString} should resolve to "" from nested file'
   assert.is(config.nestedYml.ymlRefEmptyString, '')
 })
 
+test('nested YAML: ${ymlEmptyString} shorthand should resolve to "" from nested file', () => {
+  assert.is(config.nestedYml.ymlRefEmptyStringShorthand, '')
+})
+
 test('nested YAML: ymlTruthyValue should resolve from nested file', () => {
   assert.is(config.nestedYml.ymlTruthyValue, 'I exist in YML')
 })
@@ -122,8 +170,32 @@ test('nested YAML: ${self:ymlTruthyValue} should resolve to truthy value from ne
   assert.is(config.nestedYml.ymlRefTruthyValue, 'I exist in YML')
 })
 
-test('nested YAML: ymlRefTruthyValue should resolve from nested file from its parent', () => {
+test('nested YAML: ${ymlTruthyValue} shorthand should resolve to truthy value from nested file', () => {
+  assert.is(config.nestedYml.ymlRefTruthyValueShorthand, 'I exist in YML')
+})
+
+// ==========================================
+// YAML nested file tests - nested deep value (dot.prop with self:)
+// ==========================================
+
+test('nested YAML: ymlDeepNested.level.falsyZero should be 0', () => {
+  assert.is(config.nestedYml.ymlDeepNested.level.falsyZero, 0)
+})
+
+test('nested YAML: ${self:ymlDeepNested.level.falsyZero} should resolve to 0 from nested file', () => {
+  assert.is(config.nestedYml.ymlRefDeepNestedValue, 0)
+})
+
+// ==========================================
+// YAML nested file tests - parent fallback
+// ==========================================
+
+test('nested YAML: ${self:parentValueNoChild} should resolve from parent config', () => {
   assert.is(config.nestedYml.ymlParentValueNoChild, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
+})
+
+test('nested YAML: ${parentValueNoChild} shorthand should resolve from parent config', () => {
+  assert.is(config.nestedYml.ymlParentValueNoChildShorthand, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
 })
 
 // ==========================================
@@ -144,6 +216,10 @@ test('parent: emptyString should still be PARENT_EMPTY', () => {
 
 test('parent: truthyValue should still be PARENT_TRUTHY', () => {
   assert.is(config.truthyValue, 'PARENT_TRUTHY')
+})
+
+test('parent: parentValueNoChild should still be PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF', () => {
+  assert.is(config.parentValueNoChild, 'PARENT_VALUE_HERE_BECAUSE_NO_CHILD_SELF_REF')
 })
 
 // Note: null values are not tested here as they have separate handling

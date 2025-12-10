@@ -335,21 +335,25 @@ class Configorama {
         /** */
         /* its file ref so we need to shift lookup for self in nested files */
         if (valueObject.isFileRef) {
-          const exists = dotProp.get(fullObject, varString)
-          // console.log('fallThroughSelfMatcher exists', exists)
-          if (!exists) {
-            // @ Todo make recursive
-            const deepProperties = [valueObject.path[0]].concat(varString)
-            const dotPropPath = deepProperties.join('.')
-            const deeperExists = dotProp.get(fullObject, dotPropPath)
-            // console.log('fallThroughSelfMatcher deeper', deeperExists)
-            return deeperExists
+          // First check if property exists in the nested file's context (preferred)
+          const nestedPath = [valueObject.path[0]].concat(varString)
+          const nestedDotPath = nestedPath.join('.')
+          if (dotProp.has(fullObject, nestedDotPath)) {
+            // Property exists in nested context - return true to indicate match
+            // (actual value resolution happens in resolver, not here)
+            return true
           }
+          // Fall back to top-level lookup
+          if (dotProp.has(fullObject, varString)) {
+            return true
+          }
+          return false
         }
         // console.log('fallthrough fullObject', fullObject)
         /* is simple ${whatever} reference in same file */
         const startOf = varString.split('.')
-        return fullObject[startOf[0]]
+        // Use has() to properly check existence for falsy values
+        return dotProp.has(fullObject, startOf[0])
       },
       resolver: (varString, options, config, pathValue) => {
         /*

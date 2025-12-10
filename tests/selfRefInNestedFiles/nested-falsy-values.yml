@@ -1,15 +1,32 @@
 # YAML nested file with falsy values
 # Using unique names to avoid collision with JSON nested file
+
+# Zero value tests
 ymlZero: 0
 ymlRefZero: ${self:ymlZero}
+ymlRefZeroShorthand: ${ymlZero}
 
+# False boolean tests
 ymlFalseBool: false
 ymlRefFalseBool: ${self:ymlFalseBool}
+ymlRefFalseBoolShorthand: ${ymlFalseBool}
 
+# Empty string tests
 ymlEmptyString: ""
 ymlRefEmptyString: ${self:ymlEmptyString}
+ymlRefEmptyStringShorthand: ${ymlEmptyString}
 
+# Truthy value tests
 ymlTruthyValue: "I exist in YML"
 ymlRefTruthyValue: ${self:ymlTruthyValue}
+ymlRefTruthyValueShorthand: ${ymlTruthyValue}
 
+# Nested deep value tests (dot.prop syntax with self:)
+ymlDeepNested:
+  level:
+    falsyZero: 0
+ymlRefDeepNestedValue: ${self:ymlDeepNested.level.falsyZero}
+
+# Parent fallback tests (property doesn't exist in nested file)
 ymlParentValueNoChild: ${self:parentValueNoChild}
+ymlParentValueNoChildShorthand: ${parentValueNoChild}

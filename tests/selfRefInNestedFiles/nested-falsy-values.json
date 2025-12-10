@@ -1,11 +1,22 @@
 {
   "zero": 0,
   "refZero": "${self:zero}",
+  "refZeroShorthand": "${zero}",
   "falseBool": false,
   "refFalseBool": "${self:falseBool}",
+  "refFalseBoolShorthand": "${falseBool}",
   "emptyString": "",
   "refEmptyString": "${self:emptyString}",
+  "refEmptyStringShorthand": "${emptyString}",
   "truthyValue": "I exist",
   "refTruthyValue": "${self:truthyValue}",
-  "jsonParentValueNoChild": "${self:parentValueNoChild}"
+  "refTruthyValueShorthand": "${truthyValue}",
+  "deepNested": {
+    "level": {
+      "falsyZero": 0
+    }
+  },
+  "refDeepNestedValue": "${self:deepNested.level.falsyZero}",
+  "jsonParentValueNoChild": "${self:parentValueNoChild}",
+  "jsonParentValueNoChildShorthand": "${parentValueNoChild}"
 }
