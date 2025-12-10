@@ -20,7 +20,7 @@ function decodeUnknown(rawValue) {
   let val = rawValue.replace(PASSTHROUGH_PATTERN, '')
   if (x.length) {
     x.forEach(({ match, value }) => {
-      const decodedValue = Buffer.from(value, 'base64').toString('ascii')
+      const decodedValue = Buffer.from(value, 'base64').toString('utf8')
       val = val.replace(match, decodedValue)
     })
   }
