@@ -1,4 +1,16 @@
 /* eslint-disable no-template-curly-in-string */
+/**
+ * Tests for the mergeKeys option
+ * 
+ * The mergeKeys feature merges arrays of objects by their top-level keys.
+ * This is useful for CloudFormation/Serverless configs where you import
+ * multiple resource files and want to combine all Resources into one object.
+ * 
+ * Example: With mergeKeys: ['Resources'], an array like:
+ *   [{ Resources: { A: {} } }, { Resources: { B: {} } }, { Outputs: { O: {} } }]
+ * Becomes:
+ *   { Resources: { A: {}, B: {} }, Outputs: { O: {} } }
+ */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
@@ -19,7 +31,7 @@ const setup = async () => {
   }
 
   try {
-    const configFile = path.join(__dirname, 'combined.yml')
+    const configFile = path.join(__dirname, 'mergeKeys.yml')
     config = await configorama(configFile, {
       options: args,
       mergeKeys: ['Resources']
@@ -89,7 +101,7 @@ const ymlContents = {
   ]
 }
 
-test('combine files', () => {
+test('mergeKeys: should merge Resources from multiple file imports into single object', () => {
   assert.equal(config, ymlContents)
 })
 
