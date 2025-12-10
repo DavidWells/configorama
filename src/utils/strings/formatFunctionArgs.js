@@ -20,6 +20,10 @@ module.exports = function formatArgs(args) {
     return formatArg(args)
   }
   return args.map((arg) => {
+    // Skip formatting for non-string args (e.g., arrays/objects from nested function calls)
+    if (typeof arg !== 'string') {
+      return arg
+    }
     return formatArg(arg)
   })
 }

@@ -3451,7 +3451,7 @@ Missing Value ${missingValue} - ${matchedString}
     })
   }
   runFunction(variableString) {
-    console.log('runFunction', variableString)
+    // console.log('runFunction', variableString)
     /* If json object value return it */
     if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
       return variableString
@@ -3477,7 +3477,14 @@ Missing Value ${missingValue} - ${matchedString}
       // TODO fix how commas + spaces are ned
       const splitter = splitCsv(rawArgs, ', ')
       // console.log('splitter', splitter)
-      argsToPass = formatFunctionArgs(splitter)
+      // Recursively evaluate any nested function calls in arguments
+      const evaluatedArgs = splitter.map((arg) => {
+        if (typeof arg === 'string' && funcRegex.test(arg)) {
+          return this.runFunction(arg)
+        }
+        return arg
+      })
+      argsToPass = formatFunctionArgs(evaluatedArgs)
     }
     // console.log('argsToPass runFunction', argsToPass)
     // TODO check for camelCase version. | toUpperCase messes with function name

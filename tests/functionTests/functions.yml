@@ -70,4 +70,37 @@ nestedOne: 'hi'
 nestedTwo: ${merge('haha', 'wowowow')}
 mergeNested: ${merge('lol', ${nestedTwo})}
 
+########################
+# Nested Function Calls
+# These test recursive evaluation of nested functions in arguments
+########################
+
+# Basic nested: outer function with inner function as argument
+# merge('prefix-', merge('hello', 'world')) => 'prefix-helloworld'
+nestedMergeInMerge: ${merge('prefix-', merge('hello', 'world'))}
+
+# Split result of a merge
+# split(merge('a,b', ',c,d'), ',') => ['a', 'b', 'c', 'd']
+splitMergeResult: ${split(merge('a,b', ',c,d'), ',')}
+
+# Multiple nested functions as arguments
+# merge(merge('one', 'two'), merge('three', 'four')) => 'onetwothreefour'
+mergeOfMerges: ${merge(merge('one', 'two'), merge('three', 'four'))}
+
+# Three levels of nesting
+# merge('X', merge('Y', merge('Z', '!'))) => 'XYZ!'
+tripleNested: ${merge('X', merge('Y', merge('Z', '!')))}
+
+# Join with split result (function returning array passed to function expecting array)
+# join(split('a-b-c', '-'), '_') => 'a_b_c'
+joinSplitResult: ${join(split('a-b-c', '-'), '_')}
+
+# Length of merged string
+# length(merge('hello', 'world')) => 10
+lengthOfMerge: ${length(merge('hello', 'world'))}
+
+# MD5 of merged string
+# md5(merge('hello', 'world')) => md5('helloworld')
+md5OfMerge: ${md5(merge('hello', 'world'))}
+
 fileRef: ${file(./other.yml)}

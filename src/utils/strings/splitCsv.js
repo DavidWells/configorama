@@ -4,7 +4,7 @@ const { splitByComma } = require('./splitByComma')
 const VARIABLE_SYNTAX = /\${[^}]+}/g
 
 /**
- * Split a string by comma while preserving quoted content
+ * Split a string by delimiter while preserving quoted content and balanced parentheses
  * NOTE: This is a simpler version that delegates to splitByComma for consistency.
  * For advanced use cases with bracket depth tracking and regex protection, use splitByComma directly.
  * @param {string} str - String to split
@@ -14,26 +14,53 @@ const VARIABLE_SYNTAX = /\${[^}]+}/g
  * @returns {string[]} Array of split strings
  */
 function splitCsv(str, splitter, options = {}) {
-  // If custom splitter is provided, fall back to original simple implementation
+  // If custom splitter is provided, use implementation with parenthesis tracking
   if (splitter && splitter !== ',') {
-    const splitSyntax = splitter
-    return str.split(splitSyntax).reduce(
-      (acc, curr) => {
-        if (acc.isConcatting) {
-          acc.soFar[acc.soFar.length - 1] += splitter + curr
-        } else {
-          acc.soFar.push(curr)
+    const result = []
+    let current = ''
+    let inQuote = false
+    let quoteChar = ''
+    let parenDepth = 0
+    let bracketDepth = 0
+    
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i]
+      
+      // Handle quotes
+      if ((char === "'" || char === '"') && (i === 0 || str[i-1] !== '\\')) {
+        if (!inQuote) {
+          inQuote = true
+          quoteChar = char
+        } else if (char === quoteChar) {
+          inQuote = false
         }
-        if (curr.split('"').length % 2 == 0) {
-          acc.isConcatting = !acc.isConcatting
-        }
-        return acc
-      },
-      {
-        soFar: [],
-        isConcatting: false,
-      },
-    ).soFar
+      }
+      
+      // Handle parentheses and brackets (only outside quotes)
+      if (!inQuote) {
+        if (char === '(') parenDepth++
+        else if (char === ')') parenDepth--
+        else if (char === '[') bracketDepth++
+        else if (char === ']') bracketDepth--
+      }
+      
+      // Check if we're at a splitter position
+      const atSplitter = str.substring(i, i + splitter.length) === splitter
+      
+      if (atSplitter && !inQuote && parenDepth === 0 && bracketDepth === 0) {
+        result.push(current.trim())
+        current = ''
+        i += splitter.length - 1 // Skip rest of splitter
+      } else {
+        current += char
+      }
+    }
+    
+    if (current.trim() || result.length > 0) {
+      result.push(current.trim())
+    }
+    
+    return result
   }
 
   // For standard comma splitting, use the more robust splitByComma

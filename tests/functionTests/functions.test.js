@@ -122,6 +122,55 @@ test("mergeNested: ${merge('lol', ${nestedTwo})}", () => {
   assert.equal(config.mergeNested, 'lolhahawowowow')
 })
 
+// ==========================================
+// Nested Function Calls
+// Tests recursive evaluation of nested functions in arguments
+// ==========================================
+
+test("nestedMergeInMerge: ${merge('prefix-', merge('hello', 'world'))}", () => {
+  // Inner merge('hello', 'world') => 'helloworld'
+  // Outer merge('prefix-', 'helloworld') => 'prefix-helloworld'
+  assert.is(config.nestedMergeInMerge, 'prefix-helloworld')
+})
+
+test("splitMergeResult: ${split(merge('a,b', ',c,d'), ',')}", () => {
+  // Inner merge('a,b', ',c,d') => 'a,b,c,d'
+  // Outer split('a,b,c,d', ',') => ['a', 'b', 'c', 'd']
+  assert.equal(config.splitMergeResult, ['a', 'b', 'c', 'd'])
+})
+
+test("mergeOfMerges: ${merge(merge('one', 'two'), merge('three', 'four'))}", () => {
+  // First arg: merge('one', 'two') => 'onetwo'
+  // Second arg: merge('three', 'four') => 'threefour'
+  // Outer: merge('onetwo', 'threefour') => 'onetwothreefour'
+  assert.is(config.mergeOfMerges, 'onetwothreefour')
+})
+
+test("tripleNested: ${merge('X', merge('Y', merge('Z', '!')))}", () => {
+  // Innermost: merge('Z', '!') => 'Z!'
+  // Middle: merge('Y', 'Z!') => 'YZ!'
+  // Outer: merge('X', 'YZ!') => 'XYZ!'
+  assert.is(config.tripleNested, 'XYZ!')
+})
+
+test("joinSplitResult: ${join(split('a-b-c', '-'), '_')}", () => {
+  // Inner split('a-b-c', '-') => ['a', 'b', 'c']
+  // Outer join(['a', 'b', 'c'], '_') => 'a_b_c'
+  assert.is(config.joinSplitResult, 'a_b_c')
+})
+
+test("lengthOfMerge: ${length(merge('hello', 'world'))}", () => {
+  // Inner merge('hello', 'world') => 'helloworld'
+  // Outer length('helloworld') => 10
+  assert.is(config.lengthOfMerge, 10)
+})
+
+test("md5OfMerge: ${md5(merge('hello', 'world'))}", () => {
+  // Inner merge('hello', 'world') => 'helloworld'
+  // Outer md5('helloworld') => md5 hash
+  assert.is(config.md5OfMerge, 'fc5e038d38a57032085441e7fe7010b0')
+})
+
 test("Nested fileRef: ${file(./other.yml)}", () => {
   assert.equal(config.fileRef, {
     toUpperCase: 'VALUE',
