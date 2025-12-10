@@ -12,16 +12,17 @@ function mergeByKeys(data, path, keysToMerge) {
   const mergeAll = !keysToMerge || !Array.isArray(keysToMerge) || keysToMerge.length === 0
   
   for (const item of items) {
-    const key = Object.keys(item)[0]
-    
-    if (mergeAll || keysToMerge.includes(key)) {
-      if (!result[key]) {
-        result[key] = Object.assign({}, item[key])
+    const keys = Object.keys(item)
+    for (const key of keys) {
+      if (mergeAll || keysToMerge.includes(key)) {
+        if (!result[key]) {
+          result[key] = Object.assign({}, item[key])
+        } else {
+          result[key] = Object.assign({}, result[key], item[key])
+        }
       } else {
-        result[key] = Object.assign({}, result[key], item[key])
+        result[key] = item[key]
       }
-    } else {
-      result[key] = item[key]
     }
   }
   return result
