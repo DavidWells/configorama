@@ -280,4 +280,41 @@ test('esmWithArgs -> ${file(./async-value.mjs, ${env:MY_SECRET}, ${self:normalKe
   assert.equal(config.esmWithArgs, 'esmAsyncVal')
 })
 
+// ==========================================
+// JS default export function with deep property access
+// Bug fix: Previously JS files with default export functions didn't
+// correctly handle deep property access like :database.host
+// ==========================================
+
+test('jsDefaultFuncTopLevel -> ${file(./default-export-func.js):database}', () => {
+  assert.equal(config.jsDefaultFuncTopLevel, {
+    host: 'localhost',
+    port: 5432,
+    credentials: {
+      user: 'admin',
+      password: 'secret123'
+    }
+  })
+})
+
+test('jsDefaultFuncDeepColon -> ${file(./default-export-func.js):database.host}', () => {
+  assert.equal(config.jsDefaultFuncDeepColon, 'localhost')
+})
+
+test('jsDefaultFuncDeepDot -> ${file(./default-export-func.js).database.port}', () => {
+  assert.equal(config.jsDefaultFuncDeepDot, 5432)
+})
+
+test('jsDefaultFuncThreeLevels -> ${file(./default-export-func.js):database.credentials.user}', () => {
+  assert.equal(config.jsDefaultFuncThreeLevels, 'admin')
+})
+
+test('jsDefaultFuncArray -> ${file(./default-export-func.js):features.flags.1}', () => {
+  assert.equal(config.jsDefaultFuncArray, 'flag2')
+})
+
+test('jsDefaultFuncBoolean -> ${file(./default-export-func.js):features.enabled}', () => {
+  assert.equal(config.jsDefaultFuncBoolean, true)
+})
+
 test.run()

@@ -166,3 +166,21 @@ nestedFilePathWithVar: ${file(./${subFolder}/subsub/subsubsub/foo.json)}
 
 nestedFilePathTwo: ${file(.//sub/subsub/subsubsub/foo.json) | help('Nested file path two')}
 nestedFilePathWithVarTwo: ${file(.//${subFolder}/subsub/subsubsub/foo.json) | help('Nested file path with var two')}
+
+########################
+# JS default export function with deep property access
+# Bug fix: Previously JS files with default export functions didn't
+# correctly handle deep property access like :database.host
+########################
+# Top-level property from default export function
+jsDefaultFuncTopLevel: ${file(./default-export-func.js):database}
+# Deep nested property from default export function (colon syntax)
+jsDefaultFuncDeepColon: ${file(./default-export-func.js):database.host}
+# Deep nested property from default export function (dot syntax)
+jsDefaultFuncDeepDot: ${file(./default-export-func.js).database.port}
+# Three levels deep
+jsDefaultFuncThreeLevels: ${file(./default-export-func.js):database.credentials.user}
+# Array access from default export function
+jsDefaultFuncArray: ${file(./default-export-func.js):features.flags.1}
+# Boolean value from default export function
+jsDefaultFuncBoolean: ${file(./default-export-func.js):features.enabled}

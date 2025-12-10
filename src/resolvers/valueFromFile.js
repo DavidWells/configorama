@@ -253,7 +253,19 @@ ${JSON.stringify(options.context, null, 2)}`,
   if (fileExtension === 'js' || fileExtension === 'cjs') {
     const jsFile = require(fullFilePath)
     const { moduleName } = parseModuleReference(variableString, matchedFileString)
-    const returnValueFunction = moduleName ? jsFile[moduleName] : jsFile
+    // For default export functions with :property syntax, keep the function and use deep properties
+    // For named exports (non-function module), look up the named export
+    let returnValueFunction = jsFile
+    let includeFirstProperty = false
+
+    if (moduleName && typeof jsFile === 'function') {
+      // Default export function with property access - include first property in path
+      returnValueFunction = jsFile
+      includeFirstProperty = true
+    } else if (moduleName) {
+      // Named export - look it up directly
+      returnValueFunction = jsFile[moduleName]
+    }
 
     return processExecutableFile({
       fileModule: jsFile,
@@ -264,7 +276,8 @@ ${JSON.stringify(options.context, null, 2)}`,
       matchedFileString,
       relativePath,
       fileType: 'javascript',
-      getDeeperValue: ctx.getDeeperValue
+      getDeeperValue: ctx.getDeeperValue,
+      includeFirstProperty
     })
   }
 
