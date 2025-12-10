@@ -31,8 +31,19 @@ const yamlType = (name, kind) => {
     kind,
     construct: data => {
       if (name === 'GetAtt') {
-        // special GetAtt dot syntax
-        return { [functionName]: isString(data) ? split(data, '.', 2) : data };
+        // special GetAtt dot syntax - split only at FIRST dot
+        // Attribute names can contain dots (e.g., Endpoint.Address, CertificateDetails.CAIdentifier)
+        if (isString(data)) {
+          const dotIndex = data.indexOf('.');
+          if (dotIndex === -1) {
+            return { [functionName]: [data] };
+          }
+          return { [functionName]: [
+            data.substring(0, dotIndex),      // Resource name (before first dot)
+            data.substring(dotIndex + 1)      // Attribute name (after first dot, may contain dots)
+          ]};
+        }
+        return { [functionName]: data };
       }
       return { [functionName]: data };
     },
