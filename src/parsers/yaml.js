@@ -132,8 +132,8 @@ function preProcess(ymlStr = '') {
           if (txt.indexOf(`'${nested}'`) > -1) {
             return
           }
-          /* Replace variable wrapped in quotes */
-          fixedText = fixedText.replace(nested, `"${nested}"`)
+          /* Replace ALL occurrences of variable wrapped in quotes */
+          fixedText = fixedText.replaceAll(nested, `"${nested}"`)
         })
         ymlStr = ymlStr.replace(txt, fixedText)
       }
@@ -171,8 +171,8 @@ function preProcess(ymlStr = '') {
             if (txt.indexOf(`'${nested}'`) > -1) {
               return
             }
-            /* Replace variable wrapped in quotes */
-            fixedText = fixedText.replace(nested, `"${nested}"`)
+            /* Replace ALL occurrences of variable wrapped in quotes */
+            fixedText = fixedText.replaceAll(nested, `"${nested}"`)
           })
           ymlStr = ymlStr.replace(txt, fixedText)
         }

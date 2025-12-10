@@ -166,4 +166,56 @@ test('preProcess - should handle empty input', () => {
   assert.equal(result, '')
 })
 
+// ==========================================
+// Duplicate variable tests - Bug: String.replace() only replaces first occurrence
+// ==========================================
+
+test('preProcess - should wrap ALL duplicate variables in quotes within same array', () => {
+  const input = `
+items: [\${var:foo}, \${var:foo}, \${var:foo}]
+`
+  const result = preProcess(input)
+
+  // All three occurrences should be wrapped
+  const wrappedCount = (result.match(/"\$\{var:foo\}"/g) || []).length
+
+  assert.is(wrappedCount, 3, `Expected 3 wrapped occurrences, got ${wrappedCount}. Output: ${result}`)
+})
+
+test('preProcess - should wrap ALL duplicate variables in quotes within same object', () => {
+  const input = `
+config: {stage: \${env:STAGE}, region: \${env:STAGE}}
+`
+  const result = preProcess(input)
+
+  // Both occurrences should be wrapped
+  const wrappedCount = (result.match(/"\$\{env:STAGE\}"/g) || []).length
+
+  assert.is(wrappedCount, 2, `Expected 2 wrapped occurrences, got ${wrappedCount}. Output: ${result}`)
+})
+
+test('preProcess - should wrap duplicate variables mixed with unique variables in array', () => {
+  const input = `
+mixed: [\${env:FOO}, \${env:BAR}, \${env:FOO}]
+`
+  const result = preProcess(input)
+
+  const fooCount = (result.match(/"\$\{env:FOO\}"/g) || []).length
+  const barCount = (result.match(/"\$\{env:BAR\}"/g) || []).length
+
+  assert.is(fooCount, 2, `Expected 2 wrapped FOO occurrences, got ${fooCount}. Output: ${result}`)
+  assert.is(barCount, 1, `Expected 1 wrapped BAR occurrence, got ${barCount}. Output: ${result}`)
+})
+
+test('preProcess - should wrap duplicate variables in nested array structure', () => {
+  const input = `
+nested: [[\${opt:stage}, \${opt:stage}], [\${opt:stage}]]
+`
+  const result = preProcess(input)
+
+  const wrappedCount = (result.match(/"\$\{opt:stage\}"/g) || []).length
+
+  assert.is(wrappedCount, 3, `Expected 3 wrapped occurrences, got ${wrappedCount}. Output: ${result}`)
+})
+
 test.run() 
