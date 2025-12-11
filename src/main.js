@@ -1255,8 +1255,8 @@ class Configorama {
   Config error:\n
   Path "${configValuePath}" resolved to "undefined".\n
   Verify the ${varDisplay} in config at "${configValuePath}".\n
-  ${leaf ? `See:\n  ${leaf.originalValuePath}: ${leaf.originalSource} ` : ''}
-  ${leaf && leaf.isFileRef ? `\n  The error could be deeper in the referenced file at ${configValuePath.replace(leaf.originalValuePath, '').replace(/^\./, '')} key.\n` : ''}`
+  ${leaf ? `See:\n  ${configValuePath}: ${leaf.originalSource} ` : ''}
+  ${leaf && leaf.isFileRef ? `\n  The error could be deeper in the referenced file at ${configValuePath.replace(leaf.originalValuePath || configValuePath, '').replace(/^\./, '')} key.\n` : ''}`
                 throw new Error(errorMessage)
               }
               if (typeof rawValue === 'string') {
