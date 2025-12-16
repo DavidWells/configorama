@@ -2,7 +2,7 @@
 
 Dynamic configuration values with variable support.
 
-Works with `yml`, `json`, `toml` config formats and anything that parsed down to a plain ol' javascript object
+Works with `yml`, `json`, `toml`, `hcl` (Terraform), and other config formats. Supports any format that can be parsed to a plain JavaScript object
 
 ## About
 
@@ -98,7 +98,7 @@ Configorama creates a graph of your config file and all its dependencies, then i
 
 ```mermaid
 flowchart TD
-    A[Load config file] --> B[Parse yml/json/toml to object]
+    A[Load config file] --> B[Parse yml/json/toml/hcl to object]
     B --> C[Preprocess: raw config file]
     C --> D{Return metadata only?}
     D -->|Yes| E[Collect variable metadata]
@@ -253,10 +253,10 @@ three: ${zaz.wow.cool} # Resolves to `2`
 
 ### File references
 
-Import values from external yml, json, or toml files by relative path.
+Import values from external yml, json, toml, or hcl files by relative path.
 
 ```yml
-# Import full yml/json/toml file via relative path
+# Import full yml/json/toml/hcl file via relative path
 fileRef: ${file(./subFile.yml)}
 
 # Import sub values from files. This imports other-config.yml `topLevel:` value
@@ -532,6 +532,48 @@ npm install ts-node typescript --save-dev
 - Function argument passing via `dynamicArgs`
 - Full TypeScript interface support
 - Comprehensive error handling with helpful dependency messages
+
+### Terraform HCL support
+
+Configorama supports Terraform HCL (HashiCorp Configuration Language) files, allowing you to parse `.tf`, `.tf.json`, and `.hcl` files.
+
+**Supported file types:**
+- `.tf` - Terraform configuration files
+- `.hcl` - Generic HCL files
+- `.tf.json` - Terraform JSON configuration files
+
+**Example:**
+
+```js
+const configorama = require('configorama')
+
+// Parse a Terraform configuration file
+const terraformConfig = await configorama('./main.tf')
+
+// Access Terraform variables, resources, locals, etc.
+console.log(terraformConfig.variable)  // Variables defined in the file
+console.log(terraformConfig.resource)  // Resources
+console.log(terraformConfig.locals)    // Local values
+console.log(terraformConfig.output)    // Outputs
+```
+
+**Importing Terraform files:**
+
+```yml
+# Import Terraform variables from a .tf file
+terraformVars: ${file(./terraform/variables.tf)}
+
+# Import specific variable from Terraform file
+region: ${file(./terraform/variables.tf):variable.region[0].default}
+```
+
+**Note on Terraform variable syntax:**
+Terraform uses `${var.name}` for interpolation. The HCL parser preserves these as-is (e.g., `type: "${string}"`). If you want configorama to resolve Terraform-style variables, you may need to configure custom variable sources or use the `allowUnknownVariableTypes` option.
+
+**Read-only support:**
+Currently, HCL files can be read and parsed, but writing/generating HCL files is not supported.
+
+See [tests/fixtures/terraform](./tests/fixtures/terraform) for example Terraform files.
 
 ### Git references
 

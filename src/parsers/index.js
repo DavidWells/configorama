@@ -8,6 +8,7 @@ const json = require('./json5')
 const toml = require('./toml')
 const yaml = require('./yaml')
 const ini = require('./ini')
+const hcl = require('./hcl')
 
 /**
  * Collection of format parsers for different config file types
@@ -17,5 +18,6 @@ module.exports = {
   json: json,
   toml: toml,
   yaml: yaml,
-  ini: ini
+  ini: ini,
+  hcl: hcl
 }
