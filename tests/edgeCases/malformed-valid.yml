@@ -1,0 +1,31 @@
+# YAML that is technically valid but has unusual structure
+---
+# Document marker
+
+# Unusual but valid YAML constructs
+weird_key_with_underscores_and_numbers_123: value
+
+# String that could be confused with variable syntax
+not_a_variable: "this ${looks:like} a variable but it's in quotes"
+
+# Nested structure with unusual formatting
+nested:
+  level1:
+    level2: ${self:weird_key_with_underscores_and_numbers_123}
+
+# Empty values
+empty_value:
+null_value: null
+
+# Multiline string
+multiline: |
+  This is a multiline
+  string with ${self:stage}
+  variable inside
+
+# Multiline folded
+folded: >
+  This is folded
+  into one line ${self:nested.level1.level2}
+
+stage: test

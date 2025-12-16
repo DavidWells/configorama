@@ -1,0 +1,11 @@
+{
+  "value": "test-value",
+  "nested": {
+    "key": "nested-value",
+  },
+  "array": [
+    "item1",
+    "item2",
+  ],
+  "reference": "${self:value}",
+}
