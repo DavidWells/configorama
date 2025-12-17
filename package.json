@@ -1,6 +1,6 @@
 {
   "name": "configorama",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Variable support for configuration files",
   "main": "src/index.js",
   "types": "index.d.ts",
