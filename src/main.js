@@ -158,17 +158,25 @@ class Configorama {
     // Track variable resolutions for metadata (keyed by path)
     this.resolutionTracking = {}
 
-    const defaultSyntax = buildVariableSyntax('${', '}', ['AWS', 'stageVariables'])
+    // Detect file type early to determine default syntax
+    let detectedFileType = null
+    if (typeof fileOrObject === 'string') {
+      detectedFileType = path.extname(fileOrObject).toLowerCase()
+    }
+
+    // Use $[...] syntax for HCL/Terraform files to avoid conflicts with Terraform's ${} syntax
+    const isHclFile = detectedFileType === '.tf' || detectedFileType === '.hcl'
+    const defaultSyntax = isHclFile
+      ? buildVariableSyntax('$[', ']', ['AWS', 'stageVariables'])
+      : buildVariableSyntax('${', '}', ['AWS', 'stageVariables'])
 
     const varSyntax = options.syntax || defaultSyntax
     let varRegex
     if (typeof varSyntax === 'string') {
       varRegex = new RegExp(varSyntax, 'g')
-      // this.variableSyntax = /\${((?!AWS)([ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?|(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*))}/
     } else if (varSyntax instanceof RegExp) {
       varRegex = varSyntax
     }
-    // console.log('varRegex', varRegex)
     const variableSyntax = varRegex
     this.variableSyntax = variableSyntax
 
@@ -3298,7 +3306,9 @@ Missing Value ${missingValue} - ${matchedString}
       config: this.config,
       getDeeperValue: this.getDeeperValue.bind(this),
       fileRefSyntax: fileRefSyntax,
-      textRefSyntax: textRefSyntax
+      textRefSyntax: textRefSyntax,
+      varPrefix: this.varPrefix,
+      varSuffix: this.varSuffix
     }
     return getValueFromFileResolver(ctx, variableString, options)
   }

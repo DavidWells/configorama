@@ -5,6 +5,7 @@ const YAML = require('../../parsers/yaml')
 const TOML = require('../../parsers/toml')
 const INI = require('../../parsers/ini')
 const JSON5 = require('../../parsers/json5')
+const HCL = require('../../parsers/hcl')
 const { executeTypeScriptFileSync } = require('../../parsers/typescript')
 const { executeESMFileSync } = require('../../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
@@ -56,6 +57,15 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
     configObject = INI.parse(contents)
   } else if (fileType.match(/\.(json|json5)/i)) {
     configObject = JSON5.parse(contents)
+  } else if (fileType.match(/\.(tf|hcl)$/i) || filePath.match(/\.tf\.json$/i)) {
+    // Handle Terraform HCL files (.tf, .hcl) and Terraform JSON (.tf.json)
+    if (filePath.match(/\.tf\.json$/i)) {
+      // .tf.json files are just JSON
+      configObject = JSON5.parse(contents)
+    } else {
+      // .tf and .hcl files need HCL parsing
+      configObject = HCL.parse(contents, path.basename(filePath))
+    }
   // TODO detect js syntax and use appropriate parser
   } else if (fileType.match(/\.(js|cjs)/i)) {
     let jsFile

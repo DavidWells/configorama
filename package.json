@@ -25,10 +25,11 @@
     "info": "repomix --include \"cli.js,src/**/*.js\" --ignore \"**/*.test.js\" --copy",
     "docs": "node ./scripts/docs.js",
     "t": "./scripts/run-tests.sh",
-    "test": "npm run test:lib && uvu tests \".*\\.test.js$\" ",
+    "test": "npm run test:slow && npm run test:lib && uvu tests \".*\\.test.js$\"",
     "test:tests": "uvu tests \".*\\.test.js$\" ",
     "test:api": "uvu tests/api api.test.js",
     "test:lib": "uvu src \".*\\.test.js$\"",
+    "test:slow": "uvu src \".*\\.slow-test.js$\" && uvu tests \".*\\.slow-test.js$\"",
     "watch": "watchlist tests -- npm test",
     "typecheck": "tsc --noEmit",
     "types": "tsc",
@@ -84,11 +85,28 @@
     "traverse": "^0.6.8"
   },
   "devDependencies": {
+    "@cdktf/hcl2json": "^0.21.0",
     "@types/node": "^24.10.1",
     "markdown-magic": "^3.4.0",
     "tsx": "^4.7.0",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6",
     "watchlist": "^0.3.1"
+  },
+  "peerDependencies": {
+    "@cdktf/hcl2json": ">=0.20.0",
+    "tsx": ">=4.0.0",
+    "ts-node": ">=10.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@cdktf/hcl2json": {
+      "optional": true
+    },
+    "tsx": {
+      "optional": true
+    },
+    "ts-node": {
+      "optional": true
+    }
   }
 }
