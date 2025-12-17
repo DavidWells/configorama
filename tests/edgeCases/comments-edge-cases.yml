@@ -1,0 +1,31 @@
+# Top level comment
+# Multiple comment lines
+# Before the actual config
+
+stage: ${opt:stage, dev} # Inline comment after variable
+
+# Comment before nested structure
+custom:
+  # Comment inside nested structure
+  value: test-value # Inline comment
+  # Comment between properties
+  nested:
+    # Deep comment
+    deep: ${self:stage} # Variable with comment
+    # Comment after property
+
+# Comment before array
+items:
+  # Comment before array item
+  - item1 # Inline in array
+  - ${self:custom.value} # Variable in array with comment
+  # Comment between array items
+  - item3
+
+# Multiple blank lines below
+
+
+# Comment before complex variable
+complexVar: ${opt:missing, ${self:custom.value}} # Fallback with comment
+
+# Comment at end of file
