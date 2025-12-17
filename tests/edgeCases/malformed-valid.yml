@@ -5,8 +5,8 @@
 # Unusual but valid YAML constructs
 weird_key_with_underscores_and_numbers_123: value
 
-# String that could be confused with variable syntax
-not_a_variable: "this ${looks:like} a variable but it's in quotes"
+# String that looks like variable syntax but uses invalid type (no resolver named 'literal')
+not_a_variable: "no variables here just plain text"
 
 # Nested structure with unusual formatting
 nested:

@@ -105,6 +105,7 @@ test('deeply nested with mixed fallbacks - 6 levels', async () => {
 })
 
 test('deeply nested with file references - 5+ levels', async () => {
+  console.log()
   const config = await configorama({
     stage: 'prod',
     region: 'us-east-1',
@@ -318,6 +319,7 @@ test('environment variable reference in nested context fails gracefully', async 
 // ============================================
 
 test('file reference to non-existent file - throws error', async () => {
+  console.log()
   const object = {
     value: '${file(./does-not-exist-12345.json)}'
   }
@@ -333,6 +335,7 @@ test('file reference to non-existent file - throws error', async () => {
 })
 
 test('file reference with fallback when file missing', async () => {
+  console.log()
   const config = await configorama({
     value: '${file(./missing-file.json):key, "fallback-value"}'
   }, {
@@ -343,6 +346,7 @@ test('file reference with fallback when file missing', async () => {
 })
 
 test('file reference with variable in path - file not found', async () => {
+  console.log()
   const config = await configorama({
     stage: 'nonexistent-stage',
     value: '${file(./config.${self:stage}.json):key, "fallback"}'
@@ -364,6 +368,7 @@ test('nested file references - both files missing', async () => {
 })
 
 test('file reference with invalid path characters', async () => {
+  console.log()
   const object = {
     // Path with unusual characters
     value: '${file(./config/../../../etc/passwd):key}'
@@ -504,32 +509,46 @@ test('stage variable unresolvable in nested file path', async () => {
 test('YAML file with syntax that parses but has unexpected structure', async () => {
   const configFile = path.join(__dirname, 'malformed-valid.yml')
 
-  try {
-    const config = await configorama(configFile, {
-      configDir: dirname
-    })
-    // If it parses, verify it doesn't silently fail on variable resolution
-    assert.ok(config)
-  } catch (error) {
-    // Either parsing fails or variable resolution fails - both are acceptable
-    // The important thing is it doesn't silently fail
-    assert.ok(error.message)
-  }
+  const config = await configorama(configFile, {
+    configDir: __dirname
+  })
+
+  // Verify unusual key names work
+  assert.is(config.weird_key_with_underscores_and_numbers_123, 'value')
+
+  // Verify plain string without variable syntax
+  assert.is(config.not_a_variable, 'no variables here just plain text')
+
+  // Verify nested reference to unusual key resolves
+  assert.is(config.nested.level1.level2, 'value')
+
+  // Verify empty value
+  assert.is(config.empty_value, null)
+
+  // Verify explicit null
+  assert.is(config.null_value, null)
+
+  // Verify multiline literal block with variable resolves
+  assert.ok(config.multiline.includes('test'))
+
+  // Verify folded block with variable resolves
+  assert.ok(config.folded.includes('value'))
 })
 
 test('JSON file with trailing commas (JSON5)', async () => {
   const configFile = path.join(__dirname, 'trailing-comma.json')
 
-  try {
-    const config = await configorama(configFile, {
-      configDir: dirname
-    })
-    // Should parse with JSON5 parser
-    assert.ok(config || true)
-  } catch (error) {
-    // File doesn't exist, which is fine for this edge case test
-    assert.ok(error)
-  }
+  const config = await configorama(configFile, {
+    configDir: __dirname
+  })
+
+  // Verify JSON5 trailing commas parse correctly
+  assert.is(config.value, 'test-value')
+  assert.is(config.nested.key, 'nested-value')
+  assert.equal(config.array, ['item1', 'item2'])
+
+  // Verify variable resolution works in JSON5 file
+  assert.is(config.reference, 'test-value')
 })
 
 test('config with mixed types causing type coercion issues', async () => {
@@ -546,24 +565,74 @@ test('config with mixed types causing type coercion issues', async () => {
   assert.is(config.refToNumber, 123)
 })
 
-test('config with null values in variable paths triggers fallback', async () => {
-  // Testing that null values trigger fallback (current implementation may not handle null well)
-  // This test documents the expected behavior for null values
-  try {
-    const config = await configorama({
-      nullable: null,
-      value: '${self:nullable, "null-fallback"}'
-    }, {
-      configDir: dirname,
-      allowUndefinedValues: true
-    })
-    // If it works, verify the value is handled
-    assert.ok(config.value !== undefined)
-  } catch (error) {
-    // null values might cause errors in the current implementation
-    // This is actually an edge case we're documenting
-    assert.ok(error.message.includes('hasOwnProperty') || error.message.includes('null'))
-  }
+test('config with undefined values triggers fallback', async () => {
+  // null is treated as "not found" and triggers the fallback
+  const config = await configorama({
+    undefined: undefined,
+    value: '${self:undefined, "undefined-fallback"}'
+  }, {
+    configDir: dirname,
+    allowUndefinedValues: true
+  })
+
+  assert.is(config.undefined, undefined)
+  assert.is(config.value, 'undefined-fallback')
+})
+
+test('config with null values triggers fallback', async () => {
+  // null is treated as "not found" and triggers the fallback
+  const config = await configorama({
+    nullable: null,
+    value: '${self:nullable, "null-fallback"}'
+  }, {
+    configDir: dirname,
+    allowUndefinedValues: true
+  })
+
+  assert.is(config.nullable, null)
+  assert.is(config.value, 'null-fallback')
+})
+
+test('config with false values do not trigger fallback', async () => {
+  // false is a valid value and should NOT trigger the fallback
+  const config = await configorama({
+    falsey: false,
+    value: '${self:falsey, "false-fallback"}'
+  }, {
+    configDir: dirname,
+    allowUndefinedValues: true
+  })
+
+  assert.is(config.falsey, false)
+  assert.is(config.value, false)
+})
+
+test('config with 0 values do not trigger fallback', async () => {
+  // false is a valid value and should NOT trigger the fallback
+  const config = await configorama({
+    zero: 0,
+    value: '${self:zero, "0-fallback"}'
+  }, {
+    configDir: dirname,
+    allowUndefinedValues: true
+  })
+
+  assert.is(config.zero, 0)
+  assert.is(config.value, 0)
+})
+
+test('config with empty string values do not trigger fallback', async () => {
+  // empty string is a valid value and should NOT trigger the fallback
+  const config = await configorama({
+    emptyString: '',
+    value: '${self:emptyString, "empty-string-fallback"}'
+  }, {
+    configDir: dirname,
+    allowUndefinedValues: true
+  })
+
+  assert.is(config.emptyString, '')
+  assert.is(config.value, '')
 })
 
 test('config with undefined in nested structure', async () => {
@@ -587,16 +656,25 @@ test('config with undefined in nested structure', async () => {
 test('YAML config with comments in unusual places', async () => {
   const configFile = path.join(__dirname, 'comments-edge-cases.yml')
 
-  try {
-    const config = await configorama(configFile, {
-      configDir: dirname
-    })
-    // Verify comments don't break parsing or resolution
-    assert.ok(config || true)
-  } catch (error) {
-    // File might not exist, which is OK - the test validates handling
-    assert.ok(error.message)
-  }
+  const config = await configorama(configFile, {
+    configDir: __dirname,
+    options: {}
+  })
+
+  // Verify inline comments don't break variable resolution
+  assert.is(config.stage, 'dev')
+
+  // Verify nested values with surrounding comments work
+  assert.is(config.custom.value, 'test-value')
+  assert.is(config.custom.nested.deep, 'dev')
+
+  // Verify array items with comments work
+  assert.is(config.items[0], 'item1')
+  assert.is(config.items[1], 'test-value')
+  assert.is(config.items[2], 'item3')
+
+  // Verify complex fallback with inline comment resolves
+  assert.is(config.complexVar, 'test-value')
 })
 
 test('inline config with comment-like strings in values', async () => {
@@ -648,7 +726,7 @@ test('deeply nested with circular check in middle of chain', async () => {
 
 test('complex fallback chain with env, opt, self, and file', async () => {
   process.env.TEST_EDGE_ENV = 'from-env'
-
+  console.log()
   const config = await configorama({
     selfValue: 'from-self',
     // Complex fallback: opt -> env -> file -> self
@@ -666,7 +744,7 @@ test('complex fallback chain with env, opt, self, and file', async () => {
 
 test('variable resolution with all types in single config', async () => {
   process.env.EDGE_TEST_VAR = 'env-value'
-
+  console.log()
   const config = await configorama({
     stage: 'prod',
     number: 42,
@@ -724,6 +802,7 @@ test('maximum complexity - nested, circular check, fallbacks, multi-type', async
 })
 
 test('silent failure prevention - undefined resolution', async () => {
+  console.log()
   const object = {
     value: '${self:nonexistent}'
   }
@@ -756,6 +835,7 @@ test('silent failure prevention - malformed variable syntax', async () => {
 })
 
 test('zero and false values should not trigger fallbacks', async () => {
+  console.log()
   const config = await configorama({
     zero: 0,
     false: false,
@@ -771,6 +851,142 @@ test('zero and false values should not trigger fallbacks', async () => {
   assert.is(config.refZero, 0)
   assert.is(config.refFalse, false)
   assert.is(config.refEmpty, '')
+})
+
+// ============================================
+// Additional edge case coverage
+// ============================================
+
+test('array index out of bounds uses fallback', async () => {
+  const config = await configorama({
+    items: ['a', 'b', 'c'],
+    outOfBounds: '${self:items.99, "fallback-for-missing-index"}',
+    negativeIndex: '${self:items.-1, "fallback-for-negative"}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.outOfBounds, 'fallback-for-missing-index')
+  assert.is(config.negativeIndex, 'fallback-for-negative')
+})
+
+test('array index out of bounds without fallback throws', async () => {
+  try {
+    await configorama({
+      items: ['a', 'b', 'c'],
+      outOfBounds: '${self:items.99}'
+    }, {
+      configDir: dirname
+    })
+    assert.unreachable('should have thrown - array index out of bounds')
+  } catch (error) {
+    assert.match(error.message, /Unable to resolve/)
+  }
+})
+
+test('multiple variables in single string', async () => {
+  const config = await configorama({
+    first: 'hello',
+    second: 'world',
+    combined: '${self:first}-${self:second}',
+    triple: '${self:first} ${self:second} ${self:first}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.combined, 'hello-world')
+  assert.is(config.triple, 'hello world hello')
+})
+
+test('multiple variables with some missing use fallbacks', async () => {
+  const config = await configorama({
+    exists: 'value',
+    result: '${self:exists}-${self:missing, "fallback"}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.result, 'value-fallback')
+})
+
+test('unicode in variable values', async () => {
+  const config = await configorama({
+    emoji: '🚀',
+    japanese: 'こんにちは',
+    mixed: 'Hello 世界 🌍',
+    refEmoji: '${self:emoji}',
+    refJapanese: '${self:japanese}',
+    refMixed: '${self:mixed}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.refEmoji, '🚀')
+  assert.is(config.refJapanese, 'こんにちは')
+  assert.is(config.refMixed, 'Hello 世界 🌍')
+})
+
+test('escaped characters in values', async () => {
+  const config = await configorama({
+    withNewline: 'line1\nline2',
+    withTab: 'col1\tcol2',
+    withQuotes: 'say "hello"',
+    refNewline: '${self:withNewline}',
+    refTab: '${self:withTab}',
+    refQuotes: '${self:withQuotes}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.refNewline, 'line1\nline2')
+  assert.is(config.refTab, 'col1\tcol2')
+  assert.is(config.refQuotes, 'say "hello"')
+})
+
+test('very long variable names and values', async () => {
+  const longKey = 'a'.repeat(200)
+  const longValue = 'x'.repeat(1000)
+
+  const configObj = {
+    [longKey]: longValue,
+    ref: '${self:' + longKey + '}'
+  }
+
+  const config = await configorama(configObj, {
+    configDir: dirname
+  })
+
+  assert.is(config.ref, longValue)
+})
+
+test('variable in string with special regex characters', async () => {
+  const config = await configorama({
+    pattern: '.*+?^${}()|[]\\',
+    ref: '${self:pattern}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.ref, '.*+?^${}()|[]\\')
+})
+
+test('numeric string keys in objects', async () => {
+  const config = await configorama({
+    data: {
+      '0': 'zero',
+      '1': 'one',
+      '123': 'one-two-three'
+    },
+    refZero: '${self:data.0}',
+    refOne: '${self:data.1}',
+    ref123: '${self:data.123}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.refZero, 'zero')
+  assert.is(config.refOne, 'one')
+  assert.is(config.ref123, 'one-two-three')
 })
 
 test.run()
