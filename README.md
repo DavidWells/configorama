@@ -537,6 +537,14 @@ npm install ts-node typescript --save-dev
 
 Configorama supports Terraform HCL (HashiCorp Configuration Language) files, allowing you to parse `.tf`, `.tf.json`, and `.hcl` files.
 
+**Installation:**
+
+HCL parsing requires the optional `@cdktf/hcl2json` package:
+
+```bash
+npm install @cdktf/hcl2json
+```
+
 **Supported file types:**
 - `.tf` - Terraform configuration files
 - `.hcl` - Generic HCL files

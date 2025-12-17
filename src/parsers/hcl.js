@@ -2,6 +2,26 @@ const YAML = require('./yaml')
 const JSON = require('./json5')
 
 /**
+ * Get the hcl2json module, throwing helpful error if not installed
+ * @returns {{ parse: Function }} The hcl2json module
+ * @throws {Error} If @cdktf/hcl2json is not installed
+ */
+function getHcl2Json() {
+  try {
+    return require('@cdktf/hcl2json')
+  } catch (err) {
+    if (err.code === 'MODULE_NOT_FOUND') {
+      throw new Error(
+        'HCL/Terraform file support requires "@cdktf/hcl2json" to be installed.\n' +
+        'Please install it:\n' +
+        '  npm install @cdktf/hcl2json'
+      )
+    }
+    throw err
+  }
+}
+
+/**
  * Parse HCL content into JavaScript object
  * Uses @cdktf/hcl2json to convert HCL to JSON
  * @param {string} hclContents - HCL string to parse
@@ -12,7 +32,7 @@ const JSON = require('./json5')
 async function parse(hclContents, filename = 'config.tf') {
   let hclObject = {}
   try {
-    const { parse: hclParse } = require('@cdktf/hcl2json')
+    const { parse: hclParse } = getHcl2Json()
     const result = await hclParse(filename, hclContents)
     hclObject = result
   } catch (e) {

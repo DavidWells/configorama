@@ -14,8 +14,20 @@ async function main() {
       throw new Error('HCL content is required')
     }
 
-    const { parse } = require('@cdktf/hcl2json')
-    const result = await parse(filename, contents)
+    let hcl2json
+    try {
+      hcl2json = require('@cdktf/hcl2json')
+    } catch (err) {
+      if (err.code === 'MODULE_NOT_FOUND') {
+        throw new Error(
+          'HCL/Terraform file support requires "@cdktf/hcl2json" to be installed. ' +
+          'Please install it: npm install @cdktf/hcl2json'
+        )
+      }
+      throw err
+    }
+
+    const result = await hcl2json.parse(filename, contents)
 
     // Output result as JSON
     console.log(JSON.stringify(result))
