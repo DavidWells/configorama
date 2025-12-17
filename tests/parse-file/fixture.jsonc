@@ -1,0 +1,5 @@
+{
+  // JSONC supports comments
+  "name": "jsonc-config",
+  "withComments": true
+}

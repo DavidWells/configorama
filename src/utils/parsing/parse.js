@@ -55,7 +55,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
     configObject = TOML.parse(contents)
   } else if (fileType.match(/\.(ini)/i)) {
     configObject = INI.parse(contents)
-  } else if (fileType.match(/\.(json|json5)/i)) {
+  } else if (fileType.match(/\.(json|json5|jsonc)/i)) {
     configObject = JSON5.parse(contents)
   } else if (fileType.match(/\.(tf|hcl)$/i) || filePath.match(/\.tf\.json$/i)) {
     // Handle Terraform HCL files (.tf, .hcl) and Terraform JSON (.tf.json)

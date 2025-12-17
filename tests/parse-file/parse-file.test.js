@@ -44,6 +44,13 @@ test('parseFile: parses .json5 files', () => {
   assert.is(result.trailing, 'comma')
 })
 
+test('parseFile: parses .jsonc files', () => {
+  const result = parseFile(fixturePath('fixture.jsonc'))
+
+  assert.is(result.name, 'jsonc-config')
+  assert.is(result.withComments, true)
+})
+
 test('parseFile: parses .toml files', () => {
   const result = parseFile(fixturePath('fixture.toml'))
 

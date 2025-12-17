@@ -279,7 +279,7 @@ Supported file types (extensions are case-insensitive):
 | YAML | `.yml`, `.yaml` |
 | TOML | `.toml`, `.tml` |
 | INI | `.ini` |
-| JSON | `.json`, `.json5` |
+| JSON | `.json`, `.json5`, `.jsonc` |
 
 ### Sync/Async file references
 
