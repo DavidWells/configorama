@@ -567,13 +567,31 @@ terraformVars: ${file(./terraform/variables.tf)}
 region: ${file(./terraform/variables.tf):variable.region[0].default}
 ```
 
-**Note on Terraform variable syntax:**
-Terraform uses `${var.name}` for interpolation. The HCL parser preserves these as-is (e.g., `type: "${string}"`). If you want configorama to resolve Terraform-style variables, you may need to configure custom variable sources or use the `allowUnknownVariableTypes` option.
+**Variable syntax:**
+When loading `.tf` or `.hcl` files directly, configorama automatically uses `$[...]` syntax instead of `${...}` to avoid conflicts with Terraform's native `${var.name}` interpolation. Terraform expressions like `${var.environment}` and `${map(string)}` are preserved as-is.
+
+```js
+// Loading .tf directly - uses $[...] syntax automatically
+const config = await configorama('./main.tf')
+// config.locals[0].app_name = "myapp-${var.environment}" (preserved)
+
+// Use $[...] for configorama variables in .tf files
+// myvar: $[env:MY_VAR]
+// myref: $[file(./other.yml)]  # referenced files also use $[...]
+```
+
+When importing `.tf` files from other config formats (yml, json, etc.) via `${file()}`, the parent file's syntax applies. Use `allowUnknownVariableTypes: true` if the imported `.tf` contains Terraform interpolations:
+
+```js
+const config = await configorama('./config.yml', {
+  allowUnknownVariableTypes: true
+})
+```
 
 **Read-only support:**
 Currently, HCL files can be read and parsed, but writing/generating HCL files is not supported.
 
-See [tests/fixtures/terraform](./tests/fixtures/terraform) for example Terraform files.
+See [tests/hclTests](./tests/hclTests) for example Terraform files.
 
 ### Git references
 

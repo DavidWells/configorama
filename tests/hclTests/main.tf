@@ -11,7 +11,7 @@ variable "environment" {
 }
 
 variable "instance_count" {
-  description = "Number of instances"
+  description = "Number of instances $[env:foo]"
   type        = number
   default     = 2
 }

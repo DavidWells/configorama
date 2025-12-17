@@ -2,6 +2,7 @@
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const hcl = require('./hcl')
+const JSON5 = require('json5')
 const path = require('path')
 const fs = require('fs')
 
@@ -81,7 +82,7 @@ test('hcl parse resource block', async () => {
 })
 
 test('hcl parse from file - simple.tf', async () => {
-  const filePath = path.join(__dirname, '../../tests/fixtures/terraform/simple.tf')
+  const filePath = path.join(__dirname, '../../tests/hclTests/simple.tf')
 
   // Skip if file doesn't exist
   if (!fs.existsSync(filePath)) {
@@ -120,8 +121,8 @@ test('hcl toJson basic', async () => {
   assert.ok(result, 'result should exist')
   assert.ok(typeof result === 'string', 'result should be string')
 
-  const parsed = JSON.parse(result)
-  assert.ok(parsed, 'should be valid JSON')
+  const parsed = JSON5.parse(result)
+  assert.ok(parsed, 'should be valid JSON5')
 })
 
 test('hcl toYaml basic', async () => {

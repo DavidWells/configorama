@@ -1,0 +1,39 @@
+# HCL/Terraform file tests for configorama
+
+normalKey: full
+
+# Import full terraform file
+tfFullFile: ${file(./_tfvalues.tf)}
+
+# Import specific variable defaults from terraform file
+# Terraform variables are arrays in HCL parsed output
+tfRegion: ${file(./_tfvalues.tf):variable.region.0.default}
+tfAppName: ${file(./_tfvalues.tf):variable.app_name.0.default}
+tfInstanceCount: ${file(./_tfvalues.tf):variable.instance_count.0.default}
+tfEnabled: ${file(./_tfvalues.tf):variable.enabled.0.default}
+
+# Import variable description
+tfRegionDesc: ${file(./_tfvalues.tf):variable.region.0.description}
+
+# Import locals values
+# Locals are also arrays in HCL parsed output
+tfLocalsEnv: ${file(./_tfvalues.tf):locals.0.environment}
+tfLocalsFullName: ${file(./_tfvalues.tf):locals.0.full_name}
+
+# Import entire variable block
+tfVariableRegion: ${file(./_tfvalues.tf):variable.region}
+tfVariableAppName: ${file(./_tfvalues.tf):variable.app_name}
+
+# Test with dot notation instead of colon
+tfRegionDot: ${file(./_tfvalues.tf).variable.region.0.default}
+tfAppNameDot: ${file(./_tfvalues.tf).variable.app_name.0.default}
+
+# Missing file with fallback
+tfMissing: ${file(./_nonexistent.tf), 'tfMissingDefault'}
+
+# .tf.json file tests (Terraform JSON format)
+tfJsonFull: ${file(./config.tf.json)}
+tfJsonEnvVar: ${file(./config.tf.json):variable.env_var_test.default}
+tfJsonFallback: ${file(./config.tf.json):variable.with_fallback.default}
+# Terraform ${var.xxx} syntax should be preserved
+tfJsonTerraformSyntax: ${file(./config.tf.json):locals.terraform_syntax}

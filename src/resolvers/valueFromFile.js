@@ -14,6 +14,34 @@ const YAML = require('../parsers/yaml')
 const TOML = require('../parsers/toml')
 const INI = require('../parsers/ini')
 const JSON5 = require('../parsers/json5')
+const HCL = require('../parsers/hcl')
+
+/**
+ * Convert HCL $[...] syntax to the main config's variable syntax
+ * This allows configorama variables in .tf files to work when imported from other formats
+ * @param {*} obj - Object to convert
+ * @param {string} varPrefix - Variable prefix (e.g., '${')
+ * @param {string} varSuffix - Variable suffix (e.g., '}')
+ * @returns {*} Converted object
+ */
+function convertHclVarSyntax(obj, varPrefix, varSuffix) {
+  if (!obj) return obj
+  if (typeof obj === 'string') {
+    // Convert $[...] to the main config's syntax (e.g., ${...})
+    return obj.replace(/\$\[([^\]]+)\]/g, `${varPrefix}$1${varSuffix}`)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertHclVarSyntax(item, varPrefix, varSuffix))
+  }
+  if (typeof obj === 'object') {
+    const converted = {}
+    for (const key of Object.keys(obj)) {
+      converted[key] = convertHclVarSyntax(obj[key], varPrefix, varSuffix)
+    }
+    return converted
+  }
+  return obj
+}
 
 /**
  * Recursively clean encoded JSON from an object
@@ -365,6 +393,19 @@ ${JSON.stringify(options.context, null, 2)}`,
       if (fileExtension === 'ini') {
         valueToPopulate = INI.toJson(valueToPopulate)
       }
+      if (fileExtension === 'tf' || fileExtension === 'hcl') {
+        // Parse HCL and convert $[...] to main config's syntax for variable resolution
+        const parsed = convertHclVarSyntax(HCL.parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
+        valueToPopulate = JSON.stringify(parsed)
+      }
+      if (fileExtension === 'json' || fileExtension === 'json5') {
+        let parsed = JSON5.parse(valueToPopulate)
+        // Convert $[...] to main config's syntax for .tf.json files
+        if (relativePath.endsWith('.tf.json')) {
+          parsed = convertHclVarSyntax(parsed, ctx.varPrefix, ctx.varSuffix)
+        }
+        valueToPopulate = JSON.stringify(parsed)
+      }
       // console.log('deep', variableString)
       // console.log('matchedFileString', matchedFileString)
       const deepPropertiesStr = variableString.replace(matchedFileString, '')
@@ -396,6 +437,16 @@ Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
 
     if (fileExtension === 'json' || fileExtension === 'json5') {
       valueToPopulate = JSON5.parse(valueToPopulate)
+      // Convert $[...] to main config's syntax for .tf.json files (Terraform JSON format)
+      if (relativePath.endsWith('.tf.json')) {
+        valueToPopulate = convertHclVarSyntax(valueToPopulate, ctx.varPrefix, ctx.varSuffix)
+      }
+      return Promise.resolve(valueToPopulate)
+    }
+
+    if (fileExtension === 'tf' || fileExtension === 'hcl') {
+      // Parse HCL and convert $[...] to main config's syntax for variable resolution
+      valueToPopulate = convertHclVarSyntax(HCL.parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
       return Promise.resolve(valueToPopulate)
     }
   }
