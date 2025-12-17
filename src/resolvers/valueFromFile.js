@@ -106,6 +106,8 @@ function parseFileContents(content, filePath) {
  * @param {Function} ctx.getDeeperValue - Method for nested lookups
  * @param {RegExp} ctx.fileRefSyntax - Regex for file() syntax
  * @param {RegExp} ctx.textRefSyntax - Regex for text() syntax
+ * @param {string} ctx.varPrefix - Variable prefix (e.g., '${')
+ * @param {string} ctx.varSuffix - Variable suffix (e.g., '}')
  * @param {string} variableString - The variable string to resolve
  * @param {object} options - Resolution options
  * @returns {Promise<any>}
