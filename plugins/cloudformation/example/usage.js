@@ -39,7 +39,17 @@ async function main() {
     //     "stackName": "rbac-service-v2-dev",
     //     "outputKey": "RBACTableArn",
     //     "region": "us-east-1",
+    //     "accountId": null,
     //     "configPath": "provider.environment.RBAC_TABLE_ARN"
+    //   },
+    //   {
+    //     "raw": "${cf(us-west-2:123456789):cross-account-stack.ApiEndpoint}",
+    //     "resolved": "${cf(us-west-2:123456789):cross-account-stack.ApiEndpoint}",
+    //     "stackName": "cross-account-stack",
+    //     "outputKey": "ApiEndpoint",
+    //     "region": "us-west-2",
+    //     "accountId": "123456789",
+    //     "configPath": "provider.environment.CROSS_ACCOUNT_API"
     //   }
     // ]
 
