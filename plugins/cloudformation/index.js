@@ -1,10 +1,16 @@
 /* CloudFormation stack output variable source */
+const { useCredentials } = require('./credentials')
+
 const CF_PREFIX = 'cf'
-const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-]+\))?:/i)
+// Updated regex to support: cf(region:accountId):stack.output or cf(region):stack.output
+const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-:]+\))?:/i)
 
 /**
  * Creates a CloudFormation variable source resolver
- * Syntax: ${cf:stackName.outputKey} or ${cf(region):stackName.outputKey}
+ * Syntax:
+ *   ${cf:stackName.outputKey}
+ *   ${cf(region):stackName.outputKey}
+ *   ${cf(region:accountId):stackName.outputKey}
  *
  * @param {object} options - Configuration options
  * @param {object} [options.credentials] - AWS credentials
@@ -57,8 +63,8 @@ function createCloudFormationResolver(options = {}) {
   /**
    * Fetch stack output value from CloudFormation
    */
-  async function getStackOutput(stackName, outputKey, region) {
-    const cacheKey = `${region}:${stackName}`
+  async function getStackOutput(stackName, outputKey, region, accountId = null) {
+    const cacheKey = accountId ? `${accountId}:${region}:${stackName}` : `${region}:${stackName}`
 
     // Check cache first
     if (outputCache.has(cacheKey)) {
@@ -67,48 +73,76 @@ function createCloudFormationResolver(options = {}) {
       return output ? output.OutputValue : null
     }
 
-    const client = await getClient(region)
-    const { DescribeStacksCommand } = await import('@aws-sdk/client-cloudformation')
+    // Function to fetch the stack (may be wrapped in credential swap)
+    const fetchStack = async () => {
+      const client = await getClient(region)
+      const { DescribeStacksCommand } = await import('@aws-sdk/client-cloudformation')
 
-    const command = new DescribeStacksCommand({ StackName: stackName })
+      const command = new DescribeStacksCommand({ StackName: stackName })
 
-    let response
-    try {
-      response = await client.send(command)
-    } catch (err) {
-      const code = err.Code || err.name
-      const messages = {
-        ExpiredToken: `AWS credentials expired. Refresh your credentials and try again.`,
-        AccessDenied: `Access denied to CloudFormation stack "${stackName}" in ${region}. Check IAM permissions.`,
-        ValidationError: `Stack "${stackName}" not found in ${region}.`,
-        CredentialsProviderError: `No AWS credentials found. Configure credentials via environment, ~/.aws/credentials, or pass explicitly.`,
+      let response
+      try {
+        response = await client.send(command)
+      } catch (err) {
+        const code = err.Code || err.name
+        const messages = {
+          ExpiredToken: `AWS credentials expired. Refresh your credentials and try again.`,
+          AccessDenied: `Access denied to CloudFormation stack "${stackName}" in ${region}. Check IAM permissions.`,
+          ValidationError: `Stack "${stackName}" not found in ${region}.`,
+          CredentialsProviderError: `No AWS credentials found. Configure credentials via environment, ~/.aws/credentials, or pass explicitly.`,
+        }
+        throw new Error(messages[code] || `CloudFormation error: ${err.message}`)
       }
-      throw new Error(messages[code] || `CloudFormation error: ${err.message}`)
+
+      if (!response.Stacks || response.Stacks.length === 0) {
+        throw new Error(`CloudFormation stack "${stackName}" not found in region "${region}"`)
+      }
+
+      const outputs = response.Stacks[0].Outputs || []
+      outputCache.set(cacheKey, outputs)
+
+      const output = outputs.find(o => o.OutputKey === outputKey)
+      return output ? output.OutputValue : null
     }
 
-    if (!response.Stacks || response.Stacks.length === 0) {
-      throw new Error(`CloudFormation stack "${stackName}" not found in region "${region}"`)
+    // If accountId is provided, swap credentials
+    if (accountId) {
+      return await useCredentials(accountId, fetchStack)
     }
 
-    const outputs = response.Stacks[0].Outputs || []
-    outputCache.set(cacheKey, outputs)
-
-    const output = outputs.find(o => o.OutputKey === outputKey)
-    return output ? output.OutputValue : null
+    return await fetchStack()
   }
 
   /**
    * Parse cf: variable string
-   * @param {string} varString - e.g., "cf:stack.output" or "cf(us-west-2):stack.output"
-   * @returns {object} { stackName, outputKey, region }
+   * Supports:
+   *   cf:stack.output
+   *   cf(region):stack.output
+   *   cf(region:accountId):stack.output
+   * @param {string} varString - e.g., "cf:stack.output", "cf(us-west-2):stack.output", "cf(us-west-2:123456789):stack.output"
+   * @returns {object} { stackName, outputKey, region, accountId }
    */
   function parseVariable(varString) {
-    // Check for region in parentheses: cf(us-west-2):stack.output
-    const regionMatch = varString.match(/^cf\(([a-z0-9-]+)\):/i)
-    const region = regionMatch ? regionMatch[1] : defaultRegion
+    let region = defaultRegion
+    let accountId = null
 
-    // Remove prefix (cf: or cf(region):)
-    const withoutPrefix = varString.replace(/^cf(\([a-z0-9-]+\))?:/i, '')
+    // Check for region/account in parentheses: cf(region:accountId):stack.output or cf(region):stack.output
+    const paramsMatch = varString.match(/^cf\(([a-z0-9-:]+)\):/i)
+    if (paramsMatch) {
+      const params = paramsMatch[1]
+      // Check if it contains a colon (region:accountId)
+      if (params.includes(':')) {
+        const parts = params.split(':')
+        region = parts[0]
+        accountId = parts[1]
+      } else {
+        // Just region
+        region = params
+      }
+    }
+
+    // Remove prefix (cf: or cf(params):)
+    const withoutPrefix = varString.replace(/^cf(\([a-z0-9-:]+\))?:/i, '')
 
     // Split on first dot to get stackName and outputKey
     const dotIndex = withoutPrefix.indexOf('.')
@@ -123,14 +157,14 @@ function createCloudFormationResolver(options = {}) {
       throw new Error(`Invalid cf: variable syntax "${varString}". Both stackName and outputKey are required.`)
     }
 
-    return { stackName, outputKey, region }
+    return { stackName, outputKey, region, accountId }
   }
 
   /**
    * Resolver function called for each cf: variable
    */
   async function resolver(varString, opts, currentObject, valueObject) {
-    const { stackName, outputKey, region } = parseVariable(varString)
+    const { stackName, outputKey, region, accountId } = parseVariable(varString)
 
     // Collect reference for metadata
     cfReferences.push({
@@ -139,18 +173,21 @@ function createCloudFormationResolver(options = {}) {
       stackName,
       outputKey,
       region,
+      accountId,
       configPath: valueObject.path.join('.')
     })
 
     // Skip AWS call if skipResolution is enabled
     if (skipResolution) {
-      return `[CF:${stackName}.${outputKey}]`
+      const accountInfo = accountId ? `:${accountId}` : ''
+      return `[CF:${region}${accountInfo}:${stackName}.${outputKey}]`
     }
 
-    const value = await getStackOutput(stackName, outputKey, region)
+    const value = await getStackOutput(stackName, outputKey, region, accountId)
 
     if (value === null) {
-      throw new Error(`Output "${outputKey}" not found in CloudFormation stack "${stackName}" (region: ${region})`)
+      const accountInfo = accountId ? ` account: ${accountId},` : ''
+      throw new Error(`Output "${outputKey}" not found in CloudFormation stack "${stackName}" (region: ${region},${accountInfo})`)
     }
 
     return value
@@ -160,8 +197,8 @@ function createCloudFormationResolver(options = {}) {
     type: CF_PREFIX,
     source: 'remote',
     prefix: CF_PREFIX,
-    syntax: '${cf:stackName.outputKey} or ${cf(region):stackName.outputKey}',
-    description: 'Resolves CloudFormation stack output values',
+    syntax: '${cf:stackName.outputKey}, ${cf(region):stackName.outputKey}, or ${cf(region:accountId):stackName.outputKey}',
+    description: 'Resolves CloudFormation stack output values (supports multi-region and multi-account)',
     match: cfVariableSyntax,
     resolver,
     metadataKey: 'cfReferences',
