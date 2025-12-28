@@ -470,4 +470,86 @@ test('eval edge case - nested ternary', async () => {
   assert.is(config.result, 'positive')
 })
 
+// ============================================
+// NOT prefix operator
+// ============================================
+
+test('eval edge case - NOT prefix operator', async () => {
+  const config = await configorama({
+    notTrue: '${eval(!true)}',
+    notFalse: '${eval(!false)}',
+    doubleNot: '${eval(!!true)}',
+    notZero: '${eval(!0)}',
+    notOne: '${eval(!1)}',
+    notEmptyString: '${eval(!\"\")}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.notTrue, false)
+  assert.is(config.notFalse, true)
+  assert.is(config.doubleNot, true)
+  assert.is(config.notZero, true)
+  assert.is(config.notOne, false)
+  assert.is(config.notEmptyString, true)
+})
+
+test('eval edge case - NOT with comparison', async () => {
+  const config = await configorama({
+    val: 0,
+    result: '${eval(!(5 > 10))}',
+    notComparison: '${eval(!(${self:val} > 5))}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.result, true)
+  assert.is(config.notComparison, true) // !(0 > 5) = !false = true
+})
+
+// ============================================
+// Greater/less than or equal
+// ============================================
+
+test('eval edge case - greater than or equal', async () => {
+  const config = await configorama({
+    gte1: '${eval(5 >= 5)}',
+    gte2: '${eval(6 >= 5)}',
+    gte3: '${eval(4 >= 5)}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.gte1, true)
+  assert.is(config.gte2, true)
+  assert.is(config.gte3, false)
+})
+
+test('eval edge case - less than or equal', async () => {
+  const config = await configorama({
+    lte1: '${eval(5 <= 5)}',
+    lte2: '${eval(4 <= 5)}',
+    lte3: '${eval(6 <= 5)}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.lte1, true)
+  assert.is(config.lte2, true)
+  assert.is(config.lte3, false)
+})
+
+test('eval edge case - combined >= <= with variables', async () => {
+  const config = await configorama({
+    min: 0,
+    max: 100,
+    val: 50,
+    inRange: '${eval(${self:val} >= ${self:min} && ${self:val} <= ${self:max})}'
+  }, {
+    configDir: dirname
+  })
+
+  assert.is(config.inRange, true)
+})
+
 test.run()
