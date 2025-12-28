@@ -55,11 +55,6 @@ async function executeTypeScriptFile(filePath, opts = {}) {
     }
   }
 
-  // Handle ES module default exports
-  if (tsFile && typeof tsFile === 'object' && 'default' in tsFile) {
-    tsFile = tsFile.default
-  }
-
   return tsFile
 }
 
@@ -115,11 +110,6 @@ function executeTypeScriptFileSync(filePath, opts = {}) {
     } catch (err) {
       throw new Error(`Failed to load TypeScript file with ts-node: ${err.message}`)
     }
-  }
-
-  // Handle ES module default exports
-  if (tsFile && typeof tsFile === 'object' && 'default' in tsFile) {
-    tsFile = tsFile.default
   }
 
   return tsFile

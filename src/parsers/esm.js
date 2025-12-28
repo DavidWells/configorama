@@ -19,13 +19,6 @@ async function executeESMFile(filePath, opts = {}) {
     const resolvedPath = path.resolve(filePath)
     let esmModule = jiti(resolvedPath)
 
-    // Handle different export patterns - jiti returns { default: Function } for ESM default exports
-    if (esmModule && typeof esmModule === 'object' && esmModule.default) {
-      esmModule = esmModule.default
-    }
-
-    // For ESM files, we just return the module (object or function)
-    // The calling code will determine whether to execute it or not
     return esmModule
   } catch (err) {
     throw new Error(`Failed to load ESM file ${filePath}: ${err.message}`)
@@ -50,13 +43,6 @@ function executeESMFileSync(filePath, opts = {}) {
     const resolvedPath = path.resolve(filePath)
     let esmModule = jiti(resolvedPath)
 
-    // Handle different export patterns - jiti returns { default: Function } for ESM default exports
-    if (esmModule && typeof esmModule === 'object' && esmModule.default) {
-      esmModule = esmModule.default
-    }
-
-    // For ESM files, we just return the module (object or function)
-    // The calling code will determine whether to execute it or not
     return esmModule
   } catch (err) {
     throw new Error(`Failed to load ESM file ${filePath}: ${err.message}`)

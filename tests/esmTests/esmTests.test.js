@@ -108,4 +108,14 @@ test.skip('ESM file references in YAML config work correctly', async () => {
   assert.is(config.combined.env, 42) // Default value since env not set in this context
 })
 
+test('ESM file with mixed exports (default + named) preserves .config', async () => {
+  const configFile = path.join(__dirname, 'mixed-exports.mjs')
+  const config = await configorama(configFile, {
+    options: args
+  })
+  // Should use .config export, not .default
+  assert.is(config.database, 'postgres')
+  assert.is(config.port, 5432)
+})
+
 test.run()

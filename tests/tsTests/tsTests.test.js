@@ -85,4 +85,14 @@ test('TS async config file resolves correctly', async () => {
   assert.ok(config.timestamp > 0)
 })
 
+test('TS file with mixed exports (default + named) preserves .config', async () => {
+  const configFile = path.join(__dirname, 'mixed-exports.ts')
+  const config = await configorama(configFile, {
+    options: args
+  })
+  // Should use .config export, not .default
+  assert.is(config.database, 'postgres')
+  assert.is(config.port, 5432)
+})
+
 test.run()
