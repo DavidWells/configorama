@@ -24,7 +24,7 @@ test('isValidValue - should return true for non-empty array', () => {
   assert.is(isValidValue([1, 2, 3]), true)
 })
 
-test.skip('isValidValue - should return false for null', () => {
+test('isValidValue - should return false for null', () => {
   assert.is(isValidValue(null), false)
 })
 
