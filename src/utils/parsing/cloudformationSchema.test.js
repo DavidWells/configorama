@@ -233,4 +233,18 @@ test('!EachMemberIn - member inclusion check', () => {
   assert.equal(parsed.Value['Fn::EachMemberIn'], [['a', 'b'], ['a', 'b', 'c']])
 })
 
+// ==========================================
+// Security - Unsafe YAML tags should be blocked
+// ==========================================
+
+test('security - !!js/function should be rejected', () => {
+  const maliciousYaml = `Handler: !!js/function 'function() { return "pwned"; }'`
+  assert.throws(() => parseCfYaml(maliciousYaml), /unknown tag/)
+})
+
+test('security - !!js/regexp should be rejected', () => {
+  const maliciousYaml = `Pattern: !!js/regexp /test/`
+  assert.throws(() => parseCfYaml(maliciousYaml), /unknown tag/)
+})
+
 test.run()

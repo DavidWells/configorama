@@ -1,7 +1,6 @@
 const YAML = require('js-yaml');
 const includes = require('lodash.includes');
 const isString = require('lodash.isstring');
-const split = require('lodash.split');
 const flatten = require('lodash.flatten');
 const map = require('lodash.map');
 
@@ -67,7 +66,7 @@ const createSchema = () => {
       map(['mapping', 'scalar', 'sequence'], kind => yamlType(functionName, kind))
     )
   );
-  return YAML.Schema.create(types);
+  return YAML.Schema.create(YAML.DEFAULT_SAFE_SCHEMA, types);
 };
 
 module.exports = {
