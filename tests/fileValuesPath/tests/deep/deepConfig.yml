@@ -1,0 +1,4 @@
+# References utils/special.yml without ./ prefix
+# Should find ../../utils/special.yml via findUp preserving directory structure
+deepValue: fromDeep
+utilsRef: ${file(utils/special.yml)}

@@ -73,4 +73,16 @@ test('parent file with reference to child file', () => {
   })
 })
 
+test('deep config with findUp preserving directory structure', () => {
+  // deep/deepConfig.yml references file(utils/special.yml) without ./ prefix
+  // findUp should search for "utils/special.yml" (not just "special.yml")
+  // and find ../../utils/special.yml
+  assert.equal(config.deepConfig, {
+    deepValue: 'fromDeep',
+    utilsRef: {
+      specialValue: 'found-via-findUp'
+    }
+  })
+})
+
 test.run()

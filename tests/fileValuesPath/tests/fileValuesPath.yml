@@ -15,3 +15,6 @@ parentRefChild: ${file(../parentRefChild.yml)}
 # noooooo: ${file(false.yml)}
 
 yesssss: ${file(../false.yml)}
+
+# Test findUp with directory structure preserved (utils/special.yml not ./utils/special.yml)
+deepConfig: ${file(./deep/deepConfig.yml)}
