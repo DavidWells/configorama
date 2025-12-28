@@ -258,7 +258,7 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   /* handle case for referencing raw JS files to inline them */
   if (argsToPass.length
-    && (argsToPass && argsToPass[0] && argsToPass[0].toLowerCase() === 'raw')
+    && (argsToPass && argsToPass[0] && typeof argsToPass[0] === 'string' && argsToPass[0].toLowerCase() === 'raw')
     || opts.asRawText
   ) {
     // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
