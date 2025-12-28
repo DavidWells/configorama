@@ -17,13 +17,21 @@ async function getValueFromEval(variableString) {
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
     const { default: subscript } = await import('subscript/justin')
-    
+
     // Handle string comparisons by ensuring both sides are quoted
-    const processedExpression = expression.replace(/([a-zA-Z0-9_]+)\s*([=!<>]=?)\s*['"]([^'"]+)['"]/g, '"$1"$2"$3"')
-    
+    let processedExpression = expression.replace(/([a-zA-Z0-9_]+)\s*([=!<>]=?)\s*['"]([^'"]+)['"]/g, '"$1"$2"$3"')
+
+    // Workaround: subscript doesn't handle null keyword correctly
+    // Replace null with placeholder and inject via context
+    const hasNull = /\bnull\b/.test(processedExpression)
+    if (hasNull) {
+      processedExpression = processedExpression.replace(/\bnull\b/g, '__NULL__')
+    }
+
     // console.log('processedExpression', processedExpression)
     const fn = subscript(processedExpression)
-    const result = fn()
+    const context = hasNull ? { __NULL__: null } : undefined
+    const result = fn(context)
     return result
   } catch (error) {
     throw new Error(`Error evaluating expression "${expression}": ${error.message}`)

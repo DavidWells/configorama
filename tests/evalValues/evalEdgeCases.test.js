@@ -413,16 +413,20 @@ test('eval edge case - undefined in expression', async () => {
   assert.is(config.result, true)
 })
 
-test('eval edge case - null in expression may not work', async () => {
-  // LIMITATION: null keyword may not be recognized in eval
+test('eval edge case - null comparisons', async () => {
   const config = await configorama({
-    result: '${eval(null === null)}'
+    nullEqualsNull: '${eval(null === null)}',
+    nullNotEqualsNull: '${eval(null !== null)}',
+    nullCoalesce: '${eval(null ?? "default")}',
+    nullOrFallback: '${eval(null || "fallback")}'
   }, {
     configDir: dirname
   })
 
-  // Result may be true, false, or string depending on null handling
-  assert.ok(typeof config.result === 'boolean' || typeof config.result === 'string')
+  assert.is(config.nullEqualsNull, true)
+  assert.is(config.nullNotEqualsNull, false)
+  assert.is(config.nullCoalesce, 'default')
+  assert.is(config.nullOrFallback, 'fallback')
 })
 
 test('eval edge case - empty string comparison', async () => {
