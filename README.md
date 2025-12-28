@@ -16,6 +16,7 @@ Configorama extends your configuration with a powerful variable system. It resol
 - Git references
 - Cron values
 - Eval expressions
+- If/conditional expressions
 - Async/sync JS functions
 - Filters (experimental)
 - Functions (experimental)
@@ -45,6 +46,7 @@ See [tests](https://github.com/DavidWells/configorama/tree/master/tests) for mor
   - [Git references](#git-references)
   - [Cron Values](#cron-values)
   - [Eval expressions](#eval-expressions)
+  - [If expressions](#if-expressions)
   - [Filters (experimental)](#filters-experimental)
   - [Functions (experimental)](#functions-experimental)
   - [More Examples](#more-examples)
@@ -150,6 +152,7 @@ console.log(result.resolutionHistory) // Step-by-step resolution for each path
 | git      | ${git:value}          | Git data               |
 | cron     | ${cron(expr)}         | Cron expressions       |
 | eval     | ${eval(expr)}         | Math/logic expressions |
+| if       | ${if(expr)}           | Conditional expressions |
 
 ### Environment variables
 
@@ -715,6 +718,41 @@ strictEqual: ${eval("foo" === "foo")} # true
 complex: ${eval((10 + 5) * 2)}        # 30
 ```
 
+### If expressions
+
+Conditional expressions using ternary syntax. This is an alias for `eval` with a more intuitive name for conditionals.
+
+```yml
+# Basic ternary (condition ? "yes" : "no")
+status: ${if((5 > 3) ? "yes" : "no")}           # "yes"
+
+# With variables
+threshold: 50
+value: 75
+result: ${if((${self:value} > ${self:threshold}) ? "above" : "below")}  # "above"
+
+# Nested ternary (if/else if/else)
+score: 85
+grade: ${if((${self:score} >= 90) ? "A" : (${self:score} >= 80) ? "B" : "C")}  # "B"
+
+# Boolean result (no ternary needed)
+isValid: ${if(${self:value} > 0)}               # true
+
+# Logical operators
+enabled: true
+count: 5
+canProceed: ${if(${self:enabled} && ${self:count} > 0)}  # true
+```
+
+**Supported operators:**
+
+| Category | Operators |
+|----------|-----------|
+| Comparison | `==` `!=` `===` `!==` `>` `<` `>=` `<=` |
+| Logical | `&&` `\|\|` `!` |
+| Nullish | `??` |
+| Ternary | `condition ? "yes" : "no"` |
+
 ### Filters (experimental)
 
 Pipe resolved values through transformation functions like case conversion.
@@ -818,6 +856,7 @@ The `source` property defines how the config wizard handles each variable type:
 | `${git:branch}` | `readonly` | Git repository data |
 | `${cron(expr)}` | `readonly` | Cron expression conversion |
 | `${eval(expr)}` | `readonly` | Math/logic evaluation |
+| `${if(expr)}` | `readonly` | Conditional expressions |
 
 ## Options
 
