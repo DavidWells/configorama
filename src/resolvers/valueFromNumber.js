@@ -1,6 +1,9 @@
 const isNumber = require('lodash.isnumber')
 
 function isNumberVariable(variableString) {
+  if (!variableString || variableString.trim().length === 0) {
+    return false
+  }
   const num = Number(variableString)
   return !isNaN(num) && isNumber(num)
 }
