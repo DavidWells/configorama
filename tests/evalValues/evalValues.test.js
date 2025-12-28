@@ -225,4 +225,37 @@ test('eval() with complex variable combinations', async () => {
   assert.equal(config.optAndFileEval, true, 'optAndFileEval')
 })
 
+test('eval() ternary operator', async () => {
+  const result = await configorama({
+    simple: '${eval(5 > 3 ? "yes" : "no")}',
+    withParens: '${eval((10 < 20) ? "smaller" : "bigger")}',
+    numResult: '${eval(true ? 100 : 0)}',
+    falseBranch: '${eval(false ? "yes" : "no")}'
+  })
+
+  assert.equal(result.simple, 'yes')
+  assert.equal(result.withParens, 'smaller')
+  assert.equal(result.numResult, 100)
+  assert.equal(result.falseBranch, 'no')
+})
+
+test('eval() ternary with variables', async () => {
+  const result = await configorama({
+    threshold: 50,
+    value: 75,
+    status: '${eval(${self:value} > ${self:threshold} ? "above" : "below")}'
+  })
+
+  assert.equal(result.status, 'above')
+})
+
+test('eval() nested ternary (if/else if/else)', async () => {
+  const result = await configorama({
+    score: 85,
+    grade: '${eval(${self:score} >= 90 ? "A" : ${self:score} >= 80 ? "B" : ${self:score} >= 70 ? "C" : "F")}'
+  })
+
+  assert.equal(result.grade, 'B')
+})
+
 test.run()
