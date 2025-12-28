@@ -109,6 +109,24 @@ test('resolveFilePath - relative path without ./ prefix triggers findUp', () => 
   assert.is(result, expected)
 })
 
+test('resolveFilePath - preserves directory structure when using findUp', () => {
+  // Create additional structure for this test:
+  // _test-getFullFilePath/
+  //   config.yml           <- WRONG file
+  //   utils/
+  //     config.yml         <- CORRECT file
+  //   subdir/deepdir/      <- searching from here
+  const utilsDir = path.join(testDir, 'utils')
+  fs.mkdirSync(utilsDir, { recursive: true })
+  fs.writeFileSync(path.join(utilsDir, 'config.yml'), 'correct: true')
+
+  // From deepDir, request "utils/config.yml" - should find testDir/utils/config.yml
+  const result = resolveFilePath('utils/config.yml', deepDir)
+  const expected = path.join(utilsDir, 'config.yml')
+  assert.is(result, expected,
+    `Should preserve 'utils/' directory and find utils/config.yml, not root config.yml. Got ${result}`)
+})
+
 // ==========================================
 // getFullPath - wrapper function
 // ==========================================

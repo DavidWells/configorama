@@ -19,8 +19,12 @@ function resolveFilePath(pathToResolve, basePath) {
     fullFilePath = fs.realpathSync(fullFilePath)
   // Only use findUp for relative paths (not absolute paths)
   } else if (!path.isAbsolute(pathToResolve)) {
-    const cleanName = path.basename(pathToResolve)
-    const findUpResult = findUp.sync(cleanName, { cwd: basePath })
+    // Strip ./ and ../ prefixes for findUp, but preserve directory structure like utils/
+    let searchPath = pathToResolve
+    while (searchPath.startsWith('./') || searchPath.startsWith('../')) {
+      searchPath = searchPath.replace(/^\.\.?\//, '')
+    }
+    const findUpResult = findUp.sync(searchPath, { cwd: basePath })
     if (findUpResult) {
       fullFilePath = findUpResult
     }
