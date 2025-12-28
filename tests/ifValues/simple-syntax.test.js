@@ -77,6 +77,27 @@ test('simple syntax - dev stage defaults', async () => {
   // Number from boolean condition
   assert.is(config.custom.debugLevel, 3)  // debug enabled in dev
 
+  // Logical operators
+  assert.is(config.custom.logicalAnd, 'other')  // dev && us-east-1 = false
+  assert.is(config.custom.logicalOr, 'dev-like')  // dev || staging = false
+  assert.is(config.custom.logicalNot, 'development')  // !prod && !staging = true
+
+  // Deeply nested refs (5+ levels)
+  assert.is(config.custom.deeply.nested.config.feature.enabled, true)
+  assert.is(config.custom.deeply.nested.config.feature.value, 'deep-value')
+  assert.is(config.custom.deeplyNestedCheck, 'deep-value')
+
+  // String with embedded quotes
+  assert.is(config.custom.quotedName, 'foo"bar')
+  assert.is(config.custom.quotedCheck, 'matched')
+
+  // Numeric comparisons
+  assert.is(config.custom.maxConnections, 100)
+  assert.is(config.custom.connectionWarning, 'high')  // 100 > 50
+  assert.is(config.custom.connectionCritical, 'critical')  // 100 >= 100
+  assert.is(config.custom.minCheck, 'low')  // 256 < 512
+  assert.is(config.custom.minEqualCheck, 'minimum')  // 256 <= 256
+
   // Mixed variable types inline in ternary
   assert.is(config.custom.envInTernary, 'env-default')  // dev uses env fallback
   assert.is(config.custom.optInTernary, 'opt-default')  // dev uses opt fallback
@@ -133,6 +154,14 @@ test('simple syntax - prod stage', async () => {
   // Number from boolean condition
   assert.is(config.custom.debugLevel, 0)  // debug disabled in prod
 
+  // Logical operators
+  assert.is(config.custom.logicalAnd, 'prod-primary')  // prod && us-east-1 = true (default region)
+  assert.is(config.custom.logicalOr, 'production-like')  // prod || staging = true
+  assert.is(config.custom.logicalNot, 'deployed')  // !prod && !staging = false
+
+  // Deeply nested refs (5+ levels)
+  assert.is(config.custom.deeplyNestedCheck, 'deep-value')
+
   // Mixed variable types - prod uses literal values
   assert.is(config.custom.envInTernary, 'production-value')
   assert.is(config.custom.optInTernary, 'prod-setting')
@@ -167,6 +196,8 @@ test('simple syntax - prod in eu-west-1', async () => {
   assert.is(config.custom.replicaCount, 1)
   assert.is(config.custom.maxRetries, 3)
   assert.is(config.custom.enableMetrics, true)
+  // Logical AND fails because region is not us-east-1
+  assert.is(config.custom.logicalAnd, 'other')  // prod but NOT us-east-1
 })
 
 test('simple syntax - staging stage', async () => {
@@ -180,6 +211,9 @@ test('simple syntax - staging stage', async () => {
   assert.is(config.custom.enableDebugEndpoints, true)
   // staging !== dev
   assert.is(config.custom.isNotDev, true)
+  // Logical operators with staging
+  assert.is(config.custom.logicalOr, 'production-like')  // staging is in || condition
+  assert.is(config.custom.logicalNot, 'deployed')  // staging fails !staging check
 })
 
 // Check for untested config paths after all tests
@@ -187,13 +221,41 @@ test.after(() => {
   checkUnusedDeepConfigValues(rawConfigForTracking)
 })
 
-// TODO: fix this - bare variable types in ternary should auto-convert like provider.stage does
-test.skip('bare env: in ternary should work', async () => {
+test('empty if condition throws clear error', async () => {
+  try {
+    await configorama({
+      provider: { stage: '${opt:stage, "dev"}' },
+      custom: {
+        emptyCondition: '${if() ? "yes" : "no"}'
+      }
+    }, { options: {} })
+    assert.unreachable('should have thrown')
+  } catch (e) {
+    assert.ok(e.message.includes('Empty condition'))
+  }
+})
+
+test('null comparison in if()', async () => {
+  const config = await configorama({
+    custom: {
+      nullValue: null,
+      hasValue: 'something',
+      testNull: '${if(custom.nullValue === null) ? "is-null" : "not-null"}',
+      testNotNull: '${if(custom.hasValue === null) ? "is-null" : "not-null"}',
+      testNullInString: '${if(custom.nullValue === null) ? "value-is-null" : "has-value"}'
+    }
+  }, { options: {} })
+
+  assert.is(config.custom.testNull, 'is-null')
+  assert.is(config.custom.testNotNull, 'not-null')
+  assert.is(config.custom.testNullInString, 'value-is-null')  // 'null' in string not replaced
+})
+
+test('bare env: in ternary', async () => {
   process.env.BARE_TEST_VAR = 'from-env'
   const config = await configorama({
     provider: { stage: '${opt:stage, "dev"}' },
     custom: {
-      // This should work: env:VAR bare in ternary, auto-converts to ${env:VAR}
       envBare: '${if(provider.stage === "prod") ? "production-value" : env:BARE_TEST_VAR}'
     }
   }, { options: {} })
@@ -202,12 +264,10 @@ test.skip('bare env: in ternary should work', async () => {
   delete process.env.BARE_TEST_VAR
 })
 
-// TODO: fix this - bare variable types in ternary should auto-convert
-test.skip('bare opt: in ternary should work', async () => {
+test('bare opt: in ternary', async () => {
   const config = await configorama({
     provider: { stage: '${opt:stage, "dev"}' },
     custom: {
-      // This should work: opt:setting bare in ternary
       optBare: '${if(provider.stage === "prod") ? "prod-setting" : opt:bareSetting}'
     }
   }, { options: { bareSetting: 'from-opt' } })
@@ -215,12 +275,10 @@ test.skip('bare opt: in ternary should work', async () => {
   assert.is(config.custom.optBare, 'from-opt')
 })
 
-// TODO: fix this - bare variable types in ternary should auto-convert
-test.skip('bare git: in ternary should work', async () => {
+test('bare git: in ternary', async () => {
   const config = await configorama({
     provider: { stage: '${opt:stage, "dev"}' },
     custom: {
-      // This should work: git:branch bare in ternary
       gitBare: '${if(provider.stage === "prod") ? "release" : git:branch}'
     }
   }, { options: {} })

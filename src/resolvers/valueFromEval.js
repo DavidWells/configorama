@@ -27,6 +27,18 @@ function decodeValues(expression) {
   return { processed, context }
 }
 
+// Wrap individual comparisons in parentheses for correct precedence with && / ||
+// Subscript has operator precedence issues without explicit parens
+function wrapComparisons(expr) {
+  if (!/&&|\|\|/.test(expr)) return expr
+
+  // Match comparisons: value op value (where op is ===, !==, ==, !=, >=, <=, >, <)
+  // Values can be: quoted strings, numbers, identifiers, or __VAL0__ placeholders
+  const compPattern = /((?:"[^"]*"|'[^']*'|__VAL\d+__|__NULL__|[a-zA-Z_][a-zA-Z0-9_]*|[\d.]+))\s*(===|!==|==|!=|>=|<=|>|<)\s*((?:"[^"]*"|'[^']*'|__VAL\d+__|__NULL__|[a-zA-Z_][a-zA-Z0-9_]*|[\d.]+))/g
+
+  return expr.replace(compPattern, '($1 $2 $3)')
+}
+
 async function getValueFromEval(variableString) {
   // Extract the expression inside eval()
   const match = variableString.match(/^eval\((.+)\)$/)
@@ -49,10 +61,36 @@ async function getValueFromEval(variableString) {
     processedExpression = withDecodedValues
 
     // Workaround: subscript doesn't handle null keyword correctly
-    // Replace null with placeholder and inject via context
+    // Replace null with placeholder and inject via context (but not inside quoted strings)
     const hasNull = /\bnull\b/.test(processedExpression)
     if (hasNull) {
-      processedExpression = processedExpression.replace(/\bnull\b/g, '__NULL__')
+      // Replace null only outside of quoted strings
+      let result = ''
+      let inQuote = false
+      let quoteChar = ''
+      let i = 0
+      while (i < processedExpression.length) {
+        const ch = processedExpression[i]
+        if (!inQuote && (ch === '"' || ch === "'")) {
+          inQuote = true
+          quoteChar = ch
+          result += ch
+          i++
+        } else if (inQuote && ch === quoteChar) {
+          inQuote = false
+          result += ch
+          i++
+        } else if (!inQuote && processedExpression.substring(i, i + 4) === 'null' &&
+                   (i === 0 || !/\w/.test(processedExpression[i - 1])) &&
+                   (i + 4 >= processedExpression.length || !/\w/.test(processedExpression[i + 4]))) {
+          result += '__NULL__'
+          i += 4
+        } else {
+          result += ch
+          i++
+        }
+      }
+      processedExpression = result
     }
 
     // Build context with null and any decoded values
@@ -60,6 +98,9 @@ async function getValueFromEval(variableString) {
     if (hasNull) {
       context.__NULL__ = null
     }
+
+    // Wrap comparisons in parens for correct precedence with && / ||
+    processedExpression = wrapComparisons(processedExpression)
 
     if (process.env.DEBUG_EVAL) console.log('eval processed:', processedExpression)
     const fn = subscript(processedExpression)

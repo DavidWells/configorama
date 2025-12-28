@@ -79,6 +79,31 @@ custom:
   # Number result from boolean condition
   debugLevel: '${if(custom.enableDebugEndpoints) ? 3 : 0}'
 
+  # Logical operators in conditions
+  logicalAnd: '${if(provider.stage === "prod" && provider.region === "us-east-1") ? "prod-primary" : "other"}'
+  logicalOr: '${if(provider.stage === "prod" || provider.stage === "staging") ? "production-like" : "dev-like"}'
+  logicalNot: '${if(provider.stage !== "prod" && provider.stage !== "staging") ? "development" : "deployed"}'
+
+  # Deeply nested refs (5+ levels)
+  deeply:
+    nested:
+      config:
+        feature:
+          enabled: true
+          value: "deep-value"
+  deeplyNestedCheck: '${if(custom.deeply.nested.config.feature.enabled) ? custom.deeply.nested.config.feature.value : "disabled"}'
+
+  # String with embedded quotes
+  quotedName: 'foo"bar'
+  quotedCheck: '${if(custom.quotedName === "foo\"bar") ? "matched" : "no-match"}'
+
+  # Numeric comparisons with >, <, >=, <=
+  maxConnections: 100
+  connectionWarning: '${if(custom.maxConnections > 50) ? "high" : "normal"}'
+  connectionCritical: '${if(custom.maxConnections >= 100) ? "critical" : "ok"}'
+  minCheck: '${if(custom.baseMemory < 512) ? "low" : "adequate"}'
+  minEqualCheck: '${if(custom.baseMemory <= 256) ? "minimum" : "above-min"}'
+
   # Mixed variable types inline in ternary (working - with ${} wrapper)
   envInTernary: '${if(provider.stage === "prod") ? "production-value" : ${env:SIMPLE_TEST_VAR, "env-default"}}'
   optInTernary: '${if(provider.stage === "prod") ? "prod-setting" : ${opt:devSetting, "opt-default"}}'
@@ -87,12 +112,9 @@ custom:
   # Self reference with colon in prod value
   connectionString: '${if(provider.stage === "prod") ? "prod-db:5432" : custom.database.host}'
 
-  # TODO: These bare variable type syntaxes should work but currently don't
-  # Bare env: in ternary (should auto-convert like provider.stage does)
+  # Bare variable types in ternary (env:, opt:, git:) - tested in JS with inline configs
   # envBare: '${if(provider.stage === "prod") ? "production-value" : env:BARE_TEST_VAR}'
-  # Bare opt: in ternary
   # optBare: '${if(provider.stage === "prod") ? "prod-setting" : opt:bareSetting}'
-  # Bare git: in ternary
   # gitBare: '${if(provider.stage === "prod") ? "release" : git:branch}'
 
 functions:

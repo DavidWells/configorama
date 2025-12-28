@@ -9,6 +9,12 @@ const ifRefSyntax = RegExp(/^if\s*\(.*\)(\s*\?.*)?/g)
 async function getValueFromIf(variableString) {
   if (process.env.DEBUG_IF) console.log('if resolver input:', variableString)
 
+  // Validate: check for empty condition
+  const emptyConditionMatch = variableString.match(/^if\s*\(\s*\)/)
+  if (emptyConditionMatch) {
+    throw new Error('Empty condition in ${if()}. Expected: ${if(condition) ? trueVal : falseVal}')
+  }
+
   // Check for external ternary: if(condition) ? trueVal : falseVal
   // Must properly balance parentheses to find where if() ends
   const match = variableString.match(/^if\s*\(/)

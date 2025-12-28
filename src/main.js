@@ -2398,6 +2398,8 @@ class Configorama {
       if (/\b(eval|if)\s*\(/.test(property) && !valueToPopulate.match(this.variableSyntax)) {
         const matchIdx = property.indexOf(currentMatchedString)
         const charBefore = matchIdx > 0 ? property[matchIdx - 1] : ''
+        // Always escape quotes in values for eval/if context
+        valueToPopulate = valueToPopulate.replace(/"/g, '\\"')
         if (charBefore !== '"' && charBefore !== "'") {
           // Not already quoted, wrap in quotes for eval
           valueToPopulate = `"${valueToPopulate}"`
@@ -2461,6 +2463,11 @@ class Configorama {
     } else if (typeof valueToPopulate === 'boolean' && /\b(eval|if)\s*\(/.test(property)) {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean in eval/if')
       property = replaceAll(matchedString, String(valueToPopulate), property)
+
+    // partial replacement, null inside eval/if expressions
+    } else if (valueToPopulate === null && /\b(eval|if)\s*\(/.test(property)) {
+      if (DEBUG_TYPE) console.log('DEBUG_TYPE isNull in eval/if')
+      property = replaceAll(matchedString, '__NULL__', property)
 
     } else {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE else')
