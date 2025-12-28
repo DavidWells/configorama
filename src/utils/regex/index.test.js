@@ -91,6 +91,30 @@ test('parseFunctionCall - handles multiple parens in text', () => {
   assert.is(result[2], "'Choose option (A) or (B) or (C)'")
 })
 
+test('parseFunctionCall - handles unbalanced close paren in string', () => {
+  const result = parseFunctionCall('func("value)")')
+  assert.ok(result)
+  assert.is(result[0], 'func("value)")')
+  assert.is(result[1], 'func')
+  assert.is(result[2], '"value)"')
+})
+
+test('parseFunctionCall - handles unbalanced open paren in string', () => {
+  const result = parseFunctionCall("func('open (')")
+  assert.ok(result)
+  assert.is(result[0], "func('open (')")
+  assert.is(result[1], 'func')
+  assert.is(result[2], "'open ('")
+})
+
+test('parseFunctionCall - handles multiple unbalanced parens in string', () => {
+  const result = parseFunctionCall('func("))))")')
+  assert.ok(result)
+  assert.is(result[0], 'func("))))")')
+  assert.is(result[1], 'func')
+  assert.is(result[2], '"))))"')
+})
+
 // ==========================================
 // parseFunctionCall - edge cases
 // ==========================================

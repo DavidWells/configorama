@@ -27,12 +27,27 @@ function parseFunctionCall(str) {
   
   let depth = 1
   let pos = startPos
-  
+  let inString = null // null, '"', or "'"
+
   // Track parenthesis depth to find matching closing paren
   while (pos < str.length && depth > 0) {
     const char = str[pos]
-    if (char === '(') depth++
-    else if (char === ')') depth--
+    const prevChar = pos > 0 ? str[pos - 1] : ''
+
+    // Toggle string state on unescaped quotes
+    if ((char === '"' || char === "'") && prevChar !== '\\') {
+      if (!inString) {
+        inString = char
+      } else if (char === inString) {
+        inString = null
+      }
+    }
+
+    // Only count parens outside strings
+    if (!inString) {
+      if (char === '(') depth++
+      else if (char === ')') depth--
+    }
     pos++
   }
   
