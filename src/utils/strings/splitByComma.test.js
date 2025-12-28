@@ -125,5 +125,24 @@ test('splitByComma - should handle deeply nested variables with regex', () => {
   assert.equal(result[3], '"three"')
 })
 
+test('splitByComma - should handle escaped backslash before closing quote', () => {
+  // 'text\\' = literal backslash at end of string, quote should close it
+  const result = splitByComma("before, 'text\\\\', after")
+  assert.equal(result, ["before", "'text\\\\'", "after"])
+})
+
+test('splitByComma - should handle multiple escaped backslashes before quote', () => {
+  // 'test\\\\' = two literal backslashes at end, quote should close it
+  const result = splitByComma("a, 'test\\\\\\\\', b")
+  assert.equal(result, ["a", "'test\\\\\\\\'", "b"])
+})
+
+test('splitByComma - should handle odd backslashes (escaped quote)', () => {
+  // 'test\\\' = one literal backslash + escaped quote, string not closed
+  // This should NOT split since the quote is escaped
+  const result = splitByComma("a, 'test\\\\\\'quoted', b")
+  assert.equal(result, ["a", "'test\\\\\\'quoted'", "b"])
+})
+
 // Run all tests
 test.run() 

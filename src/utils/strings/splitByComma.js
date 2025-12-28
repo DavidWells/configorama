@@ -43,12 +43,22 @@ function splitByComma(string, regexPattern) {
     const prevChar = i > 0 ? protectedString[i-1] : ''
 
     // Handle quotes
-    if ((char === "'" || char === '"') && (i === 0 || protectedString[i-1] !== "\\")) {
-      if (!inQuote) {
-        inQuote = true
-        quoteChar = char
-      } else if (char === quoteChar) {
-        inQuote = false
+    if (char === "'" || char === '"') {
+      // Count consecutive backslashes before this quote
+      let backslashCount = 0
+      for (let j = i - 1; j >= 0 && protectedString[j] === "\\"; j--) {
+        backslashCount++
+      }
+      // Quote is escaped only if preceded by odd number of backslashes
+      const isEscaped = backslashCount % 2 === 1
+
+      if (!isEscaped) {
+        if (!inQuote) {
+          inQuote = true
+          quoteChar = char
+        } else if (char === quoteChar) {
+          inQuote = false
+        }
       }
     }
 
