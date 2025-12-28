@@ -1,5 +1,6 @@
 /* ${if(...)} syntax - alias for eval() with more intuitive name for conditionals */
 const { resolver: evalResolver } = require('./valueFromEval')
+const { findOutsideQuotes } = require('../utils/strings/quoteAware')
 
 // Match both:
 //   if(condition ? trueVal : falseVal)  - ternary inside
@@ -40,26 +41,13 @@ async function getValueFromIf(variableString) {
         const ternaryPart = afterCondition.substring(1).trim() // after ?
 
         // Find the colon separating trueVal and falseVal (outside quotes and encoded patterns)
-        let colonIdx = -1
-        let inQuote = false
-        let quoteChar = ''
-        for (let j = 0; j < ternaryPart.length; j++) {
-          const ch = ternaryPart[j]
-          if (!inQuote && (ch === '"' || ch === "'")) {
-            inQuote = true
-            quoteChar = ch
-          } else if (inQuote && ch === quoteChar) {
-            inQuote = false
-          } else if (!inQuote && ch === ':') {
-            // Skip colons inside encoded patterns __OBJ:...__ or __ARR:...__
-            const before = ternaryPart.substring(0, j)
-            const isEncodedPattern = /__(?:OBJ|ARR|VAL\d+)$/.test(before)
-            if (!isEncodedPattern) {
-              colonIdx = j
-              break
-            }
-          }
-        }
+        const colonIdx = findOutsideQuotes(ternaryPart, (str, idx) => {
+          if (str[idx] !== ':') return 0
+          // Skip colons inside encoded patterns __OBJ:...__ or __ARR:...__
+          const before = str.substring(0, idx)
+          if (/__(?:OBJ|ARR|VAL\d+)$/.test(before)) return 0
+          return 1
+        })
 
         if (colonIdx !== -1) {
           const trueVal = ternaryPart.substring(0, colonIdx).trim()

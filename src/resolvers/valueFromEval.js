@@ -1,5 +1,6 @@
 // const evalRefSyntax = RegExp(/^eval\((~?[\{\}\:\${}a-zA=>+!-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 const evalRefSyntax = RegExp(/^eval\((.*)?\)/g)
+const { replaceOutsideQuotes } = require('../utils/strings/quoteAware')
 
 // Pattern for encoded objects/arrays: __OBJ:base64__ or __ARR:base64__
 const ENCODED_PATTERN = /__(?:OBJ|ARR):([A-Za-z0-9+/=]+)__/g
@@ -64,33 +65,7 @@ async function getValueFromEval(variableString) {
     // Replace null with placeholder and inject via context (but not inside quoted strings)
     const hasNull = /\bnull\b/.test(processedExpression)
     if (hasNull) {
-      // Replace null only outside of quoted strings
-      let result = ''
-      let inQuote = false
-      let quoteChar = ''
-      let i = 0
-      while (i < processedExpression.length) {
-        const ch = processedExpression[i]
-        if (!inQuote && (ch === '"' || ch === "'")) {
-          inQuote = true
-          quoteChar = ch
-          result += ch
-          i++
-        } else if (inQuote && ch === quoteChar) {
-          inQuote = false
-          result += ch
-          i++
-        } else if (!inQuote && processedExpression.substring(i, i + 4) === 'null' &&
-                   (i === 0 || !/\w/.test(processedExpression[i - 1])) &&
-                   (i + 4 >= processedExpression.length || !/\w/.test(processedExpression[i + 4]))) {
-          result += '__NULL__'
-          i += 4
-        } else {
-          result += ch
-          i++
-        }
-      }
-      processedExpression = result
+      processedExpression = replaceOutsideQuotes(processedExpression, 'null', '__NULL__')
     }
 
     // Build context with null and any decoded values

@@ -4,6 +4,7 @@
  * and convert bare references in if() expressions
  */
 const { splitByComma } = require('../strings/splitByComma')
+const { getQuoteRanges } = require('../strings/quoteAware')
 const { extractVariableWrapper } = require('../variables/variableUtils')
 
 /**
@@ -140,21 +141,7 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
         }
 
         // Build list of quoted string ranges to exclude
-        const quoteRanges = []
-        let inQuote = false
-        let quoteChar = ''
-        let quoteStart = 0
-        for (let qi = 0; qi < fullContent.length; qi++) {
-          const ch = fullContent[qi]
-          if (!inQuote && (ch === '"' || ch === "'")) {
-            inQuote = true
-            quoteChar = ch
-            quoteStart = qi
-          } else if (inQuote && ch === quoteChar) {
-            quoteRanges.push([quoteStart, qi + 1])
-            inQuote = false
-          }
-        }
+        const quoteRanges = getQuoteRanges(fullContent)
 
         // Comparison operators for detecting string comparison context
         const comparisonOps = ['===', '!==', '==', '!=']
