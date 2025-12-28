@@ -24,10 +24,9 @@ Exit received. Waiting for current operation to finish...
     // Clean up readline interface when done
     process.once('exit', () => rl.close())
     
-    // Use once() instead of on()
-    rl.once('SIGINT', () => process.emit('SIGINT'))
-    rl.once('SIGTERM', () => process.emit('SIGTERM'))
-    rl.once('SIGBREAK', () => process.emit('SIGBREAK'))
+    rl.on('SIGINT', () => process.emit('SIGINT'))
+    rl.on('SIGTERM', () => process.emit('SIGTERM'))
+    rl.on('SIGBREAK', () => process.emit('SIGBREAK'))
   }
 
   // Remove any existing listeners before adding new ones
