@@ -753,6 +753,50 @@ canProceed: ${if(${self:enabled} && ${self:count} > 0)}  # true
 | Nullish | `??` |
 | Ternary | `condition ? "yes" : "no"` |
 
+**Serverless deployment examples:**
+
+```yml
+service: my-service
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+custom:
+  # Different memory by stage
+  memorySize: ${if(("${self:provider.stage}" === "prod") ? 1024 : 512)}
+
+  # Different log retention by stage
+  logRetention: ${if(("${self:provider.stage}" === "prod") ? 30 : 7)}
+
+  # Enable features per environment
+  enableDebugEndpoints: ${if("${self:provider.stage}" !== "prod")}
+  enableMetrics: ${if("${self:provider.stage}" === "prod")}
+
+  # Regional settings
+  replicaCount: ${if(("${self:provider.region}" === "us-east-1") ? 3 : 1)}
+
+  # Conditional IAM role (use predefined role in prod, inline in dev)
+  useExternalRole: ${if("${self:provider.stage}" === "prod")}
+  role: ${if((${self:custom.useExternalRole}) ? "arn:aws:iam::123:role/prod-role" : null)}
+
+functions:
+  api:
+    handler: handler.api
+    memorySize: ${self:custom.memorySize}
+
+  # Debug function - only deployed in non-prod
+  debug:
+    handler: handler.debug
+    enabled: ${self:custom.enableDebugEndpoints}
+
+  # Metrics processor - only in prod
+  metricsProcessor:
+    handler: handler.metrics
+    enabled: ${self:custom.enableMetrics}
+```
+
 ### Filters (experimental)
 
 Pipe resolved values through transformation functions like case conversion.
