@@ -42,6 +42,7 @@ const { splitCsv } = require('./utils/strings/splitCsv')
 const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
+const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 /* Utils - ui */
 const chalk = require('./utils/ui/chalk')
 const deepLog = require('./utils/ui/deep-log')
@@ -1383,8 +1384,7 @@ class Configorama {
         if (hasFilters) {
           // Extract filter names from the match (e.g., "| String}" -> ["String"])
           const filterPart = hasFilters[0].replace(/}?$/, '') // Remove trailing }
-          foundFilters = filterPart
-            .split('|')
+          foundFilters = splitOnPipe(filterPart)
             .map((filter) => filter.trim())
             .filter(Boolean)
 
@@ -2285,9 +2285,8 @@ class Configorama {
     const hasFilters = originalSrc.match(this.filterMatch)
     let foundFilters = []
     if (hasFilters) {
-      foundFilters = hasFilters[0]
-        .replace(this.varSuffixPattern, '')
-        .split('|')
+      const filterPart = hasFilters[0].replace(this.varSuffixPattern, '')
+      foundFilters = splitOnPipe(filterPart)
         .map((filter) => filter.trim())
         .filter(Boolean)
     }
@@ -2442,7 +2441,7 @@ class Configorama {
         true,
         `populateVariable fallback ${this.callCount}`
       )
-      const cleanVarNoFilters = cleanVar.split('|')[0]
+      const cleanVarNoFilters = splitOnPipe(cleanVar)[0]
       const splitVars = splitByComma(cleanVarNoFilters)
       const nestedVar = findNestedVariable(splitVars, valueObject.originalSource)
 
@@ -2829,12 +2828,11 @@ Missing Value ${missingValue} - ${matchedString}
       promiseKey = deeperValue.match(/\s\|/) ? deeperValue : undefined
 
       // TODO clean this up
-      const t = variableString.split('|')
+      const t = splitOnPipe(variableString)
       // console.log('variableString', variableString)
       // console.log('valueObject', valueObject)
       // console.log('t', t)
-      const _filter = string
-        .split('|')
+      const _filter = splitOnPipe(string)
         .filter((value, index, arr) => {
           return index > 0
         })
@@ -3048,9 +3046,8 @@ Missing Value ${missingValue} - ${matchedString}
 
         if (typeof val === 'string' && val.match(/deep:/)) {
           // TODO refactor the deep filter logic here. match | filter | filter..
-          const allFilters = propertyString
-            .replace(this.varSuffixPattern, '')
-            .split('|')
+          const propWithoutSuffix = propertyString.replace(this.varSuffixPattern, '')
+          const allFilters = splitOnPipe(propWithoutSuffix)
             .reduce((acc, currentFilter, i) => {
               if (i === 0) {
                 return acc
@@ -3116,7 +3113,7 @@ Missing Value ${missingValue} - ${matchedString}
       // TODO @DWELLS cleanVariable makes fallback values with spaces have no spaces
       // console.log('AFTER cleanVariable', clean)
       // console.log(typeof clean)
-      const cleanClean = clean.split('|')[0]
+      const cleanClean = splitOnPipe(clean)[0]
       // console.log('cleanCleanVariable', cleanClean)
       if (funcRegex.exec(cleanClean)) {
         const valuePromise = Promise.resolve(cleanClean)
