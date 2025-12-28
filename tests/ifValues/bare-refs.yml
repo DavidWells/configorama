@@ -1,0 +1,6 @@
+provider:
+  stage: ${opt:stage, 'dev'}
+
+test:
+  # Simpler syntax: bare references like provider.stage auto-resolve
+  memorySize: '${if(provider.stage === "prod") ? 1024 : 512}'

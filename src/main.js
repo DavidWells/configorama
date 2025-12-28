@@ -64,6 +64,7 @@ const getValueFromOptions = require('./resolvers/valueFromOptions')
 const getValueFromParam = require('./resolvers/valueFromParam')
 const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
+const { encodeValue: encodeValueForEval } = require('./resolvers/valueFromEval')
 const getValueFromIf = require('./resolvers/valueFromIf')
 const createGitResolver = require('./resolvers/valueFromGit')
 const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
@@ -193,10 +194,15 @@ class Configorama {
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
+      // Store truly raw config before any preprocessing
+      this.rawOriginalConfig = cloneDeep(fileOrObject)
+      // Preprocess: convert bare refs in if(), escape help() args
+      // Skip fallback fixing for object configs (they handle bare refs differently)
+      const processed = preProcess(fileOrObject, this.variableSyntax, this.variableTypes, { skipFallbackFix: true })
       // set config objects
-      this.config = fileOrObject
+      this.config = processed
       // Keep a copy
-      this.originalConfig = cloneDeep(fileOrObject)
+      this.originalConfig = cloneDeep(processed)
       // Set configPath for file references
       this.configPath = options.configDir || process.cwd()
     } else if (typeof fileOrObject === 'string') {
@@ -2387,6 +2393,16 @@ class Configorama {
         valueToPopulate = valueToPopulate.replace(this.varSuffixPattern, '')
       }
 
+      // For eval/if expressions, string values need quotes unless already quoted
+      // BUT don't quote strings that contain variable refs (they need further resolution)
+      if (/\b(eval|if)\s*\(/.test(property) && !valueToPopulate.match(this.variableSyntax)) {
+        const matchIdx = property.indexOf(currentMatchedString)
+        const charBefore = matchIdx > 0 ? property[matchIdx - 1] : ''
+        if (charBefore !== '"' && charBefore !== "'") {
+          // Not already quoted, wrap in quotes for eval
+          valueToPopulate = `"${valueToPopulate}"`
+        }
+      }
       property = replaceAll(currentMatchedString, valueToPopulate, property)
       // console.log('property replaceAll', property)
 
@@ -2402,37 +2418,50 @@ class Configorama {
       // } else if (isArray(valueToPopulate) && valueToPopulate.length === 1) {
       //  property = replaceAll(matchedString, String(valueToPopulate[0]), property)
     } else if (isObject(valueToPopulate)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPEisObject')
+      if (DEBUG_TYPE) console.log('DEBUG_TYPE isObject')
 
-      const objStr = JSON.stringify(valueToPopulate)
-      /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
-      const isNestedInVariable = (
-        property.trim() !== matchedString.trim() &&
-        property.indexOf(matchedString) !== -1 &&
-        matchedString.match(this.variableSyntax) &&
-        property.match(this.variableSyntax)
-      )
-      // Only encode for file() or text() references where JSON braces break regex matching
-      const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
-      if (isNestedInVariable && isFileOrTextRef) {
-        // Encode object as base64 to avoid breaking variable syntax with nested braces
-        const encodedObj = encodeJsonForVariable(valueToPopulate)
-        property = replaceAll(matchedString, encodedObj, property)
-      } else if (isNestedInVariable) {
-        const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
-        if (isVar) {
-          throw new Error(
-            `Invalid variable syntax "${property}" resolves to "${replaceAll(matchedString, objStr, property)}"`,
-          )
-        }
-        property = replaceAll(matchedString, objStr, property)
+      // For eval/if expressions, encode objects to avoid {} breaking variable syntax
+      const isEvalOrIf = /\b(eval|if)\s*\(/.test(property)
+      if (isEvalOrIf) {
+        const encoded = encodeValueForEval(valueToPopulate)
+        property = replaceAll(matchedString, encoded, property)
       } else {
-        // console.log('OBJECT MATCH', `"${objStr}"`)
-        property = replaceAll(matchedString, objStr, property)
+        const objStr = JSON.stringify(valueToPopulate)
+        /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
+        const isNestedInVariable = (
+          property.trim() !== matchedString.trim() &&
+          property.indexOf(matchedString) !== -1 &&
+          matchedString.match(this.variableSyntax) &&
+          property.match(this.variableSyntax)
+        )
+        // Only encode for file() or text() references where JSON braces break regex matching
+        const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
+        if (isNestedInVariable && isFileOrTextRef) {
+          // Encode object as base64 to avoid breaking variable syntax with nested braces
+          const encodedObj = encodeJsonForVariable(valueToPopulate)
+          property = replaceAll(matchedString, encodedObj, property)
+        } else if (isNestedInVariable) {
+          const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
+          if (isVar) {
+            throw new Error(
+              `Invalid variable syntax "${property}" resolves to "${replaceAll(matchedString, objStr, property)}"`,
+            )
+          }
+          property = replaceAll(matchedString, objStr, property)
+        } else {
+          // console.log('OBJECT MATCH', `"${objStr}"`)
+          property = replaceAll(matchedString, objStr, property)
+        }
       }
       // console.log('property', property)
       // TODO run functions here
       // console.log('other new prop', property)
+
+    // partial replacement, boolean inside eval/if expressions
+    } else if (typeof valueToPopulate === 'boolean' && /\b(eval|if)\s*\(/.test(property)) {
+      if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean in eval/if')
+      property = replaceAll(matchedString, String(valueToPopulate), property)
+
     } else {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE else')
       let missingValue = matchedString
@@ -2574,8 +2603,9 @@ Missing Value ${missingValue} - ${matchedString}
         /* Not file or text refs */
         !prop.match(fileRefSyntax)
         && !prop.match(textRefSyntax)
-        /* Not eval refs */
-        && !prop.match(getValueFromEval.match) 
+        /* Not eval/if refs */
+        && !prop.match(getValueFromEval.match)
+        && !prop.match(getValueFromIf.match)
         // AND is not multiline value
         && (func && prop.split('\n').length < 3)) {
         // console.log('IS FUNCTION')
@@ -2921,8 +2951,10 @@ Missing Value ${missingValue} - ${matchedString}
         }
 
         // console.log('VALUE', val)
+        // For eval/if resolvers, null is a valid intentional result (e.g., ternary false branch)
+        const isEvalOrIfResolver = resolverType === 'eval' || resolverType === 'if'
         if (
-          val === null ||
+          (val === null && !isEvalOrIfResolver) ||
           typeof val === 'undefined' ||
           /* match deep refs as empty {}, they need resolving via functions */
           (typeof val === 'object' && isEmpty(val) && variableString.match(/deep\:/))

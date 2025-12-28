@@ -765,36 +765,36 @@ provider:
 
 custom:
   # Different memory by stage
-  memorySize: ${if(("${self:provider.stage}" === "prod") ? 1024 : 512)}
+  memorySize: '${ if( ${provider.stage} === "prod" ) ? 1024 : 512 }'
 
   # Different log retention by stage
-  logRetention: ${if(("${self:provider.stage}" === "prod") ? 30 : 7)}
+  logRetention: ${if(("${provider.stage}" === "prod") ? 30 : 7)}
 
   # Enable features per environment
-  enableDebugEndpoints: ${if("${self:provider.stage}" !== "prod")}
-  enableMetrics: ${if("${self:provider.stage}" === "prod")}
+  enableDebugEndpoints: ${if("${provider.stage}" !== "prod")}
+  enableMetrics: ${if("${provider.stage}" === "prod")}
 
   # Regional settings
-  replicaCount: ${if(("${self:provider.region}" === "us-east-1") ? 3 : 1)}
+  replicaCount: ${if(("${provider.region}" === "us-east-1") ? 3 : 1)}
 
   # Conditional IAM role (use predefined role in prod, inline in dev)
-  useExternalRole: ${if("${self:provider.stage}" === "prod")}
-  role: ${if((${self:custom.useExternalRole}) ? "arn:aws:iam::123:role/prod-role" : null)}
+  useExternalRole: ${if("${provider.stage}" === "prod")}
+  role: ${if((${custom.useExternalRole}) ? "arn:aws:iam::123:role/prod-role" : null)}
 
 functions:
   api:
     handler: handler.api
-    memorySize: ${self:custom.memorySize}
+    memorySize: ${custom.memorySize}
 
   # Debug function - only deployed in non-prod
   debug:
     handler: handler.debug
-    enabled: ${self:custom.enableDebugEndpoints}
+    enabled: ${custom.enableDebugEndpoints}
 
   # Metrics processor - only in prod
   metricsProcessor:
     handler: handler.metrics
-    enabled: ${self:custom.enableMetrics}
+    enabled: ${custom.enableMetrics}
 ```
 
 ### Filters (experimental)

@@ -1,0 +1,110 @@
+# Tests for simple bare reference syntax in if expressions
+# provider.stage auto-converts to "${provider.stage}" for string comparisons
+# custom.flag stays as ${custom.flag} for boolean use
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  runtime: nodejs18.x
+
+custom:
+  # String comparison with bare ref (auto-quoted)
+  memorySize: '${if(provider.stage === "prod") ? 1024 : 512}'
+
+  # String comparison with bare ref
+  logRetention: '${if(provider.stage === "prod") ? 30 : 7}'
+
+  # Boolean expressions with bare refs
+  enableDebugEndpoints: '${if(provider.stage !== "prod")}'
+  enableMetrics: '${if(provider.stage === "prod")}'
+
+  # Regional settings with bare ref
+  replicaCount: '${if(provider.region === "us-east-1") ? 3 : 1}'
+
+  # Boolean condition (bare ref, not quoted)
+  useExternalRole: '${if(provider.stage === "prod")}'
+
+  # Ternary with boolean bare ref and string literal containing colons
+  role: '${if(custom.useExternalRole) ? "arn:aws:iam::123:role/prod-role" : null}'
+
+  # AWS intrinsic function - define separately, reference in ternary
+  noValueRef:
+    Ref: AWS::NoValue
+  optionalBucket: '${if(provider.stage === "prod") ? "my-prod-bucket" : custom.noValueRef}'
+
+  # Nested object references
+  database:
+    host: localhost
+    port: 5432
+    name: myapp
+  dbConnection: '${if(provider.stage === "prod") ? "prod-db.example.com" : custom.database.host}'
+
+  # Numeric values in ternary
+  timeout: '${if(provider.stage === "prod") ? 30 : 10}'
+  maxRetries: '${if(provider.region === "us-east-1") ? 5 : 3}'
+
+  # String values with special chars
+  apiEndpoint: '${if(provider.stage === "prod") ? "https://api.example.com/v1" : "http://localhost:3000"}'
+
+  # Chained self references
+  baseMemory: 256
+  scaledMemory: '${if(provider.stage === "prod") ? 1024 : custom.baseMemory}'
+
+  # Array value in ternary
+  prodTags:
+    - production
+    - monitored
+  devTags:
+    - development
+    - debug
+  tags: '${if(provider.stage === "prod") ? custom.prodTags : custom.devTags}'
+
+  # Deep nested reference in condition
+  settings:
+    feature:
+      enabled: true
+      name: newFeature
+  featureFlag: '${if(custom.settings.feature.enabled) ? custom.settings.feature.name : "disabled"}'
+
+  # Multiple stage comparisons (staging)
+  isNotDev: '${if(provider.stage !== "dev")}'
+
+  # Reference to provider values
+  runtimeCheck: '${if(provider.runtime === "nodejs18.x") ? "modern" : "legacy"}'
+
+  # Null vs string
+  optionalConfig: '${if(provider.stage === "prod") ? "enabled" : null}'
+
+  # Number result from boolean condition
+  debugLevel: '${if(custom.enableDebugEndpoints) ? 3 : 0}'
+
+  # Mixed variable types inline in ternary (working - with ${} wrapper)
+  envInTernary: '${if(provider.stage === "prod") ? "production-value" : ${env:SIMPLE_TEST_VAR, "env-default"}}'
+  optInTernary: '${if(provider.stage === "prod") ? "prod-setting" : ${opt:devSetting, "opt-default"}}'
+  deployLabel: '${if(provider.stage === "prod") ? "release" : ${git:branch}}'
+
+  # Self reference with colon in prod value
+  connectionString: '${if(provider.stage === "prod") ? "prod-db:5432" : custom.database.host}'
+
+  # TODO: These bare variable type syntaxes should work but currently don't
+  # Bare env: in ternary (should auto-convert like provider.stage does)
+  # envBare: '${if(provider.stage === "prod") ? "production-value" : env:BARE_TEST_VAR}'
+  # Bare opt: in ternary
+  # optBare: '${if(provider.stage === "prod") ? "prod-setting" : opt:bareSetting}'
+  # Bare git: in ternary
+  # gitBare: '${if(provider.stage === "prod") ? "release" : git:branch}'
+
+functions:
+  api:
+    handler: handler.api
+    memorySize: ${custom.memorySize}
+    timeout: ${custom.timeout}
+
+  debug:
+    handler: handler.debug
+    enabled: ${custom.enableDebugEndpoints}
+
+  metricsProcessor:
+    handler: handler.metrics
+    enabled: ${custom.enableMetrics}
