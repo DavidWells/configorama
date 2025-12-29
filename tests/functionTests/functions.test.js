@@ -214,6 +214,14 @@ test("mergeNestedPropFilter: ${merge(${otherWW}).whatever.lol.woot | toUpperCase
   assert.is(config.mergeNestedPropFilter, 'WEE')
 })
 
+test("mergeMultiFilter: ${merge(${multiFilterObj}).foo | toLowerCase | capitalize}", () => {
+  // merge({foo:'hello WORLD'}) => {foo:'hello WORLD'}
+  // .foo => 'hello WORLD'
+  // | toLowerCase => 'hello world'
+  // | capitalize => 'Hello world'
+  assert.is(config.mergeMultiFilter, 'Hello world')
+})
+
 // ==========================================
 // Array index access on function results
 // ==========================================

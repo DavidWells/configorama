@@ -1320,9 +1320,14 @@ class Configorama {
                     return dotProp.get(val, path)
                   }
 
-                  // Extract filter from rawValue if present (may end with } from ${...})
-                  const filterMatch = rawValue.match(/\s*\|\s*([\w]+(?:\([^)]*\))?)\s*\}?$/)
-                  const filterName = filterMatch ? filterMatch[1].split('(')[0] : null
+                  // Extract filters from rawValue if present (may end with } from ${...})
+                  // Handles multiple filters like "| trim | toUpperCase"
+                  const pipeIdx = rawValue.indexOf('|')
+                  const filterNames = pipeIdx > -1
+                    ? splitOnPipe(rawValue.slice(pipeIdx).replace(/\}$/, ''))
+                        .map(f => f.trim().split('(')[0])
+                        .filter(Boolean)
+                    : []
 
                   let finalValue = funcVal
 
@@ -1343,9 +1348,11 @@ class Configorama {
                     }
                   }
 
-                  // Apply filter if present
-                  if (filterName && filters[filterName]) {
-                    finalValue = filters[filterName](finalValue)
+                  // Apply filters in sequence
+                  for (const filterName of filterNames) {
+                    if (filters[filterName]) {
+                      finalValue = filters[filterName](finalValue)
+                    }
                   }
 
                   this.update(finalValue)

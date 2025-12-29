@@ -119,6 +119,11 @@ mergeWithPropAndFilter: ${merge(${propObj}).foo | toUpperCase}
 # Multiple properties then filter
 mergeNestedPropFilter: ${merge(${otherWW}).whatever.lol.woot | toUpperCase}
 
+# Multiple filters after property access
+multiFilterObj:
+  foo: "hello WORLD"
+mergeMultiFilter: ${merge(${multiFilterObj}).foo | toLowerCase | capitalize}
+
 ########################
 # Array index access on function results
 ########################
