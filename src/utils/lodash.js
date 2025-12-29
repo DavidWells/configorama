@@ -47,26 +47,37 @@ function set(object, path, value) {
   return object;
 }
 
+// Cache for trim regex patterns (perf: avoid recompilation)
+const trimRegexCache = new Map()
+
 // Custom implementation of lodash.trim
 function trim(string, chars) {
   if (string === null || string === undefined) {
     return '';
   }
-  
+
   string = String(string);
-  
+
   if (!chars && String.prototype.trim) {
     return string.trim();
   }
-  
+
   if (!chars) {
     // Default characters to trim (whitespace)
     chars = ' \t\n\r\f\v\u00a0\u1680\u2000\u200a\u2028\u2029\u202f\u205f\u3000\ufeff';
   }
-  
-  // Create a regex pattern with the characters to trim
-  const pattern = new RegExp(`^[${chars.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}]+|[${chars.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}]+$`, 'g');
-  
+
+  // Check cache first
+  let pattern = trimRegexCache.get(chars)
+  if (!pattern) {
+    // Create and cache regex pattern with the characters to trim
+    const escaped = chars.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+    pattern = new RegExp(`^[${escaped}]+|[${escaped}]+$`, 'g')
+    trimRegexCache.set(chars, pattern)
+  }
+
+  // Reset lastIndex for global regex reuse
+  pattern.lastIndex = 0
   return string.replace(pattern, '');
 }
 

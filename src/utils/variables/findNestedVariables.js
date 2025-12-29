@@ -53,7 +53,9 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     
     // Generate a unique placeholder
     const placeholder = `__VAR_${iteration - 1}__`
-    
+    // Pre-compile regex for this placeholder (perf: avoids recompilation in replaceAllPlaceholders)
+    const placeholderRegex = new RegExp(placeholder, 'g')
+
     // Store match details
     const matchInfo = {
       variableType: undefined,
@@ -66,6 +68,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
       start: match.index,
       end: match.index + match[0].length,
       placeholder,
+      placeholderRegex,
     }
     
     if (debug) {
@@ -136,7 +139,9 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     for (let i = 0; i < matchesArray.length; i++) {
       const m = matchesArray[i]
       if (result.includes(m.placeholder)) {
-        result = result.replace(new RegExp(m.placeholder, 'g'), m[key])
+        // Reset lastIndex before reusing global regex
+        m.placeholderRegex.lastIndex = 0
+        result = result.replace(m.placeholderRegex, m[key])
         needsAnotherPass = true
       }
     }
@@ -219,6 +224,7 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
 
   const finalMatches = matches.map((m) => {
     delete m.placeholder
+    delete m.placeholderRegex
     if (typeof m.variableType === 'undefined') {
       /*
       {

@@ -32,7 +32,7 @@ function splitByComma(string, regexPattern) {
   }
 
   const result = []
-  let current = ""
+  let segmentStart = 0  // Track segment start index (perf: avoid string concat)
   let inQuote = false
   let quoteChar = ""
   let bracketDepth = 0  // Includes (), [], and {}
@@ -88,17 +88,17 @@ function splitByComma(string, regexPattern) {
       }
     }
 
-    // Process comma
+    // Process comma - use substring instead of char-by-char concat
     if (char === "," && !inQuote && bracketDepth === 0 && dollarBraceDepth === 0) {
-      result.push(current.trim())
-      current = ""
-    } else {
-      current += char
+      result.push(protectedString.substring(segmentStart, i).trim())
+      segmentStart = i + 1
     }
   }
-  
-  if (current.trim() || result.length > 0) {
-    result.push(current.trim())
+
+  // Add final segment
+  const finalSegment = protectedString.substring(segmentStart).trim()
+  if (finalSegment || result.length > 0) {
+    result.push(finalSegment)
   }
 
   if (!regexPattern) {
