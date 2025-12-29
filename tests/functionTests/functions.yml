@@ -104,3 +104,30 @@ lengthOfMerge: ${length(merge('hello', 'world'))}
 md5OfMerge: ${md5(merge('hello', 'world'))}
 
 fileRef: ${file(./other.yml)}
+
+########################
+# Property access + filters on function results
+########################
+
+# Property access after merge, then filter
+propObj:
+  foo: hello
+  bar: world
+
+mergeWithPropAndFilter: ${merge(${propObj}).foo | toUpperCase}
+
+# Multiple properties then filter
+mergeNestedPropFilter: ${merge(${otherWW}).whatever.lol.woot | toUpperCase}
+
+########################
+# Array index access on function results
+########################
+
+# Basic array index access
+splitFirst: ${split("a-b-c", "-")[0]}
+
+# Array index with property access
+splitFirstLength: ${split("hello-world", "-")[0].length}
+
+# Negative-ish test: last element
+splitLast: ${split("a-b-c", "-")[2]}

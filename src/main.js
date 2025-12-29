@@ -1268,6 +1268,7 @@ class Configorama {
             const transform = this.runFunction.bind(this)
             const varSyntax = this.variableSyntax
             const leaves = this.leaves
+            const filters = this.filters
             // console.log('leaves two', leaves)
             // Traverse resolved object and run functions
             // console.log('this.config', this.config)
@@ -1302,17 +1303,52 @@ class Configorama {
                   // console.log('funcString', funcString)
                   const func = cleanVariable(funcString, varSyntax, true, `init ${this.callCount}`)
                   const funcVal = transform(func)
-                  // Match property access AFTER function call closes, e.g. merge(...).foo.bar
-                  // The function ends with ) or }) and is followed by property path
-                  const hasObjectRef = rawValue.match(/[)\}]\s*\.([\w.]+)$/)
-                  if (hasObjectRef && typeof funcVal === 'object') {
-                    const objectPath = hasObjectRef[1]
-                    /* get value from object and update  */
-                    const valueFromObject = dotProp.get(funcVal, objectPath)
-                    this.update(valueFromObject)
-                  } else {
-                    this.update(funcVal)
+
+                  // Strip filters like " | toUpperCase" before checking for property/index access
+                  const rawValueNoFilters = rawValue.replace(/\s*\|.*$/, '')
+
+                  // Helper to get property from value (works on objects, arrays, and primitives)
+                  const getProp = (val, path) => {
+                    if (val == null) return undefined
+                    // For primitives (string, number), access property directly
+                    if (typeof val !== 'object') {
+                      // Handle single property like 'length'
+                      if (!path.includes('.')) return val[path]
+                      // Handle path like 'foo.bar' - not applicable for primitives
+                      return undefined
+                    }
+                    return dotProp.get(val, path)
                   }
+
+                  // Extract filter from rawValue if present (may end with } from ${...})
+                  const filterMatch = rawValue.match(/\s*\|\s*([\w]+(?:\([^)]*\))?)\s*\}?$/)
+                  const filterName = filterMatch ? filterMatch[1].split('(')[0] : null
+
+                  let finalValue = funcVal
+
+                  // Check for array index access: [N] optionally followed by .property
+                  const indexMatch = rawValueNoFilters.match(/[)\}]\s*\[(\d+)\](?:\.([\w.]+))?$/)
+                  if (indexMatch && Array.isArray(funcVal)) {
+                    const index = parseInt(indexMatch[1], 10)
+                    const propPath = indexMatch[2]
+                    finalValue = funcVal[index]
+                    if (propPath && finalValue != null) {
+                      finalValue = getProp(finalValue, propPath)
+                    }
+                  } else {
+                    // Check for property access: .foo.bar after function close
+                    const propMatch = rawValueNoFilters.match(/[)\}]\s*\.([\w.]+)$/)
+                    if (propMatch && typeof funcVal === 'object') {
+                      finalValue = dotProp.get(funcVal, propMatch[1])
+                    }
+                  }
+
+                  // Apply filter if present
+                  if (filterName && filters[filterName]) {
+                    finalValue = filters[filterName](finalValue)
+                  }
+
+                  this.update(finalValue)
                 }
 
                 /* fix for file(JS-ref.js, raw) to keep parens and inline code */

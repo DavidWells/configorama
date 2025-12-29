@@ -196,6 +196,47 @@ test("subThing: ${self:key}", () => {
   assert.equal(config.fileRef.subThing, 'haha')
 })
 
+// ==========================================
+// Property access + filters on function results
+// ==========================================
+
+test("mergeWithPropAndFilter: ${merge(${propObj}).foo | toUpperCase}", () => {
+  // merge({foo:'hello',bar:'world'}) => {foo:'hello',bar:'world'}
+  // .foo => 'hello'
+  // | toUpperCase => 'HELLO'
+  assert.is(config.mergeWithPropAndFilter, 'HELLO')
+})
+
+test("mergeNestedPropFilter: ${merge(${otherWW}).whatever.lol.woot | toUpperCase}", () => {
+  // merge({...otherWW}) => { haha: true, whatever: { lol: { woot: 'wee' } } }
+  // .whatever.lol.woot => 'wee'
+  // | toUpperCase => 'WEE'
+  assert.is(config.mergeNestedPropFilter, 'WEE')
+})
+
+// ==========================================
+// Array index access on function results
+// ==========================================
+
+test("splitFirst: ${split('a-b-c', '-')[0]}", () => {
+  // split('a-b-c', '-') => ['a', 'b', 'c']
+  // [0] => 'a'
+  assert.is(config.splitFirst, 'a')
+})
+
+test("splitFirstLength: ${split('hello-world', '-')[0].length}", () => {
+  // split('hello-world', '-') => ['hello', 'world']
+  // [0] => 'hello'
+  // .length => 5
+  assert.is(config.splitFirstLength, 5)
+})
+
+test("splitLast: ${split('a-b-c', '-')[2]}", () => {
+  // split('a-b-c', '-') => ['a', 'b', 'c']
+  // [2] => 'c'
+  assert.is(config.splitLast, 'c')
+})
+
 /*
 old tests when functions were in resolution path
 test('splitTestTwo "lol-hi-_ ha,ha" | split("-", 2) | toUpperCase', (t) => {
