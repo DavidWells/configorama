@@ -1,0 +1,67 @@
+# Test YAML anchors/aliases with configorama variables
+
+environment: ${opt:stage, 'dev'}
+
+# Define reusable patterns with anchors
+defaults: &defaults
+  timeout: 30
+  retries: 3
+  region: ${opt:region, 'us-east-1'}
+
+database_config: &db_config
+  host: ${env:DB_HOST, 'localhost'}
+  port: ${env:DB_PORT, 5432}
+  pool_size: 10
+
+# Nested anchor with variable interpolation
+frontend_paths: &frontend_paths
+  - src/**/*.ts
+  - src/**/*.tsx
+  - "*.config.js"
+
+backend_paths: &backend_paths
+  - api/**/*.py
+  - lib/**/*.py
+  - requirements.txt
+
+# Use aliases to compose configs
+development:
+  <<: *defaults
+  debug: true
+  database:
+    <<: *db_config
+    name: ${opt:stage}_db
+
+production:
+  <<: *defaults
+  timeout: 60
+  debug: false
+  database:
+    <<: *db_config
+    name: prod_db
+    pool_size: 50
+
+# Combining multiple anchors (merge)
+staging:
+  <<: *defaults
+  timeout: 45
+  database:
+    <<: *db_config
+    name: staging_db
+
+# Array aliases
+file_filters:
+  foo: bar
+  bar: baz
+  merged: ${merge(${self:file_filters.foo}, ${self:file_filters.bar})}
+  allMerged: ${merge(${self:file_filters.frontend}, ${self:file_filters.backend})}
+  allMergedTwo: ${merge(${self:frontend_paths}, ${self:backend_paths})}
+  frontend: *frontend_paths
+  backend: *backend_paths
+  all:
+    - *frontend_paths
+    - *backend_paths
+
+# Variable referencing anchor-resolved values
+resolved_timeout: ${self:development.timeout}
+resolved_region: ${self:production.database.name}

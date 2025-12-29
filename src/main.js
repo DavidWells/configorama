@@ -154,6 +154,8 @@ class Configorama {
     this.settings.allowUnresolvedVariables = unresolvedSetting
 
     this.filterCache = {}
+    // Cache for originalValue lookups (perf: avoid repeated dotProp.get)
+    this._originalValueCache = new Map()
 
     this.foundVariables = []
     this.fileRefsFound = []
@@ -417,6 +419,15 @@ class Configorama {
         .map((v) => v.match))
     )
     this.variablesKnownTypes = variablesKnownTypes
+
+    // Build prefix lookup map for O(1) type detection (perf optimization)
+    this._resolverByPrefix = new Map()
+    for (const r of this.variableTypes) {
+      const prefix = r.prefix || r.type
+      if (prefix && r.match instanceof RegExp && !r.internal) {
+        this._resolverByPrefix.set(prefix + ':', r)
+      }
+    }
 
     // this.allPatterns = combineRegexes(...this.variableTypes.map((v) => v.match))
     // console.log('this.allPatterns', this.allPatterns)
@@ -1291,13 +1302,13 @@ class Configorama {
                   // console.log('funcString', funcString)
                   const func = cleanVariable(funcString, varSyntax, true, `init ${this.callCount}`)
                   const funcVal = transform(func)
-                  const hasObjectRef = rawValue.match(/\.\S*$/)
+                  // Match property access AFTER function call closes, e.g. merge(...).foo.bar
+                  // The function ends with ) or }) and is followed by property path
+                  const hasObjectRef = rawValue.match(/[)\}]\s*\.([\w.]+)$/)
                   if (hasObjectRef && typeof funcVal === 'object') {
-                    const objectPath = hasObjectRef[0].replace(/^\./, '')
-                    // console.log('objectPath', objectPath)
+                    const objectPath = hasObjectRef[1]
                     /* get value from object and update  */
                     const valueFromObject = dotProp.get(funcVal, objectPath)
-                    // console.log('valueFromObject', valueFromObject)
                     this.update(valueFromObject)
                   } else {
                     this.update(funcVal)
@@ -1866,21 +1877,35 @@ class Configorama {
       const thePath = leaf.path.length > 1 ? leaf.path.join('.') : leaf.path[0]
       // console.log('thePath', thePath)
       // console.log('this.originalConfig', this.originalConfig)
-      let originalValue = dotProp.get(this.originalConfig, thePath)
-      // TODO @DWELLS make recursive
-      if (!originalValue) {
-        // Recurse up the tree until we find a value
-        let currentPathArray = leaf.path.slice(0, -1)
-        while (currentPathArray.length > 0 && !originalValue) {
-          const currentPath = currentPathArray.length > 1 ? currentPathArray.join('.') : currentPathArray[0]
-          // console.log('checking parent path:', currentPath)
-          originalValue = dotProp.get(this.originalConfig, currentPath)
-          if (typeof originalValue !== 'undefined') {
-            leaf.originalValuePath = currentPath
-            leaf.currentConfig = this.config
+
+      // Check cache first (perf: avoid repeated dotProp.get calls)
+      let originalValue
+      let originalValuePath
+      if (this._originalValueCache.has(thePath)) {
+        const cached = this._originalValueCache.get(thePath)
+        originalValue = cached.value
+        originalValuePath = cached.originalValuePath
+      } else {
+        originalValue = dotProp.get(this.originalConfig, thePath)
+        // TODO @DWELLS make recursive
+        if (!originalValue) {
+          // Recurse up the tree until we find a value
+          // Use index instead of slice() to avoid array allocations
+          for (let pathLen = leaf.path.length - 1; pathLen > 0 && !originalValue; pathLen--) {
+            const currentPath = leaf.path.slice(0, pathLen).join('.')
+            // console.log('checking parent path:', currentPath)
+            originalValue = dotProp.get(this.originalConfig, currentPath)
+            if (typeof originalValue !== 'undefined') {
+              originalValuePath = currentPath
+            }
           }
-          currentPathArray = currentPathArray.slice(0, -1)
         }
+        // Cache the result
+        this._originalValueCache.set(thePath, { value: originalValue, originalValuePath })
+      }
+      if (originalValuePath) {
+        leaf.originalValuePath = originalValuePath
+        leaf.currentConfig = this.config
       }
       leaf.originalSource = originalValue
 
@@ -2017,6 +2042,7 @@ class Configorama {
     // Initialize resolution history if needed
     if (!valueObject.resolutionHistory) {
       valueObject.resolutionHistory = []
+      valueObject._historyKeys = new Set()
     }
 
     let result = valueObject.value
@@ -2135,12 +2161,13 @@ class Configorama {
       }
 
       // Only add to history if not a duplicate (same match + variable)
-      const isDuplicate = valueObject.resolutionHistory.some(entry =>
-        entry.match === historyEntry.match &&
-        entry.variable === historyEntry.variable
-      )
-
-      if (!isDuplicate) {
+      // Use Set for O(1) lookup instead of O(n) array scan
+      const historyKey = `${historyEntry.match}|${historyEntry.variable}`
+      if (!valueObject._historyKeys) {
+        valueObject._historyKeys = new Set()
+      }
+      if (!valueObject._historyKeys.has(historyKey)) {
+        valueObject._historyKeys.add(historyKey)
         valueObject.resolutionHistory.push(historyEntry)
       }
 
@@ -2900,24 +2927,40 @@ Missing Value ${missingValue} - ${matchedString}
     /** @type {Function|undefined} */
     let resolverFunction
     let resolverType
-    /* Loop over variables and set getterFunction when match found. */
-    const found = this.variableTypes.some((r, i) => {
-      if (r.match instanceof RegExp && variableString.match(r.match)) {
-        // set resolver function
-        resolverFunction = r.resolver
-        resolverType = r.type || 'unknown'
-        return true
-      } else if (typeof r.match === 'function') {
-        // TODO finalize match API
-        if (r.match(variableString, this.config, valueObject)) {
+    let found = false
+
+    // Fast path: try prefix lookup first for O(1) detection of common types
+    const colonIdx = variableString.indexOf(':')
+    if (colonIdx !== -1) {
+      const prefix = variableString.slice(0, colonIdx + 1)
+      const resolver = this._resolverByPrefix.get(prefix)
+      if (resolver && resolver.match instanceof RegExp && variableString.match(resolver.match)) {
+        resolverFunction = resolver.resolver
+        resolverType = resolver.type || 'unknown'
+        found = true
+      }
+    }
+
+    // Fallback: loop over all variable types
+    if (!found) {
+      found = this.variableTypes.some((r, i) => {
+        if (r.match instanceof RegExp && variableString.match(r.match)) {
           // set resolver function
           resolverFunction = r.resolver
           resolverType = r.type || 'unknown'
           return true
+        } else if (typeof r.match === 'function') {
+          // TODO finalize match API
+          if (r.match(variableString, this.config, valueObject)) {
+            // set resolver function
+            resolverFunction = r.resolver
+            resolverType = r.type || 'unknown'
+            return true
+          }
         }
-      }
-      return false
-    })
+        return false
+      })
+    }
     /*
     // console.log('found variable resolver', found)
     // console.log('resolverFunction', resolverFunction)
