@@ -618,19 +618,26 @@ class Configorama {
    */
   isUnknownTypeAllowed(varString) {
     const setting = this.settings.allowUnknownVariableTypes
-    if (setting === true) return true
     if (setting === false || setting === undefined) return false
+
+    // Extract type prefix from variable string
+    // Handle both 'ssm:path' and '${ssm:path}' formats
+    let cleanVar = varString
+    if (cleanVar.startsWith(this.varPrefix)) {
+      cleanVar = cleanVar.slice(this.varPrefix.length)
+    }
+    if (cleanVar.endsWith(this.varSuffix)) {
+      cleanVar = cleanVar.slice(0, -this.varSuffix.length)
+    }
+    const typePrefix = this.extractTypePrefix(cleanVar)
+
+    // Check if this is a known type (has a resolver) - known types should not be treated as "unknown allowed"
+    const isKnownType = typePrefix && this._resolverByPrefix && this._resolverByPrefix.has(typePrefix + ':')
+    if (isKnownType) return false
+
+    if (setting === true) return true
+
     if (Array.isArray(setting)) {
-      // Extract type prefix from variable string
-      // Handle both 'ssm:path' and '${ssm:path}' formats
-      let cleanVar = varString
-      if (cleanVar.startsWith(this.varPrefix)) {
-        cleanVar = cleanVar.slice(this.varPrefix.length)
-      }
-      if (cleanVar.endsWith(this.varSuffix)) {
-        cleanVar = cleanVar.slice(0, -this.varSuffix.length)
-      }
-      const typePrefix = this.extractTypePrefix(cleanVar)
       if (typePrefix && setting.includes(typePrefix)) return true
     }
     return false
@@ -2416,7 +2423,9 @@ class Configorama {
         let deepIndex = Number(v.match(deepIndexPattern)[1])
         let item = this.deep[deepIndex]
 
-        if (item.match(deepRefSyntax)) {
+        // Only follow chain if item IS a deep ref (not just contains one)
+        // e.g. item = "${deep:0}" should follow, but item = "https://...${deep:0}..." should not
+        if (/^\$\{deep:\d+\}$/.test(item)) {
           deepIndex = Number(item.match(deepIndexPattern)[1])
           item = this.deep[deepIndex]
         }
@@ -3105,7 +3114,8 @@ Missing Value ${missingValue} - ${matchedString}
                 return Promise.resolve(undefined)
               }
             }
-            return Promise.resolve(encodeUnknown(propertyString))
+            // Encode only the unknown variable, not the entire string
+            return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
           }
 
           if (valueCount.length === 1 && noNestedVars) {
@@ -3376,10 +3386,13 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('allowUnknownVars propertyString', propertyString)
       const varMatches = propertyString.match(this.variableSyntax)
       let allowUnknownVars = propertyString
-      /* If variables found, encode them for passthrough */
+      /* Only encode variables that are actually unknown, not all of them */
       if (varMatches && varMatches.length) {
         varMatches.forEach((m) => {
-          allowUnknownVars = allowUnknownVars.replace(m, encodeUnknown(m))
+          // Only encode this variable if IT is unknown (not just because the string contains unknowns)
+          if (this.isUnknownTypeAllowed(m)) {
+            allowUnknownVars = allowUnknownVars.replace(m, encodeUnknown(m))
+          }
         })
       }
       // console.log('allowUnknownVars propertyString:', propertyString)
@@ -3600,7 +3613,17 @@ Missing Value ${missingValue} - ${matchedString}
     var hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
     // console.log('hasFunc', hasFunc)
+    // Skip special expressions (cron, eval, if) - these aren't user functions
     if (!hasFunc || hasFunc && (hasFunc[1] === 'cron' || hasFunc[1] === 'eval' || hasFunc[1] === 'if')) {
+      return variableString
+    }
+    // Skip file/text when they match resolver regex OR contain encoded passthrough values
+    // Malformed patterns (with %, \, etc) should still error
+    const hasPassthrough = variableString.includes('>passthrough')
+    if (hasFunc[1] === 'file' && (variableString.match(fileRefSyntax) || hasPassthrough)) {
+      return variableString
+    }
+    if (hasFunc[1] === 'text' && (variableString.match(textRefSyntax) || hasPassthrough)) {
       return variableString
     }
     // test for object
