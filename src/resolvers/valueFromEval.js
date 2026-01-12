@@ -69,6 +69,7 @@ async function getValueFromEval(variableString) {
     }
 
     // Build context with null and any decoded values
+    /** @type {Record<string, unknown>} */
     const context = { ...valueContext }
     if (hasNull) {
       context.__NULL__ = null

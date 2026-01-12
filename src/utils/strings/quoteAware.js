@@ -112,6 +112,7 @@ function isInsideQuotes(str, idx) {
  * @returns {Array<[number, number]>} Array of [start, end] ranges
  */
 function getQuoteRanges(str) {
+  /** @type {Array<[number, number]>} */
   const ranges = []
   let inQuote = false
   let quoteChar = ''
