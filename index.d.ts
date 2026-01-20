@@ -1,10 +1,7 @@
 // Type definitions for configorama
 // Project: https://github.com/DavidWells/configorama
 
-// Re-export variable validation types
-export * from './src/types'
-
-export interface ConfigoramaSettings {
+interface ConfigoramaSettings {
   /** Options to populate for ${opt:xyz}. These could be CLI flags */
   options?: Record<string, any>
   /** Regex of variable syntax */
@@ -64,7 +61,7 @@ export interface ConfigoramaSettings {
   filePathOverrides?: Record<string, string>
 }
 
-export interface ConfigoramaResult<T = any> {
+interface ConfigoramaResult<T = any> {
   /** The variable syntax pattern used */
   variableSyntax: RegExp
   /** Map of variable types found */
@@ -83,7 +80,7 @@ export interface ConfigoramaResult<T = any> {
  * Context passed to JS/TS/ESM config file functions
  * Used when config files export a function: `export default function(ctx) { ... }`
  */
-export interface ConfigContext<T = any> {
+interface ConfigContext<T = any> {
   /** The original unresolved configuration object */
   originalConfig: T
   /** The current (partially resolved) configuration object */
@@ -104,28 +101,40 @@ declare function configorama<T = any>(
   settings: ConfigoramaSettings & { returnMetadata: true }
 ): Promise<ConfigoramaResult<T>>
 
-export default configorama
+declare namespace configorama {
+  // Re-export types for consumers
+  export { ConfigoramaSettings, ConfigoramaResult, ConfigContext }
 
-/** Configorama sync API */
-export function sync<T = any>(
-  configPathOrObject: string | object,
-  settings?: ConfigoramaSettings
-): T
+  /** Configorama sync API */
+  export function sync<T = any>(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings
+  ): T
 
-/** Analyze config variables without resolving them */
-export function analyze(
-  configPathOrObject: string | object,
-  settings?: ConfigoramaSettings
-): Promise<any>
+  /** Analyze config variables without resolving them */
+  export function analyze(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings
+  ): Promise<any>
 
-/** Format utilities for parsing various config formats */
-export const format: {
-  yaml: any
-  json: any
-  toml: any
-  ini: any
-  hcl: any
+  /** Format utilities for parsing various config formats */
+  export const format: {
+    yaml: any
+    json: any
+    toml: any
+    ini: any
+    hcl: any
+  }
+
+  /** The Configorama class for advanced usage */
+  export const Configorama: any
+
+  /** Build variable syntax regex */
+  export function buildVariableSyntax(
+    prefix?: string,
+    suffix?: string,
+    excludePatterns?: string[]
+  ): string
 }
 
-/** The Configorama class for advanced usage */
-export const Configorama: any
+export = configorama
