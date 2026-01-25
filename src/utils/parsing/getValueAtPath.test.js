@@ -128,4 +128,25 @@ test('getValueAtPath: handles whitespace in path', () => {
   assert.is(getValueAtPath(obj, ' .foo '), 42)
 })
 
+// Error handling for malformed input
+test('getValueAtPath: throws on malformed array index with trailing characters', () => {
+  const arr = ['a', 'b', 'c']
+  assert.throws(() => getValueAtPath(arr, '.[42abc]'), /Invalid array index/)
+})
+
+test('getValueAtPath: throws on malformed array index with leading characters', () => {
+  const arr = ['a', 'b', 'c']
+  assert.throws(() => getValueAtPath(arr, '.[abc42]'), /Invalid array index/)
+})
+
+test('getValueAtPath: throws on non-numeric array index', () => {
+  const arr = ['a', 'b', 'c']
+  assert.throws(() => getValueAtPath(arr, '.[abc]'), /Invalid array index/)
+})
+
+test('getValueAtPath: throws on decimal array index', () => {
+  const arr = ['a', 'b', 'c']
+  assert.throws(() => getValueAtPath(arr, '.[1.5]'), /Invalid array index/)
+})
+
 test.run()

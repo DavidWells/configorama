@@ -43,8 +43,8 @@ function parsePath(path) {
         segments.push(content.slice(1, -1))
       } else {
         // It's a number index
-        const num = parseInt(content, 10)
-        if (isNaN(num)) {
+        const num = Number(content)
+        if (!Number.isInteger(num)) {
           throw new Error(`Invalid array index: ${content}`)
         }
         segments.push(num)
