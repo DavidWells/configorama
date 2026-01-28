@@ -10,19 +10,13 @@ const dirname = __dirname
 // The backslash character breaks the file() function regex
 // ============================================
 
-test('windows paths - backslash breaks file function parsing', async () => {
-  // LIMITATION: backslash in path breaks the file() function regex
-  try {
-    await configorama({
-      ref: '${file(.\\config\\test.json):key, "fallback"}'
-    }, {
-      configDir: dirname
-    })
-    assert.unreachable('should throw')
-  } catch (error) {
-    // Backslash causes "Function not found" error
-    assert.ok(error.message.includes('Function') || error.message.includes('not found'))
-  }
+test('windows paths - backslash path uses fallback when file not found', async () => {
+  const config = await configorama({
+    ref: '${file(.\\config\\test.json):key, "fallback"}'
+  }, {
+    configDir: dirname
+  })
+  assert.is(config.ref, 'fallback')
 })
 
 // ============================================

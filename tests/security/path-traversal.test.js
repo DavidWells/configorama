@@ -24,19 +24,14 @@ test('path traversal - relative path with ../ uses fallback when file not found'
   assert.is(config.value, 'fallback')
 })
 
-test('path traversal - encoded path characters break parsing', async () => {
-  // LIMITATION: % character in paths breaks file() function parsing
-  try {
-    await configorama({
-      value: '${file(./%2e%2e/%2e%2e/nonexistent.json):key, "fallback"}'
-    }, {
-      configDir: dirname
-    })
-    assert.unreachable('should throw')
-  } catch (error) {
-    // % breaks function parsing
-    assert.ok(error.message.includes('Function') || error.message.includes('not found'))
-  }
+test('path traversal - encoded path characters use fallback', async () => {
+  // %2e%2e is not decoded to .., so the literal path doesn't exist
+  const config = await configorama({
+    value: '${file(./%2e%2e/%2e%2e/nonexistent.json):key, "fallback"}'
+  }, {
+    configDir: dirname
+  })
+  assert.is(config.value, 'fallback')
 })
 
 test('path traversal - dynamic path with variable injection uses fallback', async () => {

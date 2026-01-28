@@ -1,5 +1,5 @@
 const { findNestedVariables } = require('./findNestedVariables')
-const { functionRegex } = require('../regex')
+const { functionRegex, fileRefSyntax } = require('../regex')
 
 const DEBUG = false
 /**
@@ -8,8 +8,6 @@ const DEBUG = false
  * @param match The variable match instance variable part
  * @returns {string} The cleaned variable match
  */
-
-const fileRefSyntax = RegExp(/^file\((~?[a-zA-Z0-9._\-\/,'" ]+?)\)/g)
 module.exports = function cleanVariable(
   match, 
   variableSyntax, 

@@ -93,11 +93,16 @@ function combineRegexes(regexes) {
   return new RegExp(`(${patterns.join('|')})`)
 }
 
+const fileRefSyntax = /^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/\\%,'" =+]+?)\)/g
+const textRefSyntax = /^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/\\%,'" =+]+?)\)/g
+
 module.exports = {
   funcRegex,
   funcRegexSimple,
   funcStartOfLineRegex,
   subFunctionRegex,
+  fileRefSyntax,
+  textRefSyntax,
   combineRegexes,
   parseFunctionCall,
   // Keep old export name for backwards compat

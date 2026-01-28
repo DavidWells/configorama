@@ -34,7 +34,7 @@ const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
 const { findLineForKey } = require('./utils/paths/findLineForKey')
 /* Utils - regex */
-const { combineRegexes, funcRegex } = require('./utils/regex')
+const { combineRegexes, funcRegex, fileRefSyntax, textRefSyntax } = require('./utils/regex')
 /* Utils - strings */
 const formatFunctionArgs = require('./utils/strings/formatFunctionArgs')
 const { splitByComma } = require('./utils/strings/splitByComma')
@@ -92,8 +92,6 @@ const deepRefSyntax = RegExp(/(\${)?deep:\d+(\.[^}]+)*()}?/)
 const deepIndexReplacePattern = new RegExp(/^deep:|(\.[^}]+)*$/g)
 const deepIndexPattern = /deep\:(\d*)/
 const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
-const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
-const textRefSyntax = RegExp(/^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" =+]+?)\)/g)
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const selfRefSyntax = RegExp(/^self:/g)
@@ -2706,7 +2704,10 @@ Missing Value ${missingValue} - ${matchedString}
         && !prop.match(getValueFromEval.match)
         && !prop.match(getValueFromIf.match)
         // AND is not multiline value
-        && (func && prop.split('\n').length < 3)) {
+        && (func && prop.split('\n').length < 3)
+        // Only tag as function if the function name is actually registered
+        // Prevents resolved values like git messages "fix(scope)" from being treated as functions
+        && (func[1] && (this.functions[func[1]] || this.functions[func[1].toLowerCase()]))) {
         // console.log('IS FUNCTION')
         /* if matches function signature like ${merge('foo', 'bar')}
           rewrite the variable to run the function after inputs resolved
