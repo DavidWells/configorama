@@ -12,10 +12,11 @@ const getValueAtPath = require('./src/utils/parsing/getValueAtPath')
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f', 'param'],
-  boolean: ['help', 'h', 'version', 'v', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify'],
+  boolean: ['help', 'h', 'version', 'v', 'V', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify'],
   alias: {
     h: 'help',
-    v: 'verify',
+    v: 'version',
+    V: 'verify',
     o: 'output',
     f: 'format',
     l: 'list',
@@ -41,7 +42,7 @@ Options:
   -f, --format <format>     Output format: json, yaml, or js (default: json)
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
-  -v, --verify              Verify the config
+  -V, --verify              Verify the config
   --param <key=value>       Pass parameter values (can be used multiple times)
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
@@ -224,10 +225,9 @@ configorama(inputFile, options)
       content: error.message,
       type: 'error',
     })
-    console.log('error', error)
     console.log(errorMsg)
     if (argv.debug) {
-      console.error(error.stack)
+      console.error('error', error)
     }
     process.exit(1)
   })
