@@ -7,7 +7,6 @@ console.log = () => {}
 // process.exit(1)
 /** */
 /* External dependencies */
-const promiseFinallyShim = require('promise.prototype.finally').shim()
 const findUp = require('find-up')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
@@ -682,9 +681,14 @@ class Configorama {
       /** */
       //process.exit(1)
 
-      // Strip _content before variable resolution, re-attach after
-      if (configObject && configObject._content !== undefined) {
+      // Strip body content before variable resolution, re-attach after
+      if (configObject && configObject._body !== undefined) {
+        this._markdownContent = configObject._body
+        this._markdownContentKey = '_body'
+        delete configObject._body
+      } else if (configObject && configObject._content !== undefined) {
         this._markdownContent = configObject._content
+        this._markdownContentKey = '_content'
         delete configObject._content
       }
 
@@ -719,12 +723,8 @@ class Configorama {
       )
 
       if (showFoundVariables) {
-        //*
         deepLog('metadata', metadata)
-        fs.writeFileSync(`metadata-${path.basename(this.configFilePath)}.json`, JSON.stringify(metadata, null, 2))
         deepLog('enrich', enrich)
-        // process.exit(1)
-        /** */
       }
 
       const variableData = metadata.variables
@@ -1245,7 +1245,7 @@ class Configorama {
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
       if (this._markdownContent !== undefined) {
-        this.originalConfig._content = this._markdownContent
+        this.originalConfig[this._markdownContentKey] = this._markdownContent
       }
       return Promise.resolve(this.originalConfig)
     }
@@ -1408,7 +1408,7 @@ class Configorama {
           }
           // Re-attach markdown body content after variable resolution
           if (this._markdownContent !== undefined) {
-            this.config._content = this._markdownContent
+            this.config[this._markdownContentKey] = this._markdownContent
           }
           return this.config
         })
