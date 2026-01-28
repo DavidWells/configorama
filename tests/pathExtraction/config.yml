@@ -1,0 +1,37 @@
+# Test fixture for jq-style path extraction
+service: my-app
+version: 1.0.0
+
+database:
+  host: localhost
+  port: 5432
+  name: mydb
+  credentials:
+    user: admin
+    password: secret123
+
+servers:
+  - name: primary
+    host: 10.0.0.1
+    port: 8080
+  - name: secondary
+    host: 10.0.0.2
+    port: 8081
+  - name: backup
+    host: 10.0.0.3
+    port: 8082
+
+features:
+  - auth
+  - logging
+  - metrics
+
+nested:
+  level1:
+    level2:
+      level3:
+        value: deeply-nested
+
+special-keys:
+  "key-with-dash": works
+  "key.with.dots": also-works
