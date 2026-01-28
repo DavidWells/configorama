@@ -2,7 +2,7 @@
 // This file provides TypeScript support for validating configuration variables
 
 // Valid variable prefixes supported by configorama
-export type KnownVariablePrefix = 'env:' | 'opt:' | 'self:' | 'file:' | 'git:' | 'cron:'
+export type KnownVariablePrefix = 'env:' | 'opt:' | 'self:' | 'file:' | 'git:' | 'cron:' | 'param:'
 
 // Quoted string literal type for fallback values
 type QuotedString = `"${string}"` | `'${string}'`

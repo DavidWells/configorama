@@ -1,3 +1,4 @@
+// Registers graceful shutdown handlers for SIGINT/SIGTERM/SIGBREAK
 const readline = require('readline')
 
 function handleSignalEvents() {

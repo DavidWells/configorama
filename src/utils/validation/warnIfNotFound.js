@@ -3,6 +3,10 @@
  */
 const { isEmpty } = require('../lodash')
 
+/**
+ * @param {*} val
+ * @returns {boolean}
+ */
 function isValidValue(val) {
   if (val !== null && typeof val === 'object' && (val.hasOwnProperty('__internal_only_flag') || val.hasOwnProperty('__internal_metadata'))) {
     return false

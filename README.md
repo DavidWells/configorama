@@ -283,6 +283,7 @@ Supported file types (extensions are case-insensitive):
 | TOML | `.toml`, `.tml` |
 | INI | `.ini` |
 | JSON | `.json`, `.json5`, `.jsonc` |
+| Markdown | `.md`, `.mdx`, `.markdown`, `.mdown`, `.mkdn`, `.mkd` |
 
 ### Sync/Async file references
 

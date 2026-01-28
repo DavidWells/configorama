@@ -1,4 +1,4 @@
-// Native replacements for lodash type checks
+// Native replacements for lodash utilities used across the codebase
 const isArray = Array.isArray
 const isString = (val) => typeof val === 'string'
 const isNumber = (val) => typeof val === 'number' && !isNaN(val)
@@ -59,7 +59,12 @@ function mapValues(obj, fn) {
   return result
 }
 
-// Custom implementation of lodash.set
+/**
+ * @param {Object} object - Target object
+ * @param {string|string[]} path - Dot-delimited path or array of keys
+ * @param {*} value - Value to set
+ * @returns {Object} The mutated object
+ */
 function set(object, path, value) {
   if (object === null || typeof object !== 'object') {
     return object;
@@ -94,7 +99,11 @@ function set(object, path, value) {
 // Cache for trim regex patterns (perf: avoid recompilation)
 const trimRegexCache = new Map()
 
-// Custom implementation of lodash.trim
+/**
+ * @param {string} string - String to trim
+ * @param {string} [chars] - Characters to trim (defaults to whitespace)
+ * @returns {string}
+ */
 function trim(string, chars) {
   if (string === null || string === undefined) {
     return '';
