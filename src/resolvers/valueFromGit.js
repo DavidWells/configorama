@@ -27,6 +27,24 @@ async function _exec(cmd, options = { timeout: 1000 }) {
   })
 }
 
+/**
+ * Execute a command with arguments array (safe from shell injection)
+ * @param {string} command - Command to execute
+ * @param {string[]} args - Arguments array
+ * @param {import('child_process').ExecFileOptions} [options] - ExecFile options
+ * @returns {Promise<string>}
+ */
+async function _execFile(command, args, options = { timeout: 1000 }) {
+  return new Promise((resolve, reject) => {
+    childProcess.execFile(command, args, options, (err, stdout) => {
+      if (err) {
+        return reject(err)
+      }
+      return resolve(String(stdout).trim())
+    })
+  })
+}
+
 // TODO denote computed fields in metadata
 /*
 {
@@ -230,27 +248,15 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
     throw new Error('File path must be a string')
   }
 
-  // Check for suspicious characters and patterns that could be used for command injection or path traversal
-  const dangerousPatterns = [
-    /[;&|`$]/,  // Command injection chars
-    // /\.\.\//,   // Directory traversal
-    // /\.\./,     // Directory traversal
-    // /^[\/\\]/,  // Absolute paths
-    /[\x00-\x1f\x7f-\x9f]/  // Control characters
-  ]
+  // Strip surrounding quotes and leading slash
+  const file = _file
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^\//, '')
 
-  if (dangerousPatterns.some(pattern => pattern.test(_file))) {
-    throw new Error('Invalid characters or pattern in file path')
-  }
-
-  // Only allow alphanumeric chars, dashes, underscores, forward slashes, and dots
-  if (!/^[a-zA-Z0-9-_./\\'"]+$/.test(_file)) {
+  // Reject control characters
+  if (/[\x00-\x1f\x7f-\x9f]/.test(file)) {
     throw new Error('File path contains invalid characters')
   }
-
-  // Normalize path and remove leading slash
-  const file = _file
-    .replace(/^\//, '')
 
   const cachedTimestamp = cache.get(file)
   if (cachedTimestamp) return cachedTimestamp
@@ -263,10 +269,7 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
   }
 
   try {
-    const cmd = `git log -1 --pretty="%ai" ${file}`
-    // console.log('cmd', cmd)
-    // console.log('cwd', cwd)
-    const output = await _exec(cmd, { cwd })
+    const output = await _execFile('git', ['log', '-1', '--pretty=%ai', '--', file], { cwd })
     const date = new Date(output)
     const dateString = date.toISOString()
     cache.set(file, dateString)
@@ -281,8 +284,8 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
     }
 
     try {
-      const backupFile = path.join(projectRoot, _file)
-      const output = await _exec(`git log -1 --pretty="%ai" ${backupFile}`, { cwd: projectRoot })
+      const backupFile = path.join(projectRoot, file)
+      const output = await _execFile('git', ['log', '-1', '--pretty=%ai', '--', backupFile], { cwd: projectRoot })
       const date = new Date(output)
       const dateString = date.toISOString()
       cache.set(file, dateString)
