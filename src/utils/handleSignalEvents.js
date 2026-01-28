@@ -29,11 +29,6 @@ Exit received. Waiting for current operation to finish...
     rl.on('SIGBREAK', () => process.emit('SIGBREAK'))
   }
 
-  // Remove any existing listeners before adding new ones
-  process.removeAllListeners('SIGINT')
-  process.removeAllListeners('SIGTERM') 
-  process.removeAllListeners('SIGBREAK')
-
   process.on('SIGINT', () => {
     global.signalEventHandling.SIGINTCount += 1
     global.signalEventHandling.shouldExitGracefully = true

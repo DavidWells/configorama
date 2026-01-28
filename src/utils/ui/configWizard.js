@@ -541,7 +541,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
       if (p.isCancel(value)) {
         p.cancel('Setup cancelled')
-        process.exit(0)
+        throw new Error('Setup cancelled')
       }
 
       userInputs.options[varInfo.cleanName] = value || varInfo.defaultValue
@@ -595,7 +595,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
       if (p.isCancel(value)) {
         p.cancel('Setup cancelled')
-        process.exit(0)
+        throw new Error('Setup cancelled')
       }
 
       userInputs.env[varInfo.cleanName] = value || varInfo.resolvedValue || varInfo.defaultValue
@@ -637,7 +637,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
       if (p.isCancel(value)) {
         p.cancel('Setup cancelled')
-        process.exit(0)
+        throw new Error('Setup cancelled')
       }
 
       userInputs.self[varInfo.cleanName] = value || varInfo.defaultValue
@@ -679,7 +679,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
       if (p.isCancel(value)) {
         p.cancel('Setup cancelled')
-        process.exit(0)
+        throw new Error('Setup cancelled')
       }
 
       userInputs.dotProp[varInfo.cleanName] = value || varInfo.defaultValue
