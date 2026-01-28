@@ -1,19 +1,63 @@
-const isArray = require('lodash.isarray')
-const isString = require('lodash.isstring')
-const isNumber = require('lodash.isnumber')
-const isObject = require('lodash.isobject')
-const isDate = require('lodash.isdate')
-const isRegExp = require('lodash.isregexp')
-const isFunction = require('lodash.isfunction')
-const isEmpty = require('lodash.isempty')
+// Native replacements for lodash type checks
+const isArray = Array.isArray
+const isString = (val) => typeof val === 'string'
+const isNumber = (val) => typeof val === 'number' && !isNaN(val)
+const isObject = (val) => val != null && typeof val === 'object'
+const isDate = (val) => val instanceof Date
+const isRegExp = (val) => val instanceof RegExp
+const isFunction = (val) => typeof val === 'function'
+
+/**
+ * @param {*} val
+ * @returns {boolean}
+ */
+function isEmpty(val) {
+  if (val == null) return true
+  if (isArray(val) || isString(val)) return val.length === 0
+  if (val instanceof Map || val instanceof Set) return val.size === 0
+  if (isObject(val)) return Object.keys(val).length === 0
+  return false
+}
+
+// Non-trivial utilities kept as dependencies
 const camelCase = require('lodash.camelcase')
 const kebabCase = require('lodash.kebabcase')
-const capitalize = require('lodash.capitalize')
-const split = require('lodash.split')
-const map = require('lodash.map')
-const mapValues = require('lodash.mapvalues')
-const assign = require('lodash.assign')
 const cloneDeep = require('lodash.clonedeep')
+
+/**
+ * @param {string} str
+ * @returns {string}
+ */
+function capitalize(str) {
+  if (!str) return ''
+  const s = String(str)
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
+/**
+ * @param {*[]} arr
+ * @param {Function} fn
+ * @returns {*[]}
+ */
+function map(arr, fn) {
+  if (arr == null) return []
+  return Array.prototype.map.call(arr, fn)
+}
+
+/**
+ * @param {Object} obj
+ * @param {Function} fn
+ * @returns {Object}
+ */
+function mapValues(obj, fn) {
+  if (obj == null) return {}
+  const result = {}
+  const keys = Object.keys(obj)
+  for (let i = 0; i < keys.length; i++) {
+    result[keys[i]] = fn(obj[keys[i]], keys[i], obj)
+  }
+  return result
+}
 
 // Custom implementation of lodash.set
 function set(object, path, value) {
@@ -94,10 +138,10 @@ module.exports = {
   camelCase,
   kebabCase,
   capitalize,
-  split,
+  split: (str, sep) => String(str).split(sep),
   map,
   mapValues,
-  assign,
+  assign: Object.assign,
   set,
   cloneDeep,
 }

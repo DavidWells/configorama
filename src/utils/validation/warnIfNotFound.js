@@ -1,7 +1,7 @@
 /**
  * Warns if a variable value is not found during resolution
  */
-const isEmpty = require('lodash.isempty')
+const { isEmpty } = require('../lodash')
 
 function isValidValue(val) {
   if (val !== null && typeof val === 'object' && (val.hasOwnProperty('__internal_only_flag') || val.hasOwnProperty('__internal_metadata'))) {

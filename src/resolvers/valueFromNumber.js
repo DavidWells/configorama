@@ -1,4 +1,4 @@
-const isNumber = require('lodash.isnumber')
+const { isNumber } = require('../utils/lodash')
 
 function isNumberVariable(variableString) {
   if (!variableString || variableString.trim().length === 0) {

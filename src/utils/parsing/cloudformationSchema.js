@@ -1,8 +1,5 @@
 const YAML = require('js-yaml');
-const includes = require('lodash.includes');
-const isString = require('lodash.isstring');
-const flatten = require('lodash.flatten');
-const map = require('lodash.map');
+const { isString } = require('../lodash')
 
 const functionNames = [
   // Standard intrinsic functions
@@ -36,7 +33,7 @@ const functionNames = [
 ];
 
 const yamlType = (name, kind) => {
-  const functionName = includes(['Ref', 'Condition'], name) ? name : `Fn::${name}`;
+  const functionName = ['Ref', 'Condition'].includes(name) ? name : `Fn::${name}`;
   return new YAML.Type(`!${name}`, {
     kind,
     construct: data => {
@@ -61,11 +58,9 @@ const yamlType = (name, kind) => {
 };
 
 const createSchema = () => {
-  const types = flatten(
-    map(functionNames, functionName =>
-      map(['mapping', 'scalar', 'sequence'], kind => yamlType(functionName, kind))
-    )
-  );
+  const types = functionNames.flatMap(functionName =>
+    ['mapping', 'scalar', 'sequence'].map(kind => yamlType(functionName, kind))
+  )
   return YAML.Schema.create(YAML.DEFAULT_SAFE_SCHEMA, types);
 };
 
