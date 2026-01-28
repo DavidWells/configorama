@@ -86,7 +86,8 @@ function set(object, path, value) {
     // Check if value is undefined, null, or not an object (primitives can't have properties)
     if (current[key] == null || typeof current[key] !== 'object') {
       // Create appropriate container based on next key type
-      current[key] = Number.isInteger(keys[i + 1]) && keys[i + 1] >= 0 ? [] : {}
+      const nextKey = keys[i + 1]
+      current[key] = Number.isInteger(nextKey) && /** @type {number} */ (nextKey) >= 0 ? [] : {}
     }
     
     current = current[key]
