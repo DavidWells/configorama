@@ -1,9 +1,12 @@
 /* Tests for simple bare reference syntax in if expressions */
 const path = require('path')
+const { execSync } = require('child_process')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
 const { createDeepTrackingProxy, checkUnusedDeepConfigValues } = require('../utils')
+
+const currentBranch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim()
 
 const configFile = path.join(__dirname, 'simple-syntax.yml')
 
@@ -101,7 +104,7 @@ test('simple syntax - dev stage defaults', async () => {
   // Mixed variable types inline in ternary
   assert.is(config.custom.envInTernary, 'env-default')  // dev uses env fallback
   assert.is(config.custom.optInTernary, 'opt-default')  // dev uses opt fallback
-  assert.is(config.custom.deployLabel, 'master')  // dev uses git branch
+  assert.is(config.custom.deployLabel, currentBranch)  // dev uses git branch
   assert.is(config.custom.connectionString, 'localhost')  // dev uses database.host
 
   // Functions
@@ -283,7 +286,7 @@ test('bare git: in ternary', async () => {
     }
   }, { options: {} })
 
-  assert.is(config.custom.gitBare, 'master')
+  assert.is(config.custom.gitBare, currentBranch)
 })
 
 test.run()
