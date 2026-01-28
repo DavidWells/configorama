@@ -9,6 +9,7 @@ const toml = require('./toml')
 const yaml = require('./yaml')
 const ini = require('./ini')
 const hcl = require('./hcl')
+const markdown = require('./markdown')
 
 /**
  * Collection of format parsers for different config file types
@@ -19,5 +20,6 @@ module.exports = {
   toml: toml,
   yaml: yaml,
   ini: ini,
-  hcl: hcl
+  hcl: hcl,
+  markdown: markdown
 }

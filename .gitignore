@@ -6,6 +6,8 @@
 /types
 node_modules
 
+.specstory
+
 # Stray generated .d.ts files (should only be in /types)
 /parsers
 /resolvers

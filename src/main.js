@@ -684,6 +684,12 @@ class Configorama {
       /** */
       //process.exit(1)
 
+      // Strip _content before variable resolution, re-attach after
+      if (configObject && configObject._content !== undefined) {
+        this._markdownContent = configObject._content
+        delete configObject._content
+      }
+
       this.config = configObject
       this.originalConfig = cloneDeep(configObject)
     }
@@ -1240,6 +1246,9 @@ class Configorama {
 
     /* If no variables found just return early */
     if (this.originalString && !this.originalString.match(this.variableSyntax)) {
+      if (this._markdownContent !== undefined) {
+        this.originalConfig._content = this._markdownContent
+      }
       return Promise.resolve(this.originalConfig)
     }
 
@@ -1398,6 +1407,10 @@ class Configorama {
             console.log()
             deepLog(this.config)
             console.log()
+          }
+          // Re-attach markdown body content after variable resolution
+          if (this._markdownContent !== undefined) {
+            this.config._content = this._markdownContent
           }
           return this.config
         })

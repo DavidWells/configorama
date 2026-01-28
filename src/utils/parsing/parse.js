@@ -66,6 +66,21 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       // .tf and .hcl files need HCL parsing
       configObject = HCL.parse(contents, path.basename(filePath))
     }
+  } else if (fileType.match(/\.(md|mdx|markdown|mdown|mkdn|mkd|mdwn|markdn|mdtxt|mdtext)/i)) {
+    const { extractFrontmatter } = require('../../parsers/markdown')
+    const { frontmatterContent, content, format } = extractFrontmatter(contents)
+
+    if (!frontmatterContent) {
+      configObject = {}
+    } else if (format === 'toml') {
+      configObject = TOML.parse(frontmatterContent)
+    } else if (format === 'json') {
+      configObject = JSON5.parse(frontmatterContent)
+    } else {
+      const ymlText = YAML.preProcess(frontmatterContent)
+      configObject = YAML.parse(ymlText)
+    }
+    configObject._content = content.replace(/^\n+|\n+$/g, '')
   // TODO detect js syntax and use appropriate parser
   } else if (fileType.match(/\.(js|cjs)/i)) {
     let jsFile
