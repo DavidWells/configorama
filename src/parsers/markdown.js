@@ -28,6 +28,9 @@ function extractFrontmatter(fileContents) {
     return noMatch
   }
 
+  // Normalize CRLF to LF for consistent delimiter matching
+  fileContents = fileContents.replace(/\r\n/g, '\n')
+
   // +++ delimiters → TOML
   if (fileContents.startsWith('+++\n')) {
     const endIdx = fileContents.indexOf('\n+++', 4)

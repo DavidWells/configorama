@@ -80,7 +80,13 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       const ymlText = YAML.preProcess(frontmatterContent)
       configObject = YAML.parse(ymlText)
     }
-    configObject._content = content.replace(/^\n+|\n+$/g, '')
+    const bodyContent = content.replace(/^\n+|\n+$/g, '')
+    if (configObject.hasOwnProperty('_content')) {
+      console.warn('configorama: frontmatter key "_content" conflicts with reserved body content key. Body stored as "_body" instead.')
+      configObject._body = bodyContent
+    } else {
+      configObject._content = bodyContent
+    }
   // TODO detect js syntax and use appropriate parser
   } else if (fileType.match(/\.(js|cjs)/i)) {
     let jsFile

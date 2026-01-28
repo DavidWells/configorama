@@ -91,4 +91,41 @@ test('${_content} in frontmatter does NOT resolve to body', async () => {
   assert.is(typeof yamlConfig._content, 'string')
 })
 
+// --- _content collision ---
+
+test('_content key in frontmatter is preserved when it conflicts with body', async () => {
+  const config = await configorama(path.join(FIXTURES, 'content-collision.md'), opts)
+  assert.is(config._content, 'my custom value')
+  assert.is(config._userContent, 'another value')
+  assert.ok(config._body)
+  assert.ok(config._body.includes('# Body'))
+})
+
+// --- CRLF line endings ---
+
+const { extractFrontmatter } = require('../../src/parsers/markdown')
+
+test('crlf: parses YAML frontmatter with \\r\\n line endings', () => {
+  const input = '---\r\ntitle: My Site\r\nstage: ${opt:stage}\r\n---\r\n# Hello World\r\n'
+  const result = extractFrontmatter(input)
+  assert.is(result.format, 'yaml')
+  assert.ok(result.frontmatterContent)
+  assert.ok(result.frontmatterContent.includes('title: My Site'))
+  assert.ok(result.content.includes('# Hello World'))
+})
+
+test('crlf: parses TOML frontmatter with \\r\\n line endings', () => {
+  const input = '+++\r\ntitle = "My Site"\r\n+++\r\n# Hello World\r\n'
+  const result = extractFrontmatter(input)
+  assert.is(result.format, 'toml')
+  assert.ok(result.frontmatterContent.includes('title = "My Site"'))
+})
+
+test('crlf: parses HTML comment frontmatter with \\r\\n line endings', () => {
+  const input = '<!--\r\ntitle: My Site\r\n-->\r\n# Hello World\r\n'
+  const result = extractFrontmatter(input)
+  assert.ok(result.frontmatterContent)
+  assert.ok(result.frontmatterContent.includes('title: My Site'))
+})
+
 test.run()
