@@ -3,7 +3,7 @@
 /**
  * Parse a jq-style path string into an array of keys/indices
  * @param {string} path - jq-style path like '.foo.bar[0]' or '.["key"]'
- * @returns {string[]} Array of path segments
+ * @returns {(string|number)[]} Array of path segments
  */
 function parsePath(path) {
   if (!path || typeof path !== 'string') return []
