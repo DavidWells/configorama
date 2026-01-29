@@ -124,6 +124,7 @@ declare namespace configorama {
     toml: any
     ini: any
     hcl: any
+    markdown: any
   }
 
   /** The Configorama class for advanced usage */

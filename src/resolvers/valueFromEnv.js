@@ -1,3 +1,5 @@
+// Resolves values from process.env environment variables
+// Matches ${env:VAR_NAME} syntax with optional fallback values
 
 const envRefSyntax = RegExp(/^env:/g)
 
