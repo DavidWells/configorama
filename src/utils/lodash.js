@@ -67,34 +67,34 @@ function mapValues(obj, fn) {
  */
 function set(object, path, value) {
   if (object === null || typeof object !== 'object') {
-    return object;
+    return object
   }
-  
+
   const keys = Array.isArray(path) ? path : String(path)
     .split('.')
     .map(key => {
-      const numKey = Number(key);
-      return Number.isInteger(numKey) && numKey >= 0 ? numKey : key;
-    });
-  
-  let current = object;
-  const lastIndex = keys.length - 1;
-  
+      const numKey = Number(key)
+      return Number.isInteger(numKey) && numKey >= 0 ? numKey : key
+    })
+
+  let current = object
+  const lastIndex = keys.length - 1
+
   for (let i = 0; i < lastIndex; i++) {
     const key = keys[i]
-    
+
     // Check if value is undefined, null, or not an object (primitives can't have properties)
     if (current[key] == null || typeof current[key] !== 'object') {
       // Create appropriate container based on next key type
       const nextKey = keys[i + 1]
       current[key] = Number.isInteger(nextKey) && /** @type {number} */ (nextKey) >= 0 ? [] : {}
     }
-    
+
     current = current[key]
   }
-  
-  current[keys[lastIndex]] = value;
-  return object;
+
+  current[keys[lastIndex]] = value
+  return object
 }
 
 // Cache for trim regex patterns (perf: avoid recompilation)
@@ -107,18 +107,18 @@ const trimRegexCache = new Map()
  */
 function trim(string, chars) {
   if (string === null || string === undefined) {
-    return '';
+    return ''
   }
 
-  string = String(string);
+  string = String(string)
 
   if (!chars && String.prototype.trim) {
-    return string.trim();
+    return string.trim()
   }
 
   if (!chars) {
     // Default characters to trim (whitespace)
-    chars = ' \t\n\r\f\v\u00a0\u1680\u2000\u200a\u2028\u2029\u202f\u205f\u3000\ufeff';
+    chars = ' \t\n\r\f\v\u00a0\u1680\u2000\u200a\u2028\u2029\u202f\u205f\u3000\ufeff'
   }
 
   // Check cache first
@@ -132,7 +132,7 @@ function trim(string, chars) {
 
   // Reset lastIndex for global regex reuse
   pattern.lastIndex = 0
-  return string.replace(pattern, '');
+  return string.replace(pattern, '')
 }
 
 module.exports = {

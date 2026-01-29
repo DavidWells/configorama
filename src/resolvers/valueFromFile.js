@@ -121,9 +121,9 @@ async function getValueFromFile(ctx, variableString, options) {
 
   // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
   // var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/g
-  var funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)/g
+  const funcParamsRegex = /(\w+)\s*\(((?:[^()]+)*)?\s*\)/g
   // tighter (?<![.\w-])\b(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*
-  var hasParams = funcParamsRegex.exec(matchedFileString)
+  const hasParams = funcParamsRegex.exec(matchedFileString)
 
   let argsToPass = []
   if (hasParams) {
@@ -257,8 +257,8 @@ ${JSON.stringify(options.context, null, 2)}`,
   const variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
 
   /* handle case for referencing raw JS files to inline them */
-  if (argsToPass.length
-    && (argsToPass && argsToPass[0] && typeof argsToPass[0] === 'string' && argsToPass[0].toLowerCase() === 'raw')
+  if ((argsToPass.length
+    && argsToPass[0] && typeof argsToPass[0] === 'string' && argsToPass[0].toLowerCase() === 'raw')
     || opts.asRawText
   ) {
     // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
