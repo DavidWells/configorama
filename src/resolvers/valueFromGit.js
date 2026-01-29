@@ -118,7 +118,8 @@ function createResolver(cwd) {
       case GIT_KEYS.name:
       case 'reponame': // repoName
       case 'repo-name':
-        value = await _exec('basename `git rev-parse --show-toplevel`')
+        const toplevel = await _execFile('git', ['rev-parse', '--show-toplevel'])
+        value = path.basename(toplevel)
         break;
       // Repo org or owner
       case GIT_KEYS.org:
@@ -136,10 +137,10 @@ function createResolver(cwd) {
       case 'dirpath': // dirPath
       case 'dir-path':
       case 'dir_path':
-        const gitBasePath = await _exec('git rev-parse --show-toplevel')
+        const gitBasePath = await _execFile('git', ['rev-parse', '--show-toplevel'])
         if (cwd) {
           const subPath = cwd.replace(gitBasePath, '')
-          const branch = await _exec('git rev-parse --abbrev-ref HEAD')
+          const branch = await _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'])
           const url = await getGitRemote()
           value = (subPath) ? `${url}/tree/${branch}${subPath}` : url
         }
@@ -219,8 +220,8 @@ function createResolver(cwd) {
       case 'isDirty':
       case 'isdirty':
       case 'is-dirty':
-        const writeTree = await _exec('git write-tree')
-        const changes = await _exec(`git diff-index ${writeTree} --`)
+        const writeTree = await _execFile('git', ['write-tree'])
+        const changes = await _execFile('git', ['diff-index', writeTree.trim(), '--'])
         value = `${changes.length > 0}`
         break
       default:
@@ -306,7 +307,7 @@ async function getGitRemote(name = 'origin') {
       return remote.match('(fetch)')
     })
     .map(function mapRemoteLineToObject(remote) {
-      var parts = remote.split('\t')
+      const parts = remote.split('\t')
       if (parts.length < 2) {
         return
       }
