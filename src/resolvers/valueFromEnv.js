@@ -13,12 +13,7 @@ Example: \${env:MY_ENV_VAR}
 `)
   }
 
-  let valueToPopulate
-  if (requestedEnvVar !== '' || '' in process.env) {
-    valueToPopulate = process.env[requestedEnvVar]
-  } else {
-    valueToPopulate = process.env
-  }
+  const valueToPopulate = process.env[requestedEnvVar]
   return Promise.resolve(valueToPopulate)
 }
 

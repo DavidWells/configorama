@@ -562,7 +562,6 @@ class Configorama {
         }
         return assign({}, value, otherValue)
       },
-      math: () => {},
       upperKeys: (o) => {
         return Object.keys(o).reduce((c, k) => ((c[k.toUpperCase()] = o[k]), c), {}) // eslint-disable-line
       },
@@ -1235,8 +1234,7 @@ class Configorama {
     
       /* Exit early if list or info flag is set */
       if (showFoundVariables) {
-        // TODO re-enable this
-        // process.exit(0)
+        return Promise.resolve(this.config)
       }
     }
 
@@ -3624,7 +3622,7 @@ Missing Value ${missingValue} - ${matchedString}
       return variableString
     }
     // console.log('runFunction', variableString)
-    var hasFunc = funcRegex.exec(variableString)
+    const hasFunc = funcRegex.exec(variableString)
     // TODO finish Function handling. Need to move this down below resolver to resolve inner refs first
     // console.log('hasFunc', hasFunc)
     // Skip special expressions (cron, eval, if) - these aren't user functions

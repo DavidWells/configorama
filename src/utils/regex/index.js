@@ -2,11 +2,6 @@
  * Shared regex patterns and utilities
  */
 
-// Legacy regex patterns (can't handle nested parentheses properly)
-const funcRegexSimple = /(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const funcStartOfLineRegex = /^(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-const subFunctionRegex = /(\w+):(\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
-
 /**
  * Parse a function call with balanced parentheses support
  * Returns a regex-exec-like array: [fullMatch, funcName, args] with index and input properties
@@ -98,13 +93,10 @@ const textRefSyntax = /^text\((~?[@\{\}\:\$a-zA-Z0-9._\-\/\\%,'" =+]+?)\)/g
 
 module.exports = {
   funcRegex,
-  funcRegexSimple,
-  funcStartOfLineRegex,
-  subFunctionRegex,
   fileRefSyntax,
   textRefSyntax,
   combineRegexes,
   parseFunctionCall,
-  // Keep old export name for backwards compat
+  // Alias used by valueFromGit
   functionRegex: funcRegex
 }

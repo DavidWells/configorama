@@ -58,27 +58,6 @@ module.exports = function cleanVariable(
     console.log(`Clean output [${caller}]`, clean)
   }
   return clean
-
-  // Support for simple variable cleaning with no space tweaks
-  if (simple) {
-    return clean
-  }
-
-  // Support for function matches that dont need space alterations
-  if (!clean.match(fileRefSyntax) && functionRegex.exec(clean)) {
-    return clean
-  }
-
-  // If file ref, add spaces after commas
-  // Special case for file(thing, arg, argTwo)
-  if (clean.match(fileRefSyntax)) {
-    // replace spaces before and after commas
-    return clean.replace(/\s*,\s*/g, ', ')
-  }
-
-  return clean.replace(/\s+(?=([^"']*"[^"']*")*[^"']*$)/g, '')
-  // ^ trim White Space OutSide Quotes https://regex101.com/r/BuBNPN/1
-  // Needed for fallback values with spaces. ${empty, 'fallback value with space'}
 }
 
 
