@@ -217,7 +217,7 @@ test('uniqueVariables groups occurrences by base variable name', async () => {
 })
 
 test('analyze serverless fixture has correct self-reference metadata', async () => {
-  const configFile = path.join(__dirname, '../_fixtures/serverless.yml')
+  const configFile = path.join(__dirname, 'serverless-analyze.yml')
 
   const result = await configorama.analyze(configFile)
 

@@ -1,0 +1,18 @@
+service: auth-service-testing
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+
+custom:
+  cors:
+    origin: '*'
+    headers:
+      - Content-Type
+      - Authorization
+
+functions:
+  api:
+    handler: handler.api
+    cors: ${self:custom.cors}
+    name: ${self:service}
