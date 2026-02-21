@@ -1,0 +1,2 @@
+service: verify-test
+missingRef: ${file(./does-not-exist.yml)}

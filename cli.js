@@ -9,6 +9,79 @@ const configorama = require('./src')
 const { makeBox } = require('@davidwells/box-logger')
 const getValueAtPath = require('./src/utils/parsing/getValueAtPath')
 
+function handleProcessingError(error) {
+  const errorMsg = makeBox({
+    title: `Error Processing Configuration: ${inputFile}`,
+    minWidth: '100%',
+    content: error.message,
+    type: 'error',
+  })
+  console.log(errorMsg)
+  if (argv.debug) {
+    console.error('error', error)
+  }
+  process.exit(1)
+}
+
+function getMissingRequiredEnvVars(uniqueVariables = {}) {
+  const missingVars = new Set()
+
+  Object.values(uniqueVariables).forEach((varData) => {
+    if (!varData || varData.variableType !== 'env') {
+      return
+    }
+    const occurrences = Array.isArray(varData.occurrences) ? varData.occurrences : []
+    const isRequired = occurrences.some((occurrence) => occurrence && occurrence.isRequired)
+    if (!isRequired) {
+      return
+    }
+    const envName = String(varData.variable || '').replace(/^env:/, '').trim()
+    if (envName && process.env[envName] === undefined) {
+      missingVars.add(envName)
+    }
+  })
+
+  return [...missingVars].sort()
+}
+
+function getMissingFileRefs(fileDependencies = {}) {
+  const refs = Array.isArray(fileDependencies.byConfigPath) ? fileDependencies.byConfigPath : []
+  return refs.filter((ref) => ref && ref.exists === false)
+}
+
+function printVerifySummary(analysis = {}) {
+  const summary = analysis.summary || {}
+  const totalVariables = summary.totalVariables || 0
+  const missingFileRefs = getMissingFileRefs(analysis.fileDependencies || {})
+  const missingEnvVars = getMissingRequiredEnvVars(analysis.uniqueVariables || {})
+
+  console.log('OK: Config structure is valid')
+  console.log(`OK: Found ${totalVariables} variable${totalVariables === 1 ? '' : 's'}`)
+  console.log('OK: No circular dependency check failures detected during analysis')
+
+  if (missingFileRefs.length > 0) {
+    console.log(`ERROR: Missing file references (${missingFileRefs.length})`)
+    missingFileRefs.forEach((ref) => {
+      const locationText = ref.location ? ` at ${ref.location}` : ''
+      const relativePath = ref.relativePath || ref.filePath || 'unknown path'
+      console.log(`  - ${relativePath}${locationText}`)
+    })
+  } else {
+    console.log('OK: All file references exist')
+  }
+
+  if (missingEnvVars.length > 0) {
+    console.log(`WARN: ${missingEnvVars.length} required environment variable${missingEnvVars.length === 1 ? '' : 's'} not set`)
+    missingEnvVars.forEach((name) => {
+      console.log(`  - ${name}`)
+    })
+  } else {
+    console.log('OK: All required environment variables are set or have defaults')
+  }
+
+  return missingFileRefs.length === 0
+}
+
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f', 'param'],
@@ -162,6 +235,16 @@ if (argv._.length) {
 // Set -- flags as options
 options.options = rest
 
+if (argv.verify) {
+  configorama.analyze(inputFile, options)
+    .then((analysis) => {
+      const verified = printVerifySummary(analysis)
+      process.exit(verified ? 0 : 1)
+    })
+    .catch(handleProcessingError)
+  return
+}
+
 // Process the configuration
 configorama(inputFile, options)
   .then((config) => {
@@ -218,16 +301,4 @@ configorama(inputFile, options)
       }
     }
   })
-  .catch((error) => {
-    const errorMsg = makeBox({
-      title: `Error Processing Configuration: ${inputFile}`,
-      minWidth: '100%',
-      content: error.message,
-      type: 'error',
-    })
-    console.log(errorMsg)
-    if (argv.debug) {
-      console.error('error', error)
-    }
-    process.exit(1)
-  })
+  .catch(handleProcessingError)
