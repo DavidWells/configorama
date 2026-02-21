@@ -5,6 +5,7 @@
 const fs = require('fs')
 const path = require('path')
 const dotProp = require('dot-prop')
+const { extractVariableWrapper } = require('../variables/variableUtils')
 
 const createGitResolver = require('../../resolvers/valueFromGit')
 const { parseFileContents } = require('../../resolvers/valueFromFile')
@@ -159,8 +160,19 @@ async function preResolveString(str, context, options = {}) {
   const { formatArrays = true } = options
   const { variableSyntax } = context
 
+  const { prefix: varPrefix, suffix: varSuffix } = variableSyntax && variableSyntax.source
+    ? extractVariableWrapper(variableSyntax.source)
+    : { prefix: '${', suffix: '}' }
+
   // Use provided syntax or fallback to basic pattern
-  const varPattern = variableSyntax ? new RegExp(variableSyntax.source, 'g') : /\$\{([^{}]+)\}/g
+  const varPattern = variableSyntax
+    ? new RegExp(
+        variableSyntax.source,
+        variableSyntax.flags && variableSyntax.flags.includes('g')
+          ? variableSyntax.flags
+          : `${variableSyntax.flags || ''}g`
+      )
+    : /\$\{([^{}]+)\}/g
 
   // Collect all matches first since we need async resolution
   const matches = []
@@ -173,8 +185,11 @@ async function preResolveString(str, context, options = {}) {
 
   // Resolve all matches
   const resolutions = await Promise.all(matches.map(async ({ match: matchStr }) => {
-    // Extract content between ${ and }
-    const varContent = matchStr.slice(2, -1)
+    // Extract content between wrapper prefix and suffix
+    if (!matchStr.startsWith(varPrefix) || !matchStr.endsWith(varSuffix)) {
+      return matchStr
+    }
+    const varContent = matchStr.slice(varPrefix.length, -varSuffix.length)
 
     // Skip if the content itself has ${} (nested variable)
     if (hasUnresolvedVars(varContent, variableSyntax)) {

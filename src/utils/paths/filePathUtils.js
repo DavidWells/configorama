@@ -1,6 +1,7 @@
 // Utilities for parsing and normalizing file paths in variable references
 
 const { splitCsv } = require('../strings/splitCsv')
+const { extractVariableWrapper } = require('../variables/variableUtils')
 
 /**
  * Normalize a file path (add ./ prefix, fix .//, skip deep refs)
@@ -118,10 +119,19 @@ function resolveInnerVariables(str, variableSyntax, config, getProp) {
     return { resolved: str, didResolve: false }
   }
 
+  const { prefix: varPrefix, suffix: varSuffix } = variableSyntax && variableSyntax.source
+    ? extractVariableWrapper(variableSyntax.source)
+    : { prefix: '${', suffix: '}' }
+
   let canResolve = true
   let resolved = str
   for (const varMatch of varMatches) {
-    const innerVar = varMatch.slice(2, -1) // Remove ${ and }
+    if (!varMatch.startsWith(varPrefix) || !varMatch.endsWith(varSuffix)) {
+      canResolve = false
+      break
+    }
+
+    const innerVar = varMatch.slice(varPrefix.length, -varSuffix.length)
     let configPath = null
 
     // Handle self: prefix

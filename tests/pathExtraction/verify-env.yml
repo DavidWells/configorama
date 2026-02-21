@@ -1,0 +1,3 @@
+service: verify-test
+requiredApiKey: ${env:VERIFY_REQUIRED_ENV}
+optionalApiKey: ${env:VERIFY_OPTIONAL_ENV, "fallback-api-key"}

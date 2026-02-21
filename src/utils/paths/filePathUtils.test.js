@@ -227,4 +227,20 @@ test('resolveInnerVariables - partial resolution fails completely', () => {
   assert.is(result.didResolve, false)
 })
 
+test('resolveInnerVariables - supports custom {{ }} syntax wrappers', () => {
+  const config = { stage: 'prod' }
+  const customSyntax = /\{\{([^}]+)\}\}/g
+  const result = resolveInnerVariables('./config-{{self:stage}}.json', customSyntax, config, getProp)
+  assert.is(result.resolved, './config-prod.json')
+  assert.is(result.didResolve, true)
+})
+
+test('resolveInnerVariables - supports Terraform style $[ ] syntax wrappers', () => {
+  const config = { stage: 'prod' }
+  const terraformSyntax = /\$\[([^\]]+)\]/g
+  const result = resolveInnerVariables('./config-$[self:stage].json', terraformSyntax, config, getProp)
+  assert.is(result.resolved, './config-prod.json')
+  assert.is(result.didResolve, true)
+})
+
 test.run()

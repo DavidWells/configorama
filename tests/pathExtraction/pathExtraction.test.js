@@ -6,6 +6,8 @@ const path = require('path')
 
 const CLI_PATH = path.join(__dirname, '../../cli.js')
 const CONFIG_PATH = path.join(__dirname, 'config.yml')
+const VERIFY_ENV_CONFIG_PATH = path.join(__dirname, 'verify-env.yml')
+const VERIFY_MISSING_FILE_CONFIG_PATH = path.join(__dirname, 'verify-missing-file.yml')
 
 function runCli(args) {
   const cmd = `node ${CLI_PATH} ${args}`
@@ -164,6 +166,27 @@ test('CLI path: no path returns full config', () => {
   assert.is(parsed.service, 'my-app')
   assert.ok(parsed.database)
   assert.ok(parsed.servers)
+})
+
+test('CLI verify: reports valid structure for healthy config', () => {
+  const result = runCli(`--verify ${CONFIG_PATH}`)
+  assert.is(result.exitCode, 0)
+  assert.ok(String(result.output).includes('OK: Config structure is valid'))
+  assert.ok(String(result.output).includes('OK: All file references exist'))
+})
+
+test('CLI verify: warns when required env vars are not set', () => {
+  delete process.env.VERIFY_REQUIRED_ENV
+  const result = runCli(`--verify ${VERIFY_ENV_CONFIG_PATH}`)
+  assert.is(result.exitCode, 0)
+  assert.ok(String(result.output).includes('WARN: 1 required environment variable not set'))
+  assert.ok(String(result.output).includes('VERIFY_REQUIRED_ENV'))
+})
+
+test('CLI verify: fails on missing file references', () => {
+  const result = runCli(`--verify ${VERIFY_MISSING_FILE_CONFIG_PATH}`)
+  assert.is(result.exitCode, 1)
+  assert.ok(String(result.output).includes('ERROR: Missing file references'))
 })
 
 test.run()

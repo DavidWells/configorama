@@ -95,4 +95,20 @@ test('preResolveString - handles self: in strings', async () => {
   assert.is(result, 'Version: 1.0.0')
 })
 
+test('preResolveString - supports custom {{ }} syntax wrappers', async () => {
+  const config = { name: 'World', stage: 'prod' }
+  const customSyntax = /\{\{([\s\S]+?)\}\}/g
+  const ctx = { config, variableSyntax: customSyntax }
+  const result = await preResolveString('Hello {{name}} from {{stage}}', ctx)
+  assert.is(result, 'Hello World from prod')
+})
+
+test('preResolveString - supports Terraform style $[ ] syntax wrappers', async () => {
+  const config = { stage: 'prod' }
+  const terraformSyntax = /\$\[([\s\S]+?)\]/g
+  const ctx = { config, variableSyntax: terraformSyntax }
+  const result = await preResolveString('Stage: $[stage]', ctx)
+  assert.is(result, 'Stage: prod')
+})
+
 test.run()
