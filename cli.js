@@ -9,6 +9,11 @@ const configorama = require('./src')
 const { makeBox } = require('@davidwells/box-logger')
 const getValueAtPath = require('./src/utils/parsing/getValueAtPath')
 
+/**
+ * Print a formatted processing error and exit
+ * @param {Error} error
+ * @returns {void}
+ */
 function handleProcessingError(error) {
   const errorMsg = makeBox({
     title: `Error Processing Configuration: ${inputFile}`,
@@ -23,6 +28,11 @@ function handleProcessingError(error) {
   process.exit(1)
 }
 
+/**
+ * Return required env vars that are currently missing
+ * @param {Record<string, { variableType?: string, variable?: string, occurrences?: Array<{ isRequired?: boolean }> }>} [uniqueVariables]
+ * @returns {string[]}
+ */
 function getMissingRequiredEnvVars(uniqueVariables = {}) {
   const missingVars = new Set()
 
@@ -44,11 +54,21 @@ function getMissingRequiredEnvVars(uniqueVariables = {}) {
   return [...missingVars].sort()
 }
 
+/**
+ * Return file references that do not currently exist
+ * @param {{ byConfigPath?: Array<{ exists?: boolean }> }} [fileDependencies]
+ * @returns {Array<{ exists?: boolean }>}
+ */
 function getMissingFileRefs(fileDependencies = {}) {
   const refs = Array.isArray(fileDependencies.byConfigPath) ? fileDependencies.byConfigPath : []
   return refs.filter((ref) => ref && ref.exists === false)
 }
 
+/**
+ * Print CLI verify summary and return verification status
+ * @param {{ summary?: { totalVariables?: number }, fileDependencies?: object, uniqueVariables?: object }} [analysis]
+ * @returns {boolean}
+ */
 function printVerifySummary(analysis = {}) {
   const summary = analysis.summary || {}
   const totalVariables = summary.totalVariables || 0
