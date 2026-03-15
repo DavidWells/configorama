@@ -1,4 +1,5 @@
-
+// Resolves values from named parameters
+// Matches ${param:KEY} syntax with optional fallback values
 const paramRefSyntax = RegExp(/^param:/g)
 
 /**
