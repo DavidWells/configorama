@@ -204,7 +204,7 @@ function createResolver(cwd) {
       // Current commit sha
       case 'sha':
       case 'sha1':
-        value = await _safeGit(() => _exec('git rev-parse --short HEAD'))
+        value = await _safeGit(() => _execFile('git', ['rev-parse', '--short', 'HEAD']))
         break
       // Current commit full sha
       case GIT_KEYS.commit:
@@ -212,7 +212,7 @@ function createResolver(cwd) {
       case 'commit-sha':
       case 'commithash':
       case 'commit-hash':
-        value = await _safeGit(() => _exec('git rev-parse HEAD'))
+        value = await _safeGit(() => _execFile('git', ['rev-parse', 'HEAD']))
         break
       // Branches
       case GIT_KEYS.branch:
@@ -220,7 +220,7 @@ function createResolver(cwd) {
       case 'branch-name':
       case 'currentbranch': // currentBranch
       case 'current-branch':
-        value = await _safeGit(() => _exec('git rev-parse --abbrev-ref HEAD'))
+        value = await _safeGit(() => _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']))
         break
       // Commit msg
       case GIT_KEYS.message:
@@ -229,18 +229,18 @@ function createResolver(cwd) {
       case 'commit-message':
       case 'commitmsg': // commitMsg
       case 'commit-msg':
-        value = await _safeGit(() => _exec('git log -1 --pretty=%B'))
+        value = await _safeGit(() => _execFile('git', ['log', '-1', '--pretty=%B']))
         break
       // Git tags
       case GIT_KEYS.tag:
       case 'describe':
-        value = await _safeGit(() => _exec('git describe --always'))
+        value = await _safeGit(() => _execFile('git', ['describe', '--always']))
         break
       // Git tags
       case 'describeLight':
       case 'describelight':
       case 'describe-light':
-        value = await _safeGit(() => _exec('git describe --always --tags'))
+        value = await _safeGit(() => _execFile('git', ['describe', '--always', '--tags']))
         break
       // Is branch dirty
       case 'isDirty':
@@ -332,8 +332,13 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
   }
 }
 
+const remoteCache = new Map()
+
 async function getGitRemote(name = 'origin') {
-  const remoteValues = await _exec('git remote -v')
+  if (remoteCache.has(name)) {
+    return remoteCache.get(name)
+  }
+  const remoteValues = await _execFile('git', ['remote', '-v'])
   const remotes = remoteValues.toString().split(os.EOL)
     .filter(function filterOnlyFetchRows(remote) {
       return remote.match('(fetch)')
@@ -359,7 +364,6 @@ async function getGitRemote(name = 'origin') {
 
   if (!originUrl) {
     throw new Error(`No git remote "${name}" found. Please double check your remote names`)
-    return
   }
   // console.log('originUrl', originUrl)
   const parsed = GitUrlParse(originUrl)
@@ -367,7 +371,9 @@ async function getGitRemote(name = 'origin') {
   // @TODO finish git api
   // console.log('parsed', parsed)
   if (parsed && parsed.source && parsed.full_name) {
-    return `https://${parsed.source}/${parsed.full_name}`
+    const result = `https://${parsed.source}/${parsed.full_name}`
+    remoteCache.set(name, result)
+    return result
   }
 }
 
