@@ -225,7 +225,7 @@ configorama(inputFile, options)
       content: error.message,
       type: 'error',
     })
-    console.log(errorMsg)
+    console.error(errorMsg)
     if (argv.debug) {
       console.error('error', error)
     }
