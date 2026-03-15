@@ -251,4 +251,30 @@ test('new array syntax plus legacy flag combine', async () => {
   assert.is(result.missingFile, '${file(./does-not-exist.yml)}')
 })
 
+test('passthrough variables tagged as encodedUnknown in resolution history', async () => {
+  const config = {
+    known: '${opt:stage}',
+    unknown: '${custom:thing}',
+  }
+
+  const result = await configorama(config, {
+    allowUnknownVariableTypes: true,
+    returnMetadata: true,
+    options: { stage: 'dev' }
+  })
+
+  assert.is(result.config.known, 'dev')
+  assert.is(result.config.unknown, '${custom:thing}')
+
+  // Resolution history should tag passthrough variables as encodedUnknown
+  const unknownHistory = result.resolutionHistory['unknown']
+  assert.ok(unknownHistory, 'Should have resolution history for unknown key')
+  assert.ok(unknownHistory.resolutionHistory, 'Should have resolutionHistory array')
+
+  const encodedEntry = unknownHistory.resolutionHistory.find(
+    (entry) => entry.variableType === 'encodedUnknown'
+  )
+  assert.ok(encodedEntry, 'Should have an entry with variableType encodedUnknown')
+})
+
 test.run()

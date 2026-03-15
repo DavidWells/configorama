@@ -94,15 +94,15 @@ const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const selfRefSyntax = RegExp(/^self:/g)
-const base64WrapperRegex = /\[_\[([A-Za-z0-9+/=\s]*)\]_\]/g
 const logLines = '─────────────────────────────────────────────────'
+const evalIfPattern = /\b(eval|if)\s*\(/
+const functionPrefixPattern = /^> function /
 
 let DEBUG = process.argv.includes('--debug') ? true : false
 let VERBOSE = process.argv.includes('--verbose') ? true : false
 let SETUP_MODE = process.argv.includes('--setup') ? true : false
 // DEBUG = true
 let DEBUG_TYPE = false
-const ENABLE_FUNCTIONS = true
 
 class Configorama {
   constructor(fileOrObject, opts) {
@@ -1260,7 +1260,7 @@ class Configorama {
       }
       const stage = cliOpts.stage || providerStage || process.env.NODE_ENV || 'dev'
       /* Load env variables into process.env */
-      const values = require('env-stage-loader')({
+      require('env-stage-loader')({
         // silent: true,
         // debug: true,
         env: stage,
@@ -1309,7 +1309,7 @@ class Configorama {
               if (typeof rawValue === 'string') {
                 // console.log('rawValue', rawValue)
                 /* Process inline functions like merge() */
-                if (ENABLE_FUNCTIONS && rawValue.match(/> function /)) {
+                if (rawValue.match(functionPrefixPattern)) {
                   // console.log('RAW FUNCTION', rawFunction)
                   const funcString = rawValue.replace(/> function /g, '')
                   // console.log('funcString', funcString)
@@ -2150,9 +2150,6 @@ class Configorama {
 
       historyEntry.match = matches[i].match
       historyEntry.variable = matches[i].variable
-      if (historyEntry.resultType === 'string' && historyEntry.result.match(/^>passthrough\[/)) {
-        historyEntry.variableType = 'encodedUnknown'
-      }
       if (resolverType) {
         historyEntry.variableType = resolverType
       }
@@ -2165,6 +2162,9 @@ class Configorama {
       }
 
       historyEntry.resultType = typeof finalResult
+      if (historyEntry.resultType === 'string' && typeof cleanResult === 'string' && cleanResult.match(/^>passthrough\[/)) {
+        historyEntry.variableType = 'encodedUnknown'
+      }
       historyEntry.valueBeforeResolution = valueBeforeResolution
       historyEntry.from = 'renderMatches'
       if (isDeepResult) {
@@ -2483,7 +2483,7 @@ class Configorama {
 
       // For eval/if expressions, string values need quotes unless already quoted
       // BUT don't quote strings that contain variable refs (they need further resolution)
-      if (/\b(eval|if)\s*\(/.test(property) && !valueToPopulate.match(this.variableSyntax)) {
+      if (evalIfPattern.test(property) && !valueToPopulate.match(this.variableSyntax)) {
         const matchIdx = property.indexOf(currentMatchedString)
         const charBefore = matchIdx > 0 ? property[matchIdx - 1] : ''
         // Always escape quotes in values for eval/if context
@@ -2511,7 +2511,7 @@ class Configorama {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isObject')
 
       // For eval/if expressions, encode objects to avoid {} breaking variable syntax
-      const isEvalOrIf = /\b(eval|if)\s*\(/.test(property)
+      const isEvalOrIf = evalIfPattern.test(property)
       if (isEvalOrIf) {
         const encoded = encodeValueForEval(valueToPopulate)
         property = replaceAll(matchedString, encoded, property)
@@ -2548,12 +2548,12 @@ class Configorama {
       // console.log('other new prop', property)
 
     // partial replacement, boolean inside eval/if expressions
-    } else if (typeof valueToPopulate === 'boolean' && /\b(eval|if)\s*\(/.test(property)) {
+    } else if (typeof valueToPopulate === 'boolean' && evalIfPattern.test(property)) {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean in eval/if')
       property = replaceAll(matchedString, String(valueToPopulate), property)
 
     // partial replacement, null inside eval/if expressions
-    } else if (valueToPopulate === null && /\b(eval|if)\s*\(/.test(property)) {
+    } else if (valueToPopulate === null && evalIfPattern.test(property)) {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isNull in eval/if')
       property = replaceAll(matchedString, '__NULL__', property)
 
@@ -2653,13 +2653,13 @@ Missing Value ${missingValue} - ${matchedString}
       }
       
       // console.log('prop', prop)
-      if (property.match(/^> function /g) && prop) {
+      if (property.match(functionPrefixPattern) && prop) {
         // console.log('func prop', property)
         // console.log('Prop', prop)
       }
       const func = funcRegex.exec(property)
       // console.log('func', func)
-      if (func && property.match(/^> function /g)) {
+      if (func && property.match(functionPrefixPattern)) {
         /* IMPORTANT fix `finalProp` for nested function reference
           nestedOne: 'hi'
           nestedTwo: ${merge('nice', 'wow')}
@@ -2710,7 +2710,7 @@ Missing Value ${missingValue} - ${matchedString}
         /* if matches function signature like ${merge('foo', 'bar')}
           rewrite the variable to run the function after inputs resolved
         */
-        const rep = property.replace(/^> function /g, '')
+        const rep = property.replace(functionPrefixPattern, '')
         property = `> function ${rep}`
       }
       // if (prop.match(/\s\|/)) {
