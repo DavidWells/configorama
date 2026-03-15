@@ -103,7 +103,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
         configObject = jsFile(jsArgs)
       }
     } catch (err) {
-      throw new Error(err)
+      throw err
     }
   } else if (fileType.match(/\.(ts|tsx|mts|cts)/i)) {
     try {

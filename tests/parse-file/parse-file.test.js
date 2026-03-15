@@ -215,4 +215,21 @@ test('parseFileContents: throws error for invalid TOML syntax', () => {
   assert.is(errorThrown, true, 'Should throw error for invalid TOML syntax')
 })
 
+test('parseFile: JS error preserves original message without double-wrapping', () => {
+  let errorThrown = false
+  let errorMessage = ''
+
+  try {
+    parseFile(fixturePath('fixture-throws.js'))
+  } catch (err) {
+    errorThrown = true
+    errorMessage = err.message
+  }
+
+  assert.is(errorThrown, true, 'Should throw error for JS that throws')
+  // Should NOT have double-wrapped "Error: Error:" prefix
+  assert.not.ok(errorMessage.startsWith('Error:'), 'Error message should not be double-wrapped')
+  assert.ok(errorMessage.includes('intentional test error'), 'Should preserve original message')
+})
+
 test.run()
