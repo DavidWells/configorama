@@ -145,6 +145,11 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
 
         // Comparison operators for detecting string comparison context
         const comparisonOps = ['===', '!==', '==', '!=']
+        // Pre-compile "preceded by string+op" patterns to avoid regex compilation per bare ref
+        const precededByPatterns = comparisonOps.map(op => {
+          const escaped = op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          return new RegExp(`["'][^"']*["']\\s*${escaped}\\s*$`)
+        })
 
         // Find and replace bare refs, skipping those inside ${...} or quoted strings
         // Only quote bare refs that are in string comparison context
@@ -171,18 +176,14 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
           const afterRef = fullContent.substring(matchEnd).trimStart()
           const beforeRef = fullContent.substring(0, matchStart).trimEnd()
 
-          const isComparedToString = comparisonOps.some(op => {
+          const isComparedToString = comparisonOps.some((op, idx) => {
             // Check if followed by: op "string"
             if (afterRef.startsWith(op)) {
               const afterOp = afterRef.substring(op.length).trimStart()
               return afterOp.startsWith('"') || afterOp.startsWith("'")
             }
             // Check if preceded by: "string" op
-            for (const o of comparisonOps) {
-              const pattern = new RegExp(`["'][^"']*["']\\s*${o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`)
-              if (pattern.test(beforeRef)) return true
-            }
-            return false
+            return precededByPatterns.some(p => p.test(beforeRef))
           })
 
           // Replace with var ref - quoted if string comparison, unquoted otherwise
@@ -367,11 +368,16 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
    */
   function traverseAndFix(obj) {
     if (typeof obj === 'string') {
-      // First escape help() variables, convert bare refs in if(), then fix fallbacks
-      const withHelpEscaped = escapeHelpVariables(obj)
-      const withBareRefsConverted = convertBareRefsInIf(withHelpEscaped)
+      // Early exits: skip expensive processing when patterns are absent
+      const hasHelp = obj.indexOf('help(') !== -1
+      const hasEvalOrIf = obj.indexOf('if(') !== -1 || obj.indexOf('eval(') !== -1
+      const hasComma = obj.indexOf(',') !== -1
+
+      const withHelpEscaped = hasHelp ? escapeHelpVariables(obj) : obj
+      const withBareRefsConverted = hasEvalOrIf ? convertBareRefsInIf(withHelpEscaped) : withHelpEscaped
       // Skip fallback fixing for object configs (they handle bare refs differently)
-      return skipFallbackFix ? withBareRefsConverted : fixFallbacksInString(withBareRefsConverted)
+      if (skipFallbackFix || !hasComma) return withBareRefsConverted
+      return fixFallbacksInString(withBareRefsConverted)
     }
 
     if (Array.isArray(obj)) {
