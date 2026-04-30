@@ -46,6 +46,134 @@ test('git fallback to empty string works in non-git dir', async () => {
   assert.is(config.emptyFallback, '')
 })
 
+test('git:dir with empty string fallback in inline string does not crash', async () => {
+  const inlineFile = path.join(tmpRoot, 'inline-empty.yml')
+  fs.writeFileSync(inlineFile, 'key: here ${git:dir, ""}\n')
+
+  const config = await configorama(inlineFile)
+  assert.is(config.key, 'here ')
+})
+
+test('git:dir empty fallback with param array refs does not crash on originalSource', async () => {
+  // When a param resolves to an array, originalSource becomes that array.
+  // populateVariable must guard .match() against non-string originalSource.
+  // The bug only triggers with enough config nodes to push resolution into
+  // extra passes where array-valued originalSource reaches .match().
+  const paramFile = path.join(tmpRoot, 'param-array.yml')
+  fs.writeFileSync(paramFile, [
+    'service: github-oidc',
+    "frameworkVersion: '^3.19.0'",
+    'custom:',
+    "  stage: ${opt:stage, 'prod'}",
+    "  region: ${opt:region, 'us-east-1'}",
+    '  githubOrgName: DavidWells',
+    "  githubRepoName: ${opt:repoName, '*'}",
+    'params:',
+    '  staging:',
+    "    subjectClaim: 'repo:${self:custom.githubOrgName}/${self:custom.githubRepoName}'",
+    '  prod:',
+    "    subjectClaim: 'repo:${self:custom.githubOrgName}/${self:custom.githubRepoName}'",
+    '  default:',
+    "    subjectClaim: 'repo:${self:custom.githubOrgName}/${self:custom.githubRepoName}'",
+    '    thumbprints: [ abc123, def456 ]',
+    '    audienceList: [ sts.amazonaws.com ]',
+    '    managedPolicyArns: []',
+    '    allowedActions:',
+    "      - 'acm:*'",
+    "      - 'apigateway:*'",
+    "      - 'cloudformation:*'",
+    "      - 's3:*'",
+    "      - 'lambda:*'",
+    "      - 'logs:*'",
+    "      - 'iam:*'",
+    "      - 'dynamodb:*'",
+    "      - 'sns:*'",
+    "      - 'sqs:*'",
+    "      - 'ssm:*'",
+    "      - 'kms:*'",
+    'provider:',
+    '  name: aws',
+    '  stage: ${self:custom.stage}',
+    '  region: ${self:custom.region}',
+    'resources:',
+    '  Description: Operational Stack ${git:dir, ""}',
+    '  Parameters:',
+    '    GitHubRestriction:',
+    "      Description: 'GitHub restrictions.'",
+    '      Type: String',
+    '      Default: ${param:subjectClaim}',
+    '    RoleName:',
+    "      Description: 'Role name.'",
+    '      Type: String',
+    "      Default: 'github-oidc-role'",
+    '    MaxSession:',
+    "      Description: 'Max session.'",
+    '      Type: Number',
+    '      Default: 3600',
+    '    PolicyArns:',
+    "      Description: 'ARNs.'",
+    '      Type: String',
+    "      Default: 'arn:aws:iam::aws:policy/AdministratorAccess'",
+    '    Boundary:',
+    "      Description: 'Boundary.'",
+    '      Type: String',
+    "      Default: ''",
+    '  Resources:',
+    '    GitHubIdentityProvider:',
+    '      Type: AWS::IAM::OIDCProvider',
+    '      Properties:',
+    '        Url: https://token.actions.githubusercontent.com',
+    '        ThumbprintList: ${param:thumbprints}',
+    '        ClientIdList: ${param:audienceList}',
+    '    GitHubActionsPermissions:',
+    '      Type: AWS::IAM::Policy',
+    '      Properties:',
+    '        PolicyName: GitHubActionsPermissions',
+    '        PolicyDocument:',
+    "          Version: '2012-10-17'",
+    '          Statement:',
+    '            - Sid: OidcSafeties',
+    '              Effect: Deny',
+    '              Action:',
+    '                - sts:AssumeRole',
+    '              Resource: "*"',
+    '            - Effect: Allow',
+    '              Action: ${param:allowedActions}',
+    "              Resource: '*'",
+    '    GitHubActionsServiceRole:',
+    '      Type: AWS::IAM::Role',
+    '      Properties:',
+    "        RoleName: 'github-oidc-role'",
+    "        Path: '/delegated-admin/developer/'",
+    '        ManagedPolicyArns: ${param:managedPolicyArns}',
+    '        AssumeRolePolicyDocument:',
+    "          Version: '2012-10-17'",
+    '          Statement:',
+    '            - Sid: RoleForGitHubOIDC',
+    '              Effect: Allow',
+    '              Action:',
+    "                - 'sts:AssumeRoleWithWebIdentity'",
+    '              Condition:',
+    '                StringEquals:',
+    "                  'token.actions.githubusercontent.com:aud': ${param:audienceList}",
+    '  Outputs:',
+    '    StackName:',
+    "      Description: 'Stack name.'",
+    "      Value: 'mystack'",
+    '    RoleArn:',
+    "      Description: 'Role ARN.'",
+    "      Value: 'some-arn'",
+    ''
+  ].join('\n'))
+
+  const config = await configorama(paramFile)
+  assert.is(config.resources.Description, 'Operational Stack ')
+  assert.equal(config.resources.Resources.GitHubActionsPermissions.Properties.PolicyDocument.Statement[1].Action, [
+    'acm:*', 'apigateway:*', 'cloudformation:*', 's3:*', 'lambda:*', 'logs:*',
+    'iam:*', 'dynamodb:*', 'sns:*', 'sqs:*', 'ssm:*', 'kms:*'
+  ])
+})
+
 test('git ref without fallback in non-git dir throws clear error pointing at config path', async () => {
   const noFallbackFile = path.join(tmpRoot, 'no-fallback.yml')
   fs.writeFileSync(noFallbackFile, "description: located in ${git:dir}\n")

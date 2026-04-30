@@ -2381,7 +2381,7 @@ class Configorama {
       }
     }
 
-    const originalSrc = valueObject.originalSource || ''
+    const originalSrc = (typeof valueObject.originalSource === 'string') ? valueObject.originalSource : ''
     const hasFilters = originalSrc.match(this.filterMatch)
     let foundFilters = []
     if (hasFilters) {
