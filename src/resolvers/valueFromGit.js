@@ -11,6 +11,21 @@ const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
 
 /**
+ * Check if a directory is inside a git repository.
+ * @param {string} [dir] - Directory to check (defaults to process.cwd())
+ * @returns {boolean}
+ */
+function isGitRepo(dir) {
+  const start = dir || process.cwd()
+  try {
+    if (!fs.existsSync(start)) return false
+    return findProjectRoot(start) !== null
+  } catch (err) {
+    return false
+  }
+}
+
+/**
  * Execute a shell command
  * @param {string} cmd - Command to execute
  * @param {import('child_process').ExecOptions} [options] - Exec options
@@ -43,6 +58,25 @@ async function _execFile(command, args, options = { timeout: 1000 }) {
       return resolve(String(stdout).trim())
     })
   })
+}
+
+/**
+ * Run a git command and return undefined on failure. This lets the variable
+ * resolver fall through to user-provided fallbacks (e.g. `${git:branch, "main"}`)
+ * when not in a git repo, without surfacing raw `fatal: not a git repository`
+ * errors. When no fallback is provided, the outer resolver in main.js still
+ * produces a clear "Unable to resolve config variable" error pointing at the
+ * exact config path.
+ *
+ * @param {() => Promise<string>} cmdFn - Function that runs the git command
+ * @returns {Promise<string|undefined>}
+ */
+async function _safeGit(cmdFn) {
+  try {
+    return await cmdFn()
+  } catch (err) {
+    return undefined
+  }
 }
 
 // TODO denote computed fields in metadata
@@ -83,14 +117,21 @@ function createResolver(cwd) {
     const variable = variableString.split(`${GIT_PREFIX}:`)[1]
     let value = null
     // console.log('createResolver variableString', variableString)
+
+    // If we're not inside a git repository, every git: variable resolves to
+    // undefined. This lets fallbacks like `${git:branch, "main"}` work, and
+    // when there's no fallback the outer resolver throws a clear "Unable to
+    // resolve config variable" error pointing at the config path.
+    if (!isGitRepo(cwd)) {
+      return undefined
+    }
+
     if (variable.match(/^remote/i)) {
       const hasParams = functionRegex.exec(variableString)
       const remoteName = (hasParams && hasParams[2]) ? formatFunctionArgs(hasParams[2]) : 'origin'
-      value = await getGitRemote(remoteName)
-      return value
+      return _safeGit(() => getGitRemote(remoteName))
     }
 
-    const verifyMsg = `Verify the cwd has a .git directory\n`
     const normalizedVar = (variable || '').toLowerCase()
     // console.log('normalizedVar', normalizedVar)
 
@@ -100,7 +141,7 @@ function createResolver(cwd) {
       const funcName = argsMatch[1]
       const args = argsMatch[2]
       if (funcName === 'timestamp' && args) {
-        value = await getGitTimestamp(args, cwd)
+        value = await getGitTimestamp(args, cwd, false)
       }
     }
 
@@ -109,56 +150,61 @@ function createResolver(cwd) {
       case GIT_KEYS.repo:
       case 'repository':
       case 'reposlug':
-      case 'repo-slug':
-        const urla = await getGitRemote()
+      case 'repo-slug': {
+        const urla = await _safeGit(() => getGitRemote())
+        if (!urla) return undefined
         const parseda = GitUrlParse(urla)
         value = parseda.full_name
-        break;
+        break
+      }
       // Repo name
       case GIT_KEYS.name:
       case 'reponame': // repoName
-      case 'repo-name':
-        const toplevel = await _execFile('git', ['rev-parse', '--show-toplevel'])
+      case 'repo-name': {
+        const toplevel = await _safeGit(() => _execFile('git', ['rev-parse', '--show-toplevel']))
+        if (!toplevel) return undefined
         value = path.basename(toplevel)
-        break;
+        break
+      }
       // Repo org or owner
       case GIT_KEYS.org:
       case 'owner':
       case 'organization':
       case 'repoowner': // repoOwner
-      case 'repo-owner':
-        const url = await getGitRemote()
+      case 'repo-owner': {
+        const url = await _safeGit(() => getGitRemote())
+        if (!url) return undefined
         const parsed = GitUrlParse(url)
         value = parsed.organization || parsed.owner
-        break;
+        break
+      }
       // Repo name
       case GIT_KEYS.dir:
       case 'directory':
       case 'dirpath': // dirPath
       case 'dir-path':
-      case 'dir_path':
-        const gitBasePath = await _execFile('git', ['rev-parse', '--show-toplevel'])
+      case 'dir_path': {
+        const gitBasePath = await _safeGit(() => _execFile('git', ['rev-parse', '--show-toplevel']))
+        if (!gitBasePath) return undefined
         if (cwd) {
           const subPath = cwd.replace(gitBasePath, '')
-          const branch = await _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'])
-          const url = await getGitRemote()
-          value = (subPath) ? `${url}/tree/${branch}${subPath}` : url
+          const branch = await _safeGit(() => _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']))
+          const url = await _safeGit(() => getGitRemote())
+          if (!url) return undefined
+          value = (subPath && branch) ? `${url}/tree/${branch}${subPath}` : url
         }
-        break;
+        break
+      }
       // Repo url
       case GIT_KEYS.url:
       case 'repourl': // repoUrl
       case 'repo-url':
-        value = await getGitRemote()
-        break;
+        value = await _safeGit(() => getGitRemote())
+        break
       // Current commit sha
       case 'sha':
       case 'sha1':
-        try {
-          value = await _exec('git rev-parse --short HEAD')
-        } catch (err) {
-          throw new Error(`\${git:sha1} error ${verifyMsg}`)
-        }
+        value = await _safeGit(() => _exec('git rev-parse --short HEAD'))
         break
       // Current commit full sha
       case GIT_KEYS.commit:
@@ -166,11 +212,7 @@ function createResolver(cwd) {
       case 'commit-sha':
       case 'commithash':
       case 'commit-hash':
-        try {
-          value = await _exec('git rev-parse HEAD')
-        } catch (err) {
-          throw new Error(`\${git:commit} error. ${verifyMsg}`)
-        }
+        value = await _safeGit(() => _exec('git rev-parse HEAD'))
         break
       // Branches
       case GIT_KEYS.branch:
@@ -178,11 +220,7 @@ function createResolver(cwd) {
       case 'branch-name':
       case 'currentbranch': // currentBranch
       case 'current-branch':
-        try {
-          value = await _exec('git rev-parse --abbrev-ref HEAD')
-        } catch (err) {
-          throw new Error(`\${git:branch} error. ${verifyMsg}`)
-        }
+        value = await _safeGit(() => _exec('git rev-parse --abbrev-ref HEAD'))
         break
       // Commit msg
       case GIT_KEYS.message:
@@ -191,42 +229,36 @@ function createResolver(cwd) {
       case 'commit-message':
       case 'commitmsg': // commitMsg
       case 'commit-msg':
-        try {
-          value = await _exec('git log -1 --pretty=%B')
-        } catch (err) {
-          throw new Error(`\${git:message} error. ${verifyMsg}`)
-        }
-        break;
+        value = await _safeGit(() => _exec('git log -1 --pretty=%B'))
+        break
       // Git tags
       case GIT_KEYS.tag:
       case 'describe':
-        try {
-          value = await _exec('git describe --always')
-        } catch (err) {
-          throw new Error(`\${git:describeLight} error. ${verifyMsg}`)
-        }
-        break;
+        value = await _safeGit(() => _exec('git describe --always'))
+        break
       // Git tags
       case 'describeLight':
       case 'describelight':
       case 'describe-light':
-        try {
-          value = await _exec('git describe --always --tags')
-        } catch (err) {
-          throw new Error(`\${git:describeLight} error. ${verifyMsg}`)
-        }
-        break;
+        value = await _safeGit(() => _exec('git describe --always --tags'))
+        break
       // Is branch dirty
       case 'isDirty':
       case 'isdirty':
-      case 'is-dirty':
-        const writeTree = await _execFile('git', ['write-tree'])
-        const changes = await _execFile('git', ['diff-index', writeTree.trim(), '--'])
+      case 'is-dirty': {
+        const writeTree = await _safeGit(() => _execFile('git', ['write-tree']))
+        if (!writeTree) return undefined
+        const changes = await _safeGit(() => _execFile('git', ['diff-index', writeTree.trim(), '--']))
+        if (changes === undefined) return undefined
         value = `${changes.length > 0}`
         break
+      }
       default:
         if (!value) {
-          throw new Error(`Git variable ${variable} is unknown. Candidates are 'describe', 'describeLight', 'sha1', 'commit', 'branch', 'message', 'repository'`)
+          // Unknown variable name (likely a typo). This is a config error,
+          // not an environment one, so throw a helpful message listing the
+          // valid keys.
+          throw new Error(`Git variable "${variable}" is unknown. Valid options: ${Object.values(GIT_KEYS).join(', ')}`)
         }
     }
     return value
