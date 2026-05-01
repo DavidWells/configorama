@@ -12,6 +12,50 @@ const cloudFormationSchema = require('./cloudformationSchema')
 
 const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
 
+const KNOWN_EXTENSIONS = new Set([
+  '.yml', '.yaml', '.json', '.json5', '.jsonc',
+  '.toml', '.tml', '.ini',
+  '.tf', '.hcl',
+  '.js', '.cjs', '.mjs', '.esm',
+  '.ts', '.tsx', '.mts', '.cts',
+  '.md', '.mdx', '.markdown', '.mdown', '.mkdn', '.mkd', '.mdwn', '.markdn', '.mdtxt', '.mdtext'
+])
+
+/**
+ * Detect config format from file contents when extension is missing
+ * @param {string} contents - Raw file contents
+ * @returns {string} Detected file extension (e.g. '.json', '.yml', '.toml')
+ */
+function detectFormat(contents) {
+  const trimmed = contents.trimStart()
+
+  // JSON object: starts with {
+  if (trimmed[0] === '{') return '.json'
+
+  // TOML section headers must be checked before JSON array (both start with [)
+  // TOML: [section.subsection] (dots distinguish from INI)
+  if (/^\[[\w-]+\.[\w.-]+\]/.test(trimmed)) return '.toml'
+  // TOML: array-of-tables [[section]]
+  if (/^\[\[[\w.-]+\]\]/.test(trimmed)) return '.toml'
+
+  // JSON array: starts with [ followed by non-word char (quotes, numbers, braces, whitespace)
+  if (trimmed[0] === '[') return '.json'
+
+  // TOML: multi-line strings
+  if (trimmed.startsWith('"""')) return '.toml'
+  // TOML: key = value
+  if (/^\w[\w.-]*\s*=\s/m.test(trimmed)) return '.toml'
+
+  // YAML: starts with document marker
+  if (trimmed.startsWith('---')) return '.yml'
+
+  // HCL: terraform keywords
+  if (/^(resource|variable|locals|provider|data|module|output|terraform)\s/.test(trimmed)) return '.tf'
+
+  // Default: YAML (most permissive parser)
+  return '.yml'
+}
+
 /**
  * @typedef {Object} ParseOptions
  * @property {string} contents - Raw file contents to parse
@@ -26,7 +70,13 @@ const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._
  * @returns {Object} Parsed configuration object
  */
 function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
-  const fileType = path.extname(filePath)
+  let fileType = path.extname(filePath)
+
+  // Content-based detection for extensionless or unrecognized files
+  if (!fileType || !KNOWN_EXTENSIONS.has(fileType.toLowerCase())) {
+    fileType = detectFormat(contents)
+  }
+
   const regex = varRegex || new RegExp(DEFAULT_VAR_SYNTAX, 'g')
   let configObject
 
