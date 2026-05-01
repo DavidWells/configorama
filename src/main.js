@@ -31,7 +31,7 @@ const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
 /* Utils - paths */
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
-const { findLineForKey } = require('./utils/paths/findLineForKey')
+const { findLineForKey, findLineByPath } = require('./utils/paths/findLineForKey')
 /* Utils - regex */
 const { combineRegexes, funcRegex, fileRefSyntax, textRefSyntax } = require('./utils/regex')
 /* Utils - strings */
@@ -3133,10 +3133,17 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           if (valueCount.length === 1 && noNestedVars) {
-            const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath} ` : ''
+            let lineInfo = ''
+            if (this.originalString && this.configFilePath && valueObject.path) {
+              const ext = path.extname(this.configFilePath)
+              if (ext === '.yml' || ext === '.yaml' || ext === '.json') {
+                const rawLines = this.originalString.split('\n')
+                const lineNum = findLineByPath(arrayToJsonPath(valueObject.path), rawLines, ext)
+                if (lineNum) lineInfo = ` at line ${lineNum},`
+              }
+            }
+            const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath}${lineInfo} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
-
-
 
             throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}
 \nFix this reference, your inputs and/or provide a valid fallback value.
