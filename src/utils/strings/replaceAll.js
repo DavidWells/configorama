@@ -1,7 +1,8 @@
+const BoundedMap = require('../BoundedMap')
 const REPLACE_PATTERN = /([\/\,\!\\\^\$\{\}\[\]\(\)\.\*\+\?\|<>\-\&])/g
 
 // Cache for compiled regex patterns (perf: avoid recompilation)
-const regexCache = new Map()
+const regexCache = new BoundedMap(200)
 
 /**
  * Replace all occurrences of a string while handling regex special characters

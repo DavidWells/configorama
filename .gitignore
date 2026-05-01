@@ -42,3 +42,6 @@ _misc
 /_result.json
 /_tester.js
 /_case.yml
+
+# bv (beads viewer) local config and caches
+.bv/

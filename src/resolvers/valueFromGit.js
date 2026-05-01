@@ -7,6 +7,7 @@ const GitUrlParse = require('git-url-parse')
 const { functionRegex } = require('../utils/regex')
 const formatFunctionArgs = require('../utils/strings/formatFunctionArgs')
 const { findProjectRoot } = require('../utils/paths/findProjectRoot')
+const BoundedMap = require('../utils/BoundedMap')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
 
@@ -266,7 +267,7 @@ function createResolver(cwd) {
   return _getValueFromGit
 }
 
-const cache = new Map()
+const cache = new BoundedMap(200)
 
 /**
  * Gets the last Git commit timestamp for a file
@@ -332,7 +333,7 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
   }
 }
 
-const remoteCache = new Map()
+const remoteCache = new BoundedMap(20)
 
 async function getGitRemote(name = 'origin') {
   if (remoteCache.has(name)) {
