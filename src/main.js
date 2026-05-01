@@ -159,6 +159,8 @@ class Configorama {
 
     // Track variable resolutions for metadata (keyed by path)
     this.resolutionTracking = {}
+    // Only track per-call metadata when returnMetadata is requested
+    this._trackCalls = !!(this.settings.returnMetadata)
 
     // Detect file type early to determine default syntax
     let detectedFileType = null
@@ -2879,7 +2881,7 @@ Missing Value ${missingValue} - ${matchedString}
     const pathValue = valueObject.path
 
     // Track every call to getValueFromSource for metadata
-    if (pathValue && pathValue.length) {
+    if (this._trackCalls && pathValue && pathValue.length) {
       const pathKey = pathValue.join('.')
       if (!this.resolutionTracking[pathKey]) {
         this.resolutionTracking[pathKey] = {
@@ -2892,7 +2894,7 @@ Missing Value ${missingValue} - ${matchedString}
 
       // this.resolutionTracking[pathKey].resolutionHistory = this.resolutionTracking[pathKey].resolutionHistory || []
 
-      // const isDuplicate = this.resolutionTracking[pathKey].resolutionHistory.some(entry => 
+      // const isDuplicate = this.resolutionTracking[pathKey].resolutionHistory.some(entry =>
       //   entry.variableString === variableString
       // )
 
@@ -3049,7 +3051,7 @@ Missing Value ${missingValue} - ${matchedString}
         valueObject,
       ).then((val) => {
         // Update the last call with the resolved value
-        if (pathValue && pathValue.length) {
+        if (this._trackCalls && pathValue && pathValue.length) {
           const pathKey = pathValue.join('.')
           if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].calls.length) {
             // Find the most recent call for this variableString
