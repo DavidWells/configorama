@@ -10,8 +10,8 @@
  * @returns {any} Regex-like result array or null
  */
 function parseFunctionCall(str) {
-  if (!str || typeof str !== 'string') return null
-  
+  if (!str || typeof str !== 'string' || str.indexOf('(') === -1) return null
+
   // Find function name followed by opening paren
   const funcMatch = str.match(/(\w+)\s*\(/)
   if (!funcMatch) return null

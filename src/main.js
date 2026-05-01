@@ -1081,7 +1081,7 @@ class Configorama {
     if (!context) context = []
     let results = _results
     if (!results) results = []
-  
+
     const addContext = (value, key) => {
       return this.getProperties(root, false, value, context.concat(key), results)
     }
@@ -2041,10 +2041,12 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
+    // Cache joined path to avoid repeated array.join('.') calls
+    const pathJoined = pathValue && pathValue.length ? pathValue.join('.') : null
 
     // Track every call to getValueFromSource for metadata
-    if (this._trackCalls && pathValue && pathValue.length) {
-      const pathKey = pathValue.join('.')
+    if (this._trackCalls && pathJoined) {
+      const pathKey = pathJoined
       if (!this.resolutionTracking[pathKey]) {
         this.resolutionTracking[pathKey] = {
           path: pathKey,
@@ -2081,7 +2083,7 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
 
     // Cycle detection: track dependencies and check for cycles
-    const fromPath = valueObject.path ? valueObject.path.join('.') : null
+    const fromPath = pathJoined
     // Extract target path from variableString (e.g., 'self:b' → 'b', 'b.c' → 'b.c')
     let toPath = variableString
     if (variableString.startsWith('self:')) {
@@ -2213,8 +2215,8 @@ Missing Value ${missingValue} - ${matchedString}
         valueObject,
       ).then((val) => {
         // Update the last call with the resolved value
-        if (this._trackCalls && pathValue && pathValue.length) {
-          const pathKey = pathValue.join('.')
+        if (this._trackCalls && pathJoined) {
+          const pathKey = pathJoined
           if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].calls.length) {
             // Find the most recent call for this variableString
             for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
@@ -2522,7 +2524,7 @@ Missing Value ${missingValue} - ${matchedString}
     }
 
     // Variable NOT FOUND. Warn user
-    const key = valueObject.path ? valueObject.path.join('.') : 'na'
+    const key = pathJoined || 'na'
     const errorMessage = [
       `Invalid variable reference syntax`,
       `Key: "${key}"`,
