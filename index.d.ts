@@ -55,6 +55,10 @@ interface ConfigoramaSettings {
   dynamicArgs?: object | Function
   /** Return both config and metadata about variables found */
   returnMetadata?: boolean
+  /** Suppress env-stage-loader logs when useDotenv/useDotEnv is enabled. Defaults to true for API calls. */
+  dotEnvSilent?: boolean
+  /** Enable env-stage-loader debug logs when useDotenv/useDotEnv is enabled */
+  dotEnvDebug?: boolean
   /** Keys to merge in arrays of objects */
   mergeKeys?: string[]
   /** Map of file paths to override */

@@ -94,6 +94,49 @@ test('allowUnknownVariableTypes: array with mixed known and unknown', async () =
   assert.ok(result.knownEnv) // HOME env var should resolve
 })
 
+test('useDotenv loads env files silently by default', async () => {
+  const messages = []
+  const originalLog = console.log
+  console.log = (...args) => messages.push(args.join(' '))
+
+  try {
+    const result = await configorama({
+      useDotenv: true,
+      stage: '${opt:stage}',
+    }, {
+      options: { stage: 'dev' }
+    })
+
+    assert.is(result.stage, 'dev')
+  } finally {
+    console.log = originalLog
+  }
+
+  assert.not.ok(messages.some(message => message.includes('[env-stage-loader]')))
+})
+
+test('dotEnvSilent false preserves env-stage-loader output', async () => {
+  const messages = []
+  const originalLog = console.log
+  console.log = (...args) => messages.push(args.join(' '))
+
+  try {
+    const result = await configorama({
+      useDotenv: true,
+      stage: '${opt:stage}',
+    }, {
+      dotEnvSilent: false,
+      options: { stage: 'dev' }
+    })
+
+    assert.is(result.stage, 'dev')
+  } finally {
+    console.log = originalLog
+  }
+
+  assert.ok(messages.some(message => message.includes('[env-stage-loader] Loading "dev" environment values')))
+})
+
 // ===========================================
 // allowUnresolvedVariables array syntax tests
 // ===========================================

@@ -128,6 +128,10 @@ class Configorama {
       returnMetadata: false,
       // Return preResolvedVariableDetails
       returnPreResolvedVariableDetails: false,
+      // Suppress env-stage-loader's normal dotenv loading logs by default.
+      // CLI users can still see them with --verbose or dotEnvSilent: false.
+      dotEnvSilent: !VERBOSE,
+      dotEnvDebug: false,
     }, options)
 
     // Backward compat: allowUnknownVars -> allowUnknownVariableTypes
@@ -832,8 +836,8 @@ class Configorama {
       const stage = cliOpts.stage || providerStage || process.env.NODE_ENV || 'dev'
       /* Load env variables into process.env */
       require('env-stage-loader')({
-        // silent: true,
-        // debug: true,
+        silent: this.settings.dotEnvSilent,
+        debug: this.settings.dotEnvDebug,
         env: stage,
         // defaultEnv: 'prod',
         // ignoreFiles: ['.env']

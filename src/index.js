@@ -15,6 +15,8 @@ const { buildVariableSyntax } = require('./utils/variables/variableUtils')
  * @property {boolean} [allowUndefinedValues] - allow undefined values to pass through without throwing errors
  * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
  * @property {boolean} [returnMetadata] - return both config and metadata about variables found
+ * @property {boolean} [dotEnvSilent] - suppress env-stage-loader logs when useDotenv/useDotEnv is enabled
+ * @property {boolean} [dotEnvDebug] - enable env-stage-loader debug logs when useDotenv/useDotEnv is enabled
  * @property {string[]} [mergeKeys] - keys to merge in arrays of objects
  * @property {Object.<string, string>} [filePathOverrides] - map of file paths to override
  */
