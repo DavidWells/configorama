@@ -1,0 +1,589 @@
+service: auth-service-testing
+
+frameworkVersion: '3'
+
+custom:
+  cors: # Enable CORS for all origins
+    origin: '*'
+    headers:
+      - Content-Type
+      - X-Amz-Date
+      - Authorization
+      - X-Api-Key
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+      - X-Amzn-Trace-Id
+      - foo
+
+plugins:
+  - serverless-manifest-plugin
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev' | help('The stage to deploy to')}
+  region: ${opt:region | String | help('The region to deploy to')}
+
+functions:
+  public:
+    handler: src/handlers/public.handler
+    description: This function is open to all callers
+    events:
+      - http:
+          path: /api/public
+          method: post
+          cors: ${self:custom.cors}
+
+  privateCognitoIdToken:
+    handler: src/handlers/private-behind-cognito-jwt.handler
+    description: Protected by valid Cognito Id Token JWT
+    events:
+      - http:
+          path: /api/private-behind-cognito-id-token
+          method: post
+          cors: ${self:custom.cors, false}
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+
+  privateCognitoAccessToken:
+    handler: src/handlers/private-behind-cognito-jwt.handler
+    description: Protected by valid Cognito Access Token JWT
+    events:
+      - http:
+          path: /api/private-behind-cognito-access-token
+          method: post
+          cors: ${self:custom.cors}
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+            scopes:
+              - aws.cognito.signin.user.admin
+
+  privateBehindApiKey:
+    handler: src/handlers/private-behind-api-key.handler
+    description: This function requires an API key
+    events:
+      - http:
+          path: /api/private-behind-api-key
+          method: post
+          private: true  # This function requires the API key
+          cors: ${self:custom.cors}
+          # request:
+          #   parameters:
+          #     headers:
+          #       CloudFront-Viewer-City: true
+          #       CloudFront-Viewer-Country: true
+          #       CloudFront-Viewer-Time-Zone: true
+          #       CloudFront-Viewer-Latitude: true
+          #       CloudFront-Viewer-Longitude: true
+          #       CloudFront-Viewer-JA3-Fingerprint: true
+
+  publicButProtected:
+    handler: src/handlers/public-but-protected.handler
+    description: This function requires IAM authentication unauthed role
+    events:
+      - http:
+          path: /api/public-but-protected
+          method: post
+          cors: ${self:custom.cors}
+          authorizer:
+            name: iam-authorizer-public-but-protected
+            type: AWS_IAM
+
+  protected:
+    handler: src/handlers/protected.handler
+    description: This function requires IAM authentication authed role
+    events:
+      - http:
+          path: /api/protected
+          method: post
+          cors: ${self:custom.cors}
+          authorizer:
+            name: iam-authorizer
+            type: AWS_IAM  # This enables IAM authentication
+
+  # JWT authorizer
+  authorizerCognitoJwt:
+    handler: src/handlers/authorizer-verify-cognito-jwt.handler
+    description: HTTP API authorizer for Cognito JWT verification
+    timeout: 10 # seconds
+    memorySize: 256
+    environment:
+      COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+      COGNITO_USER_POOL_CLIENT_ID: !Ref CognitoUserPoolClient
+
+  # Add function that uses authorizerCognitoJwt
+  privateCognitoJwt:
+    handler: src/handlers/private-behind-authorizer-fn-cognito-jwt.handler
+    description: Protected by valid Cognito JWT
+    events:
+      - http:
+          path: /api/private-behind-authorizer-fn-cognito-jwt
+          method: post
+          cors: ${self:custom.cors}
+          authorizer: authorizerCognitoJwt
+
+  ## TODO HTTP API
+  # https://github.com/aws-samples/sessions-with-aws-sam/blob/master/http-api/template.yaml
+
+  ## Cross account aoithorizer
+  ## https://github.com/allenheltondev/aws-cross-account-lambda-authorizer/tree/267b980ec5ae7699a76b092ff4844aa2e86d7d3c
+
+
+resources:
+  Resources:
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${self:provider.stage}-user-pool
+        MfaConfiguration: 'OPTIONAL'
+        EnabledMfas: [ SOFTWARE_TOKEN_MFA ]
+        # EnabledMfas: [ SOFTWARE_TOKEN_MFA, SMS_MFA, EMAIL_OTP ]
+        AutoVerifiedAttributes:
+          - email
+        UsernameAttributes:
+          - email
+        UsernameConfiguration:
+          CaseSensitive: false
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            RequireUppercase: true
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-${self:provider.stage}-client
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: ENABLED
+        AllowedOAuthFlows:
+          - code
+          - implicit
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthScopes:
+          - email
+          - openid
+          - profile
+        CallbackURLs:
+          - http://localhost:3000
+          - http://localhost:3000/callback
+        LogoutURLs:
+          - http://localhost:3000
+          - http://localhost:3000/logout
+        SupportedIdentityProviders:
+          - COGNITO
+
+    CognitoIdentityPool:
+      Type: AWS::Cognito::IdentityPool
+      Properties:
+        IdentityPoolName: ${self:service}-${self:provider.stage}-identity-pool
+        AllowUnauthenticatedIdentities: true
+        CognitoIdentityProviders:
+          - ClientId: !Ref CognitoUserPoolClient
+            ProviderName: !GetAtt CognitoUserPool.ProviderName
+
+    # IAM roles for authenticated users
+    CognitoAuthRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-auth-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: cognito-identity.amazonaws.com
+              Action: sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
+                  'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+                'ForAnyValue:StringLike':
+                  'cognito-identity.amazonaws.com:amr': authenticated
+        Policies:
+          - PolicyName: ${self:service}-${self:provider.stage}-auth-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'execute-api:Invoke'
+                  Resource: 'arn:aws:execute-api:${self:provider.region}:*:*/*'
+
+    # IAM roles for unauthenticated users
+    CognitoUnauthRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-unauth-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: cognito-identity.amazonaws.com
+              Action: sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
+                  'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+                'ForAnyValue:StringLike':
+                  'cognito-identity.amazonaws.com:amr': unauthenticated
+        Policies:
+          - PolicyName: ${self:service}-${self:provider.stage}-unauth-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'execute-api:Invoke'
+                  Resource:
+                    - 'arn:aws:execute-api:${self:provider.region}:*:*/GET/*'
+                    - !Sub 'arn:aws:execute-api:${self:provider.region}:*:*/POST/public-but-protected'
+
+    # Attach roles to Identity Pool
+    CognitoIdentityPoolRoles:
+      Type: AWS::Cognito::IdentityPoolRoleAttachment
+      Properties:
+        IdentityPoolId: !Ref CognitoIdentityPool
+        Roles:
+          authenticated: !GetAtt CognitoAuthRole.Arn
+          unauthenticated: !GetAtt CognitoUnauthRole.Arn
+
+    CognitoUserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        Domain: ${self:service}-${self:provider.stage}
+        UserPoolId: !Ref CognitoUserPool
+
+    DefaultUser:
+      Type: AWS::Cognito::UserPoolUser
+      Properties:
+        UserPoolId: !Ref CognitoUserPool
+        Username: "email@email.com"
+        UserAttributes:
+          - Name: email
+            Value: "email@email.com"
+          - Name: email_verified
+            Value: "true"
+        DesiredDeliveryMediums:
+          - EMAIL
+        ForceAliasCreation: true
+
+    ## Api gateway keys and plans
+    ApiGatewayUsagePlanBasic:
+      Type: AWS::ApiGateway::UsagePlan
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        UsagePlanName: basic-plan-${opt:stage, 'dev'}
+        ApiStages:
+          - ApiId: !Ref ApiGatewayRestApi
+            Stage: ${self:provider.stage}
+        Description: "Basic usage plan for limited access"
+        Quota:
+          Limit: 1000
+          Period: MONTH
+        Throttle:
+          BurstLimit: 200
+          RateLimit: 100
+
+    ApiGatewayUsagePlanPremium:
+      Type: AWS::ApiGateway::UsagePlan
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        UsagePlanName: premium-plan-${opt:stage, 'dev'}
+        ApiStages:
+          - ApiId: !Ref ApiGatewayRestApi
+            Stage: ${self:provider.stage}
+        Description: "Premium usage plan for more access"
+        Quota:
+          Limit: 5000
+          Period: MONTH
+        Throttle:
+          BurstLimit: 500
+          RateLimit: 200
+
+    ApiGatewayApiKeyBasic:
+      Type: AWS::ApiGateway::ApiKey
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        Name: basic-api-key-${opt:stage, 'dev'}
+        Description: "API key for basic users"
+        Enabled: true
+        StageKeys:
+          - RestApiId: !Ref ApiGatewayRestApi
+            StageName: ${self:provider.stage}
+
+    ApiGatewayApiKeyPremium:
+      Type: AWS::ApiGateway::ApiKey
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        Name: premium-api-key-${opt:stage, 'dev'}
+        Description: "API key for premium users"
+        Enabled: true
+        StageKeys:
+          - RestApiId: !Ref ApiGatewayRestApi
+            StageName: ${self:provider.stage}
+
+    ApiGatewayUsagePlanKeyBasic:
+      Type: AWS::ApiGateway::UsagePlanKey
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        KeyId: !Ref ApiGatewayApiKeyBasic
+        KeyType: API_KEY
+        UsagePlanId: !Ref ApiGatewayUsagePlanBasic
+
+    ApiGatewayUsagePlanKeyPremium:
+      Type: AWS::ApiGateway::UsagePlanKey
+      DependsOn: ApiGatewayRestApi
+      Properties:
+        KeyId: !Ref ApiGatewayApiKeyPremium
+        KeyType: API_KEY
+        UsagePlanId: !Ref ApiGatewayUsagePlanPremium
+
+
+    # ------------------------- Fix cors errors for API gateway ---------------------------
+    GatewayResponseDefault4XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+    GatewayResponseDefault5XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+    # # Add CloudWatch Logs configuration
+    # MyFunctionLogGroup:
+    #   Type: AWS::Logs::LogGroup
+    #   Properties:
+    #     LogGroupName: /aws/cloudfront/function/composite-key-transformer
+    #     RetentionInDays: 14
+    # # 2. Create the IAM Role for CloudFront Functions logging
+    # CloudFrontFunctionRole:
+    #   Type: AWS::IAM::Role
+    #   Properties:
+    #     AssumeRolePolicyDocument:
+    #       Version: '2012-10-17'
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             Service: cloudfront.amazonaws.com
+    #           Action: sts:AssumeRole
+    #     Policies:
+    #       - PolicyName: CloudFrontFunctionLoggingPolicy
+    #         PolicyDocument:
+    #           Version: '2012-10-17'
+    #           Statement:
+    #             - Effect: Allow
+    #               Action:
+    #                 - logs:CreateLogGroup
+    #                 - logs:CreateLogStream
+    #                 - logs:PutLogEvents
+    #               Resource: !GetAtt MyFunctionLogGroup.Arn
+
+    CloudFrontOriginRequestPolicy:
+      Type: 'AWS::CloudFront::OriginRequestPolicy'
+      Properties:
+        OriginRequestPolicyConfig:
+          Name: HeadersPolicy-${opt:stage, 'dev'}
+          Comment: 'Policy to include headers'
+          # https://stackoverflow.com/questions/32825413/how-do-you-add-cloudfront-in-front-of-api-gateway
+          HeadersConfig:
+            HeaderBehavior: allExcept
+            Headers:
+              - Host
+            # HeaderBehavior: allViewerAndWhitelistCloudFront # allViewer | allViewerAndWhitelistCloudFront | none | whitelist
+            # Headers:
+            #   - CloudFront-Viewer-City
+            #   - CloudFront-Viewer-Country
+            #   - CloudFront-Viewer-Latitude
+            #   - CloudFront-Viewer-Longitude
+            #   - CloudFront-Viewer-Time-Zone
+          CookiesConfig:
+            CookieBehavior: 'all'
+          QueryStringsConfig:
+            QueryStringBehavior: 'all'
+
+    CloudFrontCachePolicy:
+      Type: AWS::CloudFront::CachePolicy
+      Properties:
+        CachePolicyConfig:
+          Name: "NoCachePolicy-${opt:stage, 'dev'}"
+          Comment: "Disables caching in CloudFront, always forwarding requests to the origin"
+          DefaultTTL: 1
+          MaxTTL: 31536000
+          MinTTL: 0
+          ParametersInCacheKeyAndForwardedToOrigin:
+            EnableAcceptEncodingGzip: true
+            EnableAcceptEncodingBrotli: true
+            CookiesConfig:
+              CookieBehavior: none
+            HeadersConfig:
+              HeaderBehavior: whitelist
+              # These are the headers that are custom and forwarded to origin
+              Headers:
+                - Authorization
+                - x-api-key
+                - foo
+            QueryStringsConfig:
+              QueryStringBehavior: none
+
+    # Route 53 for fallbacks https://sbstjn.com/blog/aws-route53-failover-fargate-container-static-website/
+
+    # CloudFront Distribution
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Comment: API Gateway Distribution with Key Transformation
+          PriceClass: PriceClass_100  # Use only US, Canada, Europe
+          HttpVersion: http2
+          IPV6Enabled: true
+          # WebACLId: !If [ApplyCloudfrontWaf, !Ref CloudFrontWafACL, !Ref "AWS::NoValue"]
+          Origins:
+            - Id: NetlifyOrigin
+              DomainName: art-share.netlify.app
+              CustomOriginConfig:
+                HTTPPort: 80
+                HTTPSPort: 443
+                OriginProtocolPolicy: 'https-only'
+                OriginSSLProtocols: ['TLSv1.2']
+            - Id: APIGateway
+              DomainName: !Sub ${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com
+              OriginPath: /${opt:stage, 'dev'}  # Assuming 'prod' stage, adjust as needed
+              CustomOriginConfig:
+                HTTPPort: 80
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols:
+                  - TLSv1.2
+            - Id: JWKSOrigin
+              DomainName: !Sub "cognito-idp.${AWS::Region}.amazonaws.com"
+              OriginPath: !Sub "/${CognitoUserPool}"
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols: [TLSv1.2]
+            - Id: OAuthOrigin
+              DomainName: !Sub "${CognitoUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+              OriginPath: "/oauth2"
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols: [TLSv1.2]
+
+          DefaultCacheBehavior:
+            TargetOriginId: NetlifyOrigin
+            ViewerProtocolPolicy: 'redirect-to-https'
+            AllowedMethods: ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']
+            CachedMethods: ['GET', 'HEAD', 'OPTIONS']
+            OriginRequestPolicyId: !Ref CloudFrontOriginRequestPolicy
+            CachePolicyId: !Ref CloudFrontCachePolicy
+            Compress: true
+            DefaultTTL: 1  # 1 day
+            MinTTL: 0
+            MaxTTL: 20  # 1 year
+
+          CacheBehaviors:
+            - PathPattern: '/api/*'
+              TargetOriginId: APIGateway
+              ViewerProtocolPolicy: 'https-only'
+              AllowedMethods: ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']
+              CachedMethods: ['GET', 'HEAD', 'OPTIONS']
+              OriginRequestPolicyId: !Ref CloudFrontOriginRequestPolicy
+              CachePolicyId: !Ref CloudFrontCachePolicy
+              Compress: true
+              DefaultTTL: 0  # Don't cache API responses by default
+              MinTTL: 0
+              MaxTTL: 0
+              # https://github.com/samvera/serverless-iiif/blob/509d24082692d755c5ad8fa48d9e447722ce5741/sam/cloudfront/template.yml#L228
+              # FunctionAssociations:
+              # - Fn::If:
+              #   - ViewerRequestCloudWatchFunction
+              #   - EventType: viewer-request
+              #     FunctionARN: !Ref ViewerRequestARN
+              #   - !Ref AWS::NoValue
+            # Cognito JWKS
+            - PathPattern: /.well-known/jwks.json
+              TargetOriginId: JWKSOrigin
+              ViewerProtocolPolicy: redirect-to-https
+              CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # CachingDisabled
+              OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3 # AllViewer
+              AllowedMethods: [GET, HEAD]
+            # Cognito OAuth2
+            - PathPattern: /oauth2/*
+              TargetOriginId: OAuthOrigin
+              ViewerProtocolPolicy: redirect-to-https
+              CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # CachingDisabled
+              OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3 # AllViewer
+              AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+
+            # ForwardedValues:
+            #   Cookies:
+            #     Forward: none
+            #   QueryString: true
+            #   Headers:
+            #     - Accept
+            #     - Authorization
+            #     - x-api-key
+            #     - x-product-key
+            #     - CloudFront-Viewer-City
+            #     - CloudFront-Viewer-Country
+            #     - CloudFront-Viewer-JA3-Fingerprint
+            #     - CloudFront-Viewer-Latitude
+            #     - CloudFront-Viewer-Longitude
+            #     - CloudFront-Viewer-Time-Zone
+            #     # Add this way or via AWS::CloudFront::OriginRequestPolicy
+            #     # - 'CloudFront-Viewer-Country-Name'
+            #     # - 'CloudFront-Viewer-City'
+            #     # - 'CloudFront-Viewer-Latitude'
+            #     # - 'CloudFront-Viewer-Longitude'
+            #     # - 'CloudFront-Is-SmartTV-Viewer'
+            #     # - 'CloudFront-Is-Tablet-Viewer'
+            #     # - 'CloudFront-Is-Mobile-Viewer'
+            #     # - 'CloudFront-Is-Desktop-Viewer'
+
+          # CustomErrorResponses:
+          #   - ErrorCode: 403
+          #     ResponseCode: 403
+          #     ResponsePagePath: /error/403
+          #   - ErrorCode: 404
+          #     ResponseCode: 404
+          #     ResponsePagePath: /error/404
+
+  Outputs:
+    UserPoolId:
+      Value: !Ref CognitoUserPool
+    UserPoolClientId:
+      Value: !Ref CognitoUserPoolClient
+    IdentityPoolId:
+      Value: !Ref CognitoIdentityPool
+    UserPoolDomain:
+      Value: !Sub ${self:service}-${self:provider.stage}.auth.${self:provider.region}.amazoncognito.com
+    BasicApiKey:
+      Description: "API key for basic users"
+      Value: !Ref ApiGatewayApiKeyBasic
+    PremiumApiKey:
+      Description: "API key for premium users"
+      Value: !Ref ApiGatewayApiKeyPremium
+    DistributionId:
+      Description: CloudFront Distribution ID
+      Value: !Ref CloudFrontDistribution
+    DistributionDomainName:
+      Description: CloudFront Distribution Domain Name
+      Value: !GetAtt CloudFrontDistribution.DomainName
