@@ -43,14 +43,14 @@ function createMockCFResolver(options = {}) {
     let region = defaultRegion
     let accountId = null
 
-    // Check for region/account in parentheses
+    // Check for account/region in parentheses
     const paramsMatch = varString.match(/^cf\(([a-z0-9-:]+)\):/i)
     if (paramsMatch) {
       const params = paramsMatch[1]
       if (params.includes(':')) {
         const parts = params.split(':')
-        region = parts[0]
-        accountId = parts[1]
+        accountId = parts[0]
+        region = parts[1]
       } else {
         region = params
       }
@@ -295,11 +295,11 @@ test('skipResolution collects metadata without calling AWS', async () => {
   assert.is(dbRef.region, 'us-west-2')
 })
 
-test('cf: parses multi-account syntax with region and accountId', async () => {
+test('cf: parses multi-account syntax with accountId and region', async () => {
   const cfResolver = createCloudFormationResolver({ skipResolution: true })
 
   const object = {
-    crossAccount: '${cf(us-west-2:123456789):other-account-stack.OutputKey}',
+    crossAccount: '${cf(123456789:us-west-2):other-account-stack.OutputKey}',
   }
 
   const result = await configorama(object, {
@@ -319,7 +319,7 @@ test('cf: parses multi-account syntax with region and accountId', async () => {
   assert.is(ref.outputKey, 'OutputKey')
 
   // Placeholder should include account info
-  assert.is(result.config.crossAccount, '[CF:us-west-2:123456789:other-account-stack.OutputKey]')
+  assert.is(result.config.crossAccount, '[CF:123456789:us-west-2:other-account-stack.OutputKey]')
 })
 
 test('cf: variable syntax regex matches multi-account format', () => {
@@ -328,15 +328,15 @@ test('cf: variable syntax regex matches multi-account format', () => {
   // Should match all valid formats
   assert.ok(cfVariableSyntax.test('cf:stack.output'))
   assert.ok(cfVariableSyntax.test('cf(us-west-2):stack.output'))
-  assert.ok(cfVariableSyntax.test('cf(us-west-2:123456789):stack.output'))
-  assert.ok(cfVariableSyntax.test('cf(ap-northeast-1:987654321):stack.output'))
+  assert.ok(cfVariableSyntax.test('cf(123456789:us-west-2):stack.output'))
+  assert.ok(cfVariableSyntax.test('cf(987654321:ap-northeast-1):stack.output'))
 })
 
 test('cf: metadata includes accountId when present', async () => {
   const object = {
     local: '${cf:api-service-dev.ApiEndpoint}',
     crossRegion: '${cf(us-west-2):other-service.ServiceUrl}',
-    crossAccount: '${cf(eu-west-1:555555555):account-stack.Output, "fallback"}',
+    crossAccount: '${cf(555555555:eu-west-1):account-stack.Output, "fallback"}',
   }
 
   const result = await configorama(object, {

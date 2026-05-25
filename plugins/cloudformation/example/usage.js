@@ -43,8 +43,8 @@ async function main() {
     //     "configPath": "provider.environment.RBAC_TABLE_ARN"
     //   },
     //   {
-    //     "raw": "${cf(us-west-2:123456789):cross-account-stack.ApiEndpoint}",
-    //     "resolved": "${cf(us-west-2:123456789):cross-account-stack.ApiEndpoint}",
+    //     "raw": "${cf(123456789:us-west-2):cross-account-stack.ApiEndpoint}",
+    //     "resolved": "${cf(123456789:us-west-2):cross-account-stack.ApiEndpoint}",
     //     "stackName": "cross-account-stack",
     //     "outputKey": "ApiEndpoint",
     //     "region": "us-west-2",

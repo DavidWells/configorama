@@ -2,7 +2,7 @@
 const { useCredentials } = require('./credentials')
 
 const CF_PREFIX = 'cf'
-// Updated regex to support: cf(region:accountId):stack.output or cf(region):stack.output
+// Supports: cf(accountId:region):stack.output or cf(region):stack.output
 const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-:]+\))?:/i)
 
 /**
@@ -10,7 +10,7 @@ const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-:]+\))?:/i)
  * Syntax:
  *   ${cf:stackName.outputKey}
  *   ${cf(region):stackName.outputKey}
- *   ${cf(region:accountId):stackName.outputKey}
+ *   ${cf(accountId:region):stackName.outputKey}
  *
  * @param {object} options - Configuration options
  * @param {object} [options.credentials] - AWS credentials
@@ -118,23 +118,23 @@ function createCloudFormationResolver(options = {}) {
    * Supports:
    *   cf:stack.output
    *   cf(region):stack.output
-   *   cf(region:accountId):stack.output
-   * @param {string} varString - e.g., "cf:stack.output", "cf(us-west-2):stack.output", "cf(us-west-2:123456789):stack.output"
+   *   cf(accountId:region):stack.output
+   * @param {string} varString - e.g., "cf:stack.output", "cf(us-west-2):stack.output", "cf(123456789:us-west-2):stack.output"
    * @returns {object} { stackName, outputKey, region, accountId }
    */
   function parseVariable(varString) {
     let region = defaultRegion
     let accountId = null
 
-    // Check for region/account in parentheses: cf(region:accountId):stack.output or cf(region):stack.output
+    // Check for account/region in parentheses: cf(accountId:region):stack.output or cf(region):stack.output
     const paramsMatch = varString.match(/^cf\(([a-z0-9-:]+)\):/i)
     if (paramsMatch) {
       const params = paramsMatch[1]
-      // Check if it contains a colon (region:accountId)
+      // Check if it contains a colon (accountId:region)
       if (params.includes(':')) {
         const parts = params.split(':')
-        region = parts[0]
-        accountId = parts[1]
+        accountId = parts[0]
+        region = parts[1]
       } else {
         // Just region
         region = params
@@ -179,8 +179,8 @@ function createCloudFormationResolver(options = {}) {
 
     // Skip AWS call if skipResolution is enabled
     if (skipResolution) {
-      const accountInfo = accountId ? `:${accountId}` : ''
-      return `[CF:${region}${accountInfo}:${stackName}.${outputKey}]`
+      const accountInfo = accountId ? `${accountId}:` : ''
+      return `[CF:${accountInfo}${region}:${stackName}.${outputKey}]`
     }
 
     const value = await getStackOutput(stackName, outputKey, region, accountId)
@@ -197,7 +197,7 @@ function createCloudFormationResolver(options = {}) {
     type: CF_PREFIX,
     source: 'remote',
     prefix: CF_PREFIX,
-    syntax: '${cf:stackName.outputKey}, ${cf(region):stackName.outputKey}, or ${cf(region:accountId):stackName.outputKey}',
+    syntax: '${cf:stackName.outputKey}, ${cf(region):stackName.outputKey}, or ${cf(accountId:region):stackName.outputKey}',
     description: 'Resolves CloudFormation stack output values (supports multi-region and multi-account)',
     match: cfVariableSyntax,
     resolver,
