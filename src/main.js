@@ -2572,21 +2572,11 @@ Missing Value ${missingValue} - ${matchedString}
 
     /* Pass through unknown variable types */
     if (allowSpecialCase || this.isUnknownTypeAllowed(propertyString)) {
-      // console.log('allowUnknownVars propertyString', propertyString)
-      const varMatches = propertyString.match(this.variableSyntax)
-      let allowUnknownVars = propertyString
-      /* Only encode variables that are actually unknown, not all of them */
-      if (varMatches && varMatches.length) {
-        varMatches.forEach((m) => {
-          // Only encode this variable if IT is unknown (not just because the string contains unknowns)
-          if (this.isUnknownTypeAllowed(m)) {
-            allowUnknownVars = allowUnknownVars.replace(m, encodeUnknown(m))
-          }
-        })
-      }
-      // console.log('allowUnknownVars propertyString:', propertyString)
-      // console.log('allowUnknownVars:', allowUnknownVars)
-      return Promise.resolve(allowUnknownVars)
+      // Return only the encoded current variable, not the whole propertyString.
+      // The caller substitutes this value at the matched position; returning the
+      // full property would re-insert the surrounding context (including this
+      // variable) and cause exponential string growth on subsequent passes.
+      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
     }
 
     const message = errorMessage.join('\n')
