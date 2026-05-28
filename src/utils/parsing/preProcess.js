@@ -233,12 +233,8 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
                 const afterOp = afterRef.substring(op.length).trimStart()
                 return afterOp.startsWith('"') || afterOp.startsWith("'")
               }
-              // Check if preceded by: "string" op
-              for (const o of comparisonOps) {
-                const pattern = new RegExp(`["'][^"']*["']\\s*${o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`)
-                if (pattern.test(beforeRef)) return true
-              }
-              return false
+              // Check if preceded by: "string" op (reuses precededByPatterns)
+              return precededByPatterns.some(p => p.test(beforeRef))
             })
 
             if (!precededByQuote && !followedByQuote && isComparedToString) {
