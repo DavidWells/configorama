@@ -108,6 +108,7 @@ function parseFileContents(content, filePath) {
  * @param {RegExp} ctx.textRefSyntax - Regex for text() syntax
  * @param {string} ctx.varPrefix - Variable prefix (e.g., '${')
  * @param {string} ctx.varSuffix - Variable suffix (e.g., '}')
+ * @param {Map<string, string>} [ctx.fileContentCache] - Optional per-instance read cache keyed by absolute file path
  * @param {string} variableString - The variable string to resolve
  * @param {object} options - Resolution options
  * @returns {Promise<any>}
