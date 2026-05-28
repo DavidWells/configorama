@@ -254,7 +254,14 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   let valueToPopulate
 
-  const variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
+  // Per-instance read cache: identical ${file:...} refs hit fs once per resolve.
+  let variableFileContents
+  if (ctx.fileContentCache && ctx.fileContentCache.has(fullFilePath)) {
+    variableFileContents = ctx.fileContentCache.get(fullFilePath)
+  } else {
+    variableFileContents = fs.readFileSync(fullFilePath, 'utf-8')
+    if (ctx.fileContentCache) ctx.fileContentCache.set(fullFilePath, variableFileContents)
+  }
 
   /* handle case for referencing raw JS files to inline them */
   if ((argsToPass.length

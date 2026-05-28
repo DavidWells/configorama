@@ -191,6 +191,9 @@ class Configorama {
     // Paths whose current value is a literal with no variables — skip rebuilding
     // their leaf object on every subsequent populateObjectImpl iteration.
     this._resolvedPaths = new Set()
+    // Cache raw file contents per absolute path so repeated ${file:...} refs
+    // to the same file (e.g., merged twice into different keys) don't reread.
+    this._fileContentCache = new Map()
 
     // rawOriginalConfig (a pre-preProcess snapshot) is only consumed by metadata
     // display paths. Skipping the cloneDeep when none of those paths are active
@@ -2724,7 +2727,8 @@ Missing Value ${missingValue} - ${matchedString}
       fileRefSyntax: fileRefSyntax,
       textRefSyntax: textRefSyntax,
       varPrefix: this.varPrefix,
-      varSuffix: this.varSuffix
+      varSuffix: this.varSuffix,
+      fileContentCache: this._fileContentCache
     }
     return getValueFromFileResolver(ctx, variableString, options)
   }
