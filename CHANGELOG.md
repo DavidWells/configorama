@@ -4,6 +4,8 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 
 ## Unreleased
 
+## [0.10.0] — 2026-05-27
+
 ### Added
 - **Multi-account CloudFormation plugin** at `plugins/cloudformation/` with the `${cf(account:region):stack.Output}` syntax. The `account` field is an env-var-prefix alias (e.g. `prod` matches `PROD_AWS_ACCESS_KEY_ID`). Refcounted mutex serializes different-account resolves while allowing same-account ones to run in parallel. Includes 13 unit tests for the resolver and 13 for the credentials utility. Closes #57.
 - `scripts/bench.js`: reproducible multi-fixture resolve benchmark, accepts a lib path so you can A/B test branches or versions.
@@ -142,6 +144,7 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 
 Older releases predate this changelog. For history, see `git log v0.8.0..v0.9.8`.
 
+[0.10.0]: https://github.com/DavidWells/configorama/releases/tag/v0.10.0
 [0.9.17]: https://github.com/DavidWells/configorama/releases/tag/v0.9.17
 [0.9.16]: https://github.com/DavidWells/configorama/releases/tag/v0.9.16
 [0.9.15]: https://github.com/DavidWells/configorama/releases/tag/v0.9.15
