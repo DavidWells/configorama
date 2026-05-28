@@ -95,6 +95,7 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Programmatic Usage](#programmatic-usage)
 - [Comparison vs Serverless Framework Variables](#comparison-vs-serverless-framework-variables)
 - [Alternative Libraries](#alternative-libraries)
+- [Changelog](#changelog)
 - [Inspiration](#inspiration)
 - [License](#license)
 - [Contributing](#contributing)
@@ -3032,6 +3033,12 @@ How configorama compares to other variable-substitution libraries:
 | [yaml-boost](https://github.com/blackflux/yaml-boost) | YAML | env, file, self, function | partial | ❌ | ❌ |
 | [serverless-merge-config](https://github.com/CruGlobal/serverless-merge-config) | YAML | merge-focused | ❌ | ❌ | ❌ |
 | [serverless-terraform-variables](https://www.npmjs.com/package/serverless-terraform-variables) | YAML + .tfvars | terraform-focused | ❌ | ❌ | ❌ |
+
+---
+
+## Changelog
+
+Version history lives in [CHANGELOG.md](./CHANGELOG.md). It covers everything from 0.9.9 onward; older releases are in `git log`.
 
 ---
 
