@@ -159,6 +159,16 @@ class Configorama {
     // Cache for originalValue lookups (perf: avoid repeated dotProp.get)
     this._originalValueCache = new Map()
 
+    // rawOriginalConfig (a pre-preProcess snapshot) is only consumed by metadata
+    // display paths. Skipping the cloneDeep when none of those paths are active
+    // saves ~10-15ms per init.
+    const showFound = this.settings.dynamicArgs && (this.settings.dynamicArgs.list || this.settings.dynamicArgs.info)
+    this._needsRawClone = !!(
+      this.settings.returnMetadata ||
+      this.settings.returnPreResolvedVariableDetails ||
+      VERBOSE || SETUP_MODE || showFound
+    )
+
     this.foundVariables = []
     this.fileRefsFound = []
 
@@ -200,8 +210,10 @@ class Configorama {
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
-      // Store truly raw config before any preprocessing
-      this.rawOriginalConfig = cloneDeep(fileOrObject)
+      // Store truly raw config before any preprocessing (only when needed)
+      if (this._needsRawClone) {
+        this.rawOriginalConfig = cloneDeep(fileOrObject)
+      }
       // Preprocess: convert bare refs in if(), escape help() args
       // Skip fallback fixing for object configs (they handle bare refs differently)
       const processed = preProcess(fileOrObject, this.variableSyntax, this.variableTypes, { skipFallbackFix: true })
@@ -677,8 +689,10 @@ class Configorama {
       /*
       console.log('before preprocess', configObject)
       /** */
-      // Store truly raw config before any preprocessing (for metadata display)
-      this.rawOriginalConfig = cloneDeep(configObject)
+      // Store truly raw config before any preprocessing (only when needed)
+      if (this._needsRawClone) {
+        this.rawOriginalConfig = cloneDeep(configObject)
+      }
 
       /* Preprocess step here - escapes ${} in help() args, fixes malformed fallbacks */
       configObject = preProcess(configObject, this.variableSyntax, this.variableTypes)
