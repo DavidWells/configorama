@@ -22,6 +22,7 @@ Configorama extends your configuration with a powerful variable system that reso
 <details>
 <summary>Click to expand</summary>
 
+- [Key Features](#key-features)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
   - [Quick Start](#quick-start)
@@ -31,12 +32,16 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Analyzing Without Resolving](#analyzing-without-resolving)
   - [Getting Metadata](#getting-metadata)
 - [Variable Sources](#variable-sources)
+  - [Summary Table](#summary-table)
   - [Environment Variables](#environment-variables)
   - [CLI Option Flags](#cli-option-flags)
   - [Parameter Values](#parameter-values)
   - [Self References](#self-references)
   - [File References](#file-references)
   - [Sync/Async File References](#syncasync-file-references)
+    - [Passing Arguments to Functions](#passing-arguments-to-functions)
+    - [ConfigContext](#configcontext)
+    - [Functions Without Arguments](#functions-without-arguments)
   - [TypeScript File References](#typescript-file-references)
   - [Terraform HCL Support](#terraform-hcl-support)
   - [Git References](#git-references)
@@ -61,7 +66,7 @@ Configorama extends your configuration with a powerful variable system that reso
 - [CLI Usage](#cli-usage)
   - [Basic Commands](#basic-commands)
   - [Command Options](#command-options)
-  - [Examples](#cli-examples)
+  - [CLI Examples](#cli-examples)
 - [Testing](#testing)
   - [Running Tests](#running-tests)
   - [Test Structure](#test-structure)
@@ -82,6 +87,9 @@ Configorama extends your configuration with a powerful variable system that reso
 - [What's New](#whats-new)
 - [Alternative Libraries](#alternative-libraries)
 - [Inspiration](#inspiration)
+- [License](#license)
+- [Contributing](#contributing)
+- [Support](#support)
 
 </details>
 <!-- end-doc-gen -->
@@ -953,7 +961,7 @@ See [tests/hclTests](./tests/hclTests) for example Terraform files.
 Access repository information from the current working directory's git data.
 
 <!-- doc-gen CODE src=tests/gitVariables/gitVariables.yml -->
-```yaml
+```yml
 ########################
 # Git Variables
 ########################
@@ -1776,8 +1784,8 @@ interface VariableSource {
 **Advanced example with AWS SSM:**
 
 ```javascript
-const AWS = require('aws-sdk')
-const ssm = new AWS.SSM()
+const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm')
+const ssm = new SSMClient({})
 
 const config = await configorama('config.yml', {
   variableSources: [{
@@ -1790,10 +1798,10 @@ const config = await configorama('config.yml', {
       const paramPath = variable.replace(/^ssm:/, '')
 
       try {
-        const result = await ssm.getParameter({
+        const result = await ssm.send(new GetParameterCommand({
           Name: paramPath,
           WithDecryption: true
-        }).promise()
+        }))
 
         return result.Parameter.Value
       } catch (err) {
@@ -1806,6 +1814,8 @@ const config = await configorama('config.yml', {
   }]
 })
 ```
+
+> **See also:** the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin is a production-grade example of a `source: 'remote'` resolver — it handles multi-region, multi-account credential swapping, and per-instance client/output caching.
 
 ```yaml
 # config.yml
@@ -2087,7 +2097,7 @@ service: my-service
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs22.x
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
 
@@ -2134,7 +2144,7 @@ serverless deploy --stage prod --region us-west-2
 **Dockerfile:**
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -2212,12 +2222,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
@@ -2251,7 +2261,7 @@ stages:
 
 verify-config:
   stage: verify
-  image: node:18
+  image: node:22
   script:
     - npm ci
     - npx configorama config.yml --verify --stage $CI_ENVIRONMENT_NAME
@@ -2260,14 +2270,14 @@ verify-config:
 
 test:
   stage: test
-  image: node:18
+  image: node:22
   script:
     - npm ci
     - npm test
 
 deploy-production:
   stage: deploy
-  image: node:18
+  image: node:22
   script:
     - npm ci
     - npm run deploy
@@ -2520,14 +2530,14 @@ secrets: ${file(./fetch-secrets.js)}
 
 ```javascript
 // fetch-secrets.js
-const AWS = require('aws-sdk')
-const ssm = new AWS.SSM()
+const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm')
+const ssm = new SSMClient({})
 
 module.exports = async () => {
-  const result = await ssm.getParameter({
+  const result = await ssm.send(new GetParameterCommand({
     Name: '/myapp/api-key',
     WithDecryption: true
-  }).promise()
+  }))
 
   return result.Parameter.Value
 }
@@ -2660,14 +2670,14 @@ const config = await configorama('config.yml', {
     description: 'AWS Systems Manager Parameter Store',
     match: /^ssm:/,
     resolver: async (variable) => {
-      const AWS = require('aws-sdk')
-      const ssm = new AWS.SSM()
+      const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm')
+      const ssm = new SSMClient({})
 
       const paramName = variable.replace(/^ssm:/, '')
-      const result = await ssm.getParameter({
+      const result = await ssm.send(new GetParameterCommand({
         Name: paramName,
         WithDecryption: true
-      }).promise()
+      }))
 
       return result.Parameter.Value
     }
@@ -2821,7 +2831,7 @@ MIT © [David Wells](https://davidwells.io)
 
 ## Contributing
 
-Contributions welcome! Please read the [contributing guidelines](CONTRIBUTING.md) first.
+Bug reports and reproductions are very welcome — please open an [issue](https://github.com/DavidWells/configorama/issues) with a minimal failing config. PRs are reviewed case-by-case; small targeted fixes with a test case are most likely to land quickly.
 
 ## Support
 
