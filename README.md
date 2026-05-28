@@ -31,6 +31,8 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Resolution Flow](#resolution-flow)
   - [Analyzing Without Resolving](#analyzing-without-resolving)
   - [Getting Metadata](#getting-metadata)
+  - [Architecture](#architecture)
+  - [Performance](#performance)
 - [Variable Sources](#variable-sources)
   - [Summary Table](#summary-table)
   - [Environment Variables](#environment-variables)
@@ -91,7 +93,7 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Multi-Stage Resolution](#multi-stage-resolution)
   - [Function Arguments and Context](#function-arguments-and-context)
   - [Programmatic Usage](#programmatic-usage)
-- [What's New](#whats-new)
+- [Comparison vs Serverless Framework Variables](#comparison-vs-serverless-framework-variables)
 - [Alternative Libraries](#alternative-libraries)
 - [Inspiration](#inspiration)
 - [License](#license)
@@ -311,6 +313,59 @@ console.log(result.resolutionHistory)         // Step-by-step resolution for eac
   }
 }
 ```
+
+### Architecture
+
+```
+┌──────────────────┐    ┌─────────────────────┐    ┌──────────────────┐
+│  Input           │───▶│  Configorama core   │───▶│  Output          │
+│                  │    │                     │    │                  │
+│  • Config file   │    │  parser registry    │    │  Resolved config │
+│  • JS/TS object  │    │  (yaml, json, toml, │    │  (+ metadata if  │
+│  • Inline opts   │    │   ini, hcl, md, …)  │    │   requested)     │
+└──────────────────┘    │                     │    └──────────────────┘
+                        │  preProcess()       │
+                        │  ↓                  │
+                        │  populateObject()   │◀───┐  iterates until
+                        │  ↓                  │    │  no variables
+                        │  resolve leaf vars  │────┘  remain
+                        │  ↓                  │
+                        │  apply filters/funcs│
+                        │  ↓                  │
+                        │  return             │
+                        └──────────┬──────────┘
+                                   │
+                                   ▼
+                ┌──────────────────────────────────────┐
+                │           Variable Sources           │
+                │ ┌────────┐ ┌────────┐ ┌────────────┐ │
+                │ │ env    │ │ opt    │ │ file/text  │ │
+                │ │ self   │ │ param  │ │ git/cron   │ │
+                │ │ eval   │ │ if     │ │ + plugins  │ │
+                │ └────────┘ └────────┘ └────────────┘ │
+                │                                      │
+                │  Bundled plugins:                    │
+                │  • plugins/cloudformation            │
+                │                                      │
+                │  Custom: variableSources: [{…}]      │
+                └──────────────────────────────────────┘
+```
+
+Resolution is a **fixed-point loop**: each pass resolves what it can, then `populateObject()` runs again until no `${…}` references remain. Built-in resolvers run first; custom resolvers from `variableSources` are tried in order.
+
+### Performance
+
+Configorama is fast and stays out of the way at runtime — a typical 21KB serverless-style config resolves in **~3ms** on warm Node 22.
+
+- Honest before/after benchmarks against the published `0.9.17` baseline: [`PERF.md`](./PERF.md)
+- Reproducible bench harness: [`scripts/bench.js`](./scripts/bench.js)
+- Run against your own configs:
+  ```bash
+  node scripts/bench.js  # local
+  node scripts/bench.js /path/to/another/configorama  # A/B
+  ```
+
+If your config is slow, please open an issue with the config (or a redacted reproduction) — we can profile and tighten the hot path.
 
 ---
 
@@ -2149,6 +2204,22 @@ configorama config.yml --verify
 #   - DB_PASSWORD
 ```
 
+**Allow unknown variable types to pass through unresolved:**
+
+```bash
+# ${ssm:...} and ${custom:...} stay as literal ${ssm:...} strings
+# (typical for multi-stage pipelines where another tool resolves them)
+configorama config.yml --allow-unknown
+```
+
+**Allow undefined values in the final output:**
+
+```bash
+# Don't error on values that resolved to undefined — emit them as nulls
+# (useful for downstream tooling that does its own validation)
+configorama config.yml --allow-undefined
+```
+
 ---
 
 ## Testing
@@ -2926,68 +2997,41 @@ timeout: ${selectByEnv(30, 5, ${environment})}
 
 ---
 
-## What's New
+## Comparison vs Serverless Framework Variables
 
-How is this different than the Serverless Framework variable system?
+Configorama was forked from the Serverless Framework variable system and extended. Here's what's different:
 
-1. **Framework-agnostic** - Use with any tool, not just Serverless Framework
-
-2. **Pluggable** - Add custom variable syntax and sources easily
-
-3. **Filters** - Transform values before resolution:
-   ```yaml
-   key: ${opt:stage | toUpperCase}
-   ```
-
-4. **Cleaner self-references** - No need for `self:` prefix:
-   ```yaml
-   keyOne:
-     subKey: hi
-
-   # Before
-   key: ${self:keyOne.subKey}
-
-   # Now (both work)
-   key: ${keyOne.subKey}
-   key: ${self:keyOne.subKey}
-   ```
-
-5. **Numbers as defaults** - Numeric defaults fully supported:
-   ```yaml
-   timeout: ${env:TIMEOUT, 30}
-   port: ${opt:port, 3000}
-   ```
-
-6. **Multiple format support** - TOML, YML, JSON, INI, HCL, etc.
-
-7. **Built-in functions** - Combine and transform values:
-   ```yaml
-   merged: ${merge(${obj1}, ${obj2})}
-   ```
-
-8. **TypeScript support** - Execute TypeScript files directly:
-   ```yaml
-   config: ${file(./config.ts)}
-   ```
-
-9. **Conditional expressions** - If/else logic in configs:
-   ```yaml
-   memory: ${if(${stage} === 'prod' ? 1024 : 512)}
-   ```
-
-10. **Metadata extraction** - Analyze configs without resolving:
-    ```javascript
-    const meta = await configorama.analyze('config.yml')
-    ```
+| Capability | Serverless | Configorama |
+|---|---|---|
+| Framework-agnostic — use outside Serverless | ❌ Serverless-only | ✅ Any tool, any framework |
+| Pluggable variable sources | ❌ Hardcoded | ✅ Custom resolvers, custom syntax |
+| `self:` prefix optional in self-refs | ❌ Required | ✅ `${foo.bar}` works without `self:` |
+| Numbers as defaults | ❌ Coerced to string | ✅ `${env:TIMEOUT, 30}` stays numeric |
+| Format support | YAML/JSON | YAML, JSON/JSON5/JSONC, TOML, INI, HCL, Markdown, TS, JS |
+| Filters (pipe transforms) | ❌ | ✅ `${value \| toUpperCase}` |
+| Built-in functions | ❌ | ✅ `merge()`, custom user functions |
+| Conditional expressions | ❌ | ✅ `${if(cond ? a : b)}` |
+| Eval/math expressions | ❌ | ✅ `${eval(2 + 2)}` |
+| TypeScript file refs | ❌ | ✅ `${file(./config.ts)}` |
+| Git data refs | ❌ | ✅ `${git:branch}`, `${git:sha1}`, etc. |
+| Cron expression refs | ❌ | ✅ `${cron(every monday at 9am)}` |
+| Metadata extraction (analyze without resolving) | ❌ | ✅ `configorama.analyze(...)` |
+| Multi-account CloudFormation refs | ❌ | ✅ via bundled CF plugin |
+| Circular dependency detection | ❌ Hangs | ✅ Helpful error |
 
 ---
 
 ## Alternative Libraries
 
-- [sls-yaml](https://github.com/01alchemist/sls-yaml) - YAML with variable support
-- [yaml-boost](https://github.com/blackflux/yaml-boost) - YAML preprocessing
-- [serverless-merge-config](https://github.com/CruGlobal/serverless-merge-config) - Merge Serverless configs
-- [serverless-terraform-variables](https://www.npmjs.com/package/serverless-terraform-variables) - Terraform variable support
+How configorama compares to other variable-substitution libraries:
+
+| Library | Formats | Variable sources | Custom resolvers | Async | TypeScript |
+|---|---|---|---|---|---|
+| **configorama** | YAML, JSON5, TOML, INI, HCL, MD, TS, JS | env, opt, file, self, git, cron, eval, if, custom | ✅ | ✅ | ✅ |
+| [sls-yaml](https://github.com/01alchemist/sls-yaml) | YAML | env, opt, file, self | ❌ | ❌ | ❌ |
+| [yaml-boost](https://github.com/blackflux/yaml-boost) | YAML | env, file, self, function | partial | ❌ | ❌ |
+| [serverless-merge-config](https://github.com/CruGlobal/serverless-merge-config) | YAML | merge-focused | ❌ | ❌ | ❌ |
+| [serverless-terraform-variables](https://www.npmjs.com/package/serverless-terraform-variables) | YAML + .tfvars | terraform-focused | ❌ | ❌ | ❌ |
 
 ---
 
@@ -2995,9 +3039,12 @@ How is this different than the Serverless Framework variable system?
 
 This is forked from the [Serverless Framework](https://github.com/serverless/serverless/) variable system.
 
-**Mad props to:**
+<details>
+<summary><strong>Mad props to the original contributors</strong></summary>
 
 [erikerikson](https://github.com/erikerikson), [eahefnawy](https://github.com/eahefnawy), [HyperBrain](https://github.com/HyperBrain), [ac360](https://github.com/ac360), [gcphost](https://github.com/gcphost), [pmuens](https://github.com/pmuens), [horike37](https://github.com/horike37), [lorengordon](https://github.com/lorengordon), [AndrewFarley](https://github.com/AndrewFarley), [tobyhede](https://github.com/tobyhede), [johncmckim](https://github.com/johncmckim), [mangas](https://github.com/mangas), [e-e-e](https://github.com/e-e-e), [BasileTrujillo](https://github.com/BasileTrujillo), [miltador](https://github.com/miltador), [sammarks](https://github.com/sammarks), [RafalWilinski](https://github.com/RafalWilinski), [indieisaconcept](https://github.com/indieisaconcept), [svdgraaf](https://github.com/svdgraaf), [infiniteluke](https://github.com/infiniteluke), [j0k3r](https://github.com/j0k3r), [craigw](https://github.com/craigw), [bsdkurt](https://github.com/bsdkurt), [aoskotsky-amplify](https://github.com/aoskotsky-amplify), and all the other folks who contributed to the variable system.
+
+</details>
 
 **Additionally these tools were very helpful:**
 
@@ -3020,4 +3067,3 @@ Bug reports and reproductions are very welcome — please open an [issue](https:
 - 🐛 [Report bugs](https://github.com/DavidWells/configorama/issues)
 - 💡 [Request features](https://github.com/DavidWells/configorama/issues)
 - 📖 [Read the docs](https://github.com/DavidWells/configorama#readme)
-- 💬 [Join discussions](https://github.com/DavidWells/configorama/discussions)
