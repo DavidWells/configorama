@@ -50,6 +50,8 @@ Configorama extends your configuration with a powerful variable system that reso
   - [If Expressions](#if-expressions)
   - [Filters (Experimental)](#filters-experimental)
   - [Functions (Experimental)](#functions-experimental)
+- [Bundled Plugins](#bundled-plugins)
+  - [CloudFormation](#cloudformation)
 - [API Reference](#api-reference)
   - [Async API](#async-api)
   - [Sync API](#sync-api)
@@ -1298,6 +1300,48 @@ inRange: ${between(${value}, 50, 100)}  # true
 
 ---
 
+## Bundled Plugins
+
+Plugins ship in the repo under `plugins/` and are opt-in — install their peer dependencies, then wire them into `variableSources`. Plugins are *not* required dependencies of `configorama` itself, so consumers who don't need them aren't paying for them.
+
+### CloudFormation
+
+Resolves CloudFormation stack output values. Single-region, multi-region, and multi-account.
+
+```yaml
+# Default region, default AWS credentials
+apiUrl: ${cf:my-stack.ApiUrl}
+
+# Explicit region
+westUrl: ${cf(us-west-2):west-stack.ApiUrl}
+
+# Cross-account: 'prod' matches PROD_AWS_ACCESS_KEY_ID env vars
+prodUrl: ${cf(prod:us-west-2):prod-stack.ApiUrl}
+```
+
+```javascript
+const configorama = require('configorama')
+const createCloudFormationResolver = require('configorama/plugins/cloudformation')
+
+const cfResolver = createCloudFormationResolver({
+  defaultRegion: 'us-east-1',
+})
+
+const config = await configorama('config.yml', {
+  variableSources: [cfResolver]
+})
+```
+
+Full docs: [`plugins/cloudformation/README.md`](./plugins/cloudformation/README.md) — covers the env-var-prefix alias convention, refcounted credential mutex for parallel-safe deploys, and the `skipResolution` mode for CI metadata extraction.
+
+Peer dependency (install separately):
+
+```bash
+npm install @aws-sdk/client-cloudformation @aws-sdk/credential-providers
+```
+
+---
+
 ## API Reference
 
 ### Async API
@@ -1591,8 +1635,10 @@ const config = await configorama(configFile, {
 
 **Use cases:**
 - Multi-stage resolution (local resolution, then cloud provider resolves remaining vars)
-- Serverless Framework integration (let framework resolve SSM, CloudFormation refs)
+- Serverless Framework integration (let the framework resolve SSM and other refs it owns)
 - Gradual migration (allow unknown types during transition period)
+
+> CloudFormation refs (`${cf:…}`, `${cf(region):…}`, `${cf(account:region):…}`) are now resolved natively by the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin — no external resolver required.
 
 ---
 
@@ -2604,12 +2650,14 @@ const partiallyResolved = await configorama('config.yml', {
   allowUnknownVariableTypes: ['ssm', 'cf']
 })
 
-// Stage 2: External system resolves SSM and CloudFormation refs
-// (e.g., Serverless Dashboard, AWS CloudFormation, etc.)
+// Stage 2: External system resolves SSM and any other refs
+// (e.g., Serverless Dashboard, secrets manager, etc.)
 const fullyResolved = await externalResolver(partiallyResolved)
 ```
 
 **Use case:** Serverless Framework + Serverless Dashboard workflow.
+
+> For CloudFormation refs specifically, the bundled [CF plugin](./plugins/cloudformation/README.md) resolves them natively in Stage 1 — you don't need a second pass.
 
 ---
 
