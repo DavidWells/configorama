@@ -158,6 +158,9 @@ class Configorama {
     this.filterCache = {}
     // Cache for originalValue lookups (perf: avoid repeated dotProp.get)
     this._originalValueCache = new Map()
+    // Paths whose current value is a literal with no variables — skip rebuilding
+    // their leaf object on every subsequent populateObjectImpl iteration.
+    this._resolvedPaths = new Set()
 
     // rawOriginalConfig (a pre-preProcess snapshot) is only consumed by metadata
     // display paths. Skipping the cloneDeep when none of those paths are active
@@ -1114,12 +1117,16 @@ class Configorama {
         mapValues(current, addContext)
       }
     } else {
+      // Compute path once, then skip work for paths already known to be fully resolved.
+      const thePath = context.length > 1 ? context.join('.') : context[0]
+      if (this._resolvedPaths.has(thePath)) {
+        return results
+      }
       // TODO Add values to leaves here
       const leaf = {
         path: context,
         value: current,
       }
-      const thePath = leaf.path.length > 1 ? leaf.path.join('.') : leaf.path[0]
       // console.log('thePath', thePath)
       // console.log('this.originalConfig', this.originalConfig)
 
@@ -1168,6 +1175,9 @@ class Configorama {
           leaf.isFileRef = true
         }
       }
+      // Pre-compute hasVar so populateVariables doesn't have to re-test every leaf
+      // every iteration. Non-string values can never contain a variable.
+      leaf.hasVar = isString(current) && this.variableSyntaxTest.test(current)
       // dotProp.get(this.originalConfig, thePath)
       results.push(leaf)
     }
@@ -1185,9 +1195,18 @@ class Configorama {
    */
   populateVariables(properties) {
     // console.log('properties', properties)
+    // hasVar was precomputed in getProperties — no need to re-test the regex here.
+    // Properties whose value is defined and lacks a variable are terminally
+    // resolved: record their path so getProperties can skip them on the next
+    // iteration. Undefined-valued leaves stay eligible — the final
+    // undefined-detection traverse still needs to find them in this.leaves.
     let variables = properties.filter((property) => {
-      // Initial check if value has variable string in it
-      return isString(property.value) && this.variableSyntaxTest.test(property.value)
+      if (property.hasVar) return true
+      if (property.value !== undefined) {
+        const p = property.path
+        this._resolvedPaths.add(p.length > 1 ? p.join('.') : p[0])
+      }
+      return false
     })
     /*
     console.log(`variables at call count ${this.callCount}`, variables)
@@ -1222,6 +1241,15 @@ class Configorama {
       return results.forEach((result) => {
         if (result.value !== result.populated) {
           set(target, result.path, result.populated)
+        }
+        // If the populated value is defined and no longer contains a variable,
+        // mark this path resolved so getProperties skips it on subsequent
+        // iterations. Undefined means resolution failed — keep it eligible so
+        // the final undefined-detection traverse still has a leaf to reference.
+        const populated = result.populated
+        if (populated !== undefined && (typeof populated !== 'string' || !this.variableSyntaxTest.test(populated))) {
+          const p = result.path
+          this._resolvedPaths.add(p.length > 1 ? p.join('.') : p[0])
         }
       })
     })
