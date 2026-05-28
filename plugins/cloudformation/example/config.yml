@@ -11,6 +11,9 @@ provider:
     # Cross-region reference
     # WEST_API_URL: ${cf(us-west-2):api-service-${self:provider.stage}.ApiUrl}
 
+    # Cross-account reference: alias `prod` matches PROD_AWS_ACCESS_KEY_ID env var
+    # CROSS_ACCOUNT_API: ${cf(prod:us-west-2):api-service-prod.ApiUrl}
+
 custom:
   # Multiple outputs from same stack
   database:

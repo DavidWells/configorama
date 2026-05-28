@@ -39,9 +39,14 @@ async function main() {
     //     "stackName": "rbac-service-v2-dev",
     //     "outputKey": "RBACTableArn",
     //     "region": "us-east-1",
+    //     "account": null,
     //     "configPath": "provider.environment.RBAC_TABLE_ARN"
     //   }
     // ]
+    //
+    // Multi-account: ${cf(prod:us-west-2):api-service-prod.ApiUrl}
+    // resolves with credentials from env vars prefixed PROD_*:
+    //   PROD_AWS_ACCESS_KEY_ID, PROD_AWS_SECRET_ACCESS_KEY, PROD_AWS_REGION
 
   } catch (err) {
     console.error('Error:', err.message)

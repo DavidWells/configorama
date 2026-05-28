@@ -1,13 +1,24 @@
 /* CloudFormation stack output variable source */
+const { useCredentials } = require('./credentials')
+
 const CF_PREFIX = 'cf'
-const cfVariableSyntax = RegExp(/^cf(\([a-z0-9-]+\))?:/i)
+// Supports: cf:stack.output, cf(region):stack.output, cf(account:region):stack.output
+const cfVariableSyntax = RegExp(/^cf(\([a-z0-9_-]+(:[a-z0-9_-]+)?\))?:/i)
 
 /**
- * Creates a CloudFormation variable source resolver
- * Syntax: ${cf:stackName.outputKey} or ${cf(region):stackName.outputKey}
+ * Creates a CloudFormation variable source resolver.
+ *
+ * Syntax:
+ *   ${cf:stackName.outputKey}                       — default region, default creds
+ *   ${cf(region):stackName.outputKey}               — explicit region, default creds
+ *   ${cf(account:region):stackName.outputKey}       — explicit account alias + region
+ *
+ * `account` is an env-var-prefix alias matching `{ACCOUNT}_AWS_ACCESS_KEY_ID`
+ * (case-insensitive). E.g., with PROD_AWS_ACCESS_KEY_ID set, use `cf(prod:us-west-2):…`.
+ * See credentials.js for the discovery rules.
  *
  * @param {object} options - Configuration options
- * @param {object} [options.credentials] - AWS credentials
+ * @param {object} [options.credentials] - AWS credentials (bypasses env-var discovery)
  * @param {string} [options.defaultRegion] - Default region if not specified in variable
  * @param {boolean} [options.skipResolution] - Skip AWS calls, just collect metadata
  * @param {object} [options.clientOptions] - Additional options passed to CloudFormation client
@@ -21,25 +32,19 @@ function createCloudFormationResolver(options = {}) {
     clientOptions = {}
   } = options
 
-  // Collect references for metadata
   const cfReferences = []
 
-  // Cache for CloudFormation clients per region
+  // Clients are cached per (account, region) — different accounts cannot share a
+  // client because the provider chain memoizes credentials on first resolve.
   const clientCache = new Map()
-
-  // Cache for stack outputs to avoid repeated API calls
   const outputCache = new Map()
 
-  /**
-   * Get or create CloudFormation client for a region
-   */
-  async function getClient(region) {
-    const cacheKey = region
+  async function getClient(region, account) {
+    const cacheKey = `${account || 'default'}:${region}`
     if (clientCache.has(cacheKey)) {
       return clientCache.get(cacheKey)
     }
 
-    // Lazy load AWS SDK
     const { CloudFormationClient } = await import('@aws-sdk/client-cloudformation')
     const { fromNodeProviderChain } = await import('@aws-sdk/credential-providers')
 
@@ -54,63 +59,76 @@ function createCloudFormationResolver(options = {}) {
     return client
   }
 
-  /**
-   * Fetch stack output value from CloudFormation
-   */
-  async function getStackOutput(stackName, outputKey, region) {
-    const cacheKey = `${region}:${stackName}`
+  async function getStackOutput(stackName, outputKey, region, account = null) {
+    const cacheKey = `${account || 'default'}:${region}:${stackName}`
 
-    // Check cache first
     if (outputCache.has(cacheKey)) {
       const outputs = outputCache.get(cacheKey)
       const output = outputs.find(o => o.OutputKey === outputKey)
       return output ? output.OutputValue : null
     }
 
-    const client = await getClient(region)
-    const { DescribeStacksCommand } = await import('@aws-sdk/client-cloudformation')
+    const fetchStack = async () => {
+      const client = await getClient(region, account)
+      const { DescribeStacksCommand } = await import('@aws-sdk/client-cloudformation')
+      const command = new DescribeStacksCommand({ StackName: stackName })
 
-    const command = new DescribeStacksCommand({ StackName: stackName })
-
-    let response
-    try {
-      response = await client.send(command)
-    } catch (err) {
-      const code = err.Code || err.name
-      const messages = {
-        ExpiredToken: `AWS credentials expired. Refresh your credentials and try again.`,
-        AccessDenied: `Access denied to CloudFormation stack "${stackName}" in ${region}. Check IAM permissions.`,
-        ValidationError: `Stack "${stackName}" not found in ${region}.`,
-        CredentialsProviderError: `No AWS credentials found. Configure credentials via environment, ~/.aws/credentials, or pass explicitly.`,
+      let response
+      try {
+        response = await client.send(command)
+      } catch (err) {
+        const code = err.Code || err.name
+        const accountInfo = account ? ` for account "${account}"` : ''
+        const messages = {
+          ExpiredToken: `AWS credentials expired${accountInfo}. Refresh your credentials and try again.`,
+          AccessDenied: `Access denied to CloudFormation stack "${stackName}" in ${region}${accountInfo}. Check IAM permissions.`,
+          ValidationError: `Stack "${stackName}" not found in ${region}${accountInfo}.`,
+          CredentialsProviderError: `No AWS credentials found${accountInfo}. Configure credentials via environment, ~/.aws/credentials, or pass explicitly.`,
+        }
+        throw new Error(messages[code] || `CloudFormation error: ${err.message}`)
       }
-      throw new Error(messages[code] || `CloudFormation error: ${err.message}`)
+
+      if (!response.Stacks || response.Stacks.length === 0) {
+        throw new Error(`CloudFormation stack "${stackName}" not found in region "${region}"`)
+      }
+
+      const outputs = response.Stacks[0].Outputs || []
+      outputCache.set(cacheKey, outputs)
+
+      const output = outputs.find(o => o.OutputKey === outputKey)
+      return output ? output.OutputValue : null
     }
 
-    if (!response.Stacks || response.Stacks.length === 0) {
-      throw new Error(`CloudFormation stack "${stackName}" not found in region "${region}"`)
+    if (account) {
+      return useCredentials(account, fetchStack)
     }
-
-    const outputs = response.Stacks[0].Outputs || []
-    outputCache.set(cacheKey, outputs)
-
-    const output = outputs.find(o => o.OutputKey === outputKey)
-    return output ? output.OutputValue : null
+    return fetchStack()
   }
 
   /**
-   * Parse cf: variable string
-   * @param {string} varString - e.g., "cf:stack.output" or "cf(us-west-2):stack.output"
-   * @returns {object} { stackName, outputKey, region }
+   * Parse cf: variable string.
+   *
+   * @param {string} varString
+   * @returns {{stackName: string, outputKey: string, region: string, account: string|null}}
    */
   function parseVariable(varString) {
-    // Check for region in parentheses: cf(us-west-2):stack.output
-    const regionMatch = varString.match(/^cf\(([a-z0-9-]+)\):/i)
-    const region = regionMatch ? regionMatch[1] : defaultRegion
+    let region = defaultRegion
+    let account = null
 
-    // Remove prefix (cf: or cf(region):)
-    const withoutPrefix = varString.replace(/^cf(\([a-z0-9-]+\))?:/i, '')
+    const paramsMatch = varString.match(/^cf\(([a-z0-9_-]+(?::[a-z0-9_-]+)?)\):/i)
+    if (paramsMatch) {
+      const params = paramsMatch[1]
+      if (params.includes(':')) {
+        const [accountPart, regionPart] = params.split(':')
+        account = accountPart
+        region = regionPart
+      } else {
+        region = params
+      }
+    }
 
-    // Split on first dot to get stackName and outputKey
+    const withoutPrefix = varString.replace(/^cf(\([a-z0-9_-]+(?::[a-z0-9_-]+)?\))?:/i, '')
+
     const dotIndex = withoutPrefix.indexOf('.')
     if (dotIndex === -1) {
       throw new Error(`Invalid cf: variable syntax "${varString}". Expected format: cf:stackName.outputKey`)
@@ -123,34 +141,32 @@ function createCloudFormationResolver(options = {}) {
       throw new Error(`Invalid cf: variable syntax "${varString}". Both stackName and outputKey are required.`)
     }
 
-    return { stackName, outputKey, region }
+    return { stackName, outputKey, region, account }
   }
 
-  /**
-   * Resolver function called for each cf: variable
-   */
   async function resolver(varString, opts, currentObject, valueObject) {
-    const { stackName, outputKey, region } = parseVariable(varString)
+    const { stackName, outputKey, region, account } = parseVariable(varString)
 
-    // Collect reference for metadata
     cfReferences.push({
       raw: valueObject.originalSource,
       resolved: `\${${varString}}`,
       stackName,
       outputKey,
       region,
+      account,
       configPath: valueObject.path.join('.')
     })
 
-    // Skip AWS call if skipResolution is enabled
     if (skipResolution) {
-      return `[CF:${stackName}.${outputKey}]`
+      const accountInfo = account ? `${account}:` : ''
+      return `[CF:${accountInfo}${region}:${stackName}.${outputKey}]`
     }
 
-    const value = await getStackOutput(stackName, outputKey, region)
+    const value = await getStackOutput(stackName, outputKey, region, account)
 
     if (value === null) {
-      throw new Error(`Output "${outputKey}" not found in CloudFormation stack "${stackName}" (region: ${region})`)
+      const accountInfo = account ? `, account: ${account}` : ''
+      throw new Error(`Output "${outputKey}" not found in CloudFormation stack "${stackName}" (region: ${region}${accountInfo})`)
     }
 
     return value
@@ -160,15 +176,15 @@ function createCloudFormationResolver(options = {}) {
     type: CF_PREFIX,
     source: 'remote',
     prefix: CF_PREFIX,
-    syntax: '${cf:stackName.outputKey} or ${cf(region):stackName.outputKey}',
-    description: 'Resolves CloudFormation stack output values',
+    syntax: '${cf:stackName.outputKey}, ${cf(region):stackName.outputKey}, or ${cf(account:region):stackName.outputKey}',
+    description: 'Resolves CloudFormation stack output values (supports multi-region and multi-account)',
     match: cfVariableSyntax,
     resolver,
     metadataKey: 'cfReferences',
     collectMetadata: () => cfReferences,
-    // Expose for testing/advanced use
     clearCache: () => {
       outputCache.clear()
+      clientCache.clear()
       cfReferences.length = 0
     }
   }
@@ -178,8 +194,8 @@ if (require.main === module) {
   const instance = createCloudFormationResolver()
   instance.resolver(
     'cf:rbac-service-v2-dev.RBACTableArn',
-    {}, // opts
-    {}, // currentObject
+    {},
+    {},
     { originalSource: '${cf:rbac-service-v2-dev.RBACTableArn}', path: ['provider', 'rbacTableArn'] }
   ).then(console.log).catch(console.error)
 }

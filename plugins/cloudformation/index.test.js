@@ -40,9 +40,22 @@ function createMockCFResolver(options = {}) {
   const defaultRegion = options.defaultRegion || 'us-east-1'
 
   function parseVariable(varString) {
-    const regionMatch = varString.match(/^cf\(([a-z0-9-]+)\):/i)
-    const region = regionMatch ? regionMatch[1] : defaultRegion
-    const withoutPrefix = varString.replace(/^cf(\([a-z0-9-]+\))?:/i, '')
+    let region = defaultRegion
+    let account = null
+
+    const paramsMatch = varString.match(/^cf\(([a-z0-9_-]+(?::[a-z0-9_-]+)?)\):/i)
+    if (paramsMatch) {
+      const params = paramsMatch[1]
+      if (params.includes(':')) {
+        const [accountPart, regionPart] = params.split(':')
+        account = accountPart
+        region = regionPart
+      } else {
+        region = params
+      }
+    }
+
+    const withoutPrefix = varString.replace(/^cf(\([a-z0-9_-]+(?::[a-z0-9_-]+)?\))?:/i, '')
     const dotIndex = withoutPrefix.indexOf('.')
 
     if (dotIndex === -1) {
@@ -52,12 +65,13 @@ function createMockCFResolver(options = {}) {
     return {
       stackName: withoutPrefix.slice(0, dotIndex),
       outputKey: withoutPrefix.slice(dotIndex + 1),
-      region
+      region,
+      account
     }
   }
 
   async function resolver(varString, opts, currentObject, valueObject) {
-    const { stackName, outputKey, region } = parseVariable(varString)
+    const { stackName, outputKey, region, account } = parseVariable(varString)
 
     cfReferences.push({
       raw: valueObject.originalSource,
@@ -65,6 +79,7 @@ function createMockCFResolver(options = {}) {
       stackName,
       outputKey,
       region,
+      account,
       configPath: valueObject.path.join('.')
     })
 
@@ -90,7 +105,7 @@ function createMockCFResolver(options = {}) {
   return {
     type: 'cf',
     source: 'remote',
-    match: RegExp(/^cf(\([a-z0-9-]+\))?:/i),
+    match: RegExp(/^cf(\([a-z0-9_-]+(:[a-z0-9_-]+)?\))?:/i),
     resolver,
     metadataKey: 'cfReferences',
     collectMetadata: () => cfReferences
@@ -262,8 +277,8 @@ test('skipResolution collects metadata without calling AWS', async () => {
   })
 
   // Values should be placeholders, not resolved
-  assert.is(result.config.apiEndpoint, '[CF:api-service-prod.ApiEndpoint]')
-  assert.is(result.config.dbHost, '[CF:database-stack.DbHost]')
+  assert.is(result.config.apiEndpoint, '[CF:us-east-1:api-service-prod.ApiEndpoint]')
+  assert.is(result.config.dbHost, '[CF:us-west-2:database-stack.DbHost]')
 
   // But metadata should still be collected
   assert.ok(result.metadata.cfReferences)
@@ -277,6 +292,70 @@ test('skipResolution collects metadata without calling AWS', async () => {
   const dbRef = result.metadata.cfReferences.find(r => r.stackName === 'database-stack')
   assert.ok(dbRef)
   assert.is(dbRef.region, 'us-west-2')
+})
+
+test('cf: parses multi-account syntax with account and region', async () => {
+  const cfResolver = createCloudFormationResolver({ skipResolution: true })
+
+  const object = {
+    crossAccount: '${cf(prod:us-west-2):other-account-stack.OutputKey}',
+  }
+
+  const result = await configorama(object, {
+    configDir: dirname,
+    returnMetadata: true,
+    variableSources: [cfResolver]
+  })
+
+  assert.ok(result.metadata.cfReferences)
+  assert.is(result.metadata.cfReferences.length, 1)
+
+  const ref = result.metadata.cfReferences[0]
+  assert.is(ref.region, 'us-west-2')
+  assert.is(ref.account, 'prod')
+  assert.is(ref.stackName, 'other-account-stack')
+  assert.is(ref.outputKey, 'OutputKey')
+
+  assert.is(result.config.crossAccount, '[CF:prod:us-west-2:other-account-stack.OutputKey]')
+})
+
+test('cf: variable syntax regex matches multi-account format', () => {
+  const { cfVariableSyntax } = require('./index')
+
+  assert.ok(cfVariableSyntax.test('cf:stack.output'))
+  assert.ok(cfVariableSyntax.test('cf(us-west-2):stack.output'))
+  assert.ok(cfVariableSyntax.test('cf(prod:us-west-2):stack.output'))
+  assert.ok(cfVariableSyntax.test('cf(staging:ap-northeast-1):stack.output'))
+})
+
+test('cf: metadata includes account when present', async () => {
+  const object = {
+    local: '${cf:api-service-dev.ApiEndpoint}',
+    crossRegion: '${cf(us-west-2):other-service.ServiceUrl}',
+    crossAccount: '${cf(prod:eu-west-1):account-stack.Output, "fallback"}',
+  }
+
+  const result = await configorama(object, {
+    configDir: dirname,
+    returnMetadata: true,
+    variableSources: [createMockCFResolver()]
+  })
+
+  assert.ok(result.metadata.cfReferences)
+  assert.is(result.metadata.cfReferences.length, 3)
+
+  const localRef = result.metadata.cfReferences.find(r => r.stackName === 'api-service-dev')
+  assert.ok(localRef)
+  assert.is(localRef.account, null)
+
+  const regionRef = result.metadata.cfReferences.find(r => r.stackName === 'other-service')
+  assert.ok(regionRef)
+  assert.is(regionRef.account, null)
+
+  const accountRef = result.metadata.cfReferences.find(r => r.stackName === 'account-stack')
+  assert.ok(accountRef)
+  assert.is(accountRef.account, 'prod')
+  assert.is(accountRef.region, 'eu-west-1')
 })
 
 test.run()
