@@ -1138,21 +1138,39 @@ class Configorama {
         originalValue = cached.value
         originalValuePath = cached.originalValuePath
       } else {
-        originalValue = dotProp.get(this.originalConfig, thePath)
-        // TODO @DWELLS make recursive
+        // Walk down originalConfig once using the path array directly. Avoids
+        // dotProp.get's path-segmenting work and the previous O(depth²) loop
+        // that re-joined and re-walked parent paths.
+        const ancestorValues = []
+        let node = this.originalConfig
+        let fullPathReached = true
+        for (let i = 0; i < context.length; i++) {
+          if (node == null || typeof node !== 'object') {
+            fullPathReached = false
+            break
+          }
+          node = node[context[i]]
+          ancestorValues.push(node)
+        }
+
+        const lastIdx = ancestorValues.length - 1
+        originalValue = fullPathReached ? ancestorValues[lastIdx] : undefined
+
         if (!originalValue) {
-          // Recurse up the tree until we find a value
-          // Use index instead of slice() to avoid array allocations
-          for (let pathLen = leaf.path.length - 1; pathLen > 0 && !originalValue; pathLen--) {
-            const currentPath = leaf.path.slice(0, pathLen).join('.')
-            // console.log('checking parent path:', currentPath)
-            originalValue = dotProp.get(this.originalConfig, currentPath)
-            if (typeof originalValue !== 'undefined') {
-              originalValuePath = currentPath
+          // Same semantics as the previous "recurse up" loop: walk from the
+          // deepest non-full ancestor toward the root, take the first truthy
+          // ancestor as originalValue, and update originalValuePath each time
+          // we see a defined ancestor along the way.
+          const startIdx = fullPathReached ? lastIdx - 1 : lastIdx
+          for (let i = startIdx; i >= 0; i--) {
+            const ancestor = ancestorValues[i]
+            if (typeof ancestor !== 'undefined') {
+              originalValuePath = i > 0 ? context.slice(0, i + 1).join('.') : context[0]
+              originalValue = ancestor
+              if (ancestor) break
             }
           }
         }
-        // Cache the result
         this._originalValueCache.set(thePath, { value: originalValue, originalValuePath })
       }
       if (originalValuePath) {
