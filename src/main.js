@@ -198,6 +198,10 @@ class Configorama {
     }
     const variableSyntax = varRegex
     this.variableSyntax = variableSyntax
+    // Non-global twin for cheap boolean checks: `.test()` on a global regex
+    // would advance lastIndex between calls, and `.match()` on a global regex
+    // allocates an array of every match. Use this whenever we only need truthy.
+    this.variableSyntaxTest = new RegExp(variableSyntax.source, variableSyntax.flags.replace('g', ''))
 
     // Extract variable prefix/suffix from syntax regex for reconstructing variables
     const syntaxWrapper = extractVariableWrapper(variableSyntax.source)
@@ -830,7 +834,7 @@ class Configorama {
     const originalConfig = this.originalConfig
 
     /* If no variables found just return early */
-    if (this.originalString && !this.originalString.match(this.variableSyntax)) {
+    if (this.originalString && !this.variableSyntaxTest.test(this.originalString)) {
       if (this._markdownContent !== undefined) {
         this.originalConfig[this._markdownContentKey] = this._markdownContent
       }
@@ -843,7 +847,7 @@ class Configorama {
       /* has hardcoded stage */
       if (
         this.originalConfig && this.originalConfig.provider && 
-        this.originalConfig.provider.stage && !this.originalConfig.provider.stage.match(this.variableSyntax)
+        this.originalConfig.provider.stage && !this.variableSyntaxTest.test(this.originalConfig.provider.stage)
       ) {
         providerStage = this.originalConfig.provider.stage
       }
@@ -1183,7 +1187,7 @@ class Configorama {
     // console.log('properties', properties)
     let variables = properties.filter((property) => {
       // Initial check if value has variable string in it
-      return isString(property.value) && property.value.match(this.variableSyntax)
+      return isString(property.value) && this.variableSyntaxTest.test(property.value)
     })
     /*
     console.log(`variables at call count ${this.callCount}`, variables)
@@ -1368,7 +1372,7 @@ class Configorama {
         historyEntry.fallbackValues = variableParts.slice(1).map((fallback) => {
           const trimmedFallback = fallback.trim()
           // Check if it's a variable reference
-          const isVariable = trimmedFallback.match(this.variableSyntax) || trimmedFallback.match(this.variablesKnownTypes)
+          const isVariable = this.variableSyntaxTest.test(trimmedFallback) || this.variablesKnownTypes.test(trimmedFallback)
           const fallbackData = {
             isVariable: !!isVariable,
             fullMatch: trimmedFallback,
@@ -1606,7 +1610,7 @@ class Configorama {
       }
 
       /* Handle ${self:custom.ref, ''} with deep values */
-      if (v.match(deepRefSyntax) && originalSrc.match(this.variableSyntax) && !v.match(/deep\:(\d*)\..*}$/)) {
+      if (v.match(deepRefSyntax) && this.variableSyntaxTest.test(originalSrc) && !v.match(/deep\:(\d*)\..*}$/)) {
         // console.log('deep ref syntax')
         // console.log('deep var', this.deep)
         // console.log('originalSrc', originalSrc)
@@ -1656,8 +1660,8 @@ class Configorama {
       /** */
       // Handle comma ${opt:stage, dev} and remove extra suffix
       if (
-        currentMatchedString.match(this.variableSyntax) &&
-        !valueToPopulate.match(this.variableSyntax) &&
+        this.variableSyntaxTest.test(currentMatchedString) &&
+        !this.variableSyntaxTest.test(valueToPopulate) &&
         valueToPopulate.match(this.varSuffixPattern)
       ) {
         valueToPopulate = valueToPopulate.replace(this.varSuffixPattern, '')
@@ -1665,7 +1669,7 @@ class Configorama {
 
       // For eval/if expressions, string values need quotes unless already quoted
       // BUT don't quote strings that contain variable refs (they need further resolution)
-      if (evalIfPattern.test(property) && !valueToPopulate.match(this.variableSyntax)) {
+      if (evalIfPattern.test(property) && !this.variableSyntaxTest.test(valueToPopulate)) {
         const matchIdx = property.indexOf(currentMatchedString)
         const charBefore = matchIdx > 0 ? property[matchIdx - 1] : ''
         // Always escape quotes in values for eval/if context
@@ -1703,8 +1707,8 @@ class Configorama {
         const isNestedInVariable = (
           property.trim() !== matchedString.trim() &&
           property.indexOf(matchedString) !== -1 &&
-          matchedString.match(this.variableSyntax) &&
-          property.match(this.variableSyntax)
+          this.variableSyntaxTest.test(matchedString) &&
+          this.variableSyntaxTest.test(property)
         )
         // Only encode for file() or text() references where JSON braces break regex matching
         const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
@@ -1875,7 +1879,7 @@ Missing Value ${missingValue} - ${matchedString}
 
       if (
         /* Not another variable reference */
-        !prop.match(this.variableSyntax)
+        !this.variableSyntaxTest.test(prop)
         &&
         /* Not file or text refs */
         !prop.match(fileRefSyntax)
@@ -1912,7 +1916,7 @@ Missing Value ${missingValue} - ${matchedString}
       typeof valueToPopulate === 'string' &&
       !valueToPopulate.match(deepRefSyntax) &&
       foundFilters.length &&
-      !property.match(this.variableSyntax)
+      !this.variableSyntaxTest.test(property)
     ) {
       runFilters = true
     }
@@ -1991,7 +1995,7 @@ Missing Value ${missingValue} - ${matchedString}
       const secondValue = variableStrings[1]
       if (
         isString(firstValue) && firstValue.match(this.variablesKnownTypes) 
-        && isString(secondValue) && !secondValue.match(this.variablesKnownTypes) && !secondValue.match(this.variableSyntax)
+        && isString(secondValue) && !secondValue.match(this.variablesKnownTypes) && !this.variableSyntaxTest.test(secondValue)
       ) {
         if (!isSurroundedByQuotes(secondValue) && !/^-?\d+(\.\d+)?$/.test(secondValue) && !startsWithQuotedPipe(secondValue)) {
           variableStrings = [firstValue, ensureQuote(secondValue)]
@@ -2023,7 +2027,7 @@ Missing Value ${missingValue} - ${matchedString}
 
       extractedValues.forEach((value, index) => {
         // console.log('───────────────────────────────> value', value)
-        if (isString(value) && value.match(this.variableSyntax)) {
+        if (isString(value) && this.variableSyntaxTest.test(value)) {
           deepProperties += 1
           // console.log('makeDeepVariable overwrite', value)
           const deepVariable = this.makeDeepVariable(value, 'via overwrite')
@@ -2668,7 +2672,7 @@ Missing Value ${missingValue} - ${matchedString}
       // if there is a deep reference remaining
       ret = ret.then((result) => {
         // console.log('DEEP RESULT', result)
-        if (isString(result.value) && result.value.match(this.variableSyntax)) {
+        if (isString(result.value) && this.variableSyntaxTest.test(result.value)) {
           // console.log('makeDeepVariable getValueFromDeep', result.value)
           const deepVariable = this.makeDeepVariable(result.value, 'via getValueFromDeep')
           return Promise.resolve(appendDeepVariable(deepVariable, deepRef))
@@ -2773,7 +2777,7 @@ Missing Value ${missingValue} - ${matchedString}
 
           reducedValue = reducedValue[subProperty]
         }
-        if (typeof reducedValue === 'string' && reducedValue.match(this.variableSyntax)) {
+        if (typeof reducedValue === 'string' && this.variableSyntaxTest.test(reducedValue)) {
           // console.log('makeDeepVariable reducedValue', reducedValue)
           reducedValue = this.makeDeepVariable(reducedValue, 'via getDeeperValue')
         }
