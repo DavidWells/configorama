@@ -57,6 +57,11 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Sync API](#sync-api)
   - [Analyze API](#analyze-api)
   - [Format Utilities](#format-utilities)
+  - [Markdown Files](#markdown-files)
+  - [`buildVariableSyntax(prefix, suffix, excludePatterns?)`](#buildvariablesyntaxprefix-suffix-excludepatterns)
+  - [`Configorama` Class](#configorama-class)
+  - [`configorama/parse-file` Subpath](#configoramaparse-file-subpath)
+  - [TypeScript Types](#typescript-types)
 - [Configuration Options](#configuration-options)
   - [Custom Variable Syntax](#custom-variable-syntax)
   - [allowUnknownVariableTypes](#allowunknownvariabletypes)
@@ -1529,8 +1534,8 @@ const { format } = require('configorama')
 // Parse YAML
 const yamlObj = format.yaml.parse('key: value')
 
-// Parse JSON5
-const jsonObj = format.json5.parse('{ key: "value", }')
+// Parse JSON (handles JSON5/JSONC too — comments, trailing commas)
+const jsonObj = format.json.parse('{ key: "value", }')
 
 // Parse TOML
 const tomlObj = format.toml.parse('key = "value"')
@@ -1542,11 +1547,133 @@ const iniObj = format.ini.parse('[section]\nkey=value')
 const hclObj = await format.hcl.parse('variable "example" { default = "value" }')
 ```
 
-**Parser methods:**
+**Available parsers:** `format.json`, `format.yaml`, `format.toml`, `format.ini`, `format.hcl`, `format.markdown`.
 
-Each parser has:
-- `parse(content)` - Parse string to JavaScript object
-- `stringify(obj)` - Convert JavaScript object to format string (if supported)
+Each has at minimum a `parse(content)` method; `dump(obj)` / `stringify(obj)` and cross-format converters (e.g. `format.yaml.toJson`, `format.toml.toYaml`) are available where the underlying format supports them. `format.markdown` is a frontmatter parser — see [Markdown Files](#markdown-files) below.
+
+**Real use cases for `format`:**
+
+- Parse a config file without resolving variables (just want the structure):
+  ```javascript
+  const { format } = require('configorama')
+  const fs = require('fs')
+  const raw = format.yaml.parse(fs.readFileSync('config.yml', 'utf8'))
+  // raw is the YAML structure with ${...} strings intact
+  ```
+- Use the same YAML/TOML/JSON5 parsers as configorama itself in your own tooling, so a file that loads in one place loads identically in the other.
+
+---
+
+### Markdown Files
+
+Markdown configs (`.md`, `.mdx`, `.markdown`, `.mdown`, `.mkdn`, `.mkd`) are parsed as YAML/TOML/JSON frontmatter + body. The frontmatter becomes top-level keys; the body is exposed as `_content` on the resolved config (or `_body` if the frontmatter used that key explicitly).
+
+```markdown
+---
+service: my-service
+stage: ${opt:stage, 'dev'}
+---
+
+# Service Docs
+This is the body content.
+```
+
+Resolves to:
+
+```javascript
+{
+  service: 'my-service',
+  stage: 'dev',
+  _content: '# Service Docs\nThis is the body content.'
+}
+```
+
+The body is detached during variable resolution (so `${…}` inside the body text is left alone) and re-attached afterward — only frontmatter keys get variable expansion.
+
+---
+
+### `buildVariableSyntax(prefix, suffix, excludePatterns?)`
+
+Helper for building a properly-escaped regex source string to pass to the `syntax` option. Handles regex-special characters in your delimiters without you having to escape them yourself.
+
+```javascript
+const { buildVariableSyntax } = require('configorama')
+
+// Use {{ ... }} instead of ${ ... }
+const syntax = buildVariableSyntax('{{', '}}')
+
+const config = await configorama('config.yml', { syntax })
+```
+
+**Parameters:**
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `prefix` | `string` | `'${'` | Opening delimiter |
+| `suffix` | `string` | `'}'` | Closing delimiter |
+| `excludePatterns` | `string[]` | `['AWS', 'stageVariables']` | Patterns to exclude via negative lookahead (so e.g. `${AWS::Region}` is left untouched by CloudFormation users) |
+
+---
+
+### `Configorama` Class
+
+For advanced use cases (long-lived instances, hooking into init/resolve lifecycle, accessing partial state) the underlying class is exported.
+
+```javascript
+const { Configorama } = require('configorama')
+
+const instance = new Configorama('config.yml', { options: { stage: 'dev' } })
+await instance.init({ stage: 'dev' })
+const resolved = await instance.populateObject(instance.config)
+const metadata = instance.collectVariableMetadata()
+```
+
+Most users should prefer the top-level `configorama()` / `.sync()` / `.analyze()` functions, which are thin wrappers around this class.
+
+---
+
+### `configorama/parse-file` Subpath
+
+For tools that want to parse a config file (auto-detecting format from extension or contents) without going through variable resolution:
+
+```javascript
+const { parseFile, parseFileContents } = require('configorama/parse-file')
+
+// Read from disk
+const raw = parseFile('./config.yml')
+// returns the parsed object with ${...} strings intact
+
+// Or parse already-loaded contents
+const fromString = parseFileContents({
+  contents: 'service: my-app\nstage: ${opt:stage}',
+  filePath: 'in-memory.yml'
+})
+```
+
+Both are synchronous. Useful for build tools that inspect or rewrite configs before handing them to configorama.
+
+---
+
+### TypeScript Types
+
+Type definitions are bundled (`index.d.ts`). TypeScript users get:
+
+- Generic typing on the resolved config: `configorama<MyConfig>('config.yml')` returns `Promise<MyConfig>`
+- Full typing on `ConfigoramaSettings` and `ConfigoramaResult`
+- Editor autocomplete on all options shown in the [Complete Options Reference](#complete-options-reference)
+
+```typescript
+import configorama, { ConfigoramaSettings } from 'configorama'
+
+interface MyConfig {
+  service: string
+  stage: string
+  database: { host: string; port: number }
+}
+
+const config = await configorama<MyConfig>('config.yml', { options: { stage: 'prod' } })
+// config.database.port is typed as number
+```
 
 ---
 
@@ -1708,9 +1835,16 @@ const config = await configorama(configFile, {
 | `allowUnknownVariableTypes` | `boolean \| string[]` | `false` | Allow unknown variable types to pass through |
 | `allowUnresolvedVariables` | `boolean \| string[]` | `false` | Allow known types that can't resolve to pass through |
 | `allowUndefinedValues` | `boolean` | `false` | Allow undefined as a valid end result |
-| `returnMetadata` | `boolean` | `false` | Return both config and metadata about variables |
+| `returnMetadata` | `boolean` | `false` | Return `{ config, metadata }` instead of just the resolved config |
+| `returnPreResolvedVariableDetails` | `boolean` | `false` | Return metadata about variables *without* resolving them (used by `analyze()`) |
+| `useDotEnvFiles` | `boolean` | `false` | Auto-load `.env`, `.env.{stage}`, etc. into `process.env` before resolution (via [env-stage-loader](https://www.npmjs.com/package/env-stage-loader)) |
+| `dotEnvSilent` | `boolean` | `true` (unless `--verbose`) | Suppress the env-stage-loader log lines when `useDotEnvFiles` is on |
+| `dotEnvDebug` | `boolean` | `false` | Enable env-stage-loader debug output |
+| `dynamicArgs` | `object \| Function` | `undefined` | Values passed into `.js`/`.ts` config files when they're imported as the root config |
 | `mergeKeys` | `string[]` | `[]` | Keys to merge in arrays of objects |
 | `filePathOverrides` | `Record<string, string>` | `{}` | Map of file paths to override (for testing/mocking) |
+
+> The config file itself can also set `useDotenv: true` (or `useDotEnv: true`) at the top level to trigger dotenv loading — useful if you want the behavior intrinsic to the config rather than the JS caller.
 
 **Legacy options (deprecated):**
 
