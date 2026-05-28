@@ -71,16 +71,19 @@
   "devDependencies": {
     "@cdktf/hcl2json": "^0.21.0",
     "@types/node": "^24.10.1",
-    "markdown-magic": "^3.4.0",
+    "markdown-magic": "^4.8.0",
     "tsx": "^4.7.0",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6",
     "watchlist": "^0.3.1"
   },
+  "overrides": {
+    "lodash": "^4.18.1"
+  },
   "peerDependencies": {
     "@cdktf/hcl2json": ">=0.20.0",
-    "tsx": ">=4.0.0",
-    "ts-node": ">=10.0.0"
+    "ts-node": ">=10.0.0",
+    "tsx": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@cdktf/hcl2json": {
