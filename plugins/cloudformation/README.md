@@ -39,7 +39,7 @@ export PROD_AWS_SECRET_ACCESS_KEY=...
 export PROD_AWS_REGION=us-west-2      # optional; falls back to AWS_REGION
 ```
 
-The alias is the prefix lowercased — `STAGING_AWS_ACCESS_KEY_ID` becomes
+The alias is the prefix lowercased, so `STAGING_AWS_ACCESS_KEY_ID` becomes
 `staging`. The alias is **not** an AWS 12-digit account number; it's whatever
 string you put before `_AWS_ACCESS_KEY_ID`.
 
@@ -53,8 +53,8 @@ string you put before `_AWS_ACCESS_KEY_ID`.
 ### Parallel safety
 
 Multiple resolves for the **same** account run concurrently. Resolves for
-**different** accounts are serialized via a refcounted mutex — `process.env` is
-process-global, so two accounts can't be active at once.
+**different** accounts are serialized via a refcounted mutex, since
+`process.env` is process-global and two accounts can't be active at once.
 
 ## Metadata
 

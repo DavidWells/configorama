@@ -356,9 +356,9 @@ Resolution is a **fixed-point loop**: each pass resolves what it can, then `popu
 
 ### Performance
 
-Configorama is fast and stays out of the way at runtime — a typical 21KB serverless-style config resolves in **~3ms** on warm Node 22.
+A typical 21KB serverless-style config resolves in **~3ms** on warm Node 22.
 
-- Honest before/after benchmarks against the published `0.9.17` baseline: [`PERF.md`](./PERF.md)
+- Before/after benchmarks against the published `0.9.17` baseline: [`PERF.md`](./PERF.md)
 - Reproducible bench harness: [`scripts/bench.js`](./scripts/bench.js)
 - Run against your own configs:
   ```bash
@@ -366,7 +366,7 @@ Configorama is fast and stays out of the way at runtime — a typical 21KB serve
   node scripts/bench.js /path/to/another/configorama  # A/B
   ```
 
-If your config is slow, please open an issue with the config (or a redacted reproduction) — we can profile and tighten the hot path.
+If your config is slow, please open an issue with the config (or a redacted reproduction). We're happy to profile and tighten the hot path.
 
 ---
 
@@ -1363,7 +1363,7 @@ inRange: ${between(${value}, 50, 100)}  # true
 
 ## Bundled Plugins
 
-Plugins ship in the repo under `plugins/` and are opt-in — install their peer dependencies, then wire them into `variableSources`. Plugins are *not* required dependencies of `configorama` itself, so consumers who don't need them aren't paying for them.
+Plugins ship in the repo under `plugins/` and are opt-in: install their peer dependencies, then wire them into `variableSources`. Plugins are *not* required dependencies of `configorama` itself, so consumers who don't need them aren't paying for them.
 
 ### CloudFormation
 
@@ -1393,7 +1393,7 @@ const config = await configorama('config.yml', {
 })
 ```
 
-Full docs: [`plugins/cloudformation/README.md`](./plugins/cloudformation/README.md) — covers the env-var-prefix alias convention, refcounted credential mutex for parallel-safe deploys, and the `skipResolution` mode for CI metadata extraction.
+Full docs: [`plugins/cloudformation/README.md`](./plugins/cloudformation/README.md). Covers the env-var-prefix alias convention, the refcounted credential mutex for parallel-safe deploys, and the `skipResolution` mode for CI metadata extraction.
 
 Peer dependency (install separately):
 
@@ -1590,7 +1590,7 @@ const { format } = require('configorama')
 // Parse YAML
 const yamlObj = format.yaml.parse('key: value')
 
-// Parse JSON (handles JSON5/JSONC too — comments, trailing commas)
+// Parse JSON (handles JSON5/JSONC too: comments, trailing commas)
 const jsonObj = format.json.parse('{ key: "value", }')
 
 // Parse TOML
@@ -1605,7 +1605,7 @@ const hclObj = await format.hcl.parse('variable "example" { default = "value" }'
 
 **Available parsers:** `format.json`, `format.yaml`, `format.toml`, `format.ini`, `format.hcl`, `format.markdown`.
 
-Each has at minimum a `parse(content)` method; `dump(obj)` / `stringify(obj)` and cross-format converters (e.g. `format.yaml.toJson`, `format.toml.toYaml`) are available where the underlying format supports them. `format.markdown` is a frontmatter parser — see [Markdown Files](#markdown-files) below.
+Each has at minimum a `parse(content)` method; `dump(obj)` / `stringify(obj)` and cross-format converters (e.g. `format.yaml.toJson`, `format.toml.toYaml`) are available where the underlying format supports them. `format.markdown` is a frontmatter parser; see [Markdown Files](#markdown-files) below.
 
 **Real use cases for `format`:**
 
@@ -1644,7 +1644,7 @@ Resolves to:
 }
 ```
 
-The body is detached during variable resolution (so `${…}` inside the body text is left alone) and re-attached afterward — only frontmatter keys get variable expansion.
+The body is detached during variable resolution (so `${…}` inside the body text is left alone) and re-attached afterward; only frontmatter keys get variable expansion.
 
 ---
 
@@ -1821,7 +1821,7 @@ const config = await configorama(configFile, {
 - Serverless Framework integration (let the framework resolve SSM and other refs it owns)
 - Gradual migration (allow unknown types during transition period)
 
-> CloudFormation refs (`${cf:…}`, `${cf(region):…}`, `${cf(account:region):…}`) are now resolved natively by the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin — no external resolver required.
+> CloudFormation refs (`${cf:…}`, `${cf(region):…}`, `${cf(account:region):…}`) are now resolved natively by the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin; no external resolver required.
 
 ---
 
@@ -1900,7 +1900,7 @@ const config = await configorama(configFile, {
 | `mergeKeys` | `string[]` | `[]` | Keys to merge in arrays of objects |
 | `filePathOverrides` | `Record<string, string>` | `{}` | Map of file paths to override (for testing/mocking) |
 
-> The config file itself can also set `useDotenv: true` (or `useDotEnv: true`) at the top level to trigger dotenv loading — useful if you want the behavior intrinsic to the config rather than the JS caller.
+> The config file itself can also set `useDotenv: true` (or `useDotEnv: true`) at the top level to trigger dotenv loading. Useful when you want the behavior intrinsic to the config rather than the JS caller.
 
 **Legacy options (deprecated):**
 
@@ -2051,7 +2051,7 @@ const config = await configorama('config.yml', {
 })
 ```
 
-> **See also:** the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin is a production-grade example of a `source: 'remote'` resolver — it handles multi-region, multi-account credential swapping, and per-instance client/output caching.
+> **See also:** the bundled [`plugins/cloudformation/`](./plugins/cloudformation/README.md) plugin is a working example of a `source: 'remote'` resolver. It handles multi-region and multi-account credential swapping, plus per-instance client and output caching.
 
 ```yaml
 # config.yml
@@ -2216,7 +2216,7 @@ configorama config.yml --allow-unknown
 **Allow undefined values in the final output:**
 
 ```bash
-# Don't error on values that resolved to undefined — emit them as nulls
+# Don't error on values that resolved to undefined; emit them as nulls
 # (useful for downstream tooling that does its own validation)
 configorama config.yml --allow-undefined
 ```
@@ -2863,7 +2863,7 @@ const fullyResolved = await externalResolver(partiallyResolved)
 
 **Use case:** Serverless Framework + Serverless Dashboard workflow.
 
-> For CloudFormation refs specifically, the bundled [CF plugin](./plugins/cloudformation/README.md) resolves them natively in Stage 1 — you don't need a second pass.
+> For CloudFormation refs specifically, the bundled [CF plugin](./plugins/cloudformation/README.md) resolves them natively in Stage 1, so you don't need a second pass.
 
 ---
 
@@ -3000,11 +3000,11 @@ timeout: ${selectByEnv(30, 5, ${environment})}
 
 ## Comparison vs Serverless Framework Variables
 
-Configorama was forked from the Serverless Framework variable system and extended. Here's what's different:
+Configorama was forked from the Serverless Framework variable system and extended. The differences:
 
 | Capability | Serverless | Configorama |
 |---|---|---|
-| Framework-agnostic — use outside Serverless | ❌ Serverless-only | ✅ Any tool, any framework |
+| Framework-agnostic; use outside Serverless | ❌ Serverless-only | ✅ Any tool, any framework |
 | Pluggable variable sources | ❌ Hardcoded | ✅ Custom resolvers, custom syntax |
 | `self:` prefix optional in self-refs | ❌ Required | ✅ `${foo.bar}` works without `self:` |
 | Numbers as defaults | ❌ Coerced to string | ✅ `${env:TIMEOUT, 30}` stays numeric |
@@ -3067,7 +3067,7 @@ MIT © [David Wells](https://davidwells.io)
 
 ## Contributing
 
-Bug reports and reproductions are very welcome — please open an [issue](https://github.com/DavidWells/configorama/issues) with a minimal failing config. PRs are reviewed case-by-case; small targeted fixes with a test case are most likely to land quickly.
+Bug reports and reproductions are very welcome. Please open an [issue](https://github.com/DavidWells/configorama/issues) with a minimal failing config. PRs are reviewed case-by-case; small targeted fixes with a test case are most likely to land quickly.
 
 ## Support
 

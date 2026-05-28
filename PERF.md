@@ -1,23 +1,23 @@
 # Perf notes
 
-Honest A/B numbers for the perf commits landed between `0.9.17` and the
-current `HEAD`.
+A/B benchmark numbers for the perf commits that landed between `0.9.17` and
+the current `HEAD`.
 
 ## Methodology
 
 `scripts/bench.js` resolves a fixed set of five fixtures repeatedly:
 
-- `tests/_fixtures/serverless.yml` — 21KB serverless-style config (success)
-- `tests/mergeKeys/mergeKeys.yml` — exercises the file-content cache
-- `tests/manualYaml.yml` — small mixed-types fixture (success)
-- `tests/_case-1/serverless.yml` — file()-heavy success path
-- `tests/advancedVariables/advancedVariables.yml` — nested/recursive vars
+- `tests/_fixtures/serverless.yml`: 21KB serverless-style config (success)
+- `tests/mergeKeys/mergeKeys.yml`: exercises the file-content cache
+- `tests/manualYaml.yml`: small mixed-types fixture (success)
+- `tests/_case-1/serverless.yml`: file()-heavy success path
+- `tests/advancedVariables/advancedVariables.yml`: nested/recursive vars
 
 Each run does 3 warm-up passes (so the JIT settles), then samples N iterations
 of "resolve all five." Numbers below are per-iteration totals (sum of all five
 resolves), in milliseconds.
 
-A/B is run **alternating** between published and local — five pairs so the
+A/B is run **alternating** between published and local; five pairs so the
 machine state doesn't bias one side:
 
 ```sh
@@ -46,11 +46,11 @@ same machine, same fixture set, same process for each measurement.
 ## What the per-commit messages got wrong
 
 The seven `perf(...)` commits between `0.9.17` and `HEAD` each include a
-"Before/After" block in the message. Those blocks are honest about the
-*immediate* before/after at the moment the commit was made — but the
-baselines themselves drifted downward over the session (warm-up state, GC
-volatility, JIT artifacts across long runs). Summing the per-commit deltas
-overstates the cumulative win.
+"Before/After" block in the message. Those blocks report the *immediate*
+before/after at the moment the commit was made. The baselines themselves
+drifted downward over the session, though, from warm-up state, GC
+volatility, and JIT artifacts across long runs. Summing the per-commit
+deltas overstates the cumulative win.
 
 **Trust the clean A/B above (~5% mean / ~6% p50). Don't trust a sum of the
 per-commit deltas.**
@@ -69,17 +69,17 @@ The seven commits, in order:
 
 Each commit:
 
-- preserves resolution behavior — sha256 of resolved JSON across the fixture
+- preserves resolution behavior; sha256 of resolved JSON across the fixture
   set is unchanged
-- passes the full test suite — 1051/1051 tests, 0 regressions
+- passes the full test suite (1051/1051 tests, 0 regressions)
 - includes an isomorphism note in the message
 
 ## What's *not* measured
 
 The 5% number is for this specific fixture set on this specific machine.
 Several of the changes have **structural** improvements that should pay off
-more on workloads I didn't benchmark — but I have no measurement to back
-that up, so it's a hypothesis, not a claim:
+more on workloads I didn't benchmark, but I have no measurement to back
+that up, so treat the following as hypotheses rather than claims:
 
 - **Path-skip** (#4): scales with iteration count × resolved-leaf count.
   Configs that need 10+ populate passes (deeply chained references) should

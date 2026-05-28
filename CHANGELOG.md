@@ -1,13 +1,13 @@
 # Changelog
 
-All notable changes to configorama. Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not strictly follow SemVer at `0.x` — minor and patch bumps may contain mixed work until 1.0.
+All notable changes to configorama. Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not strictly follow SemVer at `0.x`, so minor and patch bumps may contain mixed work until 1.0.
 
 ## Unreleased
 
 ### Added
 - **Multi-account CloudFormation plugin** at `plugins/cloudformation/` with the `${cf(account:region):stack.Output}` syntax. The `account` field is an env-var-prefix alias (e.g. `prod` matches `PROD_AWS_ACCESS_KEY_ID`). Refcounted mutex serializes different-account resolves while allowing same-account ones to run in parallel. Includes 13 unit tests for the resolver and 13 for the credentials utility. Closes #57.
-- `scripts/bench.js` — reproducible multi-fixture resolve benchmark, accepts a lib path so you can A/B test branches or versions.
-- `PERF.md` documenting the honest A/B comparison against `0.9.17` (~5% mean reduction across the five-fixture workload).
+- `scripts/bench.js`: reproducible multi-fixture resolve benchmark, accepts a lib path so you can A/B test branches or versions.
+- `PERF.md` documenting the A/B comparison against `0.9.17` (~5% mean reduction across the five-fixture workload).
 
 ### Changed
 - Resolution loop is now ~5% faster on a representative workload. The seven changes:
@@ -15,7 +15,7 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
   - `getProperties` walks the path array directly on cache miss instead of O(depth²) repeated `dotProp.get(joined-string)` calls.
   - The post-resolve config walk no longer goes through the `traverse` package; uses a native pre-order recursion (skips sparse-array holes to preserve previous behaviour).
   - `populateVariables` filter uses a precomputed `hasVar` flag instead of re-running the variable-syntax regex per leaf per iteration.
-  - Boolean `.match()` checks on `this.variableSyntax` (a `/g` regex) replaced with `.test()` on a non-global twin — avoids allocating a match-array just to discard it.
+  - Boolean `.match()` checks on `this.variableSyntax` (a `/g` regex) replaced with `.test()` on a non-global twin; avoids allocating a match-array just to discard it.
   - `rawOriginalConfig` is now lazy-cloned only when a metadata consumer (`returnMetadata`, `--verbose`, `--info`, `returnPreResolvedVariableDetails`, setup mode) actually needs it.
   - `preProcess.js` reuses the precompiled `precededByPatterns` array in the second comparison-context pass instead of rebuilding the regex per `${…}` ref.
 - `valueFromFile` resolver now caches `readFileSync` per absolute path per Configorama instance. Duplicate `${file:…}` references (common with merge-keys patterns) hit the disk once.
@@ -45,7 +45,7 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 ## [0.9.16] — 2026-05-23
 
 ### Added
-- Source line numbers included in resolution error messages — easier to track down the offending config location.
+- Source line numbers included in resolution error messages, so the offending config location is easier to track down.
 - Content-based format detection for extensionless files.
 - Test fixture for `serverless analyze`.
 
@@ -80,7 +80,7 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 - `preProcess` regex compilation moved out of hot loops; added early-exit checks.
 
 ### Docs
-- First comprehensive README rewrite covering all use cases.
+- First full README rewrite covering all use cases.
 
 ## [0.9.13] — 2026-01-27
 
@@ -97,7 +97,7 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 - TypeScript types corrected for `parsePath` to include `number` in the return type.
 
 ### Changed
-- Replaced 15 micro-package lodash dependencies with native JS equivalents — smaller install size, fewer transitive deps.
+- Replaced 15 micro-package lodash dependencies with native JS equivalents (smaller install size, fewer transitive deps).
 - Removed debug code and the `promise.finally` shim (Node 12+ has native support).
 
 ## [0.9.12] — 2026-01-12
