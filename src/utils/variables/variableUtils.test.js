@@ -172,6 +172,15 @@ test('buildVariableSyntax - supports backslash in values', () => {
   assert.is(match[0], "${env:FOO, 'path\\to\\file'}")
 })
 
+test('buildVariableSyntax - default ${} syntax excludes IAM aws variables', () => {
+  const syntax = buildVariableSyntax('${', '}')
+  const regex = new RegExp(syntax, 'g')
+
+  assert.not.ok('${aws:username}'.match(regex))
+  assert.not.ok('arn:aws:s3:::bucket/${aws:PrincipalTag/team}/*'.match(regex))
+  assert.ok('${self:custom.value}'.match(regex))
+})
+
 test('buildVariableSyntax - double brace ${{}} syntax excludes }', () => {
   const syntax = buildVariableSyntax('${{', '}}')
   const regex = new RegExp(syntax, 'g')

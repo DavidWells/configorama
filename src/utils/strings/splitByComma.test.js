@@ -2,7 +2,7 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const { splitByComma } = require('./splitByComma')
 
-const variableSyntax = /\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g
+const variableSyntax = /\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g
 
 test('splitByComma - should return array with original string when no commas present', () => {
   const result = splitByComma('singleString')
@@ -145,4 +145,4 @@ test('splitByComma - should handle odd backslashes (escaped quote)', () => {
 })
 
 // Run all tests
-test.run() 
+test.run()

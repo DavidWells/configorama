@@ -358,7 +358,7 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
 }
 
 // // Test with the example
-// const regex = /\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g
+// const regex = /\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g
 // const input = '${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}'
 
 // // Run the function with debug output

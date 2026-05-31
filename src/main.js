@@ -60,6 +60,7 @@ const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
 /* Utils - paths */
 const { findLineByPath } = require('./utils/paths/findLineForKey')
+const { normalizeIgnorePaths, compileIgnorePaths, shouldIgnorePath } = require('./utils/paths/ignorePaths')
 /* Utils - regex */
 const { combineRegexes, funcRegex, fileRefSyntax, textRefSyntax } = require('./utils/regex')
 /* Utils - strings */
@@ -162,6 +163,11 @@ class Configorama {
       // CLI users can still see them with --verbose or dotEnvSilent: false.
       dotEnvSilent: !VERBOSE,
       dotEnvDebug: false,
+      // Glob-like path patterns whose values should be left verbatim.
+      // Useful for embedded languages that also use ${...}, such as
+      // CloudFormation Fn::Sub, inline Lambda code, and CloudFront functions.
+      ignorePaths: [],
+      skipResolutionPaths: [],
     }, options)
 
     // Backward compat: allowUnknownVars -> allowUnknownVariableTypes
@@ -221,9 +227,10 @@ class Configorama {
 
     // Use $[...] syntax for HCL/Terraform files to avoid conflicts with Terraform's ${} syntax
     const isHclFile = detectedFileType === '.tf' || detectedFileType === '.hcl'
+    const defaultExcludedPatterns = ['AWS', 'aws:', 'stageVariables']
     const defaultSyntax = isHclFile
-      ? buildVariableSyntax('$[', ']', ['AWS', 'stageVariables'])
-      : buildVariableSyntax('${', '}', ['AWS', 'stageVariables'])
+      ? buildVariableSyntax('$[', ']', defaultExcludedPatterns)
+      : buildVariableSyntax('${', '}', defaultExcludedPatterns)
 
     const varSyntax = options.syntax || defaultSyntax
     let varRegex
@@ -247,6 +254,7 @@ class Configorama {
     this.varPrefixPattern = new RegExp('^' + this.varPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     this.varSuffixPattern = new RegExp(escapedSuffix + '$')
     this.varSuffixWithSpacePattern = new RegExp('\\s+' + escapedSuffix + '$')
+    this.ignorePathPatterns = compileIgnorePaths(normalizeIgnorePaths(this.settings))
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
@@ -1063,6 +1071,7 @@ class Configorama {
       originalConfig: this.originalConfig,
       varSuffix: this.varSuffix,
       varSuffixWithSpacePattern: this.varSuffixWithSpacePattern,
+      ignorePathPatterns: this.ignorePathPatterns,
     })
 
     return this._cachedMetadata
@@ -1102,9 +1111,8 @@ class Configorama {
   // #######################
   // ## PROPERTY HANDLING ##
   // #######################
-  isCloudFormationSubPath(pathValue) {
-    if (!pathValue || !pathValue.length) return false
-    return pathValue[pathValue.length - 1] === 'Fn::Sub'
+  shouldSkipResolution(pathValue) {
+    return shouldIgnorePath(pathValue, this.ignorePathPatterns)
   }
 
   /**
@@ -1264,10 +1272,10 @@ class Configorama {
       }
       return false
     })
-    /* Leave CloudFormation Fn::Sub bodies verbatim. ${...} inside a !Sub is a
-       CloudFormation reference, not a configorama variable. */
+    /* Leave opaque paths verbatim. These often contain non-configorama
+       `${...}` syntax from CloudFormation, JavaScript, shell, VTL, etc. */
     variables = variables.filter((property) => {
-      return !this.isCloudFormationSubPath(property.path)
+      return !this.shouldSkipResolution(property.path)
     })
     /*
     console.log(`variables at call count ${this.callCount}`, variables)
@@ -1555,7 +1563,7 @@ class Configorama {
       console.log(valueObject)
     }
     const property = valueObject.value
-    if (this.isCloudFormationSubPath(valueObject.path)) {
+    if (this.shouldSkipResolution(valueObject.path)) {
       return Promise.resolve(property)
     }
     const matches = this.getMatches(property)

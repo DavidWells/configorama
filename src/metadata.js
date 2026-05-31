@@ -6,6 +6,7 @@ const fs = require('fs')
 const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
+const { shouldIgnorePath } = require('./utils/paths/ignorePaths')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 
@@ -21,6 +22,7 @@ const { splitOnPipe } = require('./utils/strings/splitOnPipe')
  * @param {Object} params.originalConfig - this.originalConfig, used for dotProp.get checks
  * @param {string} params.varSuffix
  * @param {RegExp} params.varSuffixWithSpacePattern
+ * @param {string[][]} [params.ignorePathPatterns]
  * @returns {Object} Metadata object containing variables, fileDependencies, and summary
  */
 function collectVariableMetadata({
@@ -33,6 +35,7 @@ function collectVariableMetadata({
   originalConfig,
   varSuffix,
   varSuffixWithSpacePattern,
+  ignorePathPatterns,
 }) {
   const foundVariables = []
   const variableData = {}
@@ -46,8 +49,8 @@ function collectVariableMetadata({
   traverse(displayConfig).forEach(function (rawValue) {
     if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
       const configValuePath = this.path.join('.')
-      /* Skip Fn::Sub variables */
-      if (configValuePath.endsWith('Fn::Sub')) {
+      /* Skip opaque paths that contain non-configorama ${...} syntax. */
+      if (shouldIgnorePath(this.path, ignorePathPatterns)) {
         return
       }
 

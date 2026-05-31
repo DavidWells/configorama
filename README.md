@@ -1667,7 +1667,7 @@ const config = await configorama('config.yml', { syntax })
 |---|---|---|---|
 | `prefix` | `string` | `'${'` | Opening delimiter |
 | `suffix` | `string` | `'}'` | Closing delimiter |
-| `excludePatterns` | `string[]` | `['AWS', 'stageVariables']` | Patterns to exclude via negative lookahead (so e.g. `${AWS::Region}` is left untouched by CloudFormation users) |
+| `excludePatterns` | `string[]` | `['AWS', 'aws:', 'stageVariables']` | Patterns to exclude via negative lookahead (so e.g. `${AWS::Region}` and `${aws:username}` are left untouched by CloudFormation users) |
 
 ---
 
@@ -1762,7 +1762,7 @@ buildVariableSyntax('<', '>')      // <env:FOO>
 function buildVariableSyntax(
   prefix: string = '${',
   suffix: string = '}',
-  excludePatterns: string[] = ['AWS', 'stageVariables']
+  excludePatterns: string[] = ['AWS', 'aws:', 'stageVariables']
 ): string
 ```
 
@@ -1891,6 +1891,9 @@ const config = await configorama(configFile, {
 | `allowUnknownVariableTypes` | `boolean \| string[]` | `false` | Allow unknown variable types to pass through |
 | `allowUnresolvedVariables` | `boolean \| string[]` | `false` | Allow known types that can't resolve to pass through |
 | `allowUndefinedValues` | `boolean` | `false` | Allow undefined as a valid end result |
+| `ignorePaths` | `string[]` | Built-in CloudFormation/code paths | Glob-like config paths whose values should be left verbatim |
+| `skipResolutionPaths` | `string[]` | `[]` | Alias for `ignorePaths` |
+| `disableDefaultIgnorePaths` | `boolean` | `false` | Disable the built-in CloudFormation/code ignore paths |
 | `returnMetadata` | `boolean` | `false` | Return `{ config, metadata }` instead of just the resolved config |
 | `returnPreResolvedVariableDetails` | `boolean` | `false` | Return metadata about variables *without* resolving them (used by `analyze()`) |
 | `useDotEnvFiles` | `boolean` | `false` | Auto-load `.env`, `.env.{stage}`, etc. into `process.env` before resolution (via [env-stage-loader](https://www.npmjs.com/package/env-stage-loader)) |

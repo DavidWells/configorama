@@ -10,7 +10,7 @@ const { executeTypeScriptFileSync } = require('../../parsers/typescript')
 const { executeESMFileSync } = require('../../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
 
-const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
+const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
 
 const KNOWN_EXTENSIONS = new Set([
   '.yml', '.yaml', '.json', '.json5', '.jsonc',

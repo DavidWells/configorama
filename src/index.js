@@ -13,6 +13,9 @@ const { buildVariableSyntax } = require('./utils/variables/variableUtils')
  * @property {Object.<string, Function>} [functions] - Object of custom functions
  * @property {boolean} [allowUnknownVars] - allow unknown variables to pass through without throwing errors
  * @property {boolean} [allowUndefinedValues] - allow undefined values to pass through without throwing errors
+ * @property {string[]} [ignorePaths] - glob-like config paths whose values should be left verbatim
+ * @property {string[]} [skipResolutionPaths] - alias for ignorePaths
+ * @property {boolean} [disableDefaultIgnorePaths] - disable built-in CloudFormation and embedded-code ignore paths
  * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
  * @property {boolean} [returnMetadata] - return both config and metadata about variables found
  * @property {boolean} [dotEnvSilent] - suppress env-stage-loader logs when useDotenv/useDotEnv is enabled

@@ -4,7 +4,7 @@ const assert = require('uvu/assert')
 const { buildVariableSyntax } = require('../../src/utils/variables/variableUtils')
 
 // Use the same function as src/main.js to build the syntax
-const defaultSyntax = buildVariableSyntax('${', '}', ['AWS', 'stageVariables'])
+const defaultSyntax = buildVariableSyntax('${', '}', ['AWS', 'aws:', 'stageVariables'])
 const regex = new RegExp(defaultSyntax, 'g')
 
 function testChar(char, shouldMatch = true) {

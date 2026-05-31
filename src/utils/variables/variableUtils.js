@@ -93,10 +93,10 @@ Remove or update the \${${variableString}} to fix
  * Excludes suffix characters from the allowed set to prevent parsing issues
  * @param {string} [prefix='${'] - Variable prefix
  * @param {string} [suffix='}'] - Variable suffix
- * @param {string[]} [excludePatterns=['AWS', 'stageVariables']] - Patterns to exclude via negative lookahead
+ * @param {string[]} [excludePatterns=['AWS', 'aws:', 'stageVariables']] - Patterns to exclude via negative lookahead
  * @returns {string} Regex source string
  */
-function buildVariableSyntax(prefix = '${', suffix = '}', excludePatterns = ['AWS', 'stageVariables']) {
+function buildVariableSyntax(prefix = '${', suffix = '}', excludePatterns = ['AWS', 'aws:', 'stageVariables']) {
   // All allowed characters, stored as individual escaped entries for regex character class
   // Each entry is how it appears in a regex character class
   // NOTE: { and } are intentionally excluded - they break nested variable matching
@@ -145,4 +145,4 @@ module.exports = {
   getFallbackString,
   verifyVariable,
   buildVariableSyntax
-} 
+}

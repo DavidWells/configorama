@@ -38,6 +38,18 @@ interface ConfigoramaSettings {
   /** Allow undefined values as final results */
   allowUndefinedValues?: boolean
 
+  /**
+   * Glob-like config paths whose values should be left verbatim.
+   * Useful for embedded languages that also use ${...}.
+   */
+  ignorePaths?: string[]
+
+  /** Alias for ignorePaths */
+  skipResolutionPaths?: string[]
+
+  /** Disable the built-in CloudFormation and embedded-code ignore paths */
+  disableDefaultIgnorePaths?: boolean
+
   // === Legacy Options (deprecated, use above instead) ===
 
   /** @deprecated Use allowUnknownVariableTypes instead */

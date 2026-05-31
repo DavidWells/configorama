@@ -9,7 +9,7 @@ const getValueFromOptions = require('../../resolvers/valueFromOptions')
 const getValueFromGit = require('../../resolvers/valueFromGit')
 
 // Define the regex pattern as used in the main function
-const regex = /\${((?!AWS|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g;
+const regex = /\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g;
 const variablesKnownTypes = /(^env:|^opt:|^self:|^file\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)|^git:|(\${)?deep:\d+(\.[^}]+)*()}?)/
 
 const fileRefSyntax = RegExp(/^file\((~?[@\{\}\:\$a-zA-Z0-9._\-\/,'" ]+?)\)/g)
@@ -239,4 +239,4 @@ test('findNestedVariables - deep - no var types passed', () => {
 
 
 // Run all tests
-test.run(); 
+test.run();
