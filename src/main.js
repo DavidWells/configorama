@@ -1102,6 +1102,11 @@ class Configorama {
   // #######################
   // ## PROPERTY HANDLING ##
   // #######################
+  isCloudFormationSubPath(pathValue) {
+    if (!pathValue || !pathValue.length) return false
+    return pathValue[pathValue.length - 1] === 'Fn::Sub'
+  }
+
   /**
    * The declaration of a terminal property.  This declaration includes the path and value of the
    * property.
@@ -1258,6 +1263,11 @@ class Configorama {
         this._resolvedPaths.add(p.length > 1 ? p.join('.') : p[0])
       }
       return false
+    })
+    /* Leave CloudFormation Fn::Sub bodies verbatim. ${...} inside a !Sub is a
+       CloudFormation reference, not a configorama variable. */
+    variables = variables.filter((property) => {
+      return !this.isCloudFormationSubPath(property.path)
     })
     /*
     console.log(`variables at call count ${this.callCount}`, variables)
@@ -1545,6 +1555,9 @@ class Configorama {
       console.log(valueObject)
     }
     const property = valueObject.value
+    if (this.isCloudFormationSubPath(valueObject.path)) {
+      return Promise.resolve(property)
+    }
     const matches = this.getMatches(property)
     /*
     console.log('populateValue matches', matches)

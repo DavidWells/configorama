@@ -1,17 +1,18 @@
 /**
  * Regression tests for the Fn::Sub passthrough exponential-growth bug.
  *
- * The bug: when an unresolvable variable appears inside a CloudFormation
- * `Fn::Sub` value (e.g. `${ApiGatewayRestApi}`, `${AWS::Region}`), the
- * resolver was returning the entire enclosing property string as the
- * substitution value for that single variable. Because the substituted
- * string itself contained the same `${...}` marker, each resolution pass
- * doubled the string length until V8 hit "Invalid string length".
+ * The bug: variables inside a CloudFormation `Fn::Sub` value
+ * (e.g. `${ApiGatewayRestApi}`, `${AWS::Region}`, `${UserPoolClientId}`)
+ * were treated as configorama variables. If a same-named key existed in the
+ * config, the resolver could inline the surrounding template back into
+ * itself and corrupt the `Fn::Sub` body.
  *
- * Fix: only encode the current variable for passthrough, not the whole
- * property. (src/main.js, around line 2587)
+ * Fix: leave `Fn::Sub` string bodies verbatim.
  */
 
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
@@ -36,7 +37,23 @@ async function resolveFast(config, options = {}) {
   return result
 }
 
-test('Fn::Sub: single CFN ref mixed with resolvable self ref', async () => {
+function collectFnSubValues(node, path = [], out = []) {
+  if (node && typeof node === 'object') {
+    if (Object.prototype.hasOwnProperty.call(node, 'Fn::Sub')) {
+      out.push({ path: path.concat('Fn::Sub'), value: node['Fn::Sub'] })
+    }
+    for (const key of Object.keys(node)) {
+      collectFnSubValues(node[key], path.concat(key), out)
+    }
+  }
+  return out
+}
+
+function getAtPath(node, path) {
+  return path.reduce((acc, key) => (acc == null ? undefined : acc[key]), node)
+}
+
+test('Fn::Sub: single CFN ref mixed with self ref stays verbatim', async () => {
   const config = {
     service: 'api-service',
     provider: { stage: '${opt:stage, "dev"}' },
@@ -53,7 +70,7 @@ test('Fn::Sub: single CFN ref mixed with resolvable self ref', async () => {
   const result = await resolveFast(config)
   assert.is(
     result.resources.Outputs.ServiceEndpoint.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.amazonaws.com/dev'
+    'https://${ApiGatewayRestApi}.execute-api.amazonaws.com/${self:provider.stage}'
   )
 })
 
@@ -76,7 +93,7 @@ test('Fn::Sub: multiple distinct CFN refs all pass through', async () => {
   )
 })
 
-test('Fn::Sub: CFN ref + AWS pseudo-parameter + resolvable self ref', async () => {
+test('Fn::Sub: CFN ref + AWS pseudo-parameter + self ref stay verbatim', async () => {
   const config = {
     service: 'svc',
     provider: { stage: 'prod' },
@@ -93,7 +110,7 @@ test('Fn::Sub: CFN ref + AWS pseudo-parameter + resolvable self ref', async () =
   const result = await resolveFast(config)
   assert.is(
     result.resources.Outputs.E.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
   )
 })
 
@@ -117,23 +134,20 @@ test('Fn::Sub: same CFN ref repeated is preserved at both positions', async () =
 })
 
 test('Fn::Sub: CFN ref with minimal surrounding text still passes through', async () => {
-  // A bare `Fn::Sub: '${ApiGatewayRestApi}'` (variable only, no literal text)
-  // takes a different resolver path and is not covered here — in practice
-  // CloudFormation users write `Ref: ApiGatewayRestApi` for that case anyway.
-  // This test pins the minimal substring form, which DOES route through the
-  // Fn::Sub passthrough path that the bug fix targets.
   const config = {
     resources: {
       Outputs: {
+        Bare: { Value: { 'Fn::Sub': '${ApiGatewayRestApi}' } },
         E: { Value: { 'Fn::Sub': 'x${ApiGatewayRestApi}' } }
       }
     }
   }
   const result = await resolveFast(config)
+  assert.is(result.resources.Outputs.Bare.Value['Fn::Sub'], '${ApiGatewayRestApi}')
   assert.is(result.resources.Outputs.E.Value['Fn::Sub'], 'x${ApiGatewayRestApi}')
 })
 
-test('Fn::Sub: only resolvable self refs (no CFN refs) still works', async () => {
+test('Fn::Sub: only self refs still stay verbatim', async () => {
   const config = {
     service: 'svc',
     provider: { stage: 'dev' },
@@ -144,7 +158,7 @@ test('Fn::Sub: only resolvable self refs (no CFN refs) still works', async () =>
     }
   }
   const result = await resolveFast(config)
-  assert.is(result.resources.Outputs.E.Value['Fn::Sub'], 'svc-dev')
+  assert.is(result.resources.Outputs.E.Value['Fn::Sub'], '${self:service}-${self:provider.stage}')
 })
 
 test('Fn::Sub: AWS::AccountId, AWS::Region, AWS::StackName pseudo-params preserved', async () => {
@@ -174,8 +188,8 @@ test('Fn::Sub: output length is not exponentially larger than input', async () =
   }
   const result = await resolveFast(config)
   const output = result.resources.Outputs.E.Value['Fn::Sub']
-  // Output should be roughly the same length as input (minor delta for ${self:..} → 'dev').
-  // A regression of the exponential bug would produce strings 10x+ larger.
+  // Output should be the same length as input. A regression of the exponential
+  // bug would produce strings 10x+ larger.
   assert.ok(
     output.length < input.length * 2,
     `output (${output.length}) is suspiciously larger than input (${input.length}): possible regression`
@@ -203,11 +217,11 @@ test('Fn::Sub: nested within larger config alongside other resolved values', asy
   assert.is(result.custom.bucketName, 'api-dev-bucket')
   assert.is(
     result.resources.Outputs.Endpoint.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev'
+    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
   )
 })
 
-test('Fn::Sub: multiple Fn::Sub blocks in same config each resolve independently', async () => {
+test('Fn::Sub: multiple Fn::Sub blocks in same config each stay verbatim', async () => {
   const config = {
     provider: { stage: 'staging' },
     resources: {
@@ -219,9 +233,9 @@ test('Fn::Sub: multiple Fn::Sub blocks in same config each resolve independently
     }
   }
   const result = await resolveFast(config)
-  assert.is(result.resources.Outputs.A.Value['Fn::Sub'], '${ApiGatewayRestApi}.staging')
+  assert.is(result.resources.Outputs.A.Value['Fn::Sub'], '${ApiGatewayRestApi}.${self:provider.stage}')
   assert.is(result.resources.Outputs.B.Value['Fn::Sub'], '${UsersTable}.${AWS::Region}')
-  assert.is(result.resources.Outputs.C.Value['Fn::Sub'], 'just-staging')
+  assert.is(result.resources.Outputs.C.Value['Fn::Sub'], 'just-${self:provider.stage}')
 })
 
 test('Fn::Sub: passthrough value contains no internal encoding markers', async () => {
@@ -238,6 +252,190 @@ test('Fn::Sub: passthrough value contains no internal encoding markers', async (
   const out = result.resources.Outputs.E.Value['Fn::Sub']
   assert.not.match(out, />passthrough/)
   assert.not.match(out, /\[_\[/)
+})
+
+test('Fn::Sub: same-named Parameter ref is not resolved or recursively inlined', async () => {
+  const config = {
+    custom: {
+      userPoolClientId: 'abc123'
+    },
+    resources: {
+      Parameters: {
+        UserPoolClientId: {
+          Type: 'String',
+          Default: '${self:custom.userPoolClientId}'
+        }
+      },
+      Resources: {
+        LoginPOST: {
+          Properties: {
+            Integration: {
+              RequestTemplates: {
+                'application/json': {
+                  'Fn::Sub': '{\n  "ClientId": "${UserPoolClientId}",\n  "User": "$input.path(\'$.username\')"\n}\n'
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const result = await resolveFast(config)
+  const template = result.resources.Resources.LoginPOST.Properties.Integration.RequestTemplates['application/json']
+
+  assert.is(result.resources.Parameters.UserPoolClientId.Default, 'abc123')
+  assert.is(
+    template['Fn::Sub'],
+    '{\n  "ClientId": "${UserPoolClientId}",\n  "User": "$input.path(\'$.username\')"\n}\n'
+  )
+})
+
+test('Fn::Sub: backend-proxy shaped subset preserves all request templates', async () => {
+  const endpointActions = {
+    AdminLoginPOST: 'AdminInitiateAuth',
+    AdminSignupPOST: 'AdminCreateUser',
+    AdminConfirmSignupPUT: 'ConfirmSignUp',
+    SignupPOST: 'SignUp',
+    ConfirmSignupPOST: 'ConfirmSignUp',
+    LoginPOST: 'InitiateAuth',
+    RespondAuthChallengePOST: 'RespondToAuthChallenge',
+    TokenRefreshPOST: 'InitiateAuth',
+    RevokeTokenPOST: 'RevokeToken',
+    ForgotPasswordPOST: 'ForgotPassword',
+    ConfirmForgotPasswordPOST: 'ConfirmForgotPassword',
+    EnableMfaPOST: 'AdminSetUserMFAPreference',
+    DisableMfaPOST: 'AdminSetUserMFAPreference'
+  }
+  const resources = {}
+
+  for (const [name, action] of Object.entries(endpointActions)) {
+    resources[name] = {
+      Type: 'AWS::ApiGateway::Method',
+      Properties: {
+        Integration: {
+          Credentials: {
+            'Fn::Sub': 'arn:aws:iam::${AWS::AccountId}:role/${Service}-Cognito-Api-${Environment}'
+          },
+          Uri: {
+            'Fn::Sub': `arn:aws:apigateway:\${AWS::Region}:cognito-idp:action/${action}`
+          },
+          RequestTemplates: {
+            'application/json': {
+              'Fn::Sub': `{
+  "Endpoint": "${name}",
+  "ClientId": "\${UserPoolClientId}",
+  "UserPoolId": "\${UserPoolId}",
+  "User": "$input.path('$.username')",
+  "Environment": "\${Environment}"
+}
+`
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const config = {
+    custom: {
+      userPoolClientId: 'example-client-id'
+    },
+    resources: {
+      Parameters: {
+        UserPoolClientId: {
+          Type: 'String',
+          Default: '${self:custom.userPoolClientId}'
+        },
+        UserPoolId: { Type: 'String' },
+        Service: { Type: 'String', Default: 'example-auth-service' },
+        Environment: { Type: 'String', Default: 'dev' }
+      },
+      Resources: {
+        CognitoApiRole: {
+          Properties: {
+            RoleName: {
+              'Fn::Sub': '${Service}-Cognito-Api-${Environment}'
+            },
+            Policies: [
+              {
+                PolicyDocument: {
+                  Statement: [
+                    {
+                      Resource: {
+                        'Fn::Sub': 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}'
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        ...resources
+      },
+      Outputs: {
+        Endpoint: {
+          Value: {
+            'Fn::Sub': 'https://${CognitoApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/'
+          }
+        }
+      }
+    }
+  }
+  const originalFnSubs = collectFnSubValues(JSON.parse(JSON.stringify(config)))
+  const result = await resolveFast(config)
+  const resultFnSubs = collectFnSubValues(result)
+
+  assert.is(result.resources.Parameters.UserPoolClientId.Default, 'example-client-id')
+  assert.is(resultFnSubs.length, originalFnSubs.length)
+  assert.is(
+    Object.keys(endpointActions).filter((name) => {
+      return result.resources.Resources[name].Properties.Integration.RequestTemplates['application/json']['Fn::Sub']
+    }).length,
+    13
+  )
+  for (const entry of originalFnSubs) {
+    assert.equal(getAtPath(result, entry.path), entry.value)
+  }
+})
+
+test('Fn::Sub: YAML !Sub body round-trips through sync API', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-'))
+  const file = path.join(dir, 'repro.yml')
+
+  try {
+    fs.writeFileSync(file, `custom:
+  userPoolClientId: "abc123"
+resources:
+  Parameters:
+    UserPoolClientId:
+      Type: String
+      Default: \${self:custom.userPoolClientId}
+  Resources:
+    LoginPOST:
+      Properties:
+        Integration:
+          RequestTemplates:
+            application/json: !Sub |
+              {
+                "ClientId": "\${UserPoolClientId}",
+                "User": "$input.path('$.username')"
+              }
+`)
+
+    const result = configorama.sync(file)
+    const template = result.resources.Resources.LoginPOST.Properties.Integration.RequestTemplates['application/json']
+
+    assert.is(result.resources.Parameters.UserPoolClientId.Default, 'abc123')
+    assert.is(
+      template['Fn::Sub'],
+      '{\n  "ClientId": "${UserPoolClientId}",\n  "User": "$input.path(\'$.username\')"\n}\n'
+    )
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test.run()
