@@ -30,6 +30,7 @@ const argv = minimist(process.argv.slice(2), {
   }
 })
 
+
 // Show help
 if (argv.help) {
   console.log(`
