@@ -2,15 +2,22 @@
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const { execSync } = require('child_process')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const CLI_PATH = path.join(__dirname, '../../cli.js')
 const CONFIG_PATH = path.join(__dirname, 'config.yml')
+const COPY_HELPER_PATH = path.join(__dirname, 'copy-helper.js')
 
-function runCli(args) {
+function runCli(args, options = {}) {
   const cmd = `node ${CLI_PATH} ${args}`
   try {
-    const output = execSync(cmd, { encoding: 'utf8', cwd: __dirname })
+    const output = execSync(cmd, {
+      encoding: 'utf8',
+      cwd: __dirname,
+      env: { ...process.env, ...(options.env || {}) }
+    })
     return { output: output.trim(), exitCode: 0 }
   } catch (err) {
     return { output: err.stderr || err.stdout || '', exitCode: err.status }
@@ -38,6 +45,44 @@ test('CLI path: .version returns string value', () => {
   const result = runCli(`${CONFIG_PATH} .version`)
   assert.is(result.exitCode, 0)
   assert.is(parseOutput(result), '1.0.0')
+})
+
+test('CLI path: --raw returns extracted string without JSON quotes', () => {
+  const result = runCli(`${CONFIG_PATH} .database.name --raw`)
+  assert.is(result.exitCode, 0)
+  assert.is(result.output, 'mydb')
+})
+
+test('CLI path: -r returns extracted string without JSON quotes', () => {
+  const result = runCli(`-r ${CONFIG_PATH} .database.name`)
+  assert.is(result.exitCode, 0)
+  assert.is(result.output, 'mydb')
+})
+
+test('CLI path: --copy copies the formatted output', () => {
+  const copyFile = path.join(os.tmpdir(), `configorama-copy-${process.pid}-${Date.now()}.txt`)
+  const copyCommand = `${JSON.stringify(process.execPath)} ${JSON.stringify(COPY_HELPER_PATH)} ${JSON.stringify(copyFile)}`
+  const result = runCli(`${CONFIG_PATH} .database.name --raw --copy`, {
+    env: { CONFIGORAMA_CLIPBOARD_COMMAND: copyCommand }
+  })
+
+  assert.is(result.exitCode, 0)
+  assert.is(result.output, 'mydb')
+  assert.is(fs.readFileSync(copyFile, 'utf8'), 'mydb')
+  fs.rmSync(copyFile, { force: true })
+})
+
+test('CLI path: -c copies JSON output by default', () => {
+  const copyFile = path.join(os.tmpdir(), `configorama-copy-${process.pid}-${Date.now()}.json`)
+  const copyCommand = `${JSON.stringify(process.execPath)} ${JSON.stringify(COPY_HELPER_PATH)} ${JSON.stringify(copyFile)}`
+  const result = runCli(`${CONFIG_PATH} .database.name -c`, {
+    env: { CONFIGORAMA_CLIPBOARD_COMMAND: copyCommand }
+  })
+
+  assert.is(result.exitCode, 0)
+  assert.is(result.output, '"mydb"')
+  assert.is(fs.readFileSync(copyFile, 'utf8'), '"mydb"')
+  fs.rmSync(copyFile, { force: true })
 })
 
 // Nested property access
@@ -138,6 +183,14 @@ test('CLI path: .database returns full object', () => {
   assert.is(parsed.credentials.user, 'admin')
 })
 
+test('CLI path: --raw leaves extracted objects as JSON', () => {
+  const result = runCli(`${CONFIG_PATH} .database --raw`)
+  assert.is(result.exitCode, 0)
+  const parsed = parseOutput(result)
+  assert.is(parsed.host, 'localhost')
+  assert.is(parsed.credentials.user, 'admin')
+})
+
 test('CLI path: .features returns full array', () => {
   const result = runCli(`${CONFIG_PATH} .features`)
   assert.is(result.exitCode, 0)
@@ -164,6 +217,13 @@ test('CLI path: no path returns full config', () => {
   assert.is(parsed.service, 'my-app')
   assert.ok(parsed.database)
   assert.ok(parsed.servers)
+})
+
+test('CLI path: relative dot-slash file is treated as input file', () => {
+  const result = runCli('./config.yml')
+  assert.is(result.exitCode, 0)
+  const parsed = parseOutput(result)
+  assert.is(parsed.service, 'my-app')
 })
 
 test.run()

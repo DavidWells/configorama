@@ -2087,8 +2087,14 @@ configorama config.yml --info
 # Verify config (check for errors without resolving)
 configorama config.yml --verify
 
-# Extract specific path from config
-configorama config.yml database.host
+# Extract a specific path from config
+configorama config.yml .database.host
+
+# Print an extracted scalar without JSON quotes
+configorama config.yml .database.host --raw
+
+# Copy the formatted output to your clipboard
+configorama config.yml .database.host --raw --copy
 
 # Output as YAML
 configorama config.yml --format yaml
@@ -2105,6 +2111,8 @@ Options:
   -v, --version             Show version number
   -o, --output <file>       Write output to file instead of stdout
   -f, --format <format>     Output format: json, yaml, or js (default: json)
+  -r, --raw                 Print extracted scalar values without JSON quoting
+  -c, --copy                Copy the formatted output to the clipboard
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -V, --verify              Verify the config
@@ -2113,9 +2121,23 @@ Options:
   --allow-undefined         Allow undefined values in the final output
 
 Path Extraction:
-  configorama config.yml database.host    Extract specific value
-  configorama config.yml functions[0]     Extract from array
+  configorama config.yml .database.host   Extract a nested value
+  configorama config.yml '.functions[0]'  Extract from an array
+  configorama -r config.yml .stage        Print raw scalar output
+  configorama -r -c config.yml .stage     Print and copy raw scalar output
 ```
+
+Path extraction uses jq-style paths. JSON remains the default output format, so extracted strings are quoted by default:
+
+```bash
+configorama config.yml .stage
+# "prod"
+
+configorama config.yml .stage --raw
+# prod
+```
+
+`--copy` copies exactly the formatted value that the CLI prints. It uses native clipboard commands where available: `pbcopy` on macOS, `clip` on Windows, and `wl-copy`, `xclip`, or `xsel` on Linux.
 
 ### CLI Examples
 
@@ -2154,12 +2176,20 @@ database:
   host: localhost
   port: 5432
 
-# Extract database.host
-configorama config.yml database.host
+# Extract database.host as JSON
+configorama config.yml .database.host
+# Output: "localhost"
+
+# Extract database.host as a raw scalar
+configorama config.yml .database.host --raw
+# Output: localhost
+
+# Extract and copy the raw scalar
+configorama config.yml .database.host --raw --copy
 # Output: localhost
 
 # Extract database config as JSON
-configorama config.yml database --format json
+configorama config.yml .database --format json
 # Output: {"host":"localhost","port":5432}
 ```
 

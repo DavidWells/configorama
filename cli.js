@@ -2,6 +2,7 @@
 
 const fs = require('fs')
 const minimist = require('minimist')
+const { spawnSync } = require('child_process')
 const Configorama = require('./src/main')
 const deepLog = require('./src/utils/ui/deep-log')
 const { logHeader } = require('./src/utils/ui/logs')
@@ -12,13 +13,15 @@ const getValueAtPath = require('./src/utils/parsing/getValueAtPath')
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f', 'param'],
-  boolean: ['help', 'h', 'version', 'v', 'V', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify'],
+  boolean: ['help', 'h', 'version', 'v', 'V', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify', 'raw', 'r', 'copy', 'c'],
   alias: {
     h: 'help',
     v: 'version',
     V: 'verify',
     o: 'output',
     f: 'format',
+    r: 'raw',
+    c: 'copy',
     l: 'list',
     i: 'info',
   },
@@ -40,6 +43,8 @@ Options:
   -v, --version             Show version number
   -o, --output <file>       Write output to file instead of stdout
   -f, --format <format>     Output format: json, yaml, or js (default: json)
+  -r, --raw                 Print extracted scalar values without JSON quoting
+  -c, --copy                Copy the formatted output to the clipboard
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -V, --verify              Verify the config
@@ -62,6 +67,8 @@ Path Extraction:
 Examples:
   configorama config.yml
   configorama config.yml .database.host
+  configorama -r config.yml .database.host
+  configorama -r --copy config.yml .database.host
   configorama '.servers[0].port' config.yml
   configorama --info config.yml
   configorama --format yaml config.json
@@ -84,11 +91,53 @@ if (argv.version) {
 let inputFile = null
 let extractPath = null
 
+function isFileArg(arg) {
+  if (fs.existsSync(arg) && fs.statSync(arg).isFile()) return true
+  return arg.startsWith('./') || arg.startsWith('../')
+}
+
+function getClipboardCommands() {
+  if (process.env.CONFIGORAMA_CLIPBOARD_COMMAND) {
+    return [{ command: process.env.CONFIGORAMA_CLIPBOARD_COMMAND, shell: true }]
+  }
+
+  if (process.platform === 'darwin') return [{ command: 'pbcopy', args: [] }]
+  if (process.platform === 'win32') return [{ command: 'clip', args: [] }]
+
+  return [
+    { command: 'wl-copy', args: [] },
+    { command: 'xclip', args: ['-selection', 'clipboard'] },
+    { command: 'xsel', args: ['--clipboard', '--input'] }
+  ]
+}
+
+function copyToClipboard(value) {
+  let lastError = ''
+  for (const candidate of getClipboardCommands()) {
+    const result = spawnSync(candidate.command, candidate.args || [], {
+      input: String(value),
+      encoding: 'utf8',
+      shell: !!candidate.shell,
+      stdio: ['pipe', 'ignore', 'pipe']
+    })
+
+    if (!result.error && result.status === 0) return { ok: true }
+    lastError = result.error ? result.error.message : (result.stderr || '').trim()
+  }
+
+  return {
+    ok: false,
+    error: lastError || 'No supported clipboard command found'
+  }
+}
+
 for (const arg of argv._) {
   if (arg === 'setup') continue
 
   // jq-style paths start with '.' or '['
-  if (arg.startsWith('.') || arg.startsWith('[')) {
+  if (!inputFile && isFileArg(arg)) {
+    inputFile = arg
+  } else if (arg.startsWith('.') || arg.startsWith('[')) {
     extractPath = arg
   } else if (!inputFile) {
     inputFile = arg
@@ -134,6 +183,10 @@ const {
   l,
   info,
   i,
+  r,
+  raw,
+  c,
+  copy,
   'allow-unknown': allowUnknown, 
   'allow-undefined': allowUndefined,
   'allow-unknown-file-refs': allowUnknownFileRefs,
@@ -177,7 +230,9 @@ configorama(inputFile, options)
     let output
 
     // Format the output
-    switch (argv.format.toLowerCase()) {
+    if (argv.raw && extractPath && (config === null || ['string', 'number', 'boolean'].includes(typeof config))) {
+      output = config === null ? 'null' : String(config)
+    } else switch (argv.format.toLowerCase()) {
       case 'yaml':
       case 'yml':
         const YAML = require('./src/parsers/yaml')
@@ -202,6 +257,14 @@ configorama(inputFile, options)
           config.variableSyntax = config.variableSyntax ? config.variableSyntax.source : undefined
         }
         output = JSON.stringify(config, null, 2)
+    }
+
+    if (argv.copy) {
+      const copyResult = copyToClipboard(output)
+      if (!copyResult.ok) {
+        console.error(`Error: Unable to copy to clipboard: ${copyResult.error}`)
+        process.exit(1)
+      }
     }
 
     // Write to file or stdout
