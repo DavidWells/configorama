@@ -22,6 +22,7 @@ const { buildVariableSyntax } = require('./utils/variables/variableUtils')
  * @property {boolean} [dotEnvDebug] - enable env-stage-loader debug logs when useDotenv/useDotEnv is enabled
  * @property {string[]} [mergeKeys] - keys to merge in arrays of objects
  * @property {Object.<string, string>} [filePathOverrides] - map of file paths to override
+ * @property {boolean} [handleSignalEvents] - install Configorama CLI signal handlers. Defaults to false for library calls.
  */
 
 /**

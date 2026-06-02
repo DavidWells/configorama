@@ -75,6 +75,8 @@ interface ConfigoramaSettings {
   mergeKeys?: string[]
   /** Map of file paths to override */
   filePathOverrides?: Record<string, string>
+  /** Install Configorama CLI signal handlers. Defaults to false for library calls. */
+  handleSignalEvents?: boolean
 }
 
 interface ConfigoramaResult<T = any> {

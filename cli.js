@@ -215,6 +215,7 @@ if (argv._.length) {
 
 // Set -- flags as options
 options.options = rest
+options.handleSignalEvents = true
 
 // Process the configuration
 configorama(inputFile, options)

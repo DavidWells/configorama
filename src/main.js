@@ -138,8 +138,8 @@ let DEBUG_TYPE = false
 
 class Configorama {
   constructor(fileOrObject, opts) {
-    /* attach sig events on async calls */
-    if (opts && !opts.sync) {
+    /* CLI-only by default. Library consumers should not get process-level signal handlers. */
+    if (opts && opts.handleSignalEvents && !opts.sync) {
       handleSignalEvents()
     }
   

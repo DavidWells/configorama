@@ -25,6 +25,22 @@ test('API is asynchronous', async () => {
   order.push('two')
 })
 
+test('API does not install signal handlers by default', async () => {
+  const before = {
+    SIGINT: process.listenerCount('SIGINT'),
+    SIGTERM: process.listenerCount('SIGTERM'),
+    SIGBREAK: process.listenerCount('SIGBREAK'),
+  }
+
+  await configorama({ foo: 'bar' })
+
+  assert.equal({
+    SIGINT: process.listenerCount('SIGINT'),
+    SIGTERM: process.listenerCount('SIGTERM'),
+    SIGBREAK: process.listenerCount('SIGBREAK'),
+  }, before)
+})
+
 test('Allow unknown variables to pass through', async () => {
   const args = {
     stage: 'dev',
