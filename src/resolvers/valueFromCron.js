@@ -91,34 +91,13 @@ function parseCronExpression(input) {
     return `${minute} ${hour} * * *`
   }
 
-  // Parse "every X minutes/hours/days" patterns
-  const everyMatch = normalizedInput.match(/^every (\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
-  if (everyMatch) {
-    const interval = parseInt(everyMatch[1])
-    const unit = everyMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
-    
-    switch (unit) {
-      case 'minute':
-        return `*/${interval} * * * *`
-      case 'hour':
-        return `0 */${interval} * * *`
-      case 'day':
-        return `0 0 */${interval} * *`
-      case 'week':
-        return `0 0 * * 0/${interval}`
-      case 'month':
-        return `0 0 1 */${interval} *`
-      default:
-        throw new Error(`Unsupported interval unit: ${unit}`)
-    }
-  }
-
-  // Parse "X minute(s)/hour(s)/day(s)" patterns (e.g., "1 minute", "5 minutes", "1 hour")
-  const intervalMatch = normalizedInput.match(/^(\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
+  // Parse "every X minutes/hours/days" and bare "X minute(s)/hour(s)/day(s)" patterns
+  // (e.g., "every 5 minutes", "1 minute", "5 minutes", "1 hour")
+  const intervalMatch = normalizedInput.match(/^(?:every )?(\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
   if (intervalMatch) {
     const interval = parseInt(intervalMatch[1])
     const unit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
-    
+
     switch (unit) {
       case 'minute':
         return `*/${interval} * * * *`
