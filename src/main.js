@@ -372,7 +372,10 @@ class Configorama {
         description: `Resolves values from files. Supports sub-properties via :key or .key lookup.`,
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
-          return this.getValueFromFile(varString, { context: pathValue })
+          // Inside ignore-path contexts (e.g. Fn::Sub) inline the file as raw text so
+          // embedded CloudFormation refs survive and the body stays a string.
+          const asRawText = !!(pathValue && this.isIgnorePath(pathValue.path))
+          return this.getValueFromFile(varString, { asRawText, context: pathValue })
         },
       },
 
@@ -483,6 +486,16 @@ class Configorama {
         .map((v) => v.match))
     )
     this.variablesKnownTypes = variablesKnownTypes
+
+    // Explicit configorama types that should still resolve inside ignore-path
+    // contexts like Fn::Sub (file, text, env, opt, cron, git, user sources, ...).
+    // Excludes self/dot.prop refs — those are left verbatim for CloudFormation /
+    // downstream Serverless resolution.
+    this.subResolvableTypes = combineRegexes(
+      /** @type {RegExp[]} */ (this.variableTypes
+        .filter((v) => v.type !== 'string' && v.type !== 'self' && v.type !== 'dot.prop' && v.match instanceof RegExp)
+        .map((v) => v.match))
+    )
 
     // Build prefix lookup map for O(1) type detection (perf optimization)
     this._resolverByPrefix = new Map()
@@ -1111,8 +1124,22 @@ class Configorama {
   // #######################
   // ## PROPERTY HANDLING ##
   // #######################
-  shouldSkipResolution(pathValue) {
+  isIgnorePath(pathValue) {
     return shouldIgnorePath(pathValue, this.ignorePathPatterns)
+  }
+  // True when the value has a configorama-typed token that resolves even inside an
+  // ignore-path (file/text/env/opt/cron/git/custom) — i.e. not just self/CFN refs.
+  hasSubResolvableToken(value) {
+    if (typeof value !== 'string') return false
+    const matches = this.getMatches(value)
+    if (!isArray(matches)) return false
+    return matches.some((m) => this.subResolvableTypes.test(m.variable))
+  }
+  shouldSkipResolution(pathValue, value) {
+    if (!this.isIgnorePath(pathValue)) return false
+    // Under an ignore path (Fn::Sub etc.) keep resolving configorama's own typed
+    // refs; only skip when nothing but self/CFN refs remain.
+    return !this.hasSubResolvableToken(value)
   }
 
   /**
@@ -1275,7 +1302,7 @@ class Configorama {
     /* Leave opaque paths verbatim. These often contain non-configorama
        `${...}` syntax from CloudFormation, JavaScript, shell, VTL, etc. */
     variables = variables.filter((property) => {
-      return !this.shouldSkipResolution(property.path)
+      return !this.shouldSkipResolution(property.path, property.value)
     })
     /*
     console.log(`variables at call count ${this.callCount}`, variables)
@@ -1563,7 +1590,7 @@ class Configorama {
       console.log(valueObject)
     }
     const property = valueObject.value
-    if (this.shouldSkipResolution(valueObject.path)) {
+    if (this.shouldSkipResolution(valueObject.path, property)) {
       return Promise.resolve(property)
     }
     const matches = this.getMatches(property)
@@ -2165,6 +2192,14 @@ Missing Value ${missingValue} - ${matchedString}
     const pathValue = valueObject.path
     // Cache joined path to avoid repeated array.join('.') calls
     const pathJoined = pathValue && pathValue.length ? pathValue.join('.') : null
+
+    // Inside ignore-path contexts (Fn::Sub, inline code, VTL templates, ...) only
+    // configorama's own typed refs (file/text/env/opt/cron/git/custom) resolve.
+    // Self refs, bare dot-prop refs, and CloudFormation refs are left verbatim for
+    // CloudFormation / downstream Serverless to resolve.
+    if (this.isIgnorePath(pathValue) && !this.subResolvableTypes.test(variableString)) {
+      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+    }
 
     // Track every call to getValueFromSource for metadata
     if (this._trackCalls && pathJoined) {

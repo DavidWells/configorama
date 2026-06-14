@@ -7,7 +7,9 @@
  * config, the resolver could inline the surrounding template back into
  * itself and corrupt the `Fn::Sub` body.
  *
- * Fix: leave `Fn::Sub` string bodies verbatim.
+ * Inside an `Fn::Sub` body, configorama's own typed refs (file/text/env/opt/
+ * cron/git/custom) still resolve, while self refs and CloudFormation refs are
+ * left verbatim for CloudFormation / downstream Serverless to resolve.
  */
 
 const fs = require('fs')
@@ -436,6 +438,97 @@ resources:
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('Fn::Sub: file-only body inlines raw JSON text and preserves CFN refs', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-file-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  const dashboardFile = path.join(dir, 'dashboard.json')
+
+  try {
+    fs.writeFileSync(dashboardFile, `{
+  "widgets": [
+    {
+      "type": "text",
+      "properties": {
+        "markdown": "Region: \${AWS::Region}; Pool: \${CognitoUserPool}"
+      }
+    }
+  ]
+}
+`)
+
+    fs.writeFileSync(configFile, `resources:
+  Resources:
+    AuthDashboard:
+      Type: AWS::CloudWatch::Dashboard
+      Properties:
+        DashboardName: !Sub cognito-dashboard
+        DashboardBody: !Sub |
+          \${file(./dashboard.json)}
+`)
+
+    const result = configorama.sync(configFile)
+    const body = result.resources.Resources.AuthDashboard.Properties.DashboardBody['Fn::Sub']
+
+    assert.type(body, 'string')
+    assert.ok(body.startsWith('{\n  "widgets"'))
+    assert.ok(body.includes('"markdown": "Region: ${AWS::Region}; Pool: ${CognitoUserPool}"'))
+    assert.not.ok(body.includes('${file(./dashboard.json)}'))
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: file ref resolves while self + CFN refs in same body stay verbatim', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-mixed-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  const dashboardFile = path.join(dir, 'dashboard.json')
+
+  try {
+    fs.writeFileSync(dashboardFile, `{ "ref": "\${AWS::Region}" }\n`)
+
+    fs.writeFileSync(configFile, `provider:
+  stage: dev
+resources:
+  Resources:
+    D:
+      Properties:
+        Body: !Sub |
+          \${file(./dashboard.json)} stage=\${self:provider.stage} api=\${ApiGatewayRestApi}
+`)
+
+    const body = configorama.sync(configFile).resources.Resources.D.Properties.Body['Fn::Sub']
+
+    // file() inlined as raw text, CFN ref inside the file preserved
+    assert.ok(body.includes('{ "ref": "${AWS::Region}" }'))
+    assert.not.ok(body.includes('${file(./dashboard.json)}'))
+    // self ref left verbatim (Serverless resolves it later), not inlined to "dev"
+    assert.ok(body.includes('stage=${self:provider.stage}'))
+    // bare CFN ref left verbatim for CloudFormation
+    assert.ok(body.includes('api=${ApiGatewayRestApi}'))
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: custom variable source resolves inside body', async () => {
+  const config = {
+    resources: {
+      Resources: {
+        D: { Properties: { Body: { 'Fn::Sub': 'token=${consul:foo} cfn=${ApiGatewayRestApi}' } } }
+      }
+    }
+  }
+  const result = await configorama(config, {
+    variableSources: [{
+      type: 'consul',
+      match: /^consul:/g,
+      resolver: (variableString) => Promise.resolve('RESOLVED')
+    }]
+  })
+  const body = result.resources.Resources.D.Properties.Body['Fn::Sub']
+  assert.is(body, 'token=RESOLVED cfn=${ApiGatewayRestApi}')
 })
 
 test.run()
