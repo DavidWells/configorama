@@ -512,6 +512,123 @@ resources:
   }
 })
 
+test('Fn::Sub: file ref with :key accessor inlines the extracted value, not raw file', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-key-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  try {
+    fs.writeFileSync(path.join(dir, 'data.json'), '{\n  "alpha": "A",\n  "beta": "B"\n}\n')
+    fs.writeFileSync(configFile, `resources:
+  Resources:
+    D:
+      Properties:
+        Body: !Sub |
+          \${file(./data.json):alpha}
+`)
+    const body = configorama.sync(configFile).resources.Resources.D.Properties.Body['Fn::Sub']
+    assert.is(body, 'A\n')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: missing file with fallback resolves to the fallback', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-fb-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  try {
+    fs.writeFileSync(configFile, `resources:
+  Resources:
+    D:
+      Properties:
+        Body: !Sub |
+          \${file(./nope.json), 'FB'}
+`)
+    const body = configorama.sync(configFile).resources.Resources.D.Properties.Body['Fn::Sub']
+    assert.is(body, 'FB\n')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: env / cron / eval refs resolve inside body', async () => {
+  process.env.FN_SUB_TEST_ENV = 'ENVVAL'
+  const result = await configorama({
+    resources: { Resources: {
+      E: { Properties: { Body: { 'Fn::Sub': 'e=${env:FN_SUB_TEST_ENV} cfn=${ApiGatewayRestApi}' } } },
+      C: { Properties: { Body: { 'Fn::Sub': '${cron(every 5 minutes)}' } } },
+      V: { Properties: { Body: { 'Fn::Sub': '${eval(1 + 2)}' } } }
+    } }
+  })
+  const R = result.resources.Resources
+  assert.is(R.E.Properties.Body['Fn::Sub'], 'e=ENVVAL cfn=${ApiGatewayRestApi}')
+  assert.is(R.C.Properties.Body['Fn::Sub'], '*/5 * * * *')
+  assert.is(R.V.Properties.Body['Fn::Sub'], 3)
+  delete process.env.FN_SUB_TEST_ENV
+})
+
+test('Fn::Sub: configorama refs inside an inlined file resolve while CFN refs are preserved', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-inl-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  try {
+    process.env.FN_SUB_INL_ENV = 'X'
+    fs.writeFileSync(path.join(dir, 'd.json'), '{ "e": "${env:FN_SUB_INL_ENV}", "r": "${AWS::Region}" }\n')
+    fs.writeFileSync(configFile, `resources:
+  Resources:
+    D:
+      Properties:
+        Body: !Sub |
+          \${file(./d.json)}
+`)
+    // Async (in-process) API so the env resolver sees env set during this test;
+    // the sync API runs in a child worker whose env is snapshotted at spawn.
+    const result = await configorama(configFile)
+    const body = result.resources.Resources.D.Properties.Body['Fn::Sub']
+    assert.ok(body.includes('"e": "X"'))
+    assert.ok(body.includes('"r": "${AWS::Region}"'))
+    delete process.env.FN_SUB_INL_ENV
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: list form leaves template refs verbatim and resolves the variables map', async () => {
+  const result = await configorama({
+    custom: { who: 'world' },
+    provider: { stage: 'dev' },
+    resources: { Resources: { D: { Properties: { Body: {
+      'Fn::Sub': [
+        'hi ${Foo} stage=${self:provider.stage} cfn=${ApiGatewayRestApi}',
+        { Foo: '${self:custom.who}' }
+      ]
+    } } } } }
+  })
+  const body = result.resources.Resources.D.Properties.Body['Fn::Sub']
+  // template (index 0) untouched, variables map (index 1) resolved
+  assert.is(body[0], 'hi ${Foo} stage=${self:provider.stage} cfn=${ApiGatewayRestApi}')
+  assert.is(body[1].Foo, 'world')
+})
+
+test('Fn::Sub: list form inlines a file ref in the template', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-list-'))
+  const configFile = path.join(dir, 'serverless.yml')
+  try {
+    fs.writeFileSync(path.join(dir, 'data.json'), '{ "k": "${AWS::Region}" }\n')
+    fs.writeFileSync(configFile, `resources:
+  Resources:
+    D:
+      Properties:
+        Body:
+          Fn::Sub:
+            - "data=\${file(./data.json)} v=\${Foo}"
+            - Foo: bar
+`)
+    const body = configorama.sync(configFile).resources.Resources.D.Properties.Body['Fn::Sub']
+    assert.is(body[0], 'data={ "k": "${AWS::Region}" }\n v=${Foo}')
+    assert.is(body[1].Foo, 'bar')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('Fn::Sub: custom variable source resolves inside body', async () => {
   const config = {
     resources: {

@@ -373,8 +373,10 @@ class Configorama {
         match: fileRefSyntax,
         resolver: (varString, o, x, pathValue) => {
           // Inside ignore-path contexts (e.g. Fn::Sub) inline the file as raw text so
-          // embedded CloudFormation refs survive and the body stays a string.
-          const asRawText = !!(pathValue && this.isIgnorePath(pathValue.path))
+          // embedded CloudFormation refs survive and the body stays a string. Skip
+          // raw mode when a :key/.key accessor is present — that needs a parsed value.
+          const hasAccessor = /\)\s*[:.]/.test(varString)
+          const asRawText = !!(pathValue && this.isIgnorePath(pathValue.path)) && !hasAccessor
           return this.getValueFromFile(varString, { asRawText, context: pathValue })
         },
       },
@@ -2193,13 +2195,6 @@ Missing Value ${missingValue} - ${matchedString}
     // Cache joined path to avoid repeated array.join('.') calls
     const pathJoined = pathValue && pathValue.length ? pathValue.join('.') : null
 
-    // Inside ignore-path contexts (Fn::Sub, inline code, VTL templates, ...) only
-    // configorama's own typed refs (file/text/env/opt/cron/git/custom) resolve.
-    // Self refs, bare dot-prop refs, and CloudFormation refs are left verbatim for
-    // CloudFormation / downstream Serverless to resolve.
-    if (this.isIgnorePath(pathValue) && !this.subResolvableTypes.test(variableString)) {
-      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
-    }
 
     // Track every call to getValueFromSource for metadata
     if (this._trackCalls && pathJoined) {
@@ -2352,6 +2347,14 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('found variable resolver', found)
     // console.log('resolverFunction', resolverFunction)
     /** */
+
+    // Inside ignore-path contexts (Fn::Sub, inline code, VTL templates, ...) leave
+    // self refs, bare config refs, and CloudFormation refs verbatim for CloudFormation
+    // / downstream Serverless to resolve. Everything configorama can resolve on its own
+    // (file/text/env/opt/cron/eval/git/custom/string/number) still resolves.
+    if (this.isIgnorePath(pathValue) && (!found || resolverType === 'self' || resolverType === 'dot.prop')) {
+      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+    }
 
     if (found && resolverFunction) {
       /*
