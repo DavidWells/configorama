@@ -114,6 +114,32 @@ const GIT_KEYS = {
 }
 
 function createResolver(cwd) {
+  let gitRepo
+  const gitResultCache = new Map()
+
+  function isCurrentGitRepo() {
+    if (typeof gitRepo === 'undefined') {
+      gitRepo = isGitRepo(cwd)
+    }
+    return gitRepo
+  }
+
+  function cachedSafeGit(key, cmdFn) {
+    if (!gitResultCache.has(key)) {
+      gitResultCache.set(key, _safeGit(cmdFn))
+    }
+    return gitResultCache.get(key)
+  }
+
+  function gitExec(args) {
+    const key = `git:${JSON.stringify(args)}`
+    return cachedSafeGit(key, () => _execFile('git', args))
+  }
+
+  function gitRemote(name = 'origin') {
+    return cachedSafeGit(`remote:${name}`, () => getGitRemote(name))
+  }
+
   async function _getValueFromGit(variableString) {
     const variable = variableString.split(`${GIT_PREFIX}:`)[1]
     let value = null
@@ -123,14 +149,14 @@ function createResolver(cwd) {
     // undefined. This lets fallbacks like `${git:branch, "main"}` work, and
     // when there's no fallback the outer resolver throws a clear "Unable to
     // resolve config variable" error pointing at the config path.
-    if (!isGitRepo(cwd)) {
+    if (!isCurrentGitRepo()) {
       return undefined
     }
 
     if (variable.match(/^remote/i)) {
       const hasParams = functionRegex.exec(variableString)
       const remoteName = (hasParams && hasParams[2]) ? formatFunctionArgs(hasParams[2]) : 'origin'
-      return _safeGit(() => getGitRemote(remoteName))
+      return gitRemote(remoteName)
     }
 
     const normalizedVar = (variable || '').toLowerCase()
@@ -152,7 +178,7 @@ function createResolver(cwd) {
       case 'repository':
       case 'reposlug':
       case 'repo-slug': {
-        const urla = await _safeGit(() => getGitRemote())
+        const urla = await gitRemote()
         if (!urla) return undefined
         const parseda = GitUrlParse(urla)
         value = parseda.full_name
@@ -162,7 +188,7 @@ function createResolver(cwd) {
       case GIT_KEYS.name:
       case 'reponame': // repoName
       case 'repo-name': {
-        const toplevel = await _safeGit(() => _execFile('git', ['rev-parse', '--show-toplevel']))
+        const toplevel = await gitExec(['rev-parse', '--show-toplevel'])
         if (!toplevel) return undefined
         value = path.basename(toplevel)
         break
@@ -173,7 +199,7 @@ function createResolver(cwd) {
       case 'organization':
       case 'repoowner': // repoOwner
       case 'repo-owner': {
-        const url = await _safeGit(() => getGitRemote())
+        const url = await gitRemote()
         if (!url) return undefined
         const parsed = GitUrlParse(url)
         value = parsed.organization || parsed.owner
@@ -185,12 +211,12 @@ function createResolver(cwd) {
       case 'dirpath': // dirPath
       case 'dir-path':
       case 'dir_path': {
-        const gitBasePath = await _safeGit(() => _execFile('git', ['rev-parse', '--show-toplevel']))
+        const gitBasePath = await gitExec(['rev-parse', '--show-toplevel'])
         if (!gitBasePath) return undefined
         if (cwd) {
           const subPath = cwd.replace(gitBasePath, '')
-          const branch = await _safeGit(() => _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']))
-          const url = await _safeGit(() => getGitRemote())
+          const branch = await gitExec(['rev-parse', '--abbrev-ref', 'HEAD'])
+          const url = await gitRemote()
           if (!url) return undefined
           value = (subPath && branch) ? `${url}/tree/${branch}${subPath}` : url
         }
@@ -200,12 +226,12 @@ function createResolver(cwd) {
       case GIT_KEYS.url:
       case 'repourl': // repoUrl
       case 'repo-url':
-        value = await _safeGit(() => getGitRemote())
+        value = await gitRemote()
         break
       // Current commit sha
       case 'sha':
       case 'sha1':
-        value = await _safeGit(() => _execFile('git', ['rev-parse', '--short', 'HEAD']))
+        value = await gitExec(['rev-parse', '--short', 'HEAD'])
         break
       // Current commit full sha
       case GIT_KEYS.commit:
@@ -213,7 +239,7 @@ function createResolver(cwd) {
       case 'commit-sha':
       case 'commithash':
       case 'commit-hash':
-        value = await _safeGit(() => _execFile('git', ['rev-parse', 'HEAD']))
+        value = await gitExec(['rev-parse', 'HEAD'])
         break
       // Branches
       case GIT_KEYS.branch:
@@ -221,7 +247,7 @@ function createResolver(cwd) {
       case 'branch-name':
       case 'currentbranch': // currentBranch
       case 'current-branch':
-        value = await _safeGit(() => _execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']))
+        value = await gitExec(['rev-parse', '--abbrev-ref', 'HEAD'])
         break
       // Commit msg
       case GIT_KEYS.message:
@@ -230,26 +256,26 @@ function createResolver(cwd) {
       case 'commit-message':
       case 'commitmsg': // commitMsg
       case 'commit-msg':
-        value = await _safeGit(() => _execFile('git', ['log', '-1', '--pretty=%B']))
+        value = await gitExec(['log', '-1', '--pretty=%B'])
         break
       // Git tags
       case GIT_KEYS.tag:
       case 'describe':
-        value = await _safeGit(() => _execFile('git', ['describe', '--always']))
+        value = await gitExec(['describe', '--always'])
         break
       // Git tags
       case 'describeLight':
       case 'describelight':
       case 'describe-light':
-        value = await _safeGit(() => _execFile('git', ['describe', '--always', '--tags']))
+        value = await gitExec(['describe', '--always', '--tags'])
         break
       // Is branch dirty
       case 'isDirty':
       case 'isdirty':
       case 'is-dirty': {
-        const writeTree = await _safeGit(() => _execFile('git', ['write-tree']))
+        const writeTree = await gitExec(['write-tree'])
         if (!writeTree) return undefined
-        const changes = await _safeGit(() => _execFile('git', ['diff-index', writeTree.trim(), '--']))
+        const changes = await gitExec(['diff-index', writeTree.trim(), '--'])
         if (changes === undefined) return undefined
         value = `${changes.length > 0}`
         break
