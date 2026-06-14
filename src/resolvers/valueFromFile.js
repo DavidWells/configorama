@@ -115,7 +115,9 @@ function parseFileContents(content, filePath) {
  */
 async function getValueFromFile(ctx, variableString, options) {
   const opts = options || {}
-  const syntax = opts.asRawText ? ctx.textRefSyntax : ctx.fileRefSyntax
+  // Pick syntax from the ref keyword, not the raw-text flag, so a file() ref can
+  // also be inlined as raw text (e.g. inside an Fn::Sub) without losing its match.
+  const syntax = /^\s*text\(/.test(variableString) ? ctx.textRefSyntax : ctx.fileRefSyntax
   // console.log('From file', `"${variableString}"`)
   let matchedFileString = variableString.match(syntax)[0]
   // console.log('matchedFileString', matchedFileString)

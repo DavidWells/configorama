@@ -1,5 +1,6 @@
 const DEFAULT_IGNORE_PATHS = [
   '**.Fn::Sub',
+  '**.Fn::Sub.0',
   '**.Properties.Code.ZipFile',
   '**.Properties.FunctionCode',
   '**.Properties.UserData',
