@@ -2,6 +2,9 @@ const { findNestedVariables } = require('./findNestedVariables')
 const { functionRegex, fileRefSyntax } = require('../regex')
 
 const DEBUG = false
+// cleanVariable is a pure function of (match, variableSyntax); the same variable
+// strings recur many times per run, so cache results per syntax regex.
+const cleanCache = new WeakMap()
 /**
  * Convert variable into string
  * ${opt:foo} => 'opt:foo'
@@ -47,9 +50,28 @@ module.exports = function cleanVariable(
   // process.exit(1)
   /** */
 
+  const cacheable = variableSyntax && typeof variableSyntax === 'object'
+  let inner = cacheable ? cleanCache.get(variableSyntax) : undefined
+  if (inner) {
+    const hit = inner.get(varToClean)
+    if (hit !== undefined) {
+      // Mirror String.replace's reset of the global regex's lastIndex.
+      variableSyntax.lastIndex = 0
+      return hit
+    }
+  }
+
   const clean = varToClean.replace(variableSyntax, (context, contents) => {
     return contents.trim()
   })
+
+  if (cacheable) {
+    if (!inner) {
+      inner = new Map()
+      cleanCache.set(variableSyntax, inner)
+    }
+    inner.set(varToClean, clean)
+  }
 
   // if (recursive && clean.match(variableSyntax)) {
   //   return cleanVariable(clean, variableSyntax, simple, caller, true)
