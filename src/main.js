@@ -221,6 +221,9 @@ class Configorama {
     // Paths whose current value is a literal with no variables — skip rebuilding
     // their leaf object on every subsequent populateObjectImpl iteration.
     this._resolvedPaths = new Set()
+    // Ignore-path decisions are constant for a run (patterns are fixed per
+    // instance), so cache per path to skip repeated glob matching.
+    this._ignorePathCache = new Map()
     // Cache raw file contents per absolute path so repeated ${file:...} refs
     // to the same file (e.g., merged twice into different keys) don't reread.
     this._fileContentCache = new Map()
@@ -1188,7 +1191,14 @@ class Configorama {
   // ## PROPERTY HANDLING ##
   // #######################
   isIgnorePath(pathValue) {
-    return shouldIgnorePath(pathValue, this.ignorePathPatterns)
+    if (!this.ignorePathPatterns.length) return false
+    // NUL-join so distinct path arrays can never collide on a shared key.
+    const key = isArray(pathValue) ? pathValue.join('\x00') : String(pathValue)
+    const cached = this._ignorePathCache.get(key)
+    if (cached !== undefined) return cached
+    const result = shouldIgnorePath(pathValue, this.ignorePathPatterns)
+    this._ignorePathCache.set(key, result)
+    return result
   }
   // True when the value has a configorama-typed token that resolves even inside an
   // ignore-path (file/text/env/opt/cron/git/custom) — i.e. not just self/CFN refs.
