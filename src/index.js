@@ -7,6 +7,9 @@ const { buildConfigRequirements } = require('./utils/requirements/configRequirem
 const { buildIntrospection } = require('./utils/introspection/model')
 const { buildAuditReport } = require('./utils/introspection/audit')
 const { formatGraph } = require('./utils/introspection/graph')
+const { ConfigoramaError } = require('./errors')
+
+const INSPECT_VIEWS = ['requirements', 'audit', 'graph']
 
 /**
  * @typedef {Object} ConfigoramaSettings
@@ -174,6 +177,47 @@ module.exports.graph = async (configPathOrObject, settings = {}) => {
   const graph = await module.exports.introspect(configPathOrObject, settings)
   if (settings.formatGraph === false) return graph
   return formatGraph(graph, settings.format || 'json')
+}
+
+/**
+ * Unified introspection entry point. Without a view it returns the full model
+ * (requirements + graph + audit). With `settings.view` it returns a single
+ * projection, identical to the focused `requirements` / `graph` / `audit` verbs.
+ * @param {string|object} configPathOrObject - Path to config file or raw config object
+ * @param {object} [settings] - Same settings as the main API, plus `view` and `format`
+ * @return {Promise<object|string>} the requested model (string for mermaid/dot graph views)
+ */
+module.exports.inspect = async (configPathOrObject, settings = {}) => {
+  const view = settings.view
+  if (view !== undefined && view !== null && view !== '' && !INSPECT_VIEWS.includes(view)) {
+    throw new ConfigoramaError('invalid_view', `Unknown inspect view "${view}". Valid views: ${INSPECT_VIEWS.join(', ')}.`)
+  }
+  if (view === 'requirements') {
+    return module.exports.analyze(configPathOrObject, { ...settings, instructions: true })
+  }
+  if (view === 'audit') {
+    return module.exports.audit(configPathOrObject, settings)
+  }
+  if (view === 'graph') {
+    return module.exports.graph(configPathOrObject, settings)
+  }
+
+  // Full model: each projection runs its own verb's code path so the unified
+  // output stays identical to `requirements`, `graph`, and `audit` run alone.
+  // (Those paths use different analyze settings, so they are not collapsible
+  // into a single shared analysis without changing their output.)
+  const [requirements, graph, audit] = await Promise.all([
+    module.exports.analyze(configPathOrObject, { ...settings, instructions: true }),
+    module.exports.graph(configPathOrObject, { ...settings, formatGraph: false }),
+    module.exports.audit(configPathOrObject, settings),
+  ])
+  return {
+    schemaVersion: 1,
+    config: typeof configPathOrObject === 'string' ? configPathOrObject : (settings.configFilePath || null),
+    requirements,
+    graph,
+    audit,
+  }
 }
 
 /**
