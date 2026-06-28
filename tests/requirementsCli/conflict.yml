@@ -1,0 +1,3 @@
+service: requirements-cli
+first: ${env:CONFIGORAMA_REQUIREMENTS_CLI_CONFLICT | String}
+second: ${env:CONFIGORAMA_REQUIREMENTS_CLI_CONFLICT | Number}

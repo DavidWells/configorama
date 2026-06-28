@@ -2,6 +2,7 @@
 
 const fallbackMap = {
   opt: 'options',
+  option: 'options',
   file: 'file',
   text: 'text',
 }

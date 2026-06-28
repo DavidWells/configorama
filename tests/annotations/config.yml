@@ -1,0 +1,22 @@
+service: annotated-config
+
+stage: ${option:stage | oneOf("dev", "prod")}
+
+secrets:
+  # Stripe live secret key
+  # @from Stripe dashboard > Developers > API keys
+  # @example sk_live_...
+  # @default Set in CI or local shell profile
+  # @sensitive true
+  # @group Payments
+  # @deprecated Use STRIPE_RESTRICTED_KEY instead
+  stripeSecret: ${env:CONFIGORAMA_ANNOTATION_STRIPE_SECRET}
+
+  # Public publishable key
+  # @sensitive false
+  publishableKey: ${env:CONFIGORAMA_ANNOTATION_PUBLIC_KEY}
+
+metadata:
+  # @description Explicit description wins
+  # Normal plain text does not become the description for this variable.
+  owner: ${env:CONFIGORAMA_ANNOTATION_OWNER}

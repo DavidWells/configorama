@@ -26,7 +26,8 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
   // Extract reference prefixes from variable types, or use defaults
   const refPrefixes = variableTypes && variableTypes.length > 0
     ? variableTypes
-        .map(v => (v.prefix || v.type) + ':')
+        .flatMap(v => v.prefixes || [v.prefix || v.type])
+        .map(prefix => prefix + ':')
         .filter(p => p !== 'dot.prop:' && p !== 'string:' && p !== 'number:')
     : ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
 

@@ -1,8 +1,13 @@
 const { trim } = require('../lodash')
 const { trimSurroundingQuotes } = require('./quoteUtils')
+const { decodeFilterArg, isEncodedFilterArg } = require('../filters/filterArgs')
 
 function formatArg(arg) {
-  const cleanArg = trimSurroundingQuotes(trim(arg), false)
+  const trimmed = trim(arg)
+  if (isEncodedFilterArg(trimmed)) {
+    return decodeFilterArg(trimmed)
+  }
+  const cleanArg = trimSurroundingQuotes(trimmed, false)
   if (cleanArg.match(/^{([^}]+)}$/)) {
     return JSON.parse(cleanArg)
   }

@@ -2,6 +2,7 @@ const Configorama = require('./main')
 const parsers = require('./parsers')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { buildVariableSyntax } = require('./utils/variables/variableUtils')
+const { serializeRequirements } = require('./utils/requirements/serializeRequirements')
 
 /**
  * @typedef {Object} ConfigoramaSettings
@@ -127,7 +128,11 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
     returnPreResolvedVariableDetails: true,
   })
   const options = settings.options || {}
-  return instance.init(options)
+  const analysis = await instance.init(options)
+  if (settings.instructions) {
+    return serializeRequirements(analysis, { configPathOrObject })
+  }
+  return analysis
 }
 
 /**

@@ -39,7 +39,25 @@ function walkAndUpdate(root, callback) {
   }
   visit(root, [], null, null)
 }
+
+function isNestedFilterArgument(property, matchedString) {
+  if (typeof property !== 'string' || typeof matchedString !== 'string') return false
+  if (property.trim() === matchedString.trim()) return false
+  const matchIdx = property.indexOf(matchedString)
+  const pipeIdx = property.indexOf('|')
+  const openParenIdx = property.lastIndexOf('(', matchIdx)
+  const closeParenIdx = property.indexOf(')', matchIdx)
+  return pipeIdx !== -1 && matchIdx > pipeIdx && openParenIdx > pipeIdx && closeParenIdx > matchIdx
+}
 const dotProp = require('dot-prop')
+
+function resolveStaticFilterArg(arg, config) {
+  const match = String(arg).trim().match(/^\$\{(?:self:)?([^}]+)\}$/)
+  if (!match) return arg
+  if (!dotProp.has(config, match[1])) return arg
+  return encodeFilterArg(dotProp.get(config, match[1]))
+}
+
 /* Utils - root */
 const {
   isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
@@ -71,11 +89,15 @@ const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
+const { encodeFilterArg } = require('./utils/filters/filterArgs')
+const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
 const chalk = require('./utils/ui/chalk')
 const deepLog = require('./utils/ui/deep-log')
 const { logHeader } = require('./utils/ui/logs')
 const { runConfigWizard } = require('./utils/ui/configWizard')
+const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
+const { redactUserInputsByRequirements } = require('./utils/redaction/setupRedaction')
 /* Display */
 const { displayNoVariablesFound, displayVariableDetails, displayUniqueVariables, displayConfigurableVariables } = require('./display')
 /* Metadata */
@@ -144,6 +166,8 @@ class Configorama {
     }
   
     const options = opts || {}
+    // Setup wizard runs when --setup flag is passed (CLI) or options.setup is true (library)
+    this.setupMode = SETUP_MODE || options.setup === true
     // Set opts to pass into JS file calls
     this.settings = Object.assign({}, {
       // Allow unknown ${xyz:...} syntax where xyz is not a registered resolver
@@ -208,7 +232,7 @@ class Configorama {
     this._needsRawClone = !!(
       this.settings.returnMetadata ||
       this.settings.returnPreResolvedVariableDetails ||
-      VERBOSE || SETUP_MODE || showFound
+      VERBOSE || this.setupMode || showFound
     )
 
     this.foundVariables = []
@@ -502,9 +526,11 @@ class Configorama {
     // Build prefix lookup map for O(1) type detection (perf optimization)
     this._resolverByPrefix = new Map()
     for (const r of this.variableTypes) {
-      const prefix = r.prefix || r.type
-      if (prefix && r.match instanceof RegExp && !r.internal) {
-        this._resolverByPrefix.set(prefix + ':', r)
+      const prefixes = r.prefixes || [r.prefix || r.type]
+      for (const prefix of prefixes) {
+        if (prefix && r.match instanceof RegExp && !r.internal) {
+          this._resolverByPrefix.set(prefix + ':', r)
+        }
       }
     }
 
@@ -575,6 +601,37 @@ class Configorama {
         if (value === undefined || value === null || value === 'null') return ''
         return String(value)
       },
+      Array: (value) => {
+        if (Array.isArray(value)) return value
+        if (typeof value !== 'string') {
+          throw new Error(`Configorama Error: Expected Array, got "${value}"`)
+        }
+        const trimmed = value.trim()
+        if (!trimmed) return []
+        try {
+          const parsed = JSON5.parse(trimmed)
+          if (Array.isArray(parsed)) return parsed
+          throw new Error('not-array')
+        } catch (error) {
+          if (trimmed.includes(',')) {
+            return trimmed.split(',').map(item => item.trim()).filter(Boolean)
+          }
+          throw new Error(`Configorama Error: Expected Array, got "${value}"`)
+        }
+      },
+      Object: (value) => {
+        if (value && typeof value === 'object' && !Array.isArray(value)) return value
+        if (typeof value !== 'string') {
+          throw new Error(`Configorama Error: Expected Object, got "${value}"`)
+        }
+        try {
+          const parsed = JSON5.parse(value)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+        } catch (error) {
+          // Fall through to consistent error below.
+        }
+        throw new Error(`Configorama Error: Expected Object, got "${value}"`)
+      },
       Json: (value) => {
         try {
           return typeof value === 'string' ? JSON.parse(value) : value
@@ -588,6 +645,7 @@ class Configorama {
         // The helpText argument is extracted during metadata collection for the wizard
         return value
       },
+      oneOf: validateOneOf,
     }
 
     // Apply user defined filters
@@ -746,7 +804,7 @@ class Configorama {
         dynamicArgs: this.settings.dynamicArgs
       })
       this.configFileContents = ''
-      if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
+      if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
       }
       /*
@@ -789,7 +847,7 @@ class Configorama {
     const variableSyntax = this.variableSyntax
     const variablesKnownTypes = this.variablesKnownTypes
 
-    if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || SETUP_MODE) {
+    if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
       const metadata = this.collectVariableMetadata()
 
       const enrich = await enrichMetadata(
@@ -844,15 +902,18 @@ class Configorama {
       displayConfigurableVariables(displayParams)
 
 
-      // WALK through CLI prompt if --setup flag is set
-      if (SETUP_MODE) {
+      // WALK through CLI prompt when setup mode is active
+      if (this.setupMode) {
         logHeader('Setup Mode')
         // deepLog('enrich', enrich)
         const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
+        const setupRequirements = buildConfigRequirements(enrich)
+        this.setupRequirements = setupRequirements
+        const displayInputs = redactUserInputsByRequirements(userInputs, setupRequirements)
 
         logHeader('User Inputs Summary')
         console.log()
-        console.log(JSON.stringify(userInputs, null, 2))
+        console.log(JSON.stringify(displayInputs, null, 2))
 
         // TODO set values
 
@@ -1808,6 +1869,9 @@ class Configorama {
           valueToPopulate = `"${valueToPopulate}"`
         }
       }
+      if (isNestedFilterArgument(property, currentMatchedString)) {
+        valueToPopulate = encodeFilterArg(valueToPopulate)
+      }
       property = replaceAll(currentMatchedString, valueToPopulate, property)
       // console.log('property replaceAll', property)
 
@@ -1818,7 +1882,10 @@ class Configorama {
     // partial replacement, number
     } else if (isNumber(valueToPopulate)) {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isNumber')
-      property = replaceAll(matchedString, String(valueToPopulate), property)
+      const replacementValue = isNestedFilterArgument(property, matchedString)
+        ? encodeFilterArg(valueToPopulate)
+        : String(valueToPopulate)
+      property = replaceAll(matchedString, replacementValue, property)
       // TODO This was temp fix for array value mismatch from filters. This fixes filterInner: ${commas | split(${self:inner}, 2) }
       // } else if (isArray(valueToPopulate) && valueToPopulate.length === 1) {
       //  property = replaceAll(matchedString, String(valueToPopulate[0]), property)
@@ -1841,7 +1908,9 @@ class Configorama {
         )
         // Only encode for file() or text() references where JSON braces break regex matching
         const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
-        if (isNestedInVariable && isFileOrTextRef) {
+        if (isNestedFilterArgument(property, matchedString)) {
+          property = replaceAll(matchedString, encodeFilterArg(valueToPopulate), property)
+        } else if (isNestedInVariable && isFileOrTextRef) {
           // Encode object as base64 to avoid breaking variable syntax with nested braces
           const encodedObj = encodeJsonForVariable(valueToPopulate)
           property = replaceAll(matchedString, encodedObj, property)
@@ -2069,7 +2138,7 @@ Missing Value ${missingValue} - ${matchedString}
           const rawArgs = funcMatch[2]
           if (rawArgs) {
             const splitter = splitCsv(rawArgs, ', ')
-            filterArgs = formatFunctionArgs(splitter)
+            filterArgs = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, this.config)))
           }
         }
 
@@ -2515,7 +2584,7 @@ Missing Value ${missingValue} - ${matchedString}
             // Parse arguments using the same logic as functions
             if (rawArgs) {
               const splitter = splitCsv(rawArgs, ', ')
-              filterArgs = formatFunctionArgs(splitter)
+              filterArgs = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, this.config)))
             }
           }
 

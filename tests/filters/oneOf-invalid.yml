@@ -1,0 +1,15 @@
+service: one-of-invalid-qa
+
+allowedStages: dev
+
+# Fails because qa is not in the inline literal set.
+badStage: '${option:stage | oneOf("dev", "staging", "prod")}'
+
+# Fails because allowedStages is a string, not an array.
+badList: '${option:listStage | oneOf(${self:allowedStages})}'
+
+# Fails because oneOf runs before Number, so "04" is compared as "04".
+badStrictThreads: '${option:strictThreads | oneOf(1, 2, 4) | Number}'
+
+# Fails because Object rejects arrays.
+badObject: '${option:settings | Object}'

@@ -1,8 +1,82 @@
 # Configorama
 
-Dynamic configuration values with variable support for yml, json, toml, hcl (Terraform), and other config formats.
+[![npm version](https://img.shields.io/npm/v/configorama.svg)](https://www.npmjs.com/package/configorama)
+[![license](https://img.shields.io/npm/l/configorama.svg)](https://www.npmjs.com/package/configorama)
+[![types](https://img.shields.io/npm/types/configorama.svg)](https://www.npmjs.com/package/configorama)
 
-Configorama extends your configuration with a powerful variable system that resolves values from CLI options, environment variables, file references, TypeScript/JavaScript files, git data, self-references, conditional expressions, and any custom source you define.
+Resolve dynamic config values from environment variables, CLI flags, files, git data, expressions, and custom sources. Works with YAML, JSON, TOML, INI, HCL, Markdown, JavaScript, and TypeScript.
+
+```bash
+npm install configorama
+npx configorama config.yml --stage prod
+```
+
+Configorama is a framework-agnostic variable engine for configuration files. Use it to resolve a config at runtime, inspect missing values before resolution, run an interactive setup flow, or emit requirements JSON for agents and automation.
+
+## TL;DR
+
+Deployment configs usually pull values from several places: env vars, CLI flags, local files, generated JavaScript, git metadata, stage-specific maps, and secret stores. Most config parsers stop at parsing, while framework-specific variable systems tend to stay tied to that framework.
+
+Configorama loads a config file, finds variable references, resolves them in dependency order, applies filters/functions, and returns a plain JavaScript object. It can also report what the config needs before resolution.
+
+Common use cases:
+
+| Need | Support | Example |
+|---|---|---|
+| Resolve values from many sources | Built-in `env`, `option`/`opt`, `self`, `file`, `text`, `git`, `cron`, `eval`, and `if` sources | `${env:API_KEY}`, `${option:stage}`, `${file(./secrets.yml)}` |
+| Keep config portable | Runs outside any framework | Use the same resolver in a CLI, build script, deploy job, or app bootstrap |
+| Prompt for missing inputs | Interactive setup wizard with type-aware prompts and masked secrets | `configorama setup config.yml` |
+| Tell agents what to provide | Requirements JSON with `schemaVersion`, `requirements[]`, and `ask[]` | `configorama requirements config.yml` |
+| Document variables near the config | `help()` plus comment annotations for descriptions, obtain hints, examples, groups, sensitivity, and deprecation warnings | `# @from Stripe dashboard > Developers > API keys` |
+| Enforce runtime constraints | Type filters and `oneOf(...)` validation | `${option:threads \| Number \| oneOf(1, 2, 4)}` |
+
+## Quick Example
+
+```yaml
+# config.yml
+service: billing-api
+
+# Deployment stage
+stage: ${option:stage | oneOf("dev", "staging", "prod")}
+
+secrets:
+  # Stripe live secret key
+  # @from Stripe dashboard > Developers > API keys
+  # @example sk_live_...
+  # @sensitive true
+  # @group Payments
+  stripeSecret: ${env:STRIPE_SECRET_KEY}
+
+database:
+  host: ${env:DB_HOST, "localhost"}
+  port: ${env:DB_PORT, 5432 | Number}
+  name: ${self:service}-${self:stage}
+```
+
+```bash
+# Resolve the config
+STRIPE_SECRET_KEY=sk_live_xxx npx configorama config.yml --stage prod
+
+# Walk through missing variables interactively
+npx configorama setup config.yml
+
+# Print requirements for agents or automation
+npx configorama requirements config.yml
+```
+
+## What We Added Recently
+
+| Area | Added |
+|---|---|
+| Normalized requirements model | `ConfigRequirements` groups occurrences by variable, normalizes `${opt:...}` and `${option:...}` as `variableType: "option"`, and tracks paths, defaults, types, allowed values, sensitivity, and conflicts. |
+| Requirements JSON | `configorama requirements config.yml` and `configorama config.yml --requirements` emit `schemaVersion: 1`, `summary`, `requirements[]`, and environment-aware `ask[]` without resolving missing values. |
+| Conflict handling | Conflicting type/default/allowed-value/annotation metadata is deterministic in the wizard. Requirements serialization fails on conflicts so agents get a clean contract. |
+| Setup wizard migration | The wizard now consumes prompt descriptors derived from the requirements model, supports enum selects from `oneOf`, displays annotation details, and redacts sensitive values in setup summaries and setup stdout. |
+| `oneOf(...)` validation | Runtime filter for inline literal sets and resolved list variables, including type-filter-first behavior such as `${option:threads \| Number \| oneOf(1, 2, 4)}`. |
+| More type filters | `Array` and `Object` filters now validate/coerce arrays, comma-separated lists, JSON/JSON5 arrays, and JSON/JSON5 objects. |
+| Option alias | `${option:name}` is supported alongside the existing `${opt:name}` shorthand. |
+| Comment metadata | Leading/inline comments become help fallback; structured tags add `@description`, `@from`, `@example`, `@default`, `@sensitive`, `@group`, and `@deprecated`. |
+| Documentation and fixtures | Added focused fixtures and tests for oneOf edge cases, option aliases, annotations, requirements CLI behavior, setup prompt descriptors, redaction, and display output. |
 
 ## Key Features
 
@@ -11,8 +85,10 @@ Configorama extends your configuration with a powerful variable system that reso
 - **Async/sync function execution** - Import and execute JavaScript/TypeScript files with argument passing
 - **Self-referencing** - Reference other values within the same config using dot notation
 - **Custom variable sources** - Pluggable architecture to add your own variable resolvers
-- **Filters and functions** - Transform and combine values with built-in or custom operators
-- **Metadata extraction** - Analyze configs without resolving them, or get full resolution history
+- **Filters and functions** - Transform, coerce, constrain, and combine values with built-in or custom operators
+- **Setup and requirements mode** - Prompt humans interactively or generate requirements JSON for agents
+- **Comment annotations** - Keep human and agent metadata beside the config value it describes
+- **Metadata extraction** - Analyze configs without resolving missing values, or get full resolution history
 - **Circular dependency detection** - Helpful error messages instead of infinite loops
 - **TypeScript support** - Full type definitions and TypeScript file execution via tsx/ts-node
 
@@ -22,6 +98,9 @@ Configorama extends your configuration with a powerful variable system that reso
 <details>
 <summary>Click to expand</summary>
 
+- [TL;DR](#tldr)
+- [Quick Example](#quick-example)
+- [What We Added Recently](#what-we-added-recently)
 - [Key Features](#key-features)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
@@ -72,6 +151,8 @@ Configorama extends your configuration with a powerful variable system that reso
 - [Custom Variable Sources](#custom-variable-sources)
   - [Variable Source Types](#variable-source-types)
   - [Creating a Custom Resolver](#creating-a-custom-resolver)
+- [Config Wizard (Experimental)](#config-wizard-experimental)
+- [Agent Requirements JSON](#agent-requirements-json)
 - [CLI Usage](#cli-usage)
   - [Basic Commands](#basic-commands)
   - [Command Options](#command-options)
@@ -82,7 +163,6 @@ Configorama extends your configuration with a powerful variable system that reso
   - [Writing Tests](#writing-tests)
 - [Deployment](#deployment)
   - [Using with Serverless Framework](#using-with-serverless-framework)
-  - [Docker Deployment](#docker-deployment)
   - [CI/CD Integration](#cicd-integration)
 - [Troubleshooting](#troubleshooting)
   - [Common Issues](#common-issues)
@@ -372,14 +452,14 @@ If your config is slow, please open an issue with the config (or a redacted repr
 
 ## Variable Sources
 
-Configorama supports multiple variable sources out of the box. All variable syntax follows the pattern `${type:value}` or `${type(value)}`.
+Configorama supports multiple variable sources. All variable syntax follows the pattern `${type:value}` or `${type(value)}`.
 
 ### Summary Table
 
 | Variable | Syntax                | Description            | Example |
 |----------|-----------------------|------------------------|---------|
 | env      | `${env:VAR}`          | Environment variables  | `${env:NODE_ENV}` |
-| opt      | `${opt:flag}`         | CLI option flags       | `${opt:stage}` |
+| option   | `${option:flag}` or `${opt:flag}` | CLI option flags (`opt` is shorthand) | `${option:stage}` |
 | param    | `${param:key}`        | Parameter values       | `${param:domain}` |
 | self     | `${key}` or `${self:key}` | Self references    | `${database.host}` |
 | file     | `${file(path)}`       | File references        | `${file(./secrets.yml)}` |
@@ -753,7 +833,7 @@ The `ctx` parameter (always the last argument) provides access to:
 |----------|-------------|
 | `originalConfig` | The original unresolved configuration object |
 | `currentConfig` | The current (partially resolved) configuration |
-| `options` | Options passed to configorama (populates `${opt:xyz}` variables) |
+| `options` | Options passed to configorama (populates `${option:xyz}` / `${opt:xyz}` variables) |
 
 **TypeScript users can import the type:**
 
@@ -943,7 +1023,7 @@ functions:
 - Support for both sync and async TypeScript functions
 - Function argument passing via config variables
 - Full TypeScript interface support
-- Comprehensive error handling with helpful dependency messages
+- Errors point to the failing dependency
 
 ---
 
@@ -1176,7 +1256,7 @@ aboveThreshold: ${eval(${value} > ${threshold})}  # true
 
 ### If Expressions
 
-Conditional expressions using ternary syntax. This is an alias for `eval` with a more intuitive name for conditionals.
+Conditional expressions using ternary syntax. This is an alias for `eval` with a clearer name for conditionals.
 
 ```yaml
 # Basic ternary (condition ? "yes" : "no")
@@ -1283,6 +1363,65 @@ serviceSlug: ${serviceName | toKebabCase}  # 'my-service-name'
 - `toLowerCase` - Convert to lowercase
 - `toKebabCase` - Convert to kebab-case
 - `toCamelCase` - Convert to camelCase
+- `String`, `Number`, `Boolean`, `Array`, `Object`, `Json` - Validate/coerce resolved values
+- `oneOf(...)` - Restrict a value to inline literals or a resolved list variable
+- `help('text')` - Attach guidance to a variable for the [config wizard](#config-wizard-experimental); returns the value unchanged
+
+The `help()` filter is an identity filter: it leaves the value untouched but records prompt/agent description text.
+
+```yaml
+apiKey: ${env:API_KEY | help('The Stripe live secret key')}
+stage: ${option:stage | toUpperCase | help('Deployment stage')}
+dbPort: ${env:DB_PORT, 5432 | Number | help('The Postgres port')}
+```
+
+`oneOf()` is a runtime constraint. It throws if the resolved value is not in the allowed set. Put type filters first when coercion matters:
+
+```yaml
+stage: ${option:stage | oneOf('dev', 'staging', 'prod')}
+threads: ${option:threads | Number | oneOf(1, 2, 4)}
+
+allowedStages:
+  - dev
+  - prod
+stageFromList: ${option:stage | oneOf(${self:allowedStages})}
+```
+
+`Array` accepts existing arrays, JSON/JSON5 array strings, and comma-separated text. `Object` accepts existing objects and JSON/JSON5 object strings.
+
+Comments are used as help fallback when `help()` is absent. Precedence is `help()` first, then trailing inline comments, then a leading comment block:
+
+```yaml
+# Used by deploy jobs
+deployToken: ${env:DEPLOY_TOKEN}
+region: ${option:region, 'us-east-1'} # AWS region
+```
+
+Use comment annotations for human and agent metadata. Filters affect runtime values; comments describe values:
+
+```yaml
+secrets:
+  # Stripe live secret key
+  # @from Stripe dashboard > Developers > API keys
+  # @example sk_live_...
+  # @default Set in CI or local shell profile
+  # @sensitive true
+  # @group Payments
+  # @deprecated Use STRIPE_RESTRICTED_KEY instead
+  stripeSecret: ${env:STRIPE_SECRET_KEY}
+```
+
+Supported annotation tags:
+
+- `@description ...` - Explicit description; overrides normal comment text and `help()`
+- `@from ...` - Where to obtain the value; appears as `obtainHint`
+- `@example ...` - Example value; can appear multiple times
+- `@default ...` - Documentation-only default hint; does not resolve the variable
+- `@sensitive true|false` - Override name-based masking detection
+- `@group ...` - Wizard display group label
+- `@deprecated ...` - Warning text for requirements JSON and prompt descriptors
+
+`from()` and `meta()` are not built-in filters. JSON files cannot use comment annotations because JSON has no comments; use JSON5/JSONC or another commented format if metadata is needed.
 
 **Custom filters:**
 
@@ -1882,7 +2021,7 @@ const config = await configorama(configFile, {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `options` | `object` | `{}` | CLI options/flags to populate `${opt:xyz}` variables |
+| `options` | `object` | `{}` | CLI options/flags to populate `${option:xyz}` / `${opt:xyz}` variables |
 | `syntax` | `string \| RegExp` | `${...}` | Custom variable syntax regex pattern |
 | `configDir` | `string` | directory of config file | Working directory for relative file paths |
 | `variableSources` | `VariableSource[]` | `[]` | Custom variable sources (see below) |
@@ -1918,7 +2057,7 @@ const config = await configorama(configFile, {
 
 ## Custom Variable Sources
 
-Configorama allows you to bring your own variable sources.
+Bring your own variable sources.
 
 ### Variable Source Types
 
@@ -1926,7 +2065,7 @@ The `source` property defines how the config wizard handles each variable type:
 
 | Source | Description | Wizard Behavior | Examples |
 |--------|-------------|-----------------|----------|
-| `'user'` | Values provided by user at runtime | Prompt user for value | `env`, `opt` |
+| `'user'` | Values provided by user at runtime | Prompt user for value | `env`, `option` / `opt` |
 | `'config'` | Values from config files or self-references | Check existence, can create | `self`, `file`, `text` |
 | `'remote'` | Values from external services | Fetch, prompt if missing, can write back | `ssm`, `vault`, `consul` |
 | `'readonly'` | Computed or system-derived values | Display only, cannot modify | `git`, `cron`, `eval` |
@@ -1936,7 +2075,7 @@ The `source` property defines how the config wizard handles each variable type:
 | Variable | Source Type | Description |
 |----------|-------------|-------------|
 | `${env:VAR}` | `user` | Environment variables |
-| `${opt:flag}` | `user` | CLI option flags |
+| `${option:flag}` / `${opt:flag}` | `user` | CLI option flags |
 | `${param:key}` | `user` | Parameter values |
 | `${self:key}` | `config` | Self references |
 | `${file(path)}` | `config` | File references |
@@ -2065,6 +2204,112 @@ database:
 
 ---
 
+## Config Wizard (Experimental)
+
+The config wizard walks you through every variable your config needs that isn't resolved yet, prompting for each one and then resolving the config with your answers.
+
+Trigger it with the `--setup` flag, the `setup` subcommand, or the `setup` library option:
+
+```bash
+configorama config.yml --setup
+configorama setup config.yml
+```
+
+```javascript
+const config = await configorama('config.yml', { setup: true })
+```
+
+The wizard groups unresolved variables by source and prompts for each:
+
+- `${option:...}` / `${opt:...}` - CLI option flags (`opt` is shorthand)
+- `${env:...}` - environment variables (shows the current `process.env` value if set)
+- `${self:...}` and dot-prop references - values defined elsewhere in the config
+
+Variables whose names look sensitive (`secret`, `password`, `token`, `key`, etc.) are prompted with a masked password input. Use comment annotations for new metadata, or annotate any variable with the backward-compatible [`help()` filter](#filters-experimental) to show guidance during the prompt:
+
+```yaml
+# Stripe live secret key
+# @from Stripe dashboard > Developers > API keys
+# @sensitive true
+apiKey: ${env:API_KEY}
+
+stage: ${opt:stage | help('Deployment stage, e.g. dev or prod')}
+```
+
+The [Variable Source Types](#variable-source-types) table describes how the wizard treats each source.
+
+> **Experimental:** the wizard fills in values for the current resolution run only. It does not write your answers back to the config file yet.
+
+---
+
+## Agent Requirements JSON
+
+Use requirements mode when an agent or script needs to know what a config is missing without running the full resolver:
+
+```bash
+configorama requirements config.yml
+configorama config.yml --requirements
+```
+
+Both commands use analyze mode and print JSON. Missing required variables do not fail requirements output. The result is environment-aware: if `process.env.API_KEY` is already set, `${env:API_KEY}` is removed from `ask[]`.
+
+```json
+{
+  "schemaVersion": 1,
+  "config": "config.yml",
+  "summary": {
+    "total": 2,
+    "required": 1,
+    "optional": 1,
+    "sensitive": 1
+  },
+  "requirements": [
+    {
+      "name": "API_KEY",
+      "variable": "env:API_KEY",
+      "variableType": "env",
+      "sourceClass": "user",
+      "type": "string",
+      "description": "Stripe live secret key",
+      "descriptionSource": "commentTag",
+      "allowedValues": null,
+      "sensitive": true,
+      "sensitiveSource": "commentTag",
+      "required": true,
+      "default": null,
+      "defaultHint": "Set in CI or local shell profile",
+      "obtainHint": "Stripe dashboard > Developers > API keys",
+      "examples": ["sk_live_..."],
+      "group": "Payments",
+      "deprecationMessage": "Use STRIPE_RESTRICTED_KEY instead",
+      "paths": ["apiKey"],
+      "conflicts": []
+    }
+  ],
+  "ask": [
+    {
+      "name": "API_KEY",
+      "variable": "env:API_KEY",
+      "variableType": "env",
+      "type": "string",
+      "sensitive": true,
+      "description": "Stripe live secret key",
+      "obtainHint": "Stripe dashboard > Developers > API keys",
+      "examples": ["sk_live_..."],
+      "defaultHint": "Set in CI or local shell profile",
+      "group": "Payments",
+      "deprecationMessage": "Use STRIPE_RESTRICTED_KEY instead",
+      "paths": ["apiKey"],
+      "how": "Set environment variable API_KEY"
+    }
+  ]
+}
+```
+
+`variableType` uses normalized names. CLI flags are reported as `option` for both `${option:stage}` and the backward-compatible `${opt:stage}` shorthand. Concrete missing `${file(...)}` and `${text(...)}` dependencies appear in `ask[]`; dynamic paths such as `${file(./${option:stage}.yml)}` ask for the inner variables first.
+
+---
+
 ## CLI Usage
 
 Configorama includes a CLI tool for resolving configs from the command line.
@@ -2086,6 +2331,13 @@ configorama config.yml --info
 
 # Verify config (check for errors without resolving)
 configorama config.yml --verify
+
+# Walk through unresolved variables interactively (experimental)
+configorama config.yml --setup
+
+# Print agent requirements JSON without resolving config
+configorama requirements config.yml
+configorama config.yml --requirements
 
 # Extract a specific path from config
 configorama config.yml .database.host
@@ -2116,6 +2368,8 @@ Options:
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -V, --verify              Verify the config
+  --setup                   Run the interactive config wizard (experimental)
+  --requirements            Print agent requirements JSON without resolving config
   --param <key=value>       Pass parameter values (can be used multiple times)
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
@@ -2424,73 +2678,6 @@ serverless deploy --stage prod --region us-west-2
 
 ---
 
-### Docker Deployment
-
-**Dockerfile:**
-
-```dockerfile
-FROM node:22-alpine
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application files
-COPY . .
-
-# Set environment variables (can be overridden at runtime)
-ENV NODE_ENV=production
-ENV STAGE=prod
-
-# Run config resolution at build time (optional)
-# RUN node -e "require('configorama').sync('./config.yml', { options: { stage: process.env.STAGE } })"
-
-CMD ["node", "index.js"]
-```
-
-**docker-compose.yml:**
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build: .
-    environment:
-      - NODE_ENV=production
-      - STAGE=prod
-      - DB_HOST=postgres
-      - DB_PASSWORD=${DB_PASSWORD}
-      - API_KEY=${API_KEY}
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-```
-
-**Usage:**
-
-```bash
-# Build
-docker build -t myapp .
-
-# Run with environment variables
-docker run \
-  -e DB_HOST=mydb.example.com \
-  -e DB_PASSWORD=secret \
-  -e API_KEY=abc123 \
-  myapp
-```
-
----
-
 ### CI/CD Integration
 
 **GitHub Actions example (.github/workflows/deploy.yml):**
@@ -2776,7 +2963,7 @@ Configorama detects circular dependencies and throws a helpful error instead of 
 
 **Q: Why should I use this?**
 
-Never render a stale configuration file again! Configorama ensures your configs are always up-to-date with the latest environment variables, CLI flags, file contents, and custom sources.
+Configs resolve fresh on every run, so values stay in sync with your environment variables, CLI flags, file contents, and custom sources instead of going stale.
 
 ---
 

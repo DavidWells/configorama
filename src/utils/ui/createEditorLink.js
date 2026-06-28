@@ -27,6 +27,22 @@ function createEditorLink(filePath, line = 1, column = 1, customDisplay = null, 
   return `\x1b]8;;${url}\x1b\\${displayText}\x1b]8;;\x1b\\`
 }
 
+/**
+ * Returns a click-to-open path: relative to cwd with a leading './' when the file
+ * lives under cwd, otherwise the absolute path. Editors linkify both forms.
+ * @param {string} filePath - The file path
+ * @returns {string} Display path that editors can open on click
+ */
+function toClickablePath(filePath) {
+  if (!filePath) return filePath
+  const rel = path.relative(process.cwd(), filePath)
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+    return '.' + path.sep + rel
+  }
+  return path.resolve(filePath)
+}
+
 module.exports = {
-  createEditorLink
+  createEditorLink,
+  toClickablePath
 }

@@ -45,3 +45,4 @@ _misc
 
 # bv (beads viewer) local config and caches
 .bv/
+/_wizard-demo.yml

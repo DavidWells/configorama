@@ -1,0 +1,26 @@
+service: one-of-qa
+
+# Leading comments become requirements descriptions when help() is absent.
+allowedStages:
+  - dev
+  - staging
+  - prod
+
+allowedTiers:
+  - free
+  - pro
+
+stageInline: '${option:stage | oneOf("dev", "staging", "prod") | help("Deployment stage from inline literals")}'
+stageFromList: '${option:stage | oneOf(${self:allowedStages})}'
+tierFromList: '${option:tier, "free" | oneOf(${self:allowedTiers})}'
+
+# Number must run before oneOf when you want numeric coercion first.
+threads: '${option:threads | Number | oneOf(1, 2, 4)}'
+
+# This intentionally validates before Number, so "04" fails even though Number("04") is 4.
+strictThreads: '${env:CONFIGORAMA_STRICT_THREADS | oneOf(1, 2, 4) | Number}'
+
+featureFlags: '${option:featureFlags | Array}'
+settings: '${option:settings | Object}'
+
+apiKey: '${env:CONFIGORAMA_ONEOF_QA_KEY | help("QA API key")}'

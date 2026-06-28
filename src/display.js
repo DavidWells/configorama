@@ -5,12 +5,63 @@ const chalk = require('./utils/ui/chalk')
 const { logHeader } = require('./utils/ui/logs')
 const { makeStackedBoxes } = require('@davidwells/box-logger')
 const { findLineForKey } = require('./utils/paths/findLineForKey')
-const { createEditorLink } = require('./utils/ui/createEditorLink')
+const { createEditorLink, toClickablePath } = require('./utils/ui/createEditorLink')
 const { isSensitiveVariable } = require('./utils/ui/configWizard')
 
 const SPACING = '           '
 const TITLE_TEXT = `Variable:${SPACING}`
 const VALUE_HEX = '#899499'
+
+function uniqueCompact(values) {
+  return [...new Set((values || []).filter(value => value !== undefined && value !== null && value !== ''))]
+}
+
+function firstValue(source, field) {
+  if (!source) return undefined
+  if (source[field] !== undefined && source[field] !== null && source[field] !== '') return source[field]
+  const occurrences = Array.isArray(source.occurrences) ? source.occurrences : []
+  const occurrence = occurrences.find(occ => occ[field] !== undefined && occ[field] !== null && occ[field] !== '')
+  return occurrence ? occurrence[field] : undefined
+}
+
+function getAnnotationMetadata(source) {
+  const occurrences = Array.isArray(source?.occurrences) ? source.occurrences : []
+  return {
+    group: firstValue(source, 'group'),
+    obtainHint: firstValue(source, 'obtainHint'),
+    examples: uniqueCompact([
+      ...(Array.isArray(source?.examples) ? source.examples : []),
+      ...occurrences.flatMap(occ => Array.isArray(occ.examples) ? occ.examples : [])
+    ]),
+    defaultHint: firstValue(source, 'defaultHint'),
+    deprecationMessage: firstValue(source, 'deprecationMessage'),
+  }
+}
+
+function appendAnnotationMetadata(varMsg, source, keyChalk, valueChalk, indent = '') {
+  const metadata = getAnnotationMetadata(source)
+  const lines = []
+
+  if (metadata.group) lines.push(['Group:', metadata.group])
+  if (metadata.obtainHint) lines.push(['From:', metadata.obtainHint])
+  if (metadata.examples.length > 0) {
+    lines.push([metadata.examples.length === 1 ? 'Example:' : 'Examples:', metadata.examples.join(', ')])
+  }
+  if (metadata.defaultHint) lines.push(['Default hint:', metadata.defaultHint])
+  if (metadata.deprecationMessage) lines.push(['Deprecated:', metadata.deprecationMessage])
+
+  for (const [label, value] of lines) {
+    varMsg += `${indent}${keyChalk(label.padEnd(TITLE_TEXT.length, ' '))} ${valueChalk(value)}\n`
+  }
+
+  return varMsg
+}
+
+function isSensitiveOccurrence(varName, occurrences = []) {
+  const explicitOccurrence = occurrences.find(occ => typeof occ.sensitive === 'boolean')
+  if (explicitOccurrence) return explicitOccurrence.sensitive
+  return isSensitiveVariable(varName)
+}
 
 /**
  * Display "No Variables Found" message
@@ -58,9 +109,13 @@ function displayVariableDetails({ varKeys, variableData, uniqueVariables, varPre
 
   const getBaseVarName = (key) => key.replace(varPrefixPattern, '').replace(varSuffixPattern, '').split(',')[0].trim()
 
-  const fileName = configFilePath ? ` in ${configFilePath}` : ''
+  logHeader(`Found ${varKeys.length} Variables`)
 
-  logHeader(`Found ${varKeys.length} Variables${fileName}`)
+  // Print the path on its own line (outside the wrapping box) so it stays clickable
+  if (configFilePath) {
+    console.log()
+    console.log(`  in ${toClickablePath(configFilePath)}`)
+  }
 
   // deepLog('variableData', variableData)
 
@@ -96,6 +151,8 @@ function displayVariableDetails({ varKeys, variableData, uniqueVariables, varPre
     // Get uniqueVariable data for description and other metadata
     const varName = getBaseVarName(key)
     const uniqueVar = uniqueVariables[varName]
+    const occurrenceMetadata = uniqueVar || { occurrences: variableInstances }
+    const isSensitive = isSensitiveOccurrence(varName, occurrenceMetadata.occurrences || variableInstances)
 
     // Build display message from enriched metadata
     let varMsg = ''
@@ -128,7 +185,7 @@ function displayVariableDetails({ varKeys, variableData, uniqueVariables, varPre
 
     // Show default value from metadata
     if (typeof firstInstance.defaultValue !== 'undefined') {
-      const defaultValueRender = firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue
+      const defaultValueRender = isSensitive ? '********' : (firstInstance.defaultValue === '' ? '""' : firstInstance.defaultValue)
       const defaultValueText = `${indent}${keyChalk('Default value:'.padEnd(TITLE_TEXT.length, ' '))}`
       varMsg += `${defaultValueText} ${valueChalk(defaultValueRender)}\n`
     }
@@ -143,6 +200,8 @@ function displayVariableDetails({ varKeys, variableData, uniqueVariables, varPre
         varMsg += `${valueChalk(firstInstance.defaultValueSrc)}\n`
       }
     }
+
+    varMsg = appendAnnotationMetadata(varMsg, occurrenceMetadata, keyChalk, valueChalk, indent)
 
     // Show path(s) from metadata
     const configPathLine = findLineForKey(variableInstances[0].path, lines, fileType)
@@ -250,7 +309,7 @@ function displayUniqueVariables({ uniqueVarKeys, uniqueVariables, lines, fileTyp
 
     // Show default value only if it's a true fallback, not a pre-resolved value
     // Redact sensitive values like API keys, secrets, tokens
-    const isSensitive = isSensitiveVariable(varName)
+    const isSensitive = isSensitiveOccurrence(varName, occurrences)
     const hasActualDefault = firstOcc.hasFallback && typeof firstOcc.defaultValue !== 'undefined'
     if (hasActualDefault) {
       const defaultValueRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
@@ -274,6 +333,8 @@ function displayUniqueVariables({ uniqueVarKeys, uniqueVariables, lines, fileTyp
         varMsg += `${valueChalk(firstOcc.defaultValueSrc)}\n`
       }
     }
+
+    varMsg = appendAnnotationMetadata(varMsg, uniqueVar, keyChalk, valueChalk)
 
     // Show config path(s) from occurrences
     let locationRender
@@ -403,7 +464,7 @@ function displayConfigurableVariables({ uniqueVarKeys, uniqueVariables, lines, f
       }
 
       // Show current/default value (redact sensitive values)
-      const isSensitive = isSensitiveVariable(v.varName)
+      const isSensitive = isSensitiveOccurrence(v.varName, occurrences)
       if (v.resolvedValue !== undefined) {
         const resolvedRender = isSensitive ? '********' : (v.resolvedValue === '' ? '""' : v.resolvedValue)
         varMsg += `${keyChalk('Current value:'.padEnd(TITLE_TEXT.length, ' '))} ${valueChalk(resolvedRender)}\n`
@@ -411,6 +472,8 @@ function displayConfigurableVariables({ uniqueVarKeys, uniqueVariables, lines, f
         const defaultRender = isSensitive ? '********' : (firstOcc.defaultValue === '' ? '""' : firstOcc.defaultValue)
         varMsg += `${keyChalk('Default value:'.padEnd(TITLE_TEXT.length, ' '))} ${valueChalk(defaultRender)}\n`
       }
+
+      varMsg = appendAnnotationMetadata(varMsg, v, keyChalk, valueChalk)
 
       // Show config path(s)
       let locationRender

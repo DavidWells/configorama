@@ -4,6 +4,9 @@ const chalk = require('./chalk')
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
+const { toClickablePath } = require('./createEditorLink')
+const { buildConfigRequirements } = require('../requirements/configRequirements')
+const { createPromptDescriptors } = require('./promptDescriptors')
 
 const INVISIBLE_SPACE = '\u2800\u2800\u2800'
 
@@ -33,6 +36,32 @@ function formatWizardMultilineText(indentCount, text, addLeadingEmptyLine = true
   const formattedLines = lines.map(line => `${chalk.gray('│')}${indent}${line}`)
   const leadingLine = addLeadingEmptyLine ? `${chalk.gray('│')}\n` : '\n'
   return leadingLine + formattedLines.join('\n') + `\n${chalk.gray('│')}`
+}
+
+/**
+ * Removes a single pair of matching surrounding quotes from a string.
+ * Mirrors how configorama strips quotes from inline fallback values like `'us-east-1'`.
+ * @param {*} val - Value to clean
+ * @returns {*} The value without surrounding quotes (non-strings pass through)
+ */
+function stripQuotes(val) {
+  if (typeof val !== 'string') return val
+  const match = val.match(/^(['"])([\s\S]*)\1$/)
+  return match ? match[2] : val
+}
+
+/**
+ * Shortens a file path for display so long absolute paths don't wrap the prompt box.
+ * Prefers a path relative to cwd when shorter, then truncates the front, keeping the filename.
+ * @param {string} filePath - Path to display
+ * @param {number} maxLen - Maximum display length (default 56)
+ * @returns {string} Display-friendly path
+ */
+function formatPathForDisplay(filePath, maxLen = 56) {
+  if (!filePath) return filePath
+  const display = toClickablePath(filePath)
+  if (display.length <= maxLen) return display
+  return '…' + display.slice(display.length - (maxLen - 1))
 }
 
 /**
@@ -201,6 +230,92 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
   return grouped
 }
 
+function shouldPromptDescriptor(descriptor) {
+  if (descriptor.variableType === 'option' || descriptor.variableType === 'env') return true
+  if (descriptor.variableType === 'self' || descriptor.variableType === 'dotProp') {
+    return descriptor.required && (descriptor.defaultValue === null || descriptor.defaultValue === undefined)
+  }
+  return false
+}
+
+function descriptorToVarInfo(descriptor) {
+  const variableType = descriptor.variableType === 'option'
+    ? 'options'
+    : descriptor.variableType === 'dotProp'
+      ? 'dot.prop'
+      : descriptor.variableType
+  const hasDefault = descriptor.defaultValue !== null && descriptor.defaultValue !== undefined && descriptor.defaultValue !== ''
+
+  return {
+    key: descriptor.variable,
+    variable: descriptor.variable,
+    cleanName: descriptor.name,
+    variableType,
+    type: descriptor.type,
+    isRequired: descriptor.required,
+    defaultValue: descriptor.defaultValue,
+    hasFallback: hasDefault,
+    resolvedValue: descriptor.variableType === 'env' && process.env[descriptor.name] !== undefined
+      ? descriptor.defaultValue
+      : undefined,
+    occurrences: descriptor.occurrences || [],
+    descriptions: descriptor.description ? [descriptor.description] : [],
+    allowedValues: descriptor.allowedValues,
+    conflictWarning: descriptor.conflictWarning,
+    obtainHint: descriptor.obtainHint,
+    examples: descriptor.examples,
+    defaultHint: descriptor.defaultHint,
+    group: descriptor.group,
+    deprecationMessage: descriptor.deprecationMessage,
+    sensitive: descriptor.sensitive,
+  }
+}
+
+function groupPromptDescriptorsForWizard(descriptors) {
+  const grouped = {
+    options: [],
+    env: [],
+    self: [],
+    dotProp: [],
+  }
+
+  for (const descriptor of descriptors || []) {
+    if (!shouldPromptDescriptor(descriptor)) continue
+    const varInfo = descriptorToVarInfo(descriptor)
+    if (descriptor.variableType === 'option') grouped.options.push(varInfo)
+    else if (descriptor.variableType === 'env') grouped.env.push(varInfo)
+    else if (descriptor.variableType === 'self') grouped.self.push(varInfo)
+    else if (descriptor.variableType === 'dotProp') grouped.dotProp.push(varInfo)
+  }
+
+  return grouped
+}
+
+function isVarInfoSensitive(varInfo) {
+  if (varInfo && typeof varInfo.sensitive === 'boolean') return varInfo.sensitive
+  return isSensitiveVariable(varInfo.cleanName)
+}
+
+function uniqueCompact(values) {
+  return [...new Set((values || []).filter(value => value !== undefined && value !== null && value !== ''))]
+}
+
+function getAnnotationDisplayMetadata(varInfo) {
+  const occurrences = varInfo && Array.isArray(varInfo.occurrences) ? varInfo.occurrences : []
+  const examples = uniqueCompact([
+    ...(Array.isArray(varInfo.examples) ? varInfo.examples : []),
+    ...occurrences.flatMap(occ => Array.isArray(occ.examples) ? occ.examples : [])
+  ])
+
+  return {
+    obtainHint: varInfo.obtainHint || occurrences.find(occ => occ.obtainHint)?.obtainHint,
+    examples,
+    defaultHint: varInfo.defaultHint || occurrences.find(occ => occ.defaultHint)?.defaultHint,
+    group: varInfo.group || occurrences.find(occ => occ.group)?.group,
+    deprecationMessage: varInfo.deprecationMessage || occurrences.find(occ => occ.deprecationMessage)?.deprecationMessage,
+  }
+}
+
 /**
  * Detects if a variable name suggests sensitive data
  * @param {string} name - Variable name
@@ -226,8 +341,16 @@ function isSensitiveVariable(name) {
  */
 function validateType(value, expectedType) {
   if (!expectedType || !value) return
+  const normalizedType = {
+    boolean: 'Boolean',
+    number: 'Number',
+    string: 'String',
+    json: 'Json',
+    object: 'Object',
+    array: 'Array',
+  }[expectedType] || expectedType
 
-  switch (expectedType) {
+  switch (normalizedType) {
     case 'Boolean':
       const lowerVal = value.toLowerCase()
       const validBooleans = ['true', 'false', 'yes', 'no', 'on', 'off', '1', '0']
@@ -250,6 +373,29 @@ function validateType(value, expectedType) {
       }
       break
 
+    case 'Object':
+      try {
+        const parsed = JSON.parse(value)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return `Must be a valid JSON object`
+        }
+      } catch (e) {
+        return `Must be valid JSON`
+      }
+      break
+
+    case 'Array':
+      if (Array.isArray(value)) break
+      if (typeof value !== 'string') return `Must be a comma-separated list or JSON array`
+      try {
+        const parsed = JSON.parse(value)
+        if (Array.isArray(parsed)) break
+        return `Must be a JSON array`
+      } catch (e) {
+        if (!value.includes(',')) return `Must be a comma-separated list or JSON array`
+      }
+      break
+
     case 'String':
       // String is always valid
       break
@@ -262,6 +408,10 @@ function validateType(value, expectedType) {
  * @returns {string|null} Expected type or null
  */
 function getExpectedType(varData) {
+  if (varData && varData.type) {
+    return varData.type
+  }
+
   // Use pre-computed types if available
   if (varData && varData.types && varData.types.length > 0) {
     return varData.types[0]
@@ -326,6 +476,10 @@ function getHelpText(varData) {
  * @returns {string[]|null} Array of allowed values or null if not found
  */
 function getAllowedValues(varData) {
+  if (varData && varData.allowedValues && varData.allowedValues.length > 0) {
+    return varData.allowedValues
+  }
+
   const helpText = getHelpText(varData)
   if (!helpText) return null
 
@@ -386,6 +540,23 @@ function createPromptMessage(varInfo) {
   // Show combined descriptions if available
   if (descriptions.length > 0) {
     contextHint = ` - ${descriptions.join('. ')}`
+  }
+  if (varInfo.conflictWarning) {
+    contextHint += `${contextHint ? '\n' : ' - '}Warning: ${varInfo.conflictWarning}`
+  }
+
+  const annotationMetadata = getAnnotationDisplayMetadata(varInfo)
+  const metadataLines = []
+  if (annotationMetadata.group) metadataLines.push(`Group: ${annotationMetadata.group}`)
+  if (annotationMetadata.obtainHint) metadataLines.push(`From: ${annotationMetadata.obtainHint}`)
+  if (annotationMetadata.examples.length > 0) {
+    metadataLines.push(`${annotationMetadata.examples.length === 1 ? 'Example' : 'Examples'}: ${annotationMetadata.examples.join(', ')}`)
+  }
+  if (annotationMetadata.defaultHint) metadataLines.push(`Default hint: ${annotationMetadata.defaultHint}`)
+  if (annotationMetadata.deprecationMessage) metadataLines.push(`Deprecated: ${annotationMetadata.deprecationMessage}`)
+
+  if (metadataLines.length > 0) {
+    contextHint += '\n' + formatWizardMultilineText(1, metadataLines.join('\n'), false)
   }
 
   // Show usage list if there are occurrences
@@ -466,13 +637,15 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
   if (!uniqueVariables || Object.keys(uniqueVariables).length === 0) {
     p.intro(chalk.cyan('Configuration Wizard'))
     if (configFilePath) {
-      p.note(`File: ${configFilePath}`, 'File')
+      p.note(formatPathForDisplay(configFilePath), 'File')
     }
     p.outro('No variables found that require setup.')
     return {}
   }
 
-  const grouped = groupVariablesByType(uniqueVariables, originalConfig)
+  const requirements = buildConfigRequirements(metadata)
+  const descriptors = createPromptDescriptors(requirements)
+  const grouped = groupPromptDescriptorsForWizard(descriptors)
   const totalVars = grouped.options.length + grouped.env.length + grouped.self.length + grouped.dotProp.length
 
   if (totalVars === 0) {
@@ -483,7 +656,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
   p.intro(chalk.cyan('Configuration Wizard'))
   if (configFilePath) {
-    p.note(`Processing config file: ${configFilePath}`)
+    p.note(formatPathForDisplay(configFilePath), 'Config file')
   }
 
   const userInputs = {
@@ -505,28 +678,30 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
     for (const varInfo of grouped.options) {
       const message = createPromptMessage(varInfo)
-      const isSensitive = isSensitiveVariable(varInfo.cleanName)
+      const isSensitive = isVarInfoSensitive(varInfo)
       const expectedType = getExpectedType(varInfo.occurrences)
       const allowedValues = getAllowedValues(varInfo)
 
       let value
+      const cleanDefault = stripQuotes(varInfo.defaultValue)
       if (allowedValues && !isSensitive) {
         // Use select picker for enumerated values
         const options = allowedValues.map(v => ({ value: v, label: v }))
         value = await p.select({
           message,
           options,
-          initialValue: varInfo.defaultValue || allowedValues[0]
+          initialValue: cleanDefault || allowedValues[0]
         })
       } else {
         const promptFn = isSensitive ? p.password : p.text
         const placeholder = varInfo.hasFallback
-          ? `  ${varInfo.defaultValue} `
+          ? String(cleanDefault)
           : `Enter value for --${varInfo.cleanName}`
 
         value = await promptFn({
           message,
           placeholder,
+          defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
           validate: (val) => {
             // Only required if no fallback exists
             if (!val && varInfo.isRequired && !varInfo.hasFallback) {
@@ -544,7 +719,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         throw new Error('Setup cancelled')
       }
 
-      userInputs.options[varInfo.cleanName] = value || varInfo.defaultValue
+      userInputs.options[varInfo.cleanName] = value || cleanDefault
     }
   }
 
@@ -559,11 +734,14 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
     for (const varInfo of grouped.env) {
       let message = createPromptMessage(varInfo)
-      const isSensitive = isSensitiveVariable(varInfo.cleanName)
+      const isSensitive = isVarInfoSensitive(varInfo)
       const promptFn = isSensitive ? p.password : p.text
       const expectedType = getExpectedType(varInfo.occurrences)
 
+      const cleanCurrent = stripQuotes(varInfo.resolvedValue)
+      const cleanDefault = stripQuotes(varInfo.defaultValue)
       let placeholder
+      let defaultValue
       if (varInfo.resolvedValue !== undefined) {
         if (isSensitive) {
           // For sensitive vars, show hint in message since password prompts don't show placeholders
@@ -571,10 +749,12 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
           // placeholder doesn't work with password prompts
           placeholder = ' enter to use current value or input a new value'
         } else {
-          placeholder = `${varInfo.resolvedValue} (current env value)`
+          placeholder = String(cleanCurrent)
+          defaultValue = String(cleanCurrent)
         }
       } else if (varInfo.hasFallback) {
-        placeholder = `${varInfo.defaultValue} (default)`
+        placeholder = String(cleanDefault)
+        defaultValue = String(cleanDefault)
       } else {
         placeholder = `Enter environment variable for ${varInfo.cleanName}`
       }
@@ -582,6 +762,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
       const value = await promptFn({
         message,
         placeholder,
+        defaultValue,
         validate: (val) => {
           // Only required if no fallback exists
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
@@ -598,7 +779,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         throw new Error('Setup cancelled')
       }
 
-      userInputs.env[varInfo.cleanName] = value || varInfo.resolvedValue || varInfo.defaultValue
+      userInputs.env[varInfo.cleanName] = value || cleanCurrent || cleanDefault
     }
   }
 
@@ -613,17 +794,19 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
     for (const varInfo of grouped.self) {
       const message = createPromptMessage(varInfo)
-      const isSensitive = isSensitiveVariable(varInfo.cleanName)
+      const isSensitive = isVarInfoSensitive(varInfo)
       const promptFn = isSensitive ? p.password : p.text
       const expectedType = getExpectedType(varInfo.occurrences)
 
+      const cleanDefault = stripQuotes(varInfo.defaultValue)
       const placeholder = varInfo.hasFallback
-        ? `${varInfo.defaultValue} (default)`
+        ? String(cleanDefault)
         : `Enter value for ${varInfo.cleanName}`
 
       const value = await promptFn({
         message,
         placeholder,
+        defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
         validate: (val) => {
           // Only required if no fallback exists
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
@@ -640,7 +823,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         throw new Error('Setup cancelled')
       }
 
-      userInputs.self[varInfo.cleanName] = value || varInfo.defaultValue
+      userInputs.self[varInfo.cleanName] = value || cleanDefault
     }
   }
 
@@ -655,17 +838,19 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 
     for (const varInfo of grouped.dotProp) {
       const message = createPromptMessage(varInfo)
-      const isSensitive = isSensitiveVariable(varInfo.cleanName)
+      const isSensitive = isVarInfoSensitive(varInfo)
       const promptFn = isSensitive ? p.password : p.text
       const expectedType = getExpectedType(varInfo.occurrences)
 
+      const cleanDefault = stripQuotes(varInfo.defaultValue)
       const placeholder = varInfo.hasFallback
-        ? `${varInfo.defaultValue} (default)`
+        ? String(cleanDefault)
         : `Enter value for ${varInfo.cleanName}`
 
       const value = await promptFn({
         message,
         placeholder,
+        defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
         validate: (val) => {
           // Only required if no fallback exists
           if (!val && varInfo.isRequired && !varInfo.hasFallback) {
@@ -682,7 +867,7 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
         throw new Error('Setup cancelled')
       }
 
-      userInputs.dotProp[varInfo.cleanName] = value || varInfo.defaultValue
+      userInputs.dotProp[varInfo.cleanName] = value || cleanDefault
     }
   }
 
@@ -708,7 +893,10 @@ async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '
 module.exports = {
   runConfigWizard,
   groupVariablesByType,
+  groupPromptDescriptorsForWizard,
+  descriptorToVarInfo,
   isSensitiveVariable,
+  isVarInfoSensitive,
   createPromptMessage,
   getExpectedType,
   getHelpText,
@@ -716,4 +904,6 @@ module.exports = {
   validateType,
   prefixMultilineText,
   formatWizardMultilineText,
+  formatPathForDisplay,
+  stripQuotes,
 }

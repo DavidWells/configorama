@@ -19,8 +19,8 @@ function findLineForKey(keyToFind, lines, fileType) {
     if (fileType === '.yml' || fileType === '.yaml') {
       return new RegExp(`^\\s*${escapedKey}\\s*:`).test(line)
     }
-    // TOML: key = or key=
-    if (fileType === '.toml') {
+    // TOML/HCL: key = or key=
+    if (fileType === '.toml' || fileType === '.hcl') {
       return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
     }
     // JSON: "key": or "key" :

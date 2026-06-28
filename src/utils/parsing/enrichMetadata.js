@@ -3,6 +3,8 @@ const fs = require('fs')
 const path = require('path')
 const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('../paths/filePathUtils')
 const { preResolveString, preResolveSingle } = require('../resolution/preResolveVariable')
+const { parseOneOfFilter } = require('../filters/oneOf')
+const { extractComment } = require('./extractComment')
 
 // Type filters that indicate expected value types
 const TYPE_FILTERS = ['Boolean', 'String', 'Number', 'Array', 'Object', 'Json']
@@ -61,6 +63,8 @@ function createOccurrence(instance, varMatch, options = {}) {
 
   // Extract type from filters
   const type = extractTypeFromFilters(filters)
+  const oneOfFilter = filters && filters.find(filter => typeof filter === 'string' && filter.match(/^oneOf\(/))
+  const oneOf = parseOneOfFilter(oneOfFilter)
 
   const occurrence = {
     originalString: instance.originalStringValue,
@@ -79,6 +83,11 @@ function createOccurrence(instance, varMatch, options = {}) {
 
   if (description) {
     occurrence.description = description
+    occurrence.descriptionSource = 'help'
+  }
+
+  if (oneOf && oneOf.allowedValues) {
+    occurrence.allowedValues = oneOf.allowedValues
   }
 
   if (instance.defaultValueSrc) {
@@ -133,6 +142,56 @@ async function enrichMetadata(
   // Create resolve context early for resolving descriptions
   const configDir = configPath ? path.dirname(configPath) : undefined
   const resolveContext = { config: originalConfig, variableSyntax, configDir, options }
+  const commentFileType = configPath ? path.extname(configPath) : ''
+  let commentLines = []
+  if (configPath) {
+    try {
+      commentLines = fs.readFileSync(configPath, 'utf8').split('\n')
+    } catch (error) {
+      commentLines = []
+    }
+  }
+
+  function applyCommentFallback(occurrence) {
+    if (!occurrence) return occurrence
+    const comment = extractComment(occurrence.path, commentLines, commentFileType)
+    if (comment) {
+      if (comment.description && (!occurrence.description || comment.descriptionSource === 'commentTag')) {
+        occurrence.description = comment.description
+        occurrence.descriptionSource = comment.descriptionSource
+      }
+      if (comment.obtainHint) occurrence.obtainHint = comment.obtainHint
+      if (comment.examples) occurrence.examples = comment.examples
+      if (comment.defaultHint) occurrence.defaultHint = comment.defaultHint
+      if (comment.sensitive !== undefined) {
+        occurrence.sensitive = comment.sensitive
+        occurrence.sensitiveSource = 'commentTag'
+      }
+      if (comment.group) occurrence.group = comment.group
+      if (comment.deprecationMessage) occurrence.deprecationMessage = comment.deprecationMessage
+    }
+    return occurrence
+  }
+
+  async function applyDynamicOneOfAllowedValues(occurrence) {
+    if (!occurrence || occurrence.allowedValues || !occurrence.filters) return occurrence
+    const oneOfFilter = occurrence.filters.find(filter => typeof filter === 'string' && filter.match(/^oneOf\(/))
+    if (!oneOfFilter) return occurrence
+
+    const match = oneOfFilter.match(/^oneOf\(\s*\$\{([^}]+)\}\s*\)$/)
+    if (!match) return occurrence
+
+    try {
+      const resolved = await preResolveSingle(match[1], resolveContext)
+      if (Array.isArray(resolved)) {
+        occurrence.allowedValues = resolved.map(String)
+      }
+    } catch (error) {
+      // Leave unresolved dynamic oneOf args without allowedValues; runtime will report errors.
+    }
+
+    return occurrence
+  }
 
   const varKeys = Object.keys(metadata.variables)
 
@@ -439,6 +498,8 @@ async function enrichMetadata(
     for (const instance of varInstances) {
       // Add this occurrence with its full context
       const occurrence = createOccurrence(instance, key)
+      applyCommentFallback(occurrence)
+      await applyDynamicOneOfAllowedValues(occurrence)
       entry.occurrences.push(occurrence)
 
       // Find inner variables in resolveDetails (excluding the outermost variable itself)
@@ -511,6 +572,8 @@ async function enrichMetadata(
               hasFallback: !!detail.hasFallback,
               defaultValue: siblingDefaultValue,
             })
+            applyCommentFallback(siblingOccurrence)
+            await applyDynamicOneOfAllowedValues(siblingOccurrence)
             if (siblingDefaultValueSrc) {
               siblingOccurrence.defaultValueSrc = siblingDefaultValueSrc
             }

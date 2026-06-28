@@ -1,0 +1,3 @@
+# Config with no variables - wizard short-circuits without prompting
+service: my-app
+stage: prod

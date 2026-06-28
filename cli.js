@@ -9,11 +9,12 @@ const { logHeader } = require('./src/utils/ui/logs')
 const configorama = require('./src')
 const { makeBox } = require('@davidwells/box-logger')
 const getValueAtPath = require('./src/utils/parsing/getValueAtPath')
+const { redactConfigByRequirements } = require('./src/utils/redaction/setupRedaction')
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
   string: ['output', 'o', 'format', 'f', 'param'],
-  boolean: ['help', 'h', 'version', 'v', 'V', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify', 'raw', 'r', 'copy', 'c'],
+  boolean: ['help', 'h', 'version', 'v', 'V', 'debug', 'allow-unknown', 'allow-undefined', 'list', 'info', 'verify', 'raw', 'r', 'copy', 'c', 'setup', 'requirements'],
   alias: {
     h: 'help',
     v: 'version',
@@ -49,6 +50,8 @@ Options:
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -V, --verify              Verify the config
+  --setup                   Run the interactive config wizard (experimental)
+  --requirements            Print agent requirements JSON without resolving config
   --param <key=value>       Pass parameter values (can be used multiple times)
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
@@ -72,6 +75,10 @@ Examples:
   configorama -r --copy config.yml .database.host
   configorama '.servers[0].port' config.yml
   configorama --info config.yml
+  configorama --setup config.yml
+  configorama setup config.yml
+  configorama requirements config.yml
+  configorama config.yml --requirements
   configorama --format yaml config.json
   configorama --output resolved.json config.yml
   configorama --param="domain=myapp.com" --param="key=value" config.yml
@@ -91,6 +98,8 @@ if (argv.version) {
 // File is first arg that exists as a file, jq path starts with '.' or '['
 let inputFile = null
 let extractPath = null
+const requirementsSubcommand = argv._[0] === 'requirements'
+const requirementsMode = requirementsSubcommand || Boolean(argv.requirements)
 
 function isFileArg(arg) {
   if (fs.existsSync(arg) && fs.statSync(arg).isFile()) return true
@@ -132,16 +141,20 @@ function copyToClipboard(value) {
   }
 }
 
-for (const arg of argv._) {
-  if (arg === 'setup') continue
+if (requirementsSubcommand) {
+  inputFile = argv._[1] || null
+} else {
+  for (const arg of argv._) {
+    if (arg === 'setup') continue
 
-  // jq-style paths start with '.' or '['
-  if (!inputFile && isFileArg(arg)) {
-    inputFile = arg
-  } else if (arg.startsWith('.') || arg.startsWith('[')) {
-    extractPath = arg
-  } else if (!inputFile) {
-    inputFile = arg
+    // jq-style paths start with '.' or '['
+    if (!inputFile && isFileArg(arg)) {
+      inputFile = arg
+    } else if (arg.startsWith('.') || arg.startsWith('[')) {
+      extractPath = arg
+    } else if (!inputFile) {
+      inputFile = arg
+    }
   }
 }
 
@@ -164,6 +177,8 @@ const options = {
   allowUnknownFileRefs: argv['allow-unknown-file-refs'] || false,
   returnMetadata: argv['return-metadata'] || false,
   returnPreResolvedVariableDetails: false,
+  // Setup wizard via --setup flag or `setup` subcommand
+  setup: Boolean(argv.setup) || argv._.includes('setup'),
   dynamicArgs: argv
 }
 
@@ -188,7 +203,9 @@ const {
   raw,
   c,
   copy,
-  'allow-unknown': allowUnknown, 
+  setup,
+  requirements,
+  'allow-unknown': allowUnknown,
   'allow-undefined': allowUndefined,
   'allow-unknown-file-refs': allowUnknownFileRefs,
   'return-metadata': returnMetadata,
@@ -208,22 +225,73 @@ if (options.dynamicArgs.verbose) {
   console.log()
 }
 
-let isSetupMode = false
-if (argv._.length) {
-  isSetupMode = argv._.includes('setup')
-}
-
 // Set -- flags as options
 options.options = rest
 options.handleSignalEvents = true
 
+function handleCliError(error) {
+  const errorMsg = makeBox({
+    title: `Error Processing Configuration: ${inputFile}`,
+    minWidth: '100%',
+    content: error.message,
+    type: 'error',
+  })
+  console.error(errorMsg)
+  if (argv.debug) {
+    console.error('error', error)
+  }
+  process.exit(1)
+}
+
+if (requirementsMode) {
+  configorama.analyze(inputFile, {
+    ...options,
+    instructions: true,
+  })
+    .then((requirementsJson) => {
+      const output = JSON.stringify(requirementsJson, null, 2)
+
+      if (argv.copy) {
+        const copyResult = copyToClipboard(output)
+        if (!copyResult.ok) {
+          console.error(`Error: Unable to copy to clipboard: ${copyResult.error}`)
+          process.exit(1)
+        }
+      }
+
+      if (argv.output) {
+        fs.writeFileSync(argv.output, output)
+        console.log(`Configuration written to ${argv.output}`)
+      } else if (!argv.verbose) {
+        console.log(output)
+      }
+    })
+    .catch(handleCliError)
+} else {
+
 // Process the configuration
-configorama(inputFile, options)
+const shouldRedactSetupStdout = options.setup && !argv.output && !argv.copy
+let setupRequirementsForRedaction = []
+const configPromise = shouldRedactSetupStdout
+  ? (() => {
+      const instance = new Configorama(inputFile, options)
+      return instance.init(options.options || {}).then((config) => {
+        setupRequirementsForRedaction = instance.setupRequirements || []
+        return config
+      })
+    })()
+  : configorama(inputFile, options)
+
+configPromise
   .then((config) => {
+    let outputConfig = shouldRedactSetupStdout
+      ? redactConfigByRequirements(config, setupRequirementsForRedaction)
+      : config
+
     // Apply path extraction if specified
     if (extractPath) {
-      config = getValueAtPath(config, extractPath)
-      if (config === undefined) {
+      outputConfig = getValueAtPath(outputConfig, extractPath)
+      if (outputConfig === undefined) {
         console.error(`Error: Path not found: ${extractPath}`)
         process.exit(1)
       }
@@ -232,33 +300,33 @@ configorama(inputFile, options)
     let output
 
     // Format the output
-    if (argv.raw && extractPath && (config === null || ['string', 'number', 'boolean'].includes(typeof config))) {
-      output = config === null ? 'null' : String(config)
+    if (argv.raw && extractPath && (outputConfig === null || ['string', 'number', 'boolean'].includes(typeof outputConfig))) {
+      output = outputConfig === null ? 'null' : String(outputConfig)
     } else switch (argv.format.toLowerCase()) {
       case 'yaml':
       case 'yml':
         const YAML = require('./src/parsers/yaml')
-        output = YAML.dump(config)
+        output = YAML.dump(outputConfig)
         break
       case 'esm':
       case 'mjs':
       case 'module':
-        output = `export default ${JSON.stringify(config, null, 2)}`
+        output = `export default ${JSON.stringify(outputConfig, null, 2)}`
         break
       case 'js':
       case 'cjs':
       case 'commonjs':
       case 'javascript':
-        output = `module.exports = ${JSON.stringify(config, null, 2)}`
+        output = `module.exports = ${JSON.stringify(outputConfig, null, 2)}`
         break
       case 'json':
       case 'json5':
       default:
         if (returnMetadata) {
           // turn regex into string
-          config.variableSyntax = config.variableSyntax ? config.variableSyntax.source : undefined
+          outputConfig.variableSyntax = outputConfig.variableSyntax ? outputConfig.variableSyntax.source : undefined
         }
-        output = JSON.stringify(config, null, 2)
+        output = JSON.stringify(outputConfig, null, 2)
     }
 
     if (argv.copy) {
@@ -283,16 +351,5 @@ configorama(inputFile, options)
       }
     }
   })
-  .catch((error) => {
-    const errorMsg = makeBox({
-      title: `Error Processing Configuration: ${inputFile}`,
-      minWidth: '100%',
-      content: error.message,
-      type: 'error',
-    })
-    console.error(errorMsg)
-    if (argv.debug) {
-      console.error('error', error)
-    }
-    process.exit(1)
-  })
+  .catch(handleCliError)
+}
