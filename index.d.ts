@@ -77,6 +77,24 @@ interface ConfigoramaSettings {
   filePathOverrides?: Record<string, string>
   /** Install Configorama CLI signal handlers. Defaults to false for library calls. */
   handleSignalEvents?: boolean
+  /** Block executable and mutating surfaces such as JS/TS file refs, custom resolvers/functions, and dotenv. */
+  safeMode?: boolean
+  /** Alias for safeMode */
+  safe?: boolean
+  /** Restrict file/text references to allowed roots. Enabled by default in safeMode. */
+  restrictFileRoots?: boolean
+  /** Allowed roots for file/text references */
+  allowedFileRoots?: string[]
+  /** Alias for allowedFileRoots */
+  safeRoots?: string[]
+  /** Allow executable file refs even when safeMode is enabled */
+  blockExecutableFiles?: boolean
+  /** Allow custom resolvers even when safeMode is enabled */
+  blockCustomResolvers?: boolean
+  /** Allow custom functions even when safeMode is enabled */
+  blockCustomFunctions?: boolean
+  /** Allow dotenv loading even when safeMode is enabled */
+  blockDotEnv?: boolean
 }
 
 interface ConfigoramaResult<T = any> {
@@ -133,6 +151,24 @@ declare namespace configorama {
   export function analyze(
     configPathOrObject: string | object,
     settings?: ConfigoramaSettings
+  ): Promise<any>
+
+  /** Build static introspection graph data without resolving dynamic values */
+  export function introspect(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings
+  ): Promise<any>
+
+  /** Build static executable/external surface audit JSON */
+  export function audit(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings
+  ): Promise<any>
+
+  /** Build dependency graph output. Returns a formatted string unless formatGraph is false. */
+  export function graph(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings & { format?: 'json' | 'mermaid' | 'mmd' | 'dot' | 'graphviz', formatGraph?: boolean }
   ): Promise<any>
 
   /** Format utilities for parsing various config formats */

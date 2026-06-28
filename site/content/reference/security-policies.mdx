@@ -1,0 +1,25 @@
+---
+title: Security policies
+description: Safe-mode settings and file-root restrictions.
+---
+
+# Security policies
+
+```js
+await configorama('config.yml', {
+  safeMode: true,
+  allowedFileRoots: [process.cwd()]
+})
+```
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `safeMode` | `false` | Enables safe inspection and blocking policy. |
+| `allowedFileRoots` | config directory in safe mode | Roots for file/text references. |
+| `restrictFileRoots` | `true` in safe mode | Blocks traversal outside allowed roots. |
+| `blockExecutableFiles` | `true` in safe mode | Blocks JS, TS, ESM, and CJS execution. |
+| `blockCustomResolvers` | `true` in safe mode | Blocks user resolver code. |
+| `blockCustomFunctions` | `true` in safe mode | Blocks user function code. |
+| `blockDotEnv` | `true` in safe mode | Blocks dotenv mutation. |
+
+See [safe inspection](/guides/safe-inspection), [security model](/concepts/security-model), and [audit schema](/reference/audit-schema).

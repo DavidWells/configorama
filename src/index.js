@@ -3,6 +3,10 @@ const parsers = require('./parsers')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { serializeRequirements } = require('./utils/requirements/serializeRequirements')
+const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
+const { buildIntrospection } = require('./utils/introspection/model')
+const { buildAuditReport } = require('./utils/introspection/audit')
+const { formatGraph } = require('./utils/introspection/graph')
 
 /**
  * @typedef {Object} ConfigoramaSettings
@@ -133,6 +137,43 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
     return serializeRequirements(analysis, { configPathOrObject })
   }
   return analysis
+}
+
+module.exports.introspect = async (configPathOrObject, settings = {}) => {
+  const analysis = await module.exports.analyze(configPathOrObject, {
+    ...settings,
+    blockCustomResolvers: false,
+    blockCustomFunctions: false,
+    blockDotEnv: false,
+  })
+  const requirements = buildConfigRequirements(analysis)
+  return buildIntrospection(analysis, { requirements })
+}
+
+module.exports.audit = async (configPathOrObject, settings = {}) => {
+  const analysis = await module.exports.analyze(configPathOrObject, {
+    ...settings,
+    blockCustomResolvers: false,
+    blockCustomFunctions: false,
+    blockDotEnv: false,
+  })
+  const requirements = buildConfigRequirements(analysis)
+  const introspection = buildIntrospection(analysis, { requirements })
+  const customResolvers = Array.isArray(settings.variableSources)
+    ? settings.variableSources.map(source => source.type).filter(Boolean)
+    : []
+  const originalConfig = analysis.originalConfig || {}
+  return buildAuditReport(introspection, {
+    safeMode: settings.safeMode === true || settings.safe === true,
+    dotenv: originalConfig.useDotenv === true || originalConfig.useDotEnv === true || settings.useDotEnvFiles === true,
+    customResolvers,
+  })
+}
+
+module.exports.graph = async (configPathOrObject, settings = {}) => {
+  const graph = await module.exports.introspect(configPathOrObject, settings)
+  if (settings.formatGraph === false) return graph
+  return formatGraph(graph, settings.format || 'json')
 }
 
 /**

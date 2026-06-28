@@ -104,6 +104,13 @@ const { displayNoVariablesFound, displayVariableDetails, displayUniqueVariables,
 const { collectVariableMetadata: collectMetadata } = require('./metadata')
 /* Utils - validation */
 const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
+const {
+  assertCustomFunctionsAllowed,
+  assertCustomResolversAllowed,
+  assertSafeConfigInput,
+  normalizeSafetyPolicy,
+} = require('./utils/security/safetyPolicy')
+const { ConfigoramaError } = require('./errors')
 /* Utils - variables */
 const cleanVariable = require('./utils/variables/cleanVariable')
 const appendDeepVariable = require('./utils/variables/appendDeepVariable')
@@ -192,6 +199,7 @@ class Configorama {
       // CloudFormation Fn::Sub, inline Lambda code, and CloudFront functions.
       ignorePaths: [],
       skipResolutionPaths: [],
+      safeMode: false,
     }, options)
 
     // Backward compat: allowUnknownVars -> allowUnknownVariableTypes
@@ -202,6 +210,13 @@ class Configorama {
     if (options.allowUnknownVariables !== undefined && options.allowUnknownVariableTypes === undefined) {
       this.settings.allowUnknownVariableTypes = options.allowUnknownVariables
     }
+
+    this.safetyPolicy = normalizeSafetyPolicy(this.settings, {
+      configDir: options.configDir || (typeof fileOrObject === 'string' ? path.dirname(path.resolve(fileOrObject)) : process.cwd())
+    })
+
+    assertCustomResolversAllowed(options.variableSources, this.safetyPolicy)
+    assertCustomFunctionsAllowed(options.functions, this.safetyPolicy)
 
     // Merge legacy allowUnknownParams and allowUnknownFileRefs into allowUnresolvedVariables
     let unresolvedSetting = this.settings.allowUnresolvedVariables
@@ -299,6 +314,7 @@ class Configorama {
       // Set configPath for file references
       this.configPath = options.configDir || process.cwd()
     } else if (typeof fileOrObject === 'string') {
+      assertSafeConfigInput(fileOrObject, this.safetyPolicy)
       // read and parse file
       const fileContents = fs.readFileSync(fileOrObject, 'utf-8')
       const fileDirectory = path.dirname(path.resolve(fileOrObject))
@@ -966,6 +982,12 @@ class Configorama {
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
     if ((useDotEnv && useDotEnv === true) || this.settings.useDotEnvFiles) {
+      if (this.safetyPolicy.blockDotEnv) {
+        throw new ConfigoramaError('blocked_by_safe_mode', 'Dotenv loading is blocked in safe mode', {
+          surface: 'dotenv',
+          configPath: this.configFilePath,
+        })
+      }
       let providerStage
       /* has hardcoded stage */
       if (
@@ -2866,7 +2888,8 @@ Missing Value ${missingValue} - ${matchedString}
       textRefSyntax: textRefSyntax,
       varPrefix: this.varPrefix,
       varSuffix: this.varSuffix,
-      fileContentCache: this._fileContentCache
+      fileContentCache: this._fileContentCache,
+      safetyPolicy: this.safetyPolicy
     }
     return getValueFromFileResolver(ctx, variableString, options)
   }
