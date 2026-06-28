@@ -1,106 +1,192 @@
 #!/usr/bin/env node
 /**
- * Multi-fixture resolution benchmark.
- *
- * Resolves a fixed set of representative test fixtures repeatedly and reports
- * per-iteration timing statistics. Used to verify perf changes against the
- * published npm baseline.
+ * Scenario benchmark harness.
  *
  * Usage:
- *   node scripts/bench.js [lib-path] [iterations]
+ *   node scripts/bench.js [lib-path] [iterations] [--json]
  *
- *   lib-path     Path to the configorama lib to require. Defaults to the
- *                local src/ in this repo. Pass an absolute path to a different
- *                version (e.g., a node_modules/configorama from `npm i`) to
- *                A/B test.
- *   iterations   Number of full passes through the fixture set. Default 200.
- *
- * Examples:
- *   # Bench local HEAD
- *   node scripts/bench.js
- *
- *   # Bench published version (after `npm i configorama` in a temp dir)
- *   node scripts/bench.js /tmp/cfg-npm/node_modules/configorama 300
- *
- *   # Alternating A/B
- *   for i in 1 2 3 4 5; do
- *     node scripts/bench.js /tmp/cfg-npm/node_modules/configorama 300
- *     node scripts/bench.js                                       300
- *   done
- *
- * Output goes to stderr so stdout stays clean for piping.
+ * The default text report is for humans. `--json` emits stable machine-readable
+ * data for CI artifacts and regression dashboards. This script intentionally
+ * reports timings without failing on thresholds.
  */
 
 const path = require('path')
 
-// Args: [lib-path] [iterations] — both optional, in either order.
-// If only one arg and it parses as a positive int, treat it as iterations.
 const args = process.argv.slice(2)
+const JSON_OUTPUT = args.includes('--json')
+const positional = args.filter(arg => arg !== '--json')
 let LIB_ARG = null
 let ITER_ARG = null
-for (const a of args) {
-  if (/^\d+$/.test(a)) ITER_ARG = a
-  else LIB_ARG = a
+for (const arg of positional) {
+  if (/^\d+$/.test(arg)) ITER_ARG = arg
+  else LIB_ARG = arg
 }
-const ITERATIONS = parseInt(ITER_ARG || '200', 10)
+
+const ITERATIONS = parseInt(ITER_ARG || '25', 10)
 const LIB_PATH = LIB_ARG
   ? path.resolve(LIB_ARG)
   : path.resolve(__dirname, '..', 'src')
-
 const REPO = path.resolve(__dirname, '..')
 
-// Silence boxed resolver output before requiring the lib
+// Keep resolver display noise out of benchmark output.
 console.log = () => {}
 
 const configorama = require(LIB_PATH)
 
-// Fixtures span a few realistic patterns: a large serverless config, a config
-// that merges files via merge-keys (exercises file-content cache),
-// fixtures that produce an error (so the error path is also covered).
-const FIXTURES = [
-  { path: 'tests/_fixtures/serverless.yml',          opts: { stage: 'dev', region: 'us-east-1' } },
-  { path: 'tests/mergeKeys/mergeKeys.yml',           opts: { stage: 'dev' } },
-  { path: 'tests/manualYaml.yml',                    opts: {} },
-  { path: 'tests/_case-1/serverless.yml',            opts: { stage: 'dev', region: 'us-east-1' } },
-  { path: 'tests/advancedVariables/advancedVariables.yml', opts: { stage: 'dev' } },
-]
-
-async function resolveAll() {
-  for (const f of FIXTURES) {
-    const fp = path.join(REPO, f.path)
-    try {
-      await configorama(fp, { configDir: path.dirname(fp), options: f.opts })
-    } catch (_) { /* some fixtures intentionally fail — they exercise the error path */ }
-  }
+function fixture(filePath) {
+  return path.join(REPO, filePath)
 }
 
-function pct(samples, q) {
-  return samples[Math.floor(samples.length * q)]
+const SCENARIOS = [
+  {
+    name: 'resolve-serverless',
+    run: () => configorama(fixture('tests/_fixtures/serverless.yml'), {
+      options: { stage: 'dev', region: 'us-east-1' }
+    })
+  },
+  {
+    name: 'nested-file-refs',
+    run: () => configorama(fixture('tests/metadata/test-config-two.yml'), {
+      options: { stage: 'prod' }
+    })
+  },
+  {
+    name: 'metadata-mode',
+    run: () => configorama(fixture('tests/metadata/test-config.yml'), {
+      returnMetadata: true,
+      options: { stage: 'prod' }
+    })
+  },
+  {
+    name: 'analyze-mode',
+    run: () => configorama.analyze(fixture('tests/metadata/test-config.yml'), {
+      options: { stage: 'prod' }
+    })
+  },
+  {
+    name: 'requirements-mode',
+    run: () => configorama.analyze(fixture('tests/metadata/test-config.yml'), {
+      instructions: true,
+      options: { stage: 'prod' }
+    })
+  },
+  {
+    name: 'safe-audit-mode',
+    run: () => configorama.audit(fixture('tests/security/fixtures/config.yml'), {
+      safeMode: true
+    })
+  },
+  {
+    name: 'graph-mode',
+    run: () => configorama.graph(fixture('tests/security/fixtures/config.yml'), {
+      safeMode: true,
+      formatGraph: false
+    })
+  },
+  {
+    name: 'filters-mode',
+    run: () => configorama(fixture('tests/filters/oneOf.yml'), {
+      options: { stage: 'dev', threads: '2' }
+    })
+  },
+  {
+    name: 'large-object',
+    run: () => configorama(makeLargeObject(), {
+      options: { stage: 'prod', region: 'us-east-1' }
+    })
+  },
+]
+
+function makeLargeObject() {
+  const config = {
+    service: 'large',
+    stage: '${opt:stage, "dev"}',
+    region: '${opt:region, "us-east-1"}',
+    items: {},
+  }
+  for (let i = 0; i < 250; i++) {
+    config.items[`item${i}`] = {
+      name: `item-${i}`,
+      label: '${self:service}-${self:stage}',
+      enabled: '${opt:enabled, true | Boolean}',
+    }
+  }
+  return config
+}
+
+function pct(sortedSamples, q) {
+  return sortedSamples[Math.min(sortedSamples.length - 1, Math.floor(sortedSamples.length * q))]
+}
+
+async function runScenario(scenario) {
+  for (let i = 0; i < 2; i++) {
+    try {
+      await scenario.run()
+    } catch (_) {}
+  }
+
+  const samples = []
+  const heapBefore = process.memoryUsage().heapUsed
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    const started = process.hrtime.bigint()
+    try {
+      await scenario.run()
+    } catch (_) {
+      // Benchmarks include some paths that can fail depending on environment;
+      // timing the path is still useful as a regression signal.
+    }
+    samples.push(Number(process.hrtime.bigint() - started) / 1e6)
+  }
+
+  const heapAfter = process.memoryUsage().heapUsed
+  samples.sort((a, b) => a - b)
+  const mean = samples.reduce((acc, value) => acc + value, 0) / samples.length
+
+  return {
+    name: scenario.name,
+    runCount: ITERATIONS,
+    meanMs: Number(mean.toFixed(3)),
+    p50Ms: Number(pct(samples, 0.5).toFixed(3)),
+    p95Ms: Number(pct(samples, 0.95).toFixed(3)),
+    minMs: Number(samples[0].toFixed(3)),
+    maxMs: Number(samples[samples.length - 1].toFixed(3)),
+    heapDeltaMb: Number(((heapAfter - heapBefore) / 1024 / 1024).toFixed(3)),
+  }
 }
 
 async function main() {
-  // Warmup so JIT settles before sampling
-  for (let i = 0; i < 3; i++) await resolveAll()
-
-  const samples = []
-  for (let i = 0; i < ITERATIONS; i++) {
-    const t = process.hrtime.bigint()
-    await resolveAll()
-    samples.push(Number(process.hrtime.bigint() - t) / 1e6)
+  const scenarios = []
+  for (const scenario of SCENARIOS) {
+    scenarios.push(await runScenario(scenario))
   }
-  samples.sort((a, b) => a - b)
-  const mean = samples.reduce((a, b) => a + b, 0) / samples.length
 
-  process.stderr.write(
-    `lib=${LIB_PATH}\n` +
-    `n=${ITERATIONS} fixtures=${FIXTURES.length}\n` +
-    `mean=${mean.toFixed(2)}ms ` +
-    `p50=${pct(samples, 0.5).toFixed(2)}ms ` +
-    `p95=${pct(samples, 0.95).toFixed(2)}ms ` +
-    `p99=${pct(samples, 0.99).toFixed(2)}ms ` +
-    `min=${samples[0].toFixed(2)}ms ` +
-    `max=${samples[samples.length - 1].toFixed(2)}ms\n`
-  )
+  const report = {
+    schemaVersion: 1,
+    libPath: LIB_PATH,
+    node: process.version,
+    platform: `${process.platform}-${process.arch}`,
+    iterations: ITERATIONS,
+    scenarioCount: scenarios.length,
+    scenarios,
+  }
+
+  if (JSON_OUTPUT) {
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n')
+    return
+  }
+
+  process.stderr.write(`lib=${LIB_PATH}\n`)
+  process.stderr.write(`node=${process.version} platform=${report.platform} iterations=${ITERATIONS}\n`)
+  for (const scenario of scenarios) {
+    process.stderr.write(
+      `${scenario.name}: mean=${scenario.meanMs}ms p50=${scenario.p50Ms}ms p95=${scenario.p95Ms}ms heapDelta=${scenario.heapDeltaMb}MB\n`
+    )
+  }
 }
 
-main().catch(err => { process.stderr.write(err.stack + '\n'); process.exit(1) })
+main().catch(error => {
+  process.stderr.write((error && error.stack) ? error.stack : String(error))
+  process.stderr.write('\n')
+  process.exit(1)
+})

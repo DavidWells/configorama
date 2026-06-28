@@ -1,0 +1,22 @@
+name: Performance Report
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: mkdir -p artifacts
+      - run: node scripts/bench.js 3 --json > artifacts/configorama-benchmark.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: configorama-benchmark
+          path: artifacts/configorama-benchmark.json
