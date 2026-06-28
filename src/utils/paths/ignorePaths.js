@@ -30,17 +30,29 @@ function patternToSegments(pattern) {
 }
 
 function matchSegments(patternSegments, pathSegments) {
-  if (!patternSegments.length) return pathSegments.length === 0
+  return matchFrom(patternSegments, 0, pathSegments, 0)
+}
 
-  const [head, ...tail] = patternSegments
-  if (head === '**') {
-    if (matchSegments(tail, pathSegments)) return true
-    return pathSegments.length > 0 && matchSegments(patternSegments, pathSegments.slice(1))
+// Index-based glob match: '**' spans zero-or-more segments (with backtracking),
+// '*' matches one segment, anything else matches literally. Avoids per-call array
+// allocation (no destructuring/slice) that dominated resolution hot paths.
+function matchFrom(pattern, pi, path, si) {
+  while (pi < pattern.length) {
+    const head = pattern[pi]
+    if (head === '**') {
+      // '**' consumes zero segments here...
+      if (matchFrom(pattern, pi + 1, path, si)) return true
+      // ...or one more path segment, still anchored on '**'
+      if (si >= path.length) return false
+      si++
+      continue
+    }
+    if (si >= path.length) return false
+    if (head !== '*' && head !== path[si]) return false
+    pi++
+    si++
   }
-
-  if (!pathSegments.length) return false
-  if (head !== '*' && head !== pathSegments[0]) return false
-  return matchSegments(tail, pathSegments.slice(1))
+  return si === path.length
 }
 
 function normalizeIgnorePaths(options = {}) {
