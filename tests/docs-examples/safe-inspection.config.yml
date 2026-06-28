@@ -1,0 +1,4 @@
+# docs:start safe-inspection-config
+safeData: ${file(./data.yml):value}
+unsafeData: ${file(./unsafe.js):secret}
+# docs:end safe-inspection-config

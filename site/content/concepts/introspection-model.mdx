@@ -1,0 +1,31 @@
+---
+title: Introspection model
+description: How metadata, requirements, audit, and graph reports share discovery.
+---
+
+# Introspection model
+
+The introspection model is the shared reporting layer for Configorama. It starts with metadata discovery, enriches that data with comments and resolution context, then projects the same model into requirements JSON, audit JSON, and dependency graph output.
+
+This exists to prevent metadata drift. If requirements, audit, graph, and setup mode each walked config independently, they would eventually disagree about fallbacks, filters, file references, or sensitivity. The implementation keeps `src/metadata.js` and `enrichMetadata` as the source discovery path.
+
+```mermaid
+graph LR
+  A[metadata.js] --> B[enrichMetadata]
+  B --> C[requirements]
+  B --> D[introspection graph]
+  D --> E[audit]
+  D --> F[graph export]
+```
+
+```sh
+configorama requirements config.yml
+configorama audit config.yml
+configorama graph config.yml --format json
+```
+
+<Callout type="warning">
+  Static introspection cannot fully resolve dynamic targets such as `${file(./${opt:stage}.yml)}`. It records partial edges and diagnostics instead.
+</Callout>
+
+Read [dependency graphs](/guides/dependency-graphs), [requirements schema](/reference/requirements-schema), and [audit schema](/reference/audit-schema) for the concrete outputs.

@@ -1,0 +1,5 @@
+# docs:start requirements-config
+service: requirements-cli
+apiKey: ${env:CONFIGORAMA_REQUIREMENTS_CLI_API_KEY | help("API key")}
+stage: ${opt:stage, "dev"}
+# docs:end requirements-config

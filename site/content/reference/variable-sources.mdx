@@ -1,0 +1,39 @@
+---
+title: Variable sources
+description: Built-in variable source syntax and source classes.
+---
+
+# Variable sources
+
+```yaml
+stage: ${opt:stage, "dev"}
+secret: ${env:API_KEY}
+branch: ${git:branch, "main"}
+fileData: ${file(./config.json):key}
+```
+
+| Source | Syntax | Source class | Notes |
+|---|---|---|---|
+| Environment | `${env:NAME}` | `user` | Reads `process.env`. |
+| Options | `${opt:name}` or `${option:name}` | `user` | Reads CLI/API options. |
+| Params | `${param:name}` | `user` | Reads named parameters. |
+| Self | `${self:path}` or `${path}` | `config` | Reads the current config object. |
+| File | `${file(./path.yml)}` | `config` | Reads and parses a local file. |
+| Text | `${text(./script.txt)}` | `config` | Reads raw text. |
+| Git | `${git:branch}` | `readonly` | Spawns git commands. |
+| Eval and if | `${eval(...)}`, `${if(...)}` | `readonly` | Sandboxed expression data-flow. |
+
+`opt:` and `option:` are aliases for CLI/API options. `param:` is a separate named parameter source, which is useful when a config has stage params or caller-supplied values that should not be confused with raw CLI flags.
+
+```yaml
+stage: ${opt:stage, "dev"}
+stageAgain: ${option:stage, "dev"}
+domain: ${param:domain, "example.test"}
+branch: ${git:branch, "main"}
+```
+
+Custom sources can match by prefix, regex, or function and can expose metadata for downstream inspection. Treat them as executable extensions in safe mode because the resolver function is user-provided code.
+
+See [security model](/concepts/security-model) and [filters and functions](/reference/filters-functions).
+
+For per-source details and synced examples, use the [variable type reference](/reference/variables).

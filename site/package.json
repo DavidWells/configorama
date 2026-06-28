@@ -1,0 +1,38 @@
+{
+  "name": "configorama-docs-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && npm run search:index",
+    "search:index": "pagefind --site .next/server/app --output-path public/_pagefind",
+    "start": "next start",
+    "docs:examples": "node scripts/docs-examples.mjs",
+    "docs:examples:check": "node scripts/docs-examples.mjs --check",
+    "typecheck": "tsc --noEmit",
+    "content:lint": "node scripts/content-lint.mjs",
+    "content:audit": "node scripts/audit-content.mjs",
+    "link:check": "node scripts/link-check.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "validate": "npm run docs:examples:check && npm run typecheck && npm run content:lint && npm run link:check && npm run build && npm run smoke"
+  },
+  "dependencies": {
+    "next": "16.2.9",
+    "nextra": "4.6.0",
+    "nextra-theme-docs": "4.6.0",
+    "pagefind": "1.5.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.12",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "markdown-magic": "^4.10.5",
+    "typescript": "5.8.3"
+  },
+  "overrides": {
+    "postcss": "8.5.15"
+  }
+}

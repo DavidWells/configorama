@@ -1,0 +1,8 @@
+# docs:start file-references-config
+stage: ${opt:stage, "dev"}
+settings: ${file(./settings.yml)}
+databaseHost: ${file(./settings.yml):database.host}
+databasePort: ${file(./settings.yml).database.port}
+stageConfig: ${file(./config.${opt:stage}.json)}
+fallbackValue: ${file(./missing.yml):name, "local"}
+# docs:end file-references-config

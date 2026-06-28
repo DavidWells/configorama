@@ -1,0 +1,19 @@
+---
+title: Eval variables
+description: Evaluate sandboxed expressions against resolved config data.
+---
+
+# Eval variables
+
+`eval(...)` evaluates a sandboxed expression against resolved data. It is data-flow logic, not JavaScript `eval` or `Function` execution.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-eval" lang="yaml" */}
+```yaml
+replicas: ${opt:replicas, 2 | Number}
+isScaled: ${eval(${self:replicas} > 1)}
+```
+{/* /docs */}
+
+Use eval for small boolean, arithmetic, or comparison expressions. Avoid using it as a substitute for a full programming language; executable config belongs in trusted JS/TS modules.
+
+See [security model](/concepts/security-model) for the data-flow classification and [dynamic configuration](/guides/dynamic-configuration) for conditional examples.

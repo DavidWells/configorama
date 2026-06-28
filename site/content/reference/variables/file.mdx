@@ -1,0 +1,20 @@
+---
+title: File variables
+description: Read and parse local files with file variables.
+---
+
+# File variables
+
+`file` variables read another file and parse it when the format is supported. You can import the whole parsed value or select a nested property with `:path` or `.path` accessors.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-file" lang="yaml" */}
+```yaml
+settings: ${file(./settings.yml)}
+databaseHost: ${file(./settings.yml):database.host}
+databasePortFromFile: ${file(./settings.yml).database.port}
+```
+{/* /docs */}
+
+Supported parsed formats include YAML, JSON, JSON5, TOML, INI, HCL, Markdown frontmatter, JS, TS, and ESM depending on runtime support. JS, TS, and ESM file references execute code and are blocked by safe mode.
+
+See [file references](/guides/file-references) for workflow examples and [safe inspection](/guides/safe-inspection) for root restrictions and executable file policy.

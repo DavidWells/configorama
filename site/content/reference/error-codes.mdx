@@ -1,0 +1,23 @@
+---
+title: Error codes
+description: Stable machine-readable CLI and API errors.
+---
+
+# Error codes
+
+```sh
+configorama config.yml --safe --error-format json
+```
+
+| Code | Meaning |
+|---|---|
+| `blocked_by_safe_mode` | Safe mode blocked executable or mutating behavior. |
+| `file_root_forbidden` | A file reference escaped the allowed roots. |
+| `missing_env` | An environment variable was required and missing. |
+| `unknown_filter` | A filter name was not registered. |
+| `unresolved_variable` | A variable could not resolve and had no valid fallback. |
+| `missing_file` | A required referenced file was absent. |
+| `invalid_variable_syntax` | Variable syntax was invalid. |
+| `circular_dependency` | Self references created a cycle. |
+
+Use these codes in CI instead of scraping styled terminal output. See [debug resolution](/guides/debug-resolution) and [CLI reference](/reference/cli).

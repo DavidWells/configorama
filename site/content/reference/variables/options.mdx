@@ -1,0 +1,19 @@
+---
+title: Option variables
+description: Read CLI flags and API options with opt or option variables.
+---
+
+# Option variables
+
+`opt` and `option` are aliases. They read CLI flags or the `options` object passed to the API.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-options" lang="yaml" */}
+```yaml
+stage: ${opt:stage, "dev"}
+region: ${option:region, "us-east-1"}
+```
+{/* /docs */}
+
+Use options for invocation-specific values such as `stage`, `region`, `profile`, or output mode. Options are user inputs, so they are reported by requirements and analyze output when required.
+
+See [CLI reference](/reference/cli) for command syntax and [API reference](/reference/api) for programmatic options.

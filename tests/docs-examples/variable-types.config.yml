@@ -1,0 +1,52 @@
+# docs:start variable-env
+apiHost: ${env:DOCS_API_HOST, "localhost"}
+apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+# docs:end variable-env
+
+# docs:start variable-options
+stage: ${opt:stage, "dev"}
+region: ${option:region, "us-east-1"}
+# docs:end variable-options
+
+# docs:start variable-param
+domain: ${param:domain, "example.test"}
+databasePort: ${param:databasePort, 5432 | Number}
+# docs:end variable-param
+
+# docs:start variable-self
+service: billing
+baseUrl: https://${self:apiHost}:${self:apiPort}
+serviceUrl: ${self:baseUrl}/${self:stage}/${self:service}
+# docs:end variable-self
+
+# docs:start variable-file
+settings: ${file(./settings.yml)}
+databaseHost: ${file(./settings.yml):database.host}
+databasePortFromFile: ${file(./settings.yml).database.port}
+# docs:end variable-file
+
+# docs:start variable-text
+template: ${text(./message.txt)}
+# docs:end variable-text
+
+# docs:start variable-git
+branchName: ${git:branch, "main"}
+shortSha: ${git:sha1, "unknown"}
+# docs:end variable-git
+
+# docs:start variable-cron
+everyFiveMinutes: ${cron(every 5 minutes)}
+weekdayMorning: ${cron(on monday at 9:00)}
+# docs:end variable-cron
+
+# docs:start variable-eval
+replicas: ${opt:replicas, 2 | Number}
+isScaled: ${eval(${self:replicas} > 1)}
+# docs:end variable-eval
+
+# docs:start variable-if
+provider:
+  stage: ${opt:stage, "dev"}
+environmentName: '${if(provider.stage === "prod") ? "production" : "development"}'
+workerCount: '${if(provider.stage === "prod") ? 4 : 1}'
+# docs:end variable-if

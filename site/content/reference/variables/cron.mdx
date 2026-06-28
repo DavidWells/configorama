@@ -1,0 +1,19 @@
+---
+title: Cron variables
+description: Convert readable schedules to cron expressions.
+---
+
+# Cron variables
+
+`cron(...)` converts common human-readable schedules into cron expressions. Existing cron expressions pass through as cron strings.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-cron" lang="yaml" */}
+```yaml
+everyFiveMinutes: ${cron(every 5 minutes)}
+weekdayMorning: ${cron(on monday at 9:00)}
+```
+{/* /docs */}
+
+Use cron variables when deployment config wants readable schedules but the target platform expects cron syntax. Supported phrases include common intervals, weekdays, named times such as `midnight`, and explicit times.
+
+See [filters and functions](/reference/filters-functions) for related helpers.

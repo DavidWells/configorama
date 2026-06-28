@@ -1,0 +1,19 @@
+---
+title: Param variables
+description: Read named parameters from CLI params, stage params, and defaults.
+---
+
+# Param variables
+
+`param` variables read named parameters. Resolution checks CLI `--param` values first, then stage-specific params, then default params.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-param" lang="yaml" */}
+```yaml
+domain: ${param:domain, "example.test"}
+databasePort: ${param:databasePort, 5432 | Number}
+```
+{/* /docs */}
+
+Use params when a value belongs to the config contract but should not be treated as a raw CLI option. This mirrors Serverless-style stage parameters and keeps reusable deployment inputs explicit.
+
+See [variable sources](/reference/variable-sources) for source classes and [dynamic configuration](/guides/dynamic-configuration) for stage-driven examples.

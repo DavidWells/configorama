@@ -1,0 +1,24 @@
+---
+title: Requirements JSON schema
+description: Fields emitted by requirements mode.
+---
+
+# Requirements JSON schema
+
+```json
+{
+  "schemaVersion": 1,
+  "summary": {},
+  "requirements": [],
+  "ask": []
+}
+```
+
+| Field | Type | Purpose |
+|---|---|---|
+| `schemaVersion` | number | Version of the machine-readable contract. |
+| `summary` | object | Counts and conflict status. |
+| `requirements[]` | array | Normalized variables and their occurrences. |
+| `ask[]` | array | Inputs a human or agent should provide. |
+
+Requirement entries include `name`, `variable`, `variableType`, `sourceClass`, `type`, `description`, `allowedValues`, `sensitive`, `required`, `default`, `paths`, `conflicts`, and `occurrences`. See [inspect requirements](/guides/inspect-requirements) and [API reference](/reference/api).

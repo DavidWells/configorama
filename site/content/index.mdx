@@ -1,0 +1,88 @@
+---
+title: Configorama
+description: Resolve, inspect, and safely audit dynamic configuration files.
+---
+
+# Configorama
+
+Configorama is a framework-agnostic resolver for dynamic configuration files. It reads YAML, JSON, TOML, INI, HCL, Markdown frontmatter, JavaScript, and TypeScript, then resolves variables from environment values, CLI options, files, git metadata, expressions, and custom sources. The docs are for people who need repeatable config behavior in local tools, CI jobs, deployment scripts, and agent workflows.
+
+It exists because modern config rarely lives in one file anymore. A service config may depend on stage flags, secret environment variables, generated JavaScript, shared JSON files, and derived values. Configorama gives that flow one resolver, plus inspection modes that show what the config needs before you trust or execute it.
+
+<Cards num={2}>
+  <Cards.Card title="Get started" href="/guides/get-started" arrow>
+    Install the package and resolve a small config.
+  </Cards.Card>
+  <Cards.Card title="Inspect requirements" href="/guides/inspect-requirements" arrow>
+    Generate JSON that tells agents and CI which inputs are needed.
+  </Cards.Card>
+  <Cards.Card title="Safe inspection" href="/guides/safe-inspection" arrow>
+    Audit untrusted repositories without executing dynamic config.
+  </Cards.Card>
+  <Cards.Card title="Reference" href="/reference/cli" arrow>
+    Look up commands, APIs, schemas, sources, filters, and error codes.
+  </Cards.Card>
+</Cards>
+
+## Example
+
+For example, given this simple yaml config file:
+
+{/* docs CONFIGORAMA_EXAMPLE id="getting-started-config" lang="yaml" */}
+```yaml
+service: billing
+stage: ${opt:stage, "dev"}
+```
+{/* /docs */}
+
+Running it through the CLI:
+
+```sh
+npm install configorama
+configorama config.yml --stage prod
+```
+
+You get this resolved output:
+
+{/* docs CONFIGORAMA_RESULT id="getting-started-output" lang="json" */}
+```json
+{
+  "service": "billing",
+  "stage": "prod"
+}
+```
+{/* /docs */}
+
+You can call the same resolver programmatically:
+
+```js filename="resolve-config.js"
+const configorama = require('configorama')
+
+async function loadConfig() {
+  const config = await configorama('config.yml', {
+    options: {
+      stage: 'prod'
+    }
+  })
+
+  console.log(config)
+}
+
+loadConfig().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
+```
+
+## How it works
+
+```mermaid
+graph LR
+  A[Config file] --> B[Parse]
+  B --> C[Discover variables]
+  C --> D[Resolve or inspect]
+  D --> E[Resolved config]
+  D --> F[Requirements, audit, graph]
+```
+
+The main paths through these docs are [the first config guide](/guides/first-config), [safe inspection](/guides/safe-inspection), [the CLI reference](/reference/cli), and [the API reference](/reference/api). Read [the architecture concept](/concepts/architecture) when you want the mental model behind the commands.

@@ -1,0 +1,31 @@
+---
+title: Security model
+description: Trust boundaries for data config, expressions, and executable config.
+---
+
+# Security model
+
+Configorama treats config surfaces by risk, not just by source. Environment variables and CLI options are user inputs, file and text references read local files, git variables spawn git commands, `eval` and `if` evaluate sandboxed expressions, and JavaScript or TypeScript file references execute code.
+
+This distinction matters because not every dynamic feature is remote code execution. The expression resolver uses `subscript/justin` with a small context, so it is classified as data-flow risk. JS and TS file references, custom resolvers, custom functions, and dotenv mutation are the surfaces safe mode blocks.
+
+```mermaid
+graph TD
+  A[Config surface] --> B{Risk class}
+  B --> C[data]
+  B --> D[file read]
+  B --> E[data-flow expression]
+  B --> F[executable code]
+  B --> G[process or env mutation]
+```
+
+```sh
+configorama audit config.yml
+configorama config.yml --safe --safe-root .
+```
+
+<Callout type="warning">
+  Safe mode is an inspection and resolution policy, not a sandbox for code you already chose to execute. If a config is untrusted, audit it before resolving it.
+</Callout>
+
+For commands, read [safe inspection](/guides/safe-inspection). For exact flags, read [security policies](/reference/security-policies) and [error codes](/reference/error-codes).

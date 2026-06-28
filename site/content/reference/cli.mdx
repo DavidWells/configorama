@@ -1,0 +1,46 @@
+---
+title: CLI reference
+description: Commands and flags for the Configorama CLI.
+---
+
+# CLI reference
+
+```sh
+configorama [options] <file> [path]
+configorama requirements <file>
+configorama audit <file>
+configorama graph <file> --format json
+```
+
+| Command | Purpose |
+|---|---|
+| `configorama <file>` | Resolve a config file and print JSON by default. |
+| `configorama requirements <file>` | Print requirements JSON without resolving missing values. |
+| `configorama audit <file>` | Print executable and external surface findings. |
+| `configorama graph <file>` | Print dependency graph output. |
+
+| Flag | Type | Purpose |
+|---|---|---|
+| `--format` | `json`, `yaml`, `js`, `mermaid`, `dot` | Output format. Graph subcommands use graph formats. |
+| `--output` | path | Write output to a file. |
+| `--raw` | boolean | Print scalar path extraction without JSON quoting. |
+| `--copy` | boolean | Copy output to the clipboard. |
+| `--requirements` | boolean | Emit requirements JSON from the root command. |
+| `--safe` | boolean | Enable safe-mode blocking during resolution. |
+| `--safe-root` | path | Allow file references under a root. |
+| `--error-format json` | string | Emit structured JSON errors. |
+
+Path extraction can appear after the file path or before it, depending on the command shape the user prefers:
+
+```sh
+configorama config.yml .service
+configorama .database.name config.yml
+configorama config.yml ".servers[0].name"
+configorama config.yml ".servers[-1].name"
+configorama config.yml '.["special-keys"]["key-with-dash"]'
+configorama config.yml .service --raw
+```
+
+Use `--copy` or `-c` when a local workflow needs the resolved output on the clipboard. Tests use `CONFIGORAMA_CLIPBOARD_COMMAND` as a hook, but normal users should rely on the default platform command.
+
+See [structured error codes](/reference/error-codes) and [safe inspection](/guides/safe-inspection).

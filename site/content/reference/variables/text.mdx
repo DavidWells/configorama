@@ -1,0 +1,18 @@
+---
+title: Text variables
+description: Read raw local file contents with text variables.
+---
+
+# Text variables
+
+`text` variables read a local file as raw text. Unlike `file`, the content is not parsed as structured data.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-text" lang="yaml" */}
+```yaml
+template: ${text(./message.txt)}
+```
+{/* /docs */}
+
+Use `text` for templates, scripts, inline policy bodies, or other file contents that should stay a string. Root restrictions still apply in safe mode because this is a local file read.
+
+See [security policies](/reference/security-policies) for safe roots and [CloudFormation and Serverless](/guides/cloudformation-serverless) for pass-through template behavior.

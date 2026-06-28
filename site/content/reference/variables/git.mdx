@@ -1,0 +1,19 @@
+---
+title: Git variables
+description: Read repository metadata with git variables.
+---
+
+# Git variables
+
+`git` variables read repository metadata by running git commands. They are readonly, but still interact with the local repository and process environment.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-git" lang="yaml" */}
+```yaml
+branchName: ${git:branch, "main"}
+shortSha: ${git:sha1, "unknown"}
+```
+{/* /docs */}
+
+Use fallbacks when a config may resolve outside a git checkout. Common keys include branch, commit, sha1, message, remote, tag, describe, repo, owner, and timestamp.
+
+See [safe inspection](/guides/safe-inspection) for audit behavior and [use in CI](/guides/use-in-ci) for automation patterns.

@@ -1,0 +1,25 @@
+---
+title: Graph JSON schema
+description: Fields emitted by graph mode.
+---
+
+# Graph JSON schema
+
+```json
+{
+  "schemaVersion": 1,
+  "nodes": [],
+  "edges": [],
+  "diagnostics": [],
+  "summary": {}
+}
+```
+
+| Field | Type | Purpose |
+|---|---|---|
+| `nodes[]` | array | Config paths, variables, files, executable surfaces, and sources. |
+| `edges[]` | array | `uses`, `reads`, and `depends_on` relationships. |
+| `diagnostics[]` | array | Static graph caveats. |
+| `summary` | object | Node, edge, and diagnostic counts. |
+
+Graph output can also be formatted as Mermaid or DOT. See [dependency graphs](/guides/dependency-graphs) and [introspection model](/concepts/introspection-model).

@@ -1,0 +1,29 @@
+---
+title: Variable types
+description: Core Configorama variable sources and expression helpers.
+---
+
+# Variable types
+
+Configorama variables use `${...}` syntax to describe where a value should come from. The common shape is `${source:name, fallback}` for keyed sources and `${source(...)}` for function-style helpers.
+
+```yaml
+stage: ${opt:stage, "dev"}
+host: ${env:API_HOST, "localhost"}
+schedule: ${cron(every 5 minutes)}
+```
+
+| Type | Source class | Page |
+|---|---|---|
+| `env` | `user` | [Environment](/reference/variables/env) |
+| `opt` / `option` | `user` | [Options](/reference/variables/options) |
+| `param` | `user` | [Params](/reference/variables/params) |
+| `self` / bare path | `config` | [Self](/reference/variables/self) |
+| `file` | `config` | [File](/reference/variables/file) |
+| `text` | `config` | [Text](/reference/variables/text) |
+| `git` | `readonly` | [Git](/reference/variables/git) |
+| `cron` | `readonly` | [Cron](/reference/variables/cron) |
+| `eval` | `readonly` data-flow | [Eval](/reference/variables/eval) |
+| `if` | `readonly` data-flow | [If](/reference/variables/if) |
+
+Custom variable sources are extension points rather than core types. See [write a custom resolver](/guides/custom-resolvers) for the user-provided resolver API and [safe inspection](/guides/safe-inspection) for execution policy.

@@ -1,0 +1,24 @@
+---
+title: Audit JSON schema
+description: Fields emitted by audit mode.
+---
+
+# Audit JSON schema
+
+```json
+{
+  "schemaVersion": 1,
+  "safeMode": true,
+  "findings": [],
+  "diagnostics": [],
+  "summary": {}
+}
+```
+
+| Field | Type | Purpose |
+|---|---|---|
+| `findings[]` | array | Risk surfaces such as executable code or file reads. |
+| `diagnostics[]` | array | Static-analysis caveats such as dynamic file targets. |
+| `summary` | object | Counts by severity. |
+
+Findings include `id`, `severity`, `risk`, `kind`, `variable`, `path`, `relativePath`, `configPaths`, and `message`. See [safe inspection](/guides/safe-inspection) and [security model](/concepts/security-model).

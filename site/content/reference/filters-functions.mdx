@@ -1,0 +1,35 @@
+---
+title: Filters and functions
+description: Transform, coerce, validate, and derive config values.
+---
+
+# Filters and functions
+
+```yaml
+threads: ${opt:threads, 2 | Number | oneOf(1, 2, 4)}
+upper: ${opt:name, "demo" | toUpperCase}
+```
+
+| Filter | Purpose |
+|---|---|
+| `String` | Coerce to string. |
+| `Number` | Validate and coerce numeric values. |
+| `Boolean` | Validate and coerce common boolean strings. |
+| `Array` | Parse arrays and comma-separated lists. |
+| `Object` | Parse JSON/JSON5 object strings. |
+| `Json` | Parse JSON. |
+| `oneOf(...)` | Restrict values to an allowed set. |
+| `help(...)` | Add prompt and requirements metadata. |
+
+Functions include `split`, `join`, `length`, `merge`, `upperKeys`, and `md5`. See [debug resolution](/guides/debug-resolution) for failure behavior and [requirements schema](/reference/requirements-schema) for how filters appear in metadata.
+
+Standalone references preserve non-string types where the source resolves to a number, boolean, array, or object. Interpolated strings become strings unless a filter explicitly parses or coerces them.
+
+```yaml
+port: ${opt:port, 5432 | Number}
+enabled: ${opt:enabled, true | Boolean}
+labels: ${opt:labels, '["api","prod"]' | Json}
+description: service-${opt:stage, "dev"}
+```
+
+`help(...)` is intentionally an identity filter: it contributes requirements/setup metadata but returns the original value. Use it beside type filters when humans or agents need better prompts.

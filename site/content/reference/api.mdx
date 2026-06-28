@@ -1,0 +1,26 @@
+---
+title: API reference
+description: Public JavaScript API surface for Configorama.
+---
+
+# API reference
+
+```js
+const configorama = require('configorama')
+```
+
+| API | Returns | Purpose |
+|---|---|---|
+| `configorama(file, settings)` | Promise of object | Resolve a config. |
+| `configorama.sync(file, settings)` | `object` | Resolve synchronously. |
+| `configorama.analyze(file, settings)` | Promise of object | Analyze variables without full resolution. |
+| `configorama.introspect(file, settings)` | Promise of object | Build static graph data. |
+| `configorama.audit(file, settings)` | Promise of object | Build audit JSON. |
+| `configorama.graph(file, settings)` | Promise of string or object | Build formatted graph output. |
+
+```js filename="inspect.js"
+const report = await configorama.audit('config.yml', { safeMode: true })
+console.log(report.summary)
+```
+
+Settings include `options`, `configDir`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, and legacy compatibility flags. Read [security policies](/reference/security-policies) and [requirements schema](/reference/requirements-schema).

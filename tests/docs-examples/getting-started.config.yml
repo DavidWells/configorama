@@ -1,0 +1,4 @@
+# docs:start getting-started-config
+service: billing
+stage: ${opt:stage, "dev"}
+# docs:end getting-started-config

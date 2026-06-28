@@ -1,0 +1,21 @@
+---
+title: If variables
+description: Choose values with sandboxed conditional expressions.
+---
+
+# If variables
+
+`if(...)` is the conditional expression helper. It uses the same sandboxed expression engine as `eval`, but is written for readable ternary-style config choices.
+
+{/* docs CONFIGORAMA_EXAMPLE id="variable-if" lang="yaml" */}
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+environmentName: '${if(provider.stage === "prod") ? "production" : "development"}'
+workerCount: '${if(provider.stage === "prod") ? 4 : 1}'
+```
+{/* /docs */}
+
+Use `if` when a value depends on a small condition. It can return strings, numbers, booleans, nulls, arrays, or objects when the expression resolves that way.
+
+See [dynamic configuration](/guides/dynamic-configuration) for stage-based examples and [eval variables](/reference/variables/eval) for expression behavior.

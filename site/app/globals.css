@@ -1,0 +1,14 @@
+main h1,
+article h1,
+h1.x\:text-4xl {
+  text-align: left !important;
+}
+
+.nextra-card > p {
+  padding: 1rem 1rem 0;
+}
+
+.nextra-sidebar .x\:grid.x\:gap-1,
+.nextra-mobile-nav .x\:grid.x\:gap-1 {
+  gap: 0;
+}
