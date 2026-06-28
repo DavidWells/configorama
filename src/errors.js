@@ -10,6 +10,7 @@ const ERROR_CODES = [
   { code: 'circular_dependency', description: 'Variables reference each other in a cycle.' },
   { code: 'invalid_view', description: 'An unknown --view was passed to the inspect command.' },
   { code: 'blocked_by_safe_mode', description: 'An executable or mutating reference was blocked by --safe.' },
+  { code: 'blocked_eval_escape', description: 'An eval/if expression attempted a prototype-chain (constructor) escape.' },
   { code: 'file_root_forbidden', description: 'A file/text reference resolved outside an allowed --safe-root.' },
   { code: 'unknown_command', description: 'The first argument was not a recognized command.' },
   { code: 'no_input_file', description: 'No config file was provided on the command line.' },
@@ -56,6 +57,7 @@ function classifyErrorMessage(message, fallbackCode = 'configorama_error') {
   if (/Filter ".+" not found/.test(text)) return 'unknown_filter'
   if (/Unable to resolve config variable/.test(text) && /env:/.test(text)) return 'missing_env'
   if (/Unable to resolve config variable/.test(text)) return 'unresolved_variable'
+  if (/Blocked eval expression/.test(text)) return 'blocked_eval_escape'
   if (/File not found|cannot resolve due to missing file/i.test(text)) return 'missing_file'
   if (/Invalid variable reference syntax/.test(text)) return 'invalid_variable_syntax'
   if (/Circular variable dependency/.test(text)) return 'circular_dependency'

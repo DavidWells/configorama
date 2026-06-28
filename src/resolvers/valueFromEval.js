@@ -1,6 +1,7 @@
 // const evalRefSyntax = RegExp(/^eval\((~?[\{\}\:\${}a-zA=>+!-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
 const evalRefSyntax = RegExp(/^eval\((.*)?\)/g)
 const { replaceOutsideQuotes } = require('../utils/strings/quoteAware')
+const { assertSafeEvalExpression } = require('../utils/security/evalSafety')
 
 // Pattern for encoded objects/arrays: __OBJ:base64__ or __ARR:base64__
 const ENCODED_PATTERN = /__(?:OBJ|ARR):([A-Za-z0-9+/=]+)__/g
@@ -53,6 +54,7 @@ async function getValueFromEval(variableString) {
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
     const { default: subscript } = await import('subscript/justin')
+    const { default: parse } = await import('subscript/parse')
 
     // Handle string comparisons by ensuring both sides are quoted
     let processedExpression = expression.replace(/([a-zA-Z0-9_]+)\s*([=!<>]=?)\s*['"]([^'"]+)['"]/g, '"$1"$2"$3"')
@@ -79,6 +81,13 @@ async function getValueFromEval(variableString) {
     processedExpression = wrapComparisons(processedExpression)
 
     if (process.env.DEBUG_EVAL) console.log('eval processed:', processedExpression)
+
+    // Block prototype-chain escapes (e.g. "".constructor.constructor) before
+    // compiling, whether or not safe mode is enabled.
+    let ast = null
+    try { ast = parse(processedExpression) } catch (parseError) { ast = null }
+    assertSafeEvalExpression(processedExpression, ast)
+
     const fn = subscript(processedExpression)
     const result = fn(Object.keys(context).length > 0 ? context : undefined)
     return result
