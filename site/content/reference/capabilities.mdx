@@ -19,6 +19,9 @@ configorama capabilities
   "commands": [
     { "name": "inspect", "usage": "configorama inspect <file> [--view requirements|audit|graph]", "summary": "..." }
   ],
+  "aliases": [
+    { "name": "audit", "mapsTo": "inspect --view audit", "summary": "..." }
+  ],
   "views": ["requirements", "audit", "graph"],
   "formats": {
     "resolve": ["json", "yaml", "js", "esm"],
@@ -40,7 +43,8 @@ configorama capabilities
 | Field | Purpose |
 |---|---|
 | `name`, `version`, `schemaVersion` | Identify the tool and the contract version. |
-| `commands` | Every command with its usage string and summary. |
+| `commands` | The documented commands with usage strings and summaries. |
+| `aliases` | Hidden back-compat verbs (`requirements`, `audit`, `graph`) that map to an `inspect --view`. They still run if typed. |
 | `views` | Valid `inspect --view` values. |
 | `formats` | Output formats per mode (`resolve`, `graph`). |
 | `errorCodes` | The full [error-code registry](/reference/error-codes). |

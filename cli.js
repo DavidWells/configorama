@@ -61,9 +61,6 @@ Commands:
   (default)                 Resolve <file> and print the result
   inspect <file>            Introspect a config without resolving it (full model)
                               --view requirements|audit|graph for a single slice
-  requirements <file>       Inputs a config needs   (alias: inspect --view requirements)
-  audit <file>              Risky references         (alias: inspect --view audit)
-  graph <file>              Variable/file dep graph  (alias: inspect --view graph)
   setup <file>              Run the interactive config wizard (experimental)
   capabilities              Print the machine-readable CLI contract (JSON)
 
@@ -87,8 +84,7 @@ Options:
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
 
-  Aliases: the \`requirements\` and \`setup\` commands are also available as the
-  \`--requirements\` and \`--setup\` flags. \`capabilities\` is also \`--capabilities\`.
+  Aliases: \`setup\` is also available as \`--setup\`, and \`capabilities\` as \`--capabilities\`.
 
 Path Extraction:
   Use jq-style paths to extract specific values from the resolved config.
@@ -113,12 +109,9 @@ Examples:
   configorama setup config.yml
   configorama inspect config.yml
   configorama inspect config.yml --view requirements
+  configorama inspect config.yml --view audit
   configorama inspect config.yml --view graph --format mermaid
-  configorama requirements config.yml
-  configorama audit config.yml
-  configorama graph config.yml --format mermaid
   configorama capabilities
-  configorama config.yml --requirements
   configorama --format yaml config.json
   configorama --output resolved.json config.yml
   configorama --param="domain=myapp.com" --param="key=value" config.yml

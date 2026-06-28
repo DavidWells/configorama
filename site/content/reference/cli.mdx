@@ -8,9 +8,6 @@ description: Commands and flags for the Configorama CLI.
 ```sh
 configorama [options] <file> [path]
 configorama inspect <file> [--view requirements|audit|graph]
-configorama requirements <file>
-configorama audit <file>
-configorama graph <file> --format json
 configorama capabilities
 ```
 
@@ -18,11 +15,10 @@ configorama capabilities
 |---|---|
 | `configorama <file>` | Resolve a config file and print JSON by default. |
 | `configorama inspect <file>` | Introspect a config without resolving it. Returns the full model (`requirements`, `graph`, `audit`) or a single `--view`. |
-| `configorama requirements <file>` | Requirements JSON without resolving missing values. Alias of `inspect --view requirements`. |
-| `configorama audit <file>` | Executable and external surface findings. Alias of `inspect --view audit`. |
-| `configorama graph <file>` | Dependency graph output. Alias of `inspect --view graph`. |
 | `configorama capabilities` | Print the machine-readable CLI contract (commands, views, formats, error codes, exit codes, flags). |
 | `configorama setup <file>` | Run the interactive setup wizard (experimental). |
+
+`inspect --view requirements`, `--view audit`, and `--view graph` cover the three projections. The standalone `requirements`, `audit`, and `graph` commands still work as back-compat aliases but are not part of the documented surface; `capabilities` lists them under `aliases`.
 
 | Flag | Type | Purpose |
 |---|---|---|
@@ -31,11 +27,10 @@ configorama capabilities
 | `--output` | path | Write output to a file. |
 | `--raw` | boolean | Print scalar path extraction without JSON quoting. |
 | `--copy` | boolean | Copy output to the clipboard. |
-| `--requirements` | boolean | Emit requirements JSON from the root command (alias of the `requirements` command). |
 | `--safe` | boolean | Block executable/mutating references during resolution. |
-| `--unsafe` | boolean | Disable the default safe inspection used by `inspect`/`audit`/`graph`. |
+| `--unsafe` | boolean | Disable the default safe inspection used by `inspect`. |
 | `--safe-root` | path | Restrict file/text references to an allowed root. |
-| `--error-format` | `json`, `human` | Error format on stderr. JSON is the default for `inspect`/`requirements`/`audit`/`graph`/`capabilities`; `human` (boxed) is the default for resolve. |
+| `--error-format` | `json`, `human` | Error format on stderr. JSON is the default for `inspect` and `capabilities`; `human` (boxed) is the default for resolve. |
 | `--param` | `key=value` | Pass parameter values (repeatable). |
 | `--allow-unknown` | boolean | Allow unknown variables to pass through. |
 | `--allow-undefined` | boolean | Allow undefined values in the final output. |

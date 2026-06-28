@@ -21,11 +21,15 @@ function buildCapabilities() {
     commands: [
       { name: 'resolve', usage: 'configorama <file> [path]', summary: 'Resolve a config file and print the result (default command).' },
       { name: 'inspect', usage: 'configorama inspect <file> [--view requirements|audit|graph]', summary: 'Introspect a config without resolving it; returns the full model or one view.' },
-      { name: 'requirements', usage: 'configorama requirements <file>', summary: 'Inputs a config needs (alias of `inspect --view requirements`).' },
-      { name: 'audit', usage: 'configorama audit <file>', summary: 'Risky references (alias of `inspect --view audit`).' },
-      { name: 'graph', usage: 'configorama graph <file> [--format json|mermaid|dot]', summary: 'Dependency graph of variables and files (alias of `inspect --view graph`).' },
       { name: 'setup', usage: 'configorama setup <file>', summary: 'Run the interactive setup wizard (experimental).' },
       { name: 'capabilities', usage: 'configorama capabilities', summary: 'Print this machine-readable contract.' },
+    ],
+    // Hidden back-compat commands that map to an inspect view. They still run if
+    // typed, but inspect is the documented surface.
+    aliases: [
+      { name: 'requirements', mapsTo: 'inspect --view requirements', summary: 'Inputs a config needs.' },
+      { name: 'audit', mapsTo: 'inspect --view audit', summary: 'Risky references.' },
+      { name: 'graph', mapsTo: 'inspect --view graph', summary: 'Dependency graph of variables and files.' },
     ],
     views: VIEWS,
     formats: {

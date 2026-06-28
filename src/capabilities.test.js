@@ -11,11 +11,15 @@ test('buildCapabilities - reports name, version and schemaVersion', () => {
   assert.is(caps.schemaVersion, 1)
 })
 
-test('buildCapabilities - lists inspect and its alias verbs', () => {
+test('buildCapabilities - commands list is the documented surface', () => {
   const names = buildCapabilities().commands.map(c => c.name)
-  for (const name of ['resolve', 'inspect', 'requirements', 'audit', 'graph', 'capabilities']) {
-    assert.ok(names.includes(name), `missing command: ${name}`)
-  }
+  assert.equal(names, ['resolve', 'inspect', 'setup', 'capabilities'])
+})
+
+test('buildCapabilities - hidden verbs are discoverable under aliases', () => {
+  const aliases = buildCapabilities().aliases
+  assert.equal(aliases.map(a => a.name), ['requirements', 'audit', 'graph'])
+  assert.is(aliases.find(a => a.name === 'audit').mapsTo, 'inspect --view audit')
 })
 
 test('buildCapabilities - exposes the full error-code registry', () => {
