@@ -8,5 +8,6 @@ export default {
   'audit-schema': 'Audit schema',
   'graph-schema': 'Graph schema',
   'error-codes': 'Error codes',
+  capabilities: 'Capabilities',
   'security-policies': 'Security policies'
 }

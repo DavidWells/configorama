@@ -12,6 +12,7 @@ configorama config.yml --safe --error-format json
 | Code | Meaning |
 |---|---|
 | `blocked_by_safe_mode` | Safe mode blocked executable or mutating behavior. |
+| `blocked_eval_escape` | An `eval`/`if` expression attempted a prototype-chain (constructor) escape. |
 | `file_root_forbidden` | A file reference escaped the allowed roots. |
 | `missing_env` | An environment variable was required and missing. |
 | `unknown_filter` | A filter name was not registered. |
@@ -19,5 +20,13 @@ configorama config.yml --safe --error-format json
 | `missing_file` | A required referenced file was absent. |
 | `invalid_variable_syntax` | Variable syntax was invalid. |
 | `circular_dependency` | Self references created a cycle. |
+| `invalid_view` | An unknown `--view` was passed to `inspect`. |
+| `unknown_command` | The first argument was not a recognized command. |
+| `no_input_file` | No config file was provided. |
+| `file_not_found` | The provided config file path does not exist. |
+| `path_not_found` | A jq-style extraction path matched nothing in the resolved config. |
+| `configorama_error` | Generic, unclassified error. |
+
+The `inspect`, `requirements`, `audit`, `graph`, and `capabilities` commands emit JSON errors by default; pass `--error-format human` for the boxed form. Resolve mode is the reverse: boxed by default, `--error-format json` to opt in. `configorama capabilities` exposes the full code registry under `errorCodes`.
 
 Use these codes in CI instead of scraping styled terminal output. See [debug resolution](/guides/debug-resolution) and [CLI reference](/reference/cli).

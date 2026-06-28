@@ -14,13 +14,21 @@ timeline
     Requirements JSON : Agent input contracts
     Safe mode : Untrusted config inspection
     Graph export : Dependency visualization
+    Unified inspect : requirements, graph, and audit in one command
+    Capabilities : Machine-readable CLI contract
+    Intent recovery : Did-you-mean for mistyped commands and flags
+    Eval hardening : Prototype-chain escape blocked in eval/if
 ```
 
 ```sh
+configorama inspect config.yml
+configorama capabilities
 configorama requirements config.yml
 configorama audit config.yml
 configorama graph config.yml --format json
 ```
+
+The `inspect` command unifies requirements, audit, and graph as views; the focused verbs remain as aliases. `capabilities` exposes the contract (commands, formats, error codes) for agents. `eval` and `if` now block constructor/prototype access (`blocked_eval_escape`), so the sandboxed-expression guarantee is enforced, not just documented.
 
 <Callout type="warning">
   Treat schema changes as automation changes. Review [requirements schema](/reference/requirements-schema), [audit schema](/reference/audit-schema), and [graph schema](/reference/graph-schema) before updating CI consumers.

@@ -20,8 +20,12 @@ graph LR
 
 ```sh
 configorama audit config.yml
+configorama inspect config.yml --view audit   # equivalent to the audit verb
+configorama inspect config.yml                # full model: requirements, graph, and audit at once
 configorama config.yml --safe --safe-root .
 ```
+
+Both `inspect` and `audit` default to safe inspection (file/text reads scoped to the config directory, executable surfaces reported but not run). Pass `--unsafe` to opt out of that default.
 
 {/* docs CONFIGORAMA_EXAMPLE id="safe-inspection-config" lang="yaml" */}
 ```yaml

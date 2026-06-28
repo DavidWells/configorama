@@ -16,4 +16,8 @@ isScaled: ${eval(${self:replicas} > 1)}
 
 Use eval for small boolean, arithmetic, or comparison expressions. Avoid using it as a substitute for a full programming language; executable config belongs in trusted JS/TS modules.
 
+<Callout type="warning">
+  Expressions cannot reach the prototype chain. Access to `constructor`, `prototype`, and `__proto__` — including dynamically computed keys like `["con" + "structor"]` — is rejected before evaluation with the `blocked_eval_escape` error code. This closes the `"".constructor.constructor(...)` route to arbitrary code, with or without safe mode.
+</Callout>
+
 See [security model](/concepts/security-model) for the data-flow classification and [dynamic configuration](/guides/dynamic-configuration) for conditional examples.

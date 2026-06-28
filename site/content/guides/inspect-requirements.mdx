@@ -19,7 +19,11 @@ graph TD
 
 ```sh
 configorama requirements config.yml
+configorama inspect config.yml --view requirements   # same output
+configorama inspect config.yml                        # requirements alongside graph and audit
 ```
+
+`requirements` is the requirements view of the unified `inspect` command. Use the bare verb when you only need the input contract, or `inspect` with no `--view` when you also want the dependency graph and audit findings in one call.
 
 The output contains `schemaVersion`, `summary`, `requirements`, and `ask`. Each requirement includes the normalized variable type, paths where it appears, default values, type filters, allowed values, sensitivity, and conflicts.
 

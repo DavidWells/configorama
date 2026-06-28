@@ -9,6 +9,8 @@ The introspection model is the shared reporting layer for Configorama. It starts
 
 This exists to prevent metadata drift. If requirements, audit, graph, and setup mode each walked config independently, they would eventually disagree about fallbacks, filters, file references, or sensitivity. The implementation keeps `src/metadata.js` and `enrichMetadata` as the source discovery path.
 
+The `inspect` command is the unified entry point over this model: with no `--view` it returns the full `{ requirements, graph, audit }` object, and the `requirements`, `audit`, and `graph` commands are aliases for the individual views.
+
 ```mermaid
 graph LR
   A[metadata.js] --> B[enrichMetadata]
@@ -16,9 +18,18 @@ graph LR
   B --> D[introspection graph]
   D --> E[audit]
   D --> F[graph export]
+  C --> G[inspect]
+  E --> G
+  F --> G
 ```
 
 ```sh
+configorama inspect config.yml                      # full model: requirements + graph + audit
+configorama inspect config.yml --view requirements
+configorama inspect config.yml --view audit
+configorama inspect config.yml --view graph --format json
+
+# the focused verbs are aliases of the views above
 configorama requirements config.yml
 configorama audit config.yml
 configorama graph config.yml --format json

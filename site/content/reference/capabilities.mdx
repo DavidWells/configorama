@@ -1,0 +1,55 @@
+---
+title: Capabilities
+description: Machine-readable CLI contract for agents and automation.
+---
+
+# Capabilities
+
+`configorama capabilities` prints a stable, machine-readable description of the CLI surface. Agents and CI jobs read the contract from the tool instead of scraping help text or documentation.
+
+```sh
+configorama capabilities
+```
+
+```json
+{
+  "name": "configorama",
+  "version": "0.11.2",
+  "schemaVersion": 1,
+  "commands": [
+    { "name": "inspect", "usage": "configorama inspect <file> [--view requirements|audit|graph]", "summary": "..." }
+  ],
+  "views": ["requirements", "audit", "graph"],
+  "formats": {
+    "resolve": ["json", "yaml", "js", "esm"],
+    "graph": ["json", "mermaid", "dot"]
+  },
+  "errorCodes": [
+    { "code": "missing_env", "description": "..." }
+  ],
+  "exitCodes": [
+    { "code": 0, "meaning": "Success." },
+    { "code": 1, "meaning": "Error. The category is in the JSON `error.code` field." }
+  ],
+  "flags": [
+    { "flag": "--view <view>", "summary": "..." }
+  ]
+}
+```
+
+| Field | Purpose |
+|---|---|
+| `name`, `version`, `schemaVersion` | Identify the tool and the contract version. |
+| `commands` | Every command with its usage string and summary. |
+| `views` | Valid `inspect --view` values. |
+| `formats` | Output formats per mode (`resolve`, `graph`). |
+| `errorCodes` | The full [error-code registry](/reference/error-codes). |
+| `exitCodes` | `0` success, `1` error (category in the JSON `error.code` field). |
+| `flags` | Global flags with summaries. |
+
+```sh
+# Discover the error categories an agent should branch on
+configorama capabilities | jq -r '.errorCodes[].code'
+```
+
+See the [CLI reference](/reference/cli) for the commands and [error codes](/reference/error-codes) for the failure contract.

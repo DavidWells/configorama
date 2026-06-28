@@ -14,13 +14,19 @@ const configorama = require('configorama')
 | `configorama(file, settings)` | Promise of object | Resolve a config. |
 | `configorama.sync(file, settings)` | `object` | Resolve synchronously. |
 | `configorama.analyze(file, settings)` | Promise of object | Analyze variables without full resolution. |
+| `configorama.inspect(file, settings)` | Promise of object or string | Introspect without resolving. Full `{ requirements, graph, audit }` model, or one slice via `settings.view`. |
 | `configorama.introspect(file, settings)` | Promise of object | Build static graph data. |
 | `configorama.audit(file, settings)` | Promise of object | Build audit JSON. |
 | `configorama.graph(file, settings)` | Promise of string or object | Build formatted graph output. |
 
+`inspect` is the unified entry point; `requirements` (via `analyze`), `audit`, and `graph` are the individual projections it composes. Pass `settings.view` as `requirements`, `audit`, or `graph` for a single slice.
+
 ```js filename="inspect.js"
-const report = await configorama.audit('config.yml', { safeMode: true })
-console.log(report.summary)
+const model = await configorama.inspect('config.yml', { safeMode: true })
+console.log(model.audit.summary, model.requirements.summary)
+
+// Or a single projection, identical to configorama.audit(...)
+const audit = await configorama.inspect('config.yml', { view: 'audit', safeMode: true })
 ```
 
-Settings include `options`, `configDir`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, and legacy compatibility flags. Read [security policies](/reference/security-policies) and [requirements schema](/reference/requirements-schema).
+Settings include `options`, `configDir`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, `view` (for `inspect`), and legacy compatibility flags. Read [security policies](/reference/security-policies) and [requirements schema](/reference/requirements-schema).

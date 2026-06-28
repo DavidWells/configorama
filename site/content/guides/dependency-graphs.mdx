@@ -20,6 +20,9 @@ graph TD
 configorama graph config.yml --format json
 configorama graph config.yml --format mermaid
 configorama graph config.yml --format dot
+
+# graph is the graph view of inspect; these are equivalent
+configorama inspect config.yml --view graph --format mermaid
 ```
 
 ```yaml filename="config.yml"
