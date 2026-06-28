@@ -22,7 +22,7 @@ sequenceDiagram
 ```
 
 ```sh
-configorama requirements config.yml
+configorama inspect config.yml --view requirements
 configorama config.yml --error-format json
 ```
 
@@ -41,4 +41,4 @@ The path extraction tests cover object paths, array indices, negative indices, b
   Human terminal output is designed for people. Agents and CI should use `--error-format json` and structured error codes instead of scraping styled text.
 </Callout>
 
-For deeper inspection, read [requirements mode](/guides/inspect-requirements), [error codes](/reference/error-codes), and [the resolution model](/concepts/resolution-model). If the failing value is a JS or TS file ref, start with [safe inspection](/guides/safe-inspection).
+For deeper inspection, read [the requirements view](/guides/inspect-requirements), [error codes](/reference/error-codes), and [the resolution model](/concepts/resolution-model). If the failing value is a JS or TS file ref, start with [safe inspection](/guides/safe-inspection).

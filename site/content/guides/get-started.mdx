@@ -52,11 +52,11 @@ DB_HOST=db.internal configorama config.yml --stage prod
 
 </Steps>
 
-Later, the same metadata can drive setup flows. A config that uses `help("Database host")` gives requirements mode and setup mode better user-facing text without changing the resolved value.
+Later, the same metadata can drive setup flows. A config that uses `help("Database host")` gives the requirements view and setup mode better user-facing text without changing the resolved value.
 
 ```yaml filename="config.yml"
 database:
   host: ${env:DB_HOST | help("Database host")}
 ```
 
-You now have a resolved object where `stage` comes from the CLI option, `database.host` comes from the environment, and `database.port` comes from the fallback. Next, try [resolving a first config](/guides/first-config) or inspect the same file with [requirements mode](/guides/inspect-requirements).
+You now have a resolved object where `stage` comes from the CLI option, `database.host` comes from the environment, and `database.port` comes from the fallback. Next, try [resolving a first config](/guides/first-config) or inspect the same file with the [requirements view](/guides/inspect-requirements).

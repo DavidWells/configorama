@@ -147,25 +147,31 @@ declare namespace configorama {
     settings?: ConfigoramaSettings
   ): T
 
-  /** Analyze config variables without resolving them */
+  /** Unified introspection entry point. Returns requirements, graph, and audit, or one view. */
+  export function inspect(
+    configPathOrObject: string | object,
+    settings?: ConfigoramaSettings & { view?: 'requirements' | 'audit' | 'graph', format?: 'json' | 'mermaid' | 'mmd' | 'dot' | 'graphviz' }
+  ): Promise<any>
+
+  /** @deprecated Use inspect(config, { view: 'requirements' }) for requirements, or returnMetadata for resolved metadata. */
   export function analyze(
     configPathOrObject: string | object,
     settings?: ConfigoramaSettings
   ): Promise<any>
 
-  /** Build static introspection graph data without resolving dynamic values */
+  /** @deprecated Use inspect(config) for the unified inspection model. */
   export function introspect(
     configPathOrObject: string | object,
     settings?: ConfigoramaSettings
   ): Promise<any>
 
-  /** Build static executable/external surface audit JSON */
+  /** @deprecated Use inspect(config, { view: 'audit' }). */
   export function audit(
     configPathOrObject: string | object,
     settings?: ConfigoramaSettings
   ): Promise<any>
 
-  /** Build dependency graph output. Returns a formatted string unless formatGraph is false. */
+  /** @deprecated Use inspect(config, { view: 'graph', format }). */
   export function graph(
     configPathOrObject: string | object,
     settings?: ConfigoramaSettings & { format?: 'json' | 'mermaid' | 'mmd' | 'dot' | 'graphviz', formatGraph?: boolean }

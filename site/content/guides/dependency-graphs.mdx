@@ -17,12 +17,12 @@ graph TD
 ```
 
 ```sh
-configorama graph config.yml --format json
-configorama graph config.yml --format mermaid
-configorama graph config.yml --format dot
-
-# graph is the graph view of inspect; these are equivalent
+configorama inspect config.yml --view graph --format json
 configorama inspect config.yml --view graph --format mermaid
+configorama inspect config.yml --view graph --format dot
+
+# compatibility alias
+configorama graph config.yml --format mermaid
 ```
 
 ```yaml filename="config.yml"

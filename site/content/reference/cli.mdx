@@ -20,6 +20,18 @@ configorama capabilities
 
 `inspect --view requirements`, `--view audit`, and `--view graph` cover the three projections. The standalone `requirements`, `audit`, and `graph` commands still work as back-compat aliases but are not part of the documented surface; `capabilities` lists them under `aliases`.
 
+Without `--view`, `inspect` returns all three projections in one object:
+
+```json
+{
+  "schemaVersion": 1,
+  "config": "config.yml",
+  "requirements": {},
+  "graph": {},
+  "audit": {}
+}
+```
+
 | Flag | Type | Purpose |
 |---|---|---|
 | `--view` | `requirements`, `audit`, `graph` | Select one `inspect` projection. Omit for the full model. |

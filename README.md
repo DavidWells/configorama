@@ -11,7 +11,7 @@ npm install configorama
 npx configorama config.yml --stage prod
 ```
 
-Configorama is a framework-agnostic variable engine for configuration files. Use it to resolve a config at runtime, inspect missing values before resolution, run an interactive setup flow, or emit requirements JSON for agents and automation.
+Configorama is a framework-agnostic variable engine for configuration files. Use it to resolve a config at runtime, inspect missing values before resolution, audit risky references, draw dependency graphs, run an interactive setup flow, or emit requirements JSON for agents and automation.
 
 ## TL;DR
 
@@ -26,7 +26,8 @@ Common use cases:
 | Resolve values from many sources | Built-in `env`, `option`/`opt`, `self`, `file`, `text`, `git`, `cron`, `eval`, and `if` sources | `${env:API_KEY}`, `${option:stage}`, `${file(./secrets.yml)}` |
 | Keep config portable | Runs outside any framework | Use the same resolver in a CLI, build script, deploy job, or app bootstrap |
 | Prompt for missing inputs | Interactive setup wizard with type-aware prompts and masked secrets | `configorama setup config.yml` |
-| Tell agents what to provide | Requirements JSON with `schemaVersion`, `requirements[]`, and `ask[]` | `configorama requirements config.yml` |
+| Tell agents what to provide | Requirements JSON with `schemaVersion`, `requirements[]`, and `ask[]` | `configorama inspect config.yml --view requirements` |
+| Inspect before resolving | Full inspection model plus focused `requirements`, `audit`, and `graph` views | `configorama inspect config.yml` |
 | Document variables near the config | `help()` plus comment annotations for descriptions, obtain hints, examples, groups, sensitivity, and deprecation warnings | `# @from Stripe dashboard > Developers > API keys` |
 | Enforce runtime constraints | Type filters and `oneOf(...)` validation | `${option:threads \| Number \| oneOf(1, 2, 4)}` |
 
@@ -61,7 +62,10 @@ STRIPE_SECRET_KEY=sk_live_xxx npx configorama config.yml --stage prod
 npx configorama setup config.yml
 
 # Print requirements for agents or automation
-npx configorama requirements config.yml
+npx configorama inspect config.yml --view requirements
+
+# Inspect requirements, dependency graph, and audit report together
+npx configorama inspect config.yml
 ```
 
 ## What We Added Recently
@@ -69,14 +73,18 @@ npx configorama requirements config.yml
 | Area | Added |
 |---|---|
 | Normalized requirements model | `ConfigRequirements` groups occurrences by variable, normalizes `${opt:...}` and `${option:...}` as `variableType: "option"`, and tracks paths, defaults, types, allowed values, sensitivity, and conflicts. |
-| Requirements JSON | `configorama requirements config.yml` and `configorama config.yml --requirements` emit `schemaVersion: 1`, `summary`, `requirements[]`, and environment-aware `ask[]` without resolving missing values. |
+| Unified inspection CLI | `configorama inspect config.yml` emits requirements, graph, and audit output without resolving missing values. Use `--view requirements`, `--view audit`, or `--view graph` for one slice. |
+| Requirements JSON | `configorama inspect config.yml --view requirements`, `configorama requirements config.yml`, and `configorama config.yml --requirements` emit `schemaVersion: 1`, `summary`, `requirements[]`, and environment-aware `ask[]`. |
+| Safe inspection | `inspect`, `audit`, and `graph` run in safe mode by default. Use `--unsafe` to opt out or `--safe-root <dir>` to restrict file/text references. |
+| Agent-friendly CLI contract | `configorama capabilities` prints commands, aliases, formats, flags, error codes, and exit codes as JSON. |
+| Path extraction polish | Jq-style paths, `--raw`, and `--copy` make scalar extraction usable in scripts: `configorama -r --copy config.yml .database.host`. |
 | Conflict handling | Conflicting type/default/allowed-value/annotation metadata is deterministic in the wizard. Requirements serialization fails on conflicts so agents get a clean contract. |
 | Setup wizard migration | The wizard now consumes prompt descriptors derived from the requirements model, supports enum selects from `oneOf`, displays annotation details, and redacts sensitive values in setup summaries and setup stdout. |
 | `oneOf(...)` validation | Runtime filter for inline literal sets and resolved list variables, including type-filter-first behavior such as `${option:threads \| Number \| oneOf(1, 2, 4)}`. |
 | More type filters | `Array` and `Object` filters now validate/coerce arrays, comma-separated lists, JSON/JSON5 arrays, and JSON/JSON5 objects. |
 | Option alias | `${option:name}` is supported alongside the existing `${opt:name}` shorthand. |
 | Comment metadata | Leading/inline comments become help fallback; structured tags add `@description`, `@from`, `@example`, `@default`, `@sensitive`, `@group`, and `@deprecated`. |
-| Documentation and fixtures | Added focused fixtures and tests for oneOf edge cases, option aliases, annotations, requirements CLI behavior, setup prompt descriptors, redaction, and display output. |
+| Structured CLI errors | Inspection commands default to JSON errors on stderr; `--error-format human` is available for terminal use. |
 
 ## Key Features
 
@@ -86,7 +94,7 @@ npx configorama requirements config.yml
 - **Self-referencing** - Reference other values within the same config using dot notation
 - **Custom variable sources** - Pluggable architecture to add your own variable resolvers
 - **Filters and functions** - Transform, coerce, constrain, and combine values with built-in or custom operators
-- **Setup and requirements mode** - Prompt humans interactively or generate requirements JSON for agents
+- **Inspection modes** - Prompt humans interactively, generate requirements JSON, audit risky references, or output dependency graphs
 - **Comment annotations** - Keep human and agent metadata beside the config value it describes
 - **Metadata extraction** - Analyze configs without resolving missing values, or get full resolution history
 - **Circular dependency detection** - Helpful error messages instead of infinite loops
@@ -136,7 +144,8 @@ npx configorama requirements config.yml
 - [API Reference](#api-reference)
   - [Async API](#async-api)
   - [Sync API](#sync-api)
-  - [Analyze API](#analyze-api)
+  - [Library API](#library-api)
+  - [Inspect API](#inspect-api)
   - [Format Utilities](#format-utilities)
   - [Markdown Files](#markdown-files)
   - [`buildVariableSyntax(prefix, suffix, excludePatterns?)`](#buildvariablesyntaxprefix-suffix-excludepatterns)
@@ -153,6 +162,7 @@ npx configorama requirements config.yml
   - [Creating a Custom Resolver](#creating-a-custom-resolver)
 - [Config Wizard (Experimental)](#config-wizard-experimental)
 - [Agent Requirements JSON](#agent-requirements-json)
+- [Runtime Inspection](#runtime-inspection)
 - [CLI Usage](#cli-usage)
   - [Basic Commands](#basic-commands)
   - [Command Options](#command-options)
@@ -1658,62 +1668,87 @@ const config = configorama.sync('./config.yml', {
 
 ---
 
-### Analyze API
-
-Analyze config structure without resolving variables.
-
-**Signature:**
-
-```typescript
-function configorama.analyze(
-  configPathOrObject: string | object,
-  settings?: ConfigoramaSettings
-): Promise<AnalyzeResult>
-```
-
-**Returns:**
-
-```typescript
-interface AnalyzeResult {
-  originalConfig: object         // Raw config object
-  variables: Variable[]          // All variables found
-  uniqueVariables: Record<string, Variable[]>  // Variables grouped by name
-  fileDependencies: string[]     // File references
-}
-
-interface Variable {
-  variable: string               // Full variable syntax (e.g., '${env:KEY}')
-  variableType: string           // Type (e.g., 'env', 'opt', 'file')
-  variableName: string           // Name/path (e.g., 'KEY')
-  variablePath: string           // Location in config (e.g., 'database.host')
-  defaultValue: any              // Default value if provided
-  hasDefault: boolean            // Whether default exists
-}
-```
-
-**Example:**
+### Library API
 
 ```javascript
 const configorama = require('configorama')
 
-const analysis = await configorama.analyze('./config.yml')
-
-console.log(`Found ${analysis.variables.length} variables`)
-console.log(`File dependencies:`, analysis.fileDependencies)
-
-// List all environment variables required
-const envVars = analysis.variables
-  .filter(v => v.variableType === 'env' && !v.hasDefault)
-  .map(v => v.variableName)
-
-console.log('Required env vars:', envVars)
+const config = await configorama('config.yml')
+const result = await configorama('config.yml', { returnMetadata: true })
+const requirements = await configorama.inspect('config.yml', { view: 'requirements' })
+const graph = await configorama.inspect('config.yml', { view: 'graph', format: 'mermaid' })
+const configSync = configorama.sync('config.yml')
 ```
 
-**Use cases:**
-- Generate documentation of required environment variables
-- Validate config structure in CI/CD
-- Build dependency graphs
-- Audit external dependencies before resolution
+The stable public surface is intentionally small:
+
+| Method | Use it for |
+|---|---|
+| `configorama(fileOrObject, opts)` | Async resolution. Set `returnMetadata: true` when you need `metadata.variables`, `metadata.uniqueVariables`, or `metadata.fileDependencies`. |
+| `configorama.sync(fileOrObject, opts)` | Synchronous resolution for blocking contexts. |
+| `configorama.inspect(fileOrObject, opts)` | Pre-resolution inspection. Use `view: "requirements"`, `view: "audit"`, or `view: "graph"` for one projection. |
+| `configorama.format` | Parser utilities for YAML, JSON/JSON5, TOML, INI, HCL, and Markdown frontmatter. |
+
+Lower-level helpers still exist for compatibility: `analyze()`, `introspect()`, `audit()`, `graph()`, `buildVariableSyntax()`, and `Configorama`. New code should start with `configorama()`, `configorama.sync()`, or `configorama.inspect()`.
+
+`returnMetadata: true` remains the right API for tools that need resolved config plus dependency metadata:
+
+```javascript
+const result = await configorama('serverless.yml', {
+  returnMetadata: true,
+  allowUnknownVariableTypes: true,
+  allowUnresolvedVariables: true,
+  options: { stage: 'prod' }
+})
+
+console.log(result.config)
+console.log(result.metadata.variables)
+console.log(result.metadata.uniqueVariables)
+console.log(result.metadata.fileDependencies.resolvedPaths)
+console.log(result.metadata.fileDependencies.globPatterns)
+```
+
+That metadata shape is the same path used by the newer inspection APIs, so tools can keep consuming it without switching to `inspect()`.
+
+---
+
+### Inspect API
+
+Inspect config structure without resolving missing user inputs.
+
+**Signature:**
+
+```typescript
+function configorama.inspect(
+  configPathOrObject: string | object,
+  settings?: ConfigoramaSettings & {
+    view?: 'requirements' | 'audit' | 'graph'
+    format?: 'json' | 'mermaid' | 'dot'
+  }
+): Promise<object | string>
+```
+
+With no `view`, `inspect()` returns the full model:
+
+```javascript
+const model = await configorama.inspect('./config.yml')
+
+console.log(model.requirements)
+console.log(model.graph)
+console.log(model.audit)
+```
+
+Use `view` for one projection:
+
+```javascript
+const configorama = require('configorama')
+
+const requirements = await configorama.inspect('./config.yml', { view: 'requirements' })
+const audit = await configorama.inspect('./config.yml', { view: 'audit' })
+const graph = await configorama.inspect('./config.yml', { view: 'graph', format: 'mermaid' })
+```
+
+The older `analyze()`, `introspect()`, `audit()`, and `graph()` helpers map to the same underlying inspection paths. They are kept for existing consumers.
 
 ---
 
@@ -2244,14 +2279,20 @@ The [Variable Source Types](#variable-source-types) table describes how the wiza
 
 ## Agent Requirements JSON
 
-Use requirements mode when an agent or script needs to know what a config is missing without running the full resolver:
+Use the requirements inspection view when an agent or script needs to know what a config is missing without running the full resolver:
+
+```bash
+configorama inspect config.yml --view requirements
+```
+
+The older `requirements` command and `--requirements` flag still work:
 
 ```bash
 configorama requirements config.yml
 configorama config.yml --requirements
 ```
 
-Both commands use analyze mode and print JSON. Missing required variables do not fail requirements output. The result is environment-aware: if `process.env.API_KEY` is already set, `${env:API_KEY}` is removed from `ask[]`.
+All three forms use analyze mode and print JSON. Missing required variables do not fail requirements output. The result is environment-aware: if `process.env.API_KEY` is already set, `${env:API_KEY}` is removed from `ask[]`.
 
 ```json
 {
@@ -2310,9 +2351,54 @@ Both commands use analyze mode and print JSON. Missing required variables do not
 
 ---
 
+## Runtime Inspection
+
+`inspect` is the current CLI surface for pre-resolution analysis. It does not resolve missing user inputs. By default it returns the full model:
+
+```bash
+configorama inspect config.yml
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "config": "config.yml",
+  "requirements": {},
+  "graph": {},
+  "audit": {}
+}
+```
+
+Use `--view` when a script wants one projection:
+
+```bash
+# Required inputs and ask[] contract
+configorama inspect config.yml --view requirements
+
+# Static risk report for executable or external surfaces
+configorama inspect config.yml --view audit
+
+# Dependency graph as JSON, Mermaid, or Graphviz DOT
+configorama inspect config.yml --view graph --format json
+configorama inspect config.yml --view graph --format mermaid
+configorama inspect config.yml --view graph --format dot
+```
+
+Inspection commands default to safe mode, which blocks executable and config-mutating surfaces during analysis. Use `--unsafe` only when you intentionally want the resolver to execute those surfaces during inspection. Use `--safe-root <dir>` or `--file-root <dir>` to restrict file and text references to known directories.
+
+Agents can discover the CLI contract without scraping this README:
+
+```bash
+configorama capabilities
+```
+
+That command prints JSON containing the documented commands, compatibility aliases, views, output formats, flags, error codes, and exit codes.
+
+---
+
 ## CLI Usage
 
-Configorama includes a CLI tool for resolving configs from the command line.
+Configorama includes a CLI tool for resolving configs, extracting paths, and inspecting config requirements before resolution.
 
 ### Basic Commands
 
@@ -2334,10 +2420,26 @@ configorama config.yml --verify
 
 # Walk through unresolved variables interactively (experimental)
 configorama config.yml --setup
+configorama setup config.yml
 
-# Print agent requirements JSON without resolving config
+# Inspect requirements, graph, and audit together
+configorama inspect config.yml
+
+# Print agent requirements JSON without resolving missing values
+configorama inspect config.yml --view requirements
+
+# Compatibility forms for requirements JSON
 configorama requirements config.yml
 configorama config.yml --requirements
+
+# Audit risky references without resolving missing values
+configorama inspect config.yml --view audit
+
+# Print a dependency graph
+configorama inspect config.yml --view graph --format mermaid
+
+# Print the machine-readable CLI contract
+configorama capabilities
 
 # Extract a specific path from config
 configorama config.yml .database.host
@@ -2357,22 +2459,37 @@ configorama config.yml --format yaml
 ```text
 Usage:
   configorama [options] <file> [path]
+  configorama <command> <file> [options]
+
+Commands:
+  (default)                 Resolve <file> and print the result
+  inspect <file>            Introspect a config without resolving it
+                              --view requirements|audit|graph for one slice
+  setup <file>              Run the interactive config wizard (experimental)
+  capabilities              Print the machine-readable CLI contract as JSON
 
 Options:
   -h, --help                Show this help message
   -v, --version             Show version number
   -o, --output <file>       Write output to file instead of stdout
-  -f, --format <format>     Output format: json, yaml, or js (default: json)
+  -f, --format <format>     Output format: json, yaml, js (resolve);
+                            json, mermaid, dot (graph)
+      --view <view>         inspect view: requirements, audit, or graph
   -r, --raw                 Print extracted scalar values without JSON quoting
   -c, --copy                Copy the formatted output to the clipboard
   -d, --debug               Enable debug mode
   -i, --info                Show info about the config
   -V, --verify              Verify the config
-  --setup                   Run the interactive config wizard (experimental)
-  --requirements            Print agent requirements JSON without resolving config
+  --safe                    Block executable/config-mutating surfaces during resolution
+  --unsafe                  Disable inspect/audit/graph default safe inspection
+  --safe-root <dir>         Restrict file/text references to an allowed root
+  --file-root <dir>         Alias for --safe-root
+  --error-format <fmt>      Error format on stderr: json or human
   --param <key=value>       Pass parameter values (can be used multiple times)
   --allow-unknown           Allow unknown variables to pass through
   --allow-undefined         Allow undefined values in the final output
+  --setup                   Alias for configorama setup <file>
+  --requirements            Compatibility form for requirements JSON
 
 Path Extraction:
   configorama config.yml .database.host   Extract a nested value
@@ -2392,6 +2509,8 @@ configorama config.yml .stage --raw
 ```
 
 `--copy` copies exactly the formatted value that the CLI prints. It uses native clipboard commands where available: `pbcopy` on macOS, `clip` on Windows, and `wl-copy`, `xclip`, or `xsel` on Linux.
+
+Structured commands (`inspect`, `requirements`, `audit`, `graph`, and `capabilities`) default to JSON errors on stderr. Use `--error-format human` for boxed terminal errors, or `--error-format json` to force machine-readable errors in resolve mode.
 
 ### CLI Examples
 

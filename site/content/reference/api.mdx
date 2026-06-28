@@ -13,20 +13,46 @@ const configorama = require('configorama')
 |---|---|---|
 | `configorama(file, settings)` | Promise of object | Resolve a config. |
 | `configorama.sync(file, settings)` | `object` | Resolve synchronously. |
-| `configorama.analyze(file, settings)` | Promise of object | Analyze variables without full resolution. |
 | `configorama.inspect(file, settings)` | Promise of object or string | Introspect without resolving. Full `{ requirements, graph, audit }` model, or one slice via `settings.view`. |
-| `configorama.introspect(file, settings)` | Promise of object | Build static graph data. |
-| `configorama.audit(file, settings)` | Promise of object | Build audit JSON. |
-| `configorama.graph(file, settings)` | Promise of string or object | Build formatted graph output. |
+| `configorama.format` | object | Parser utilities for YAML, JSON/JSON5, TOML, INI, HCL, and Markdown frontmatter. |
 
-`inspect` is the unified entry point; `requirements` (via `analyze`), `audit`, and `graph` are the individual projections it composes. Pass `settings.view` as `requirements`, `audit`, or `graph` for a single slice.
+`inspect` is the unified pre-resolution entry point. Pass `settings.view` as `requirements`, `audit`, or `graph` for a single slice.
 
 ```js filename="inspect.js"
 const model = await configorama.inspect('config.yml', { safeMode: true })
 console.log(model.audit.summary, model.requirements.summary)
 
-// Or a single projection, identical to configorama.audit(...)
 const audit = await configorama.inspect('config.yml', { view: 'audit', safeMode: true })
 ```
+
+With no `view`, `inspect` returns all three projections:
+
+```js
+{
+  schemaVersion: 1,
+  config: 'config.yml',
+  requirements: {},
+  graph: {},
+  audit: {}
+}
+```
+
+Use `returnMetadata: true` on the main resolver when you need resolved config plus variable and file-reference metadata:
+
+```js filename="metadata.js"
+const result = await configorama('serverless.yml', {
+  returnMetadata: true,
+  allowUnknownVariableTypes: true,
+  allowUnresolvedVariables: true,
+  options: { stage: 'prod' }
+})
+
+console.log(result.config)
+console.log(result.metadata.variables)
+console.log(result.metadata.uniqueVariables)
+console.log(result.metadata.fileDependencies.resolvedPaths)
+```
+
+Compatibility helpers still exist for older consumers: `analyze`, `introspect`, `audit`, `graph`, `buildVariableSyntax`, and the `Configorama` class. New code should start with `configorama`, `configorama.sync`, or `configorama.inspect`.
 
 Settings include `options`, `configDir`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, `view` (for `inspect`), and legacy compatibility flags. Read [security policies](/reference/security-policies) and [requirements schema](/reference/requirements-schema).
