@@ -53,8 +53,9 @@ async function getValueFromEval(variableString) {
 
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
-    const { default: subscript } = await import('subscript/justin')
-    const { default: parse } = await import('subscript/parse')
+    // justin re-exports `parse` from subscript; importing the subpath directly
+    // ('subscript/parse') is not resolvable under classic module resolution.
+    const { default: subscript, parse } = await import('subscript/justin')
 
     // Handle string comparisons by ensuring both sides are quoted
     let processedExpression = expression.replace(/([a-zA-Z0-9_]+)\s*([=!<>]=?)\s*['"]([^'"]+)['"]/g, '"$1"$2"$3"')
