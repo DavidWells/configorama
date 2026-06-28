@@ -1,3 +1,5 @@
+const { isSensitiveVariable } = require('../redaction/redact')
+
 const TYPE_MAP = {
   Boolean: 'boolean',
   String: 'string',
@@ -5,18 +7,6 @@ const TYPE_MAP = {
   Array: 'array',
   Object: 'object',
   Json: 'json',
-}
-
-function isSensitiveVariable(name) {
-  const sensitivePatterns = [
-    /secret/i,
-    /password/i,
-    /token/i,
-    /key/i,
-    /credential/i,
-    /auth/i,
-  ]
-  return sensitivePatterns.some(pattern => pattern.test(name))
 }
 
 const VARIABLE_TYPE_MAP = {
@@ -275,9 +265,7 @@ function collectConflicts({ typeEntries, defaultEntries, allowedSets, scalarAnno
 }
 
 function getSensitiveValue(name, sensitiveEntries) {
-  const override = selectFieldValue(sensitiveEntries)
-  if (override !== null) return Boolean(override)
-  return isSensitiveVariable(name)
+  return isSensitiveVariable(name, { sensitiveEntries })
 }
 
 function buildRequirement(varKey, entry) {

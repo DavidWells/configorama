@@ -1,0 +1,2 @@
+safeData: ${file(./data.yml):value}
+unsafeData: ${file(./unsafe.js):secret}

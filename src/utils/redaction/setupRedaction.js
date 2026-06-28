@@ -1,11 +1,5 @@
 const dotProp = require('dot-prop')
-
-const REDACTED_VALUE = '********'
-
-function cloneJson(value) {
-  if (value === undefined) return undefined
-  return JSON.parse(JSON.stringify(value))
-}
+const { REDACTED_VALUE, cloneJson } = require('./redact')
 
 function inputSectionForRequirement(requirement) {
   if (!requirement) return null
