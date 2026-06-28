@@ -7,6 +7,7 @@ const path = require('path')
 const { toClickablePath } = require('./createEditorLink')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { createPromptDescriptors } = require('./promptDescriptors')
+const { isSensitiveVariable } = require('../redaction/redact')
 
 const INVISIBLE_SPACE = '\u2800\u2800\u2800'
 
@@ -314,23 +315,6 @@ function getAnnotationDisplayMetadata(varInfo) {
     group: varInfo.group || occurrences.find(occ => occ.group)?.group,
     deprecationMessage: varInfo.deprecationMessage || occurrences.find(occ => occ.deprecationMessage)?.deprecationMessage,
   }
-}
-
-/**
- * Detects if a variable name suggests sensitive data
- * @param {string} name - Variable name
- * @returns {boolean} True if likely sensitive
- */
-function isSensitiveVariable(name) {
-  const sensitivePatterns = [
-    /secret/i,
-    /password/i,
-    /token/i,
-    /key/i,
-    /credential/i,
-    /auth/i,
-  ]
-  return sensitivePatterns.some(pattern => pattern.test(name))
 }
 
 /**

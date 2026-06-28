@@ -6,7 +6,7 @@ const { logHeader } = require('./utils/ui/logs')
 const { makeStackedBoxes } = require('@davidwells/box-logger')
 const { findLineForKey } = require('./utils/paths/findLineForKey')
 const { createEditorLink, toClickablePath } = require('./utils/ui/createEditorLink')
-const { isSensitiveVariable } = require('./utils/ui/configWizard')
+const { isSensitiveVariable } = require('./utils/redaction/redact')
 
 const SPACING = '           '
 const TITLE_TEXT = `Variable:${SPACING}`

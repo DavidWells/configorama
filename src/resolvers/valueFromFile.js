@@ -8,6 +8,7 @@ const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/ge
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { makeBox } = require('@davidwells/box-logger')
 const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
+const { checkFileAccess } = require('../utils/security/safetyPolicy')
 
 /* File Parsers */
 const YAML = require('../parsers/yaml')
@@ -109,6 +110,7 @@ function parseFileContents(content, filePath) {
  * @param {string} ctx.varPrefix - Variable prefix (e.g., '${')
  * @param {string} ctx.varSuffix - Variable suffix (e.g., '}')
  * @param {Map<string, string>} [ctx.fileContentCache] - Optional per-instance read cache keyed by absolute file path
+ * @param {object} [ctx.safetyPolicy] - Optional safe-mode policy for executable and root checks
  * @param {string} variableString - The variable string to resolve
  * @param {object} options - Resolution options
  * @returns {Promise<any>}
@@ -187,6 +189,9 @@ async function getValueFromFile(ctx, variableString, options) {
   }
 
   const exists = fs.existsSync(fullFilePath)
+  if (ctx.safetyPolicy) {
+    checkFileAccess(fullFilePath, ctx.safetyPolicy, { variableString })
+  }
 
   const fileRefEntry = {
     filePath: fullFilePath,
