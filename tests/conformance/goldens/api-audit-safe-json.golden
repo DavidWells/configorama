@@ -1,0 +1,56 @@
+{
+  "diagnostics": [],
+  "findings": [
+    {
+      "configPaths": [],
+      "id": "file:./unsafe.js",
+      "kind": "executable",
+      "message": "Reference may execute JavaScript or TypeScript.",
+      "path": "<ROOT>/tests/security/fixtures/unsafe.js",
+      "relativePath": "./unsafe.js",
+      "risk": "executable_code",
+      "severity": "high"
+    },
+    {
+      "configPaths": [
+        "unsafeData"
+      ],
+      "id": "variable:file(./unsafe.js)",
+      "kind": "file",
+      "message": "Reference may execute JavaScript or TypeScript.",
+      "risk": "executable_code",
+      "severity": "high",
+      "variable": "file(./unsafe.js)"
+    },
+    {
+      "configPaths": [],
+      "id": "file:./data.yml",
+      "kind": "file",
+      "message": "Reference reads a local file.",
+      "path": "<ROOT>/tests/security/fixtures/data.yml",
+      "relativePath": "./data.yml",
+      "risk": "local_file_read",
+      "severity": "low"
+    },
+    {
+      "configPaths": [
+        "safeData"
+      ],
+      "id": "variable:file(./data.yml)",
+      "kind": "file",
+      "message": "Reference reads a local file.",
+      "risk": "local_file_read",
+      "severity": "low",
+      "variable": "file(./data.yml)"
+    }
+  ],
+  "safeMode": true,
+  "schemaVersion": 1,
+  "summary": {
+    "high": 2,
+    "info": 0,
+    "low": 2,
+    "medium": 0,
+    "total": 4
+  }
+}

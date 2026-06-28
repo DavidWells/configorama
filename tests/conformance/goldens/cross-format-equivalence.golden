@@ -1,0 +1,66 @@
+{
+  "equivalent.hcl": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.ini": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.js": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.json": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.md": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.toml": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.ts": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  },
+  "equivalent.yml": {
+    "database": {
+      "host": "db.internal",
+      "port": 6543
+    },
+    "service": "demo",
+    "stage": "prod"
+  }
+}

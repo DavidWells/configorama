@@ -1,0 +1,9 @@
+module.exports = {
+  service: 'demo',
+  stage: '${opt:stage, "dev"}',
+  enabled: '${opt:enabled, true | Boolean}',
+  database: {
+    host: '${env:CONF_DB_HOST, "localhost"}',
+    port: '${opt:port, 5432 | Number}',
+  }
+}

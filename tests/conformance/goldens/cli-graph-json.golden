@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "nodes": [
+    {
+      "id": "file:./unsafe.js",
+      "kind": "executable",
+      "path": "<ROOT>/tests/security/fixtures/unsafe.js",
+      "relativePath": "./unsafe.js",
+      "exists": true,
+      "risk": "executable_code",
+      "severity": "high"
+    },
+    {
+      "id": "file:./data.yml",
+      "kind": "file",
+      "path": "<ROOT>/tests/security/fixtures/data.yml",
+      "relativePath": "./data.yml",
+      "exists": true,
+      "risk": "local_file_read",
+      "severity": "low"
+    },
+    {
+      "id": "variable:file(./data.yml)",
+      "kind": "file",
+      "variable": "file(./data.yml)",
+      "variableType": "file",
+      "sourceClass": "config",
+      "risk": "local_file_read",
+      "severity": "low",
+      "paths": [
+        "safeData"
+      ],
+      "sensitive": false,
+      "required": true,
+      "default": null,
+      "description": null
+    },
+    {
+      "id": "variable:file(./unsafe.js)",
+      "kind": "file",
+      "variable": "file(./unsafe.js)",
+      "variableType": "file",
+      "sourceClass": "config",
+      "risk": "executable_code",
+      "severity": "high",
+      "paths": [
+        "unsafeData"
+      ],
+      "sensitive": false,
+      "required": true,
+      "default": null,
+      "description": null
+    }
+  ],
+  "edges": [
+    {
+      "from": "configPath:safeData",
+      "to": "file:./data.yml",
+      "kind": "reads"
+    },
+    {
+      "from": "configPath:safeData",
+      "to": "variable:file(./data.yml)",
+      "kind": "uses"
+    },
+    {
+      "from": "configPath:unsafeData",
+      "to": "file:./unsafe.js",
+      "kind": "reads"
+    },
+    {
+      "from": "configPath:unsafeData",
+      "to": "variable:file(./unsafe.js)",
+      "kind": "uses"
+    }
+  ],
+  "diagnostics": [],
+  "summary": {
+    "nodes": 4,
+    "edges": 4,
+    "diagnostics": 0
+  }
+}

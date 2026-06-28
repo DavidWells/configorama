@@ -1,0 +1,8 @@
+{
+  "hclBooleanFilter": {
+    "hclEnabled": "false",
+    "reason": "HCL $[] variable parsing currently resolves the option value but does not apply the Boolean filter in this fixture.",
+    "status": "documented",
+    "yamlEnabled": false
+  }
+}
