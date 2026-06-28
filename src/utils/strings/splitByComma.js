@@ -21,6 +21,11 @@ function splitByComma(string, regexPattern) {
     return [""]
   }
 
+  // No comma anywhere means no split, regardless of quotes/brackets/placeholders.
+  if (string.indexOf(",") === -1) {
+    return [string.trim()]
+  }
+
   // Extract regex patterns to protect them
   const placeholders = []
   let protectedString = string
