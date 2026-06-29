@@ -21,6 +21,10 @@ export default {
     title: 'Concepts',
     theme: { typesetting: 'article' }
   },
+  credits: {
+    title: 'Credits',
+    theme: { typesetting: 'article' }
+  },
   _separator_more: {
     type: 'separator',
     title: 'More'

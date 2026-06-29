@@ -7,7 +7,7 @@ description: Built-in variable source syntax and source classes.
 
 Variable sources describe where each dynamic value comes from. Use this page when you want the syntax for each built-in source in one place, then open the per-variable pages when you need edge cases or policy details.
 
-The source system is fully customizable: add your own variable sources when config values need to come from an internal service, secret store, deployment registry, or any project-specific lookup.
+The source system is fully customizable: [add your own variable sources](/guides/custom-resolvers) when config values need to come from an internal service, secret store, deployment registry, or any project-specific lookup.
 
 ```yaml
 stage: ${opt:stage, "dev"}

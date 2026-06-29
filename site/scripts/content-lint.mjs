@@ -8,6 +8,7 @@ for (const page of pages) {
   const rel = path.relative(process.cwd(), page.filePath)
   const intro = firstParagraph(page.body)
   const isReference = isReferenceRoute(page.route)
+  const isCredits = page.route === '/credits'
   const isHome = page.route === '/'
   const isIntroGuide = page.route === '/guides/get-started'
 
@@ -15,7 +16,7 @@ for (const page of pages) {
   check(wordCount(intro) >= 35 || isReference, rel, 'intro paragraph has orientation')
   check(/why|because|solves|exists to|useful|need|helps|purpose/i.test(page.body.slice(0, 1800)) || isReference, rel, 'states motivation early')
   check(/```mermaid|<FileTree|<Cards|graph [A-Z]+|sequenceDiagram/.test(page.body) || isReference, rel, 'has mental model')
-  check(/```[a-zA-Z0-9]+/.test(page.body), rel, 'has language-tagged example')
+  check(/```[a-zA-Z0-9]+/.test(page.body) || isCredits, rel, 'has language-tagged example')
   check(isHome || isReference || isIntroGuide || /Callout type="(warning|error|important)"|gotcha|pitfall|caveat|common mistake/i.test(page.body), rel, 'has pitfall or warning')
   check(isHome || countInternalLinks(page.body) >= 2 || isReference, rel, 'has cross-links')
   check(!hasPlaceholder(page.body), rel, 'has no placeholders')
@@ -31,6 +32,7 @@ function isReferenceRoute(route) {
     route === '/variable-sources' ||
     route === '/filters-functions' ||
     route === '/security-policies' ||
+    route === '/credits' ||
     route === '/glossary' ||
     route.startsWith('/variables') ||
     route.startsWith('/schemas')
