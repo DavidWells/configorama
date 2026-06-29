@@ -1,5 +1,6 @@
 export default {
   'get-started': 'Get started',
+  'setup-wizard': 'Run the setup wizard',
   'first-config': 'Resolve your first config',
   'file-references': 'Load files and secrets',
   'custom-resolvers': 'Write a custom resolver',

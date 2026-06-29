@@ -1,0 +1,75 @@
+---
+title: Run the setup wizard
+description: Prompt for config inputs interactively before resolving a file.
+---
+
+# Run the setup wizard
+
+The setup wizard is for local setup and one-off operator runs. It reads the same requirements data used by `inspect`, prompts for the values that still need input, then resolves the config with those answers for the current run.
+
+```mermaid
+graph LR
+  A[config.yml] --> B[requirements]
+  B --> C[setup prompts]
+  C --> D[current run inputs]
+  D --> E[resolved config]
+```
+
+```sh
+configorama setup config.yml
+```
+
+Use `npx` when Configorama is not installed in the project:
+
+```sh
+npx --yes configorama setup config.yml
+```
+
+You can also run the same flow through the resolve command:
+
+```sh
+configorama config.yml --setup
+```
+
+## Add prompt text
+
+The wizard gets better when the config describes where values come from. Use `help()` for short prompt text, or use comments when the prompt needs examples, source notes, grouping, or sensitivity.
+
+```yaml filename="config.yml"
+service: billing-api
+stage: ${option:stage | oneOf("dev", "staging", "prod") | help("Deployment stage")}
+
+database:
+  host: ${env:DB_HOST | help("Database host")}
+  port: ${env:DB_PORT, 5432 | Number | help("Database port")}
+
+secrets:
+  # Stripe live secret key
+  # @from Stripe dashboard > Developers > API keys
+  # @example sk_live_...
+  # @sensitive true
+  stripeKey: ${env:STRIPE_SECRET_KEY}
+```
+
+In this example, `stage` becomes a select prompt because `oneOf(...)` defines the allowed values. `database.port` is validated as a number. `secrets.stripeKey` is treated as sensitive because the annotation says so, and names such as `secret`, `password`, `token`, and `key` are also masked by default.
+
+## What it prompts for
+
+The wizard groups inputs by source:
+
+| Source | Prompt behavior |
+|---|---|
+| `option` / `opt` | Asks for the CLI flag value, such as `--stage`. |
+| `env` | Uses the current environment value if it exists, or asks for one. |
+| `file` / `text` | Prompts for file-backed inputs when they appear in requirements output. |
+| `self` and bare config refs | Prompts only when the referenced config value is not already resolved. |
+
+Defaults are shown as placeholders and used when the prompt is left blank. Type filters such as `Number`, boolean filters, JSON/object filters, and array filters are used for validation and normalization.
+
+<Callout type="warning">
+  The wizard fills values for the current resolution run only. It does not edit `config.yml`, write `.env` files, or persist secrets.
+</Callout>
+
+For CI and agents, use `configorama inspect config.yml --view requirements` instead. The requirements output is the durable JSON contract behind the wizard, and it is easier to review, diff, and store as an artifact.
+
+See [inspect required inputs](/guides/inspect-requirements) for the JSON shape and [filters and functions](/reference/filters-functions) for `help()` and `oneOf(...)`.
