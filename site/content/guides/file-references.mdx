@@ -36,6 +36,19 @@ appName: ${file(@config/app.yml):name}
 featureFlag: ${file(@data/features.json):checkout.enabled}
 ```
 
+Secret values do not need to live in the committed config. A common local pattern is to keep the reference in `config.yml` and point it at a gitignored file:
+
+```yaml filename="config.yml"
+database:
+  password: ${file(./.secrets/local.yml):database.password}
+```
+
+```gitignore filename=".gitignore"
+.secrets/
+```
+
+That keeps the dependency visible without committing the value. If secrets live somewhere else, provide a [custom resolver](/guides/custom-resolvers) instead of a file reference. Custom resolvers can read from local stores such as the macOS Keychain or 1Password CLI, or from remote stores such as AWS Secrets Manager, GCP Secret Manager, Vault, or your own internal service.
+
 <Callout type="warning">
   JavaScript and TypeScript file references execute code. Use plain YAML, JSON, TOML, INI, HCL, Markdown, or text files for untrusted inspection, and read [executable config](/guides/executable-configs) before using JS/TS file refs.
 </Callout>
