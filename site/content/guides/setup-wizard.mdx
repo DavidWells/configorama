@@ -1,13 +1,13 @@
 ---
-title: Run the setup wizard
+title: Self configuring config
 description: Use dependency discovery to walk through configuring a file.
 ---
 
-# Run the setup wizard
+# Self configuring config
 
-The setup wizard is for local setup and one-off operator runs. Configorama can inspect a file before resolving it, build a graph of the values it depends on, and use that graph to walk someone through configuring the file.
+A Configorama file can be self configuring because Configorama can inspect it before resolving it, build a graph of the values it depends on, and use that graph to walk someone through the setup process.
 
-That graph includes environment variables, CLI options, file references, self references, defaults, type filters, allowed values, sensitivity, and prompt text. The wizard turns those dependencies into questions, then resolves the config with the answers for the current run.
+That graph includes environment variables, CLI options, file references, self references, defaults, type filters, allowed values, sensitivity, and prompt text. The setup wizard turns those dependencies into questions, then resolves the config with the answers for the current run.
 
 ```mermaid
 graph LR
@@ -18,6 +18,8 @@ graph LR
   D --> E
   E --> F[resolved config]
 ```
+
+## Run it
 
 ```sh
 configorama setup config.yml

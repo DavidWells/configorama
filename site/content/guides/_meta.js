@@ -1,6 +1,6 @@
 export default {
   'get-started': 'Get started',
-  'setup-wizard': 'Run the setup wizard',
+  'setup-wizard': 'Self configuring config',
   'first-config': 'Resolve your first config',
   'frontmatter-and-formats': 'Formats supported',
   'file-references': 'Load files and secrets',
