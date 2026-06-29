@@ -5,7 +5,27 @@ description: Reference values from the current config object.
 
 # Self variables
 
-`self` variables read from the current config object. The shorthand form is a bare config path such as `${service}` or `${provider.stage}`. Use `${self:...}` when you want the source to be explicit.
+`self` variables read from the current config object. The shorthand form is a bare config path such as `${stage}` or `${provider.stage}`. Use `${self:...}` when you want the source to be explicit.
+
+## Shorthand
+
+Use a bare path when the value is already in the config.
+
+```yaml
+stage: ${opt:stage, "dev"}
+endpoint: https://api.example.com/${stage}
+```
+
+## Explicit self
+
+Use `self:` when you want the reference source to be obvious.
+
+```yaml
+foo: bar
+value: ${self:foo}
+```
+
+## Nested paths
 
 {/* docs CONFIGORAMA_EXAMPLE id="variable-self" lang="yaml" */}
 ```yaml
