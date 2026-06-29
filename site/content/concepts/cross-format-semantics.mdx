@@ -39,6 +39,29 @@ stage: ${opt:stage, "dev"}
 
 Markdown without frontmatter is returned as content, while frontmatter values are resolved like other parsed config values. Hidden HTML-comment frontmatter is a Markdown input feature; it is separate from the JSX comments used by the docs site to synchronize examples.
 
+If a Markdown file has no frontmatter, the result contains only `_content`. The Markdown body is not part of variable resolution, so `${self:_content}` in frontmatter does not read the body. If frontmatter already defines `_content`, Configorama preserves that explicit value and stores the body separately.
+
+```md filename="page.md"
+---
+title: ${opt:title, "Docs"}
+_content: custom frontmatter value
+---
+
+# Body
+```
+
+## Extensionless files
+
+Files without extensions are parsed by content sniffing. Configorama recognizes common JSON, YAML, and TOML shapes, including JSON arrays and YAML files with a `---` document marker.
+
+```sh
+configorama ./config-json
+configorama ./config-yaml
+configorama ./config-toml
+```
+
+When a file has a recognized extension, the extension wins over content sniffing. Prefer normal extensions for committed config files, and treat extensionless parsing as compatibility for generated files, dotfiles, and platform-specific config inputs.
+
 ## YAML behavior
 
 YAML anchors and merge keys apply before variable resolution, which makes them useful for shared defaults.

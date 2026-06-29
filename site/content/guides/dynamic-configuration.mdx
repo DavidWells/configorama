@@ -17,6 +17,17 @@ graph TD
   C --> D
 ```
 
+Start with simple self references. When a variable name matches a value in the same config, you can omit the `self:` prefix:
+
+```yaml filename="config.yml"
+service: checkout
+stage: ${opt:stage, "dev"}
+name: ${service}-${stage}
+url: https://${name}.example.com
+```
+
+The same shorthand works inside dynamic paths:
+
 ```yaml filename="config.yml"
 stage: ${opt:stage, "dev"}
 service: checkout
@@ -25,9 +36,51 @@ configs:
     checkout: http://localhost:3000
   prod:
     checkout: https://checkout.example.com
-serviceUrl: ${self:configs.${self:stage}.${self:service}}
-stageConfig: ${file(./config.${opt:stage}.json)}
+serviceUrl: ${configs.${stage}.${service}}
+stageConfig: ${file(./config.${stage}.json)}
 domain: ${param:domain, "example.test"}
+```
+
+Dynamic paths can contain more than one variable. This is useful for tenant, region, service, or feature-flag matrices:
+
+```yaml filename="config.yml"
+tenant: ${param:tenant, "acme"}
+region: ${opt:region, "us"}
+service: api
+
+tenantConfigs:
+  acme:
+    us:
+      api: https://api.us.acme.example.com
+    eu:
+      api: https://api.eu.acme.example.com
+
+serviceUrl: ${self:tenantConfigs.${self:tenant}.${self:region}.${self:service}}
+```
+
+The dynamic part can resolve through another key before Configorama reads the final value:
+
+```yaml filename="config.yml"
+stage: ${opt:stage, "prod"}
+pathByStage:
+  prod: services.api.production.url
+services:
+  api:
+    production:
+      url: https://api.example.com
+
+apiUrl: ${self:${self:pathByStage.${self:stage}}}
+```
+
+Dynamic array indexes use the same dot-path rules:
+
+```yaml filename="config.yml"
+selectedIndex: ${opt:serverIndex, 1 | Number}
+servers:
+  - dev.example.com
+  - prod.example.com
+
+serverHost: ${self:servers.${self:selectedIndex}}
 ```
 
 Conditions and expressions are data-flow helpers, not JavaScript execution. Use them for dynamic config values that do not need a trusted JS or TS module:

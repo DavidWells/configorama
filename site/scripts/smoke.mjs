@@ -2,12 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const requiredFiles = [
-  '.next/server/app/index.html',
-  '.next/server/app/guides/get-started.html',
-  '.next/server/app/guides/inspect-config.html',
-  '.next/server/app/cli.html',
-  'public/_pagefind/pagefind.js',
-  'public/_pagefind/pagefind-entry.json'
+  'out/index.html',
+  'out/guides/get-started.html',
+  'out/guides/inspect-config.html',
+  'out/cli.html',
+  'out/_pagefind/pagefind.js',
+  'out/_pagefind/pagefind-entry.json'
 ]
 
 const missing = requiredFiles.filter(file => !fs.existsSync(path.resolve(file)))
@@ -17,7 +17,7 @@ if (missing.length) {
   process.exit(1)
 }
 
-const home = fs.readFileSync('.next/server/app/index.html', 'utf8')
+const home = fs.readFileSync('out/index.html', 'utf8')
 if (!home.includes('Configorama')) {
   console.error('Smoke check failed. Home page does not include Configorama.')
   process.exit(1)

@@ -6,6 +6,8 @@
 /types
 node_modules
 
+site/out
+
 .specstory
 
 # Stray generated .d.ts files (should only be in /types)

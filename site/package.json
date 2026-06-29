@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && npm run search:index",
-    "search:index": "pagefind --site .next/server/app --output-path public/_pagefind",
+    "build": "npm run search:clean && next build && npm run search:index",
+    "search:clean": "node scripts/clean-pagefind.mjs",
+    "search:index": "npm run search:clean && pagefind --site out --output-path out/_pagefind",
     "start": "next start",
     "docs:examples": "node scripts/docs-examples.mjs",
     "docs:examples:check": "node scripts/docs-examples.mjs --check",
@@ -16,8 +17,7 @@
     "link:check": "node scripts/link-check.mjs",
     "smoke": "node scripts/smoke.mjs",
     "validate": "npm run docs:examples:check && npm run typecheck && npm run content:lint && npm run link:check && npm run build && npm run smoke",
-    "deploy": "cd .. && npm run site:deploy",
-    "deploy:prod": "cd .. && npm run site:deploy:prod"
+    "deploy": "npx --yes netlify-cli deploy --no-build --prod --dir out --site cc35ef1a-d288-4289-a911-48042d3e1c6f"
   },
   "dependencies": {
     "next": "16.2.9",

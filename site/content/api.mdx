@@ -15,6 +15,7 @@ const configorama = require('configorama')
 | `configorama.sync(file, settings)` | `object` | Resolve synchronously. |
 | `configorama.inspect(file, settings)` | Promise of object or string | Introspect without resolving. Full `{ requirements, graph, audit }` model, or one slice via `settings.view`. |
 | `configorama.format` | object | Parser utilities for YAML, JSON/JSON5, TOML, INI, HCL, and Markdown frontmatter. |
+| `configorama/parse-file` | object | Subpath export for `parseFile` and `parseFileContents`. |
 
 `inspect` is the unified pre-resolution entry point. Pass `settings.view` as `requirements`, `audit`, or `graph` for a single slice.
 
@@ -53,6 +54,75 @@ console.log(result.metadata.uniqueVariables)
 console.log(result.metadata.fileDependencies.resolvedPaths)
 ```
 
+## Pass through variables
+
+Use `allowUnknownVariableTypes` when another system owns a variable source that Configorama does not resolve. This keeps references such as `${ssm:path}` or `${cf:stack.output}` in the output while still resolving known Configorama variables.
+
+```js filename="passthrough-unknown.js"
+const config = await configorama({
+  stage: '${opt:stage}',
+  parameter: '${ssm:/app/prod/password}',
+  output: '${cf:shared.ApiUrl}'
+}, {
+  options: { stage: 'prod' },
+  allowUnknownVariableTypes: ['ssm', 'cf']
+})
+```
+
+Use `allowUnresolvedVariables` when Configorama knows the source type, but the current caller intentionally cannot provide a value yet.
+
+```js filename="passthrough-unresolved.js"
+const config = await configorama({
+  missingParam: '${param:tenant}',
+  missingFile: '${file(./generated.yml)}'
+}, {
+  allowUnresolvedVariables: ['param', 'file']
+})
+```
+
+`allowUnknownVariableTypes` is for unregistered source names. `allowUnresolvedVariables` is for registered sources such as `env`, `option`, `param`, `file`, or `text` that fail to resolve. Both settings also accept `true`, but an explicit allowlist is easier to audit.
+
+## Dotenv loading
+
+A config can request environment files with `useDotenv` or `useDotEnv`. API calls suppress `env-stage-loader` logs by default; pass `dotEnvSilent: false` when you want to see which environment files were loaded.
+
+```yaml filename="config.yml"
+useDotenv: true
+stage: ${opt:stage, "dev"}
+apiKey: ${env:API_KEY}
+```
+
+```js filename="resolve-config.js"
+await configorama('config.yml', {
+  options: { stage: 'dev' },
+  dotEnvSilent: false
+})
+```
+
+Safe mode blocks dotenv mutation unless policy allows it. See [security policies](/security-policies) for `blockDotEnv`.
+
+## Parser subpath
+
+Use `configorama/parse-file` when you only need Configorama's parser stack, not variable resolution.
+
+```js filename="parse-file.js"
+const { parseFile, parseFileContents } = require('configorama/parse-file')
+
+const fromDisk = parseFile('settings.json5')
+const fromString = parseFileContents({
+  filePath: 'inline.toml',
+  contents: 'name = "billing"'
+})
+```
+
+`parseFile` supports the same parser families as file references, including YAML, JSON, JSON5, JSONC, TOML, INI, HCL, Markdown, JavaScript, TypeScript, and ESM. Function exports can receive `dynamicArgs`.
+
+```js filename="parse-js-config.js"
+const config = parseFile('config.js', {
+  dynamicArgs: { stage: 'prod' }
+})
+```
+
 Compatibility helpers still exist for older consumers: `analyze`, `introspect`, `audit`, `graph`, `buildVariableSyntax`, and the `Configorama` class. New code should start with `configorama`, `configorama.sync`, or `configorama.inspect`.
 
 Use `buildVariableSyntax(...)` with the `syntax` setting when `${...}` conflicts with another platform:
@@ -65,4 +135,4 @@ const config = await configorama('config.yml', {
 })
 ```
 
-Settings include `options`, `configDir`, `syntax`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, `view` (for `inspect`), and legacy compatibility flags. Read [bring your own syntax](/guides/bring-your-own-syntax), [security policies](/security-policies), and [requirements schema](/schemas/requirements).
+Settings include `options`, `params`, `configDir`, `syntax`, `variableSources`, `filters`, `functions`, `dynamicArgs`, `returnMetadata`, `filePathOverrides`, `safeMode`, `allowedFileRoots`, `allowUnknownVariableTypes`, `allowUnresolvedVariables`, `view` (for `inspect`), and legacy compatibility flags. Read [file references](/guides/file-references), [bring your own syntax](/guides/bring-your-own-syntax), [security policies](/security-policies), and [requirements schema](/schemas/requirements).
