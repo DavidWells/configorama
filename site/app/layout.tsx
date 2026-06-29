@@ -24,12 +24,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const navbar = (
     <Navbar
-      logo={<strong>Configorama</strong>}
+      logo={
+        <span className="nav-brand">
+          <strong>Configorama</strong>
+          <span className="nav-tagline">Modern config for humans &amp; agents</span>
+        </span>
+      }
       projectLink="https://github.com/DavidWells/configorama"
     />
   )
 
-  const footer = <Footer>MIT {new Date().getFullYear()} © Configorama.</Footer>
+  const footer = <Footer>MIT {new Date().getFullYear()} David Wells</Footer>
 
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>

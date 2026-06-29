@@ -12,3 +12,23 @@ h1.x\:text-4xl {
 .nextra-mobile-nav .x\:grid.x\:gap-1 {
   gap: 0;
 }
+
+.nav-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.nav-tagline {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+/* keep the mobile navbar uncluttered */
+@media (max-width: 768px) {
+  .nav-tagline {
+    display: none;
+  }
+}

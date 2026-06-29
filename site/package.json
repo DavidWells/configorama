@@ -15,7 +15,9 @@
     "content:audit": "node scripts/audit-content.mjs",
     "link:check": "node scripts/link-check.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "validate": "npm run docs:examples:check && npm run typecheck && npm run content:lint && npm run link:check && npm run build && npm run smoke"
+    "validate": "npm run docs:examples:check && npm run typecheck && npm run content:lint && npm run link:check && npm run build && npm run smoke",
+    "deploy": "cd .. && npm run site:deploy",
+    "deploy:prod": "cd .. && npm run site:deploy:prod"
   },
   "dependencies": {
     "next": "16.2.9",
