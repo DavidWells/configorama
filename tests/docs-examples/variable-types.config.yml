@@ -14,9 +14,14 @@ databasePort: ${param:databasePort, 5432 | Number}
 # docs:end variable-param
 
 # docs:start variable-self
-service: billing
-baseUrl: https://${self:apiHost}:${self:apiPort}
-serviceUrl: ${self:baseUrl}/${self:stage}/${self:service}
+selfExample:
+  service: billing
+  stage: ${opt:stage, "dev"}
+  apiHost: ${env:DOCS_API_HOST, "localhost"}
+  apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+  baseUrl: https://${selfExample.apiHost}:${selfExample.apiPort}
+  serviceUrl: ${selfExample.baseUrl}/${selfExample.stage}/${selfExample.service}
+  explicitServiceUrl: ${self:selfExample.baseUrl}/${self:selfExample.stage}/${self:selfExample.service}
 # docs:end variable-self
 
 # docs:start variable-file
@@ -36,12 +41,27 @@ shortSha: ${git:sha1, "unknown"}
 
 # docs:start variable-cron
 everyFiveMinutes: ${cron(every 5 minutes)}
+# ^ becomes */5 * * * *
 weekdayMorning: ${cron(on monday at 9:00)}
+# ^ becomes 0 9 * * 1
+dailyMidnight: ${cron(every day)}
+# ^ becomes 0 0 * * *
+businessHours: ${cron(business hours)}
+# ^ becomes 0 9-17 * * 1-5
+monthlyBilling: ${cron(on 1st of month at 00:00)}
+# ^ becomes 0 0 1 * *
+existingCron: ${cron(15 10 * * 1-5)}
+# ^ stays 15 10 * * 1-5
 # docs:end variable-cron
 
 # docs:start variable-eval
+evalStage: ${opt:stage, "dev"}
 replicas: ${opt:replicas, 2 | Number}
 isScaled: ${eval(${self:replicas} > 1)}
+minReplicas: 2
+desiredReplicas: '${eval(${replicas} < ${minReplicas} ? ${minReplicas} : ${replicas})}'
+workerMemoryMb: ${eval(${replicas} * 256)}
+canDeploy: ${eval(${evalStage} == "prod" && ${replicas} >= 3)}
 # docs:end variable-eval
 
 # docs:start variable-if

@@ -9,6 +9,8 @@ Executable config files are useful when static data files are not expressive eno
 
 The feature exists because some projects need shared constants, package-local helpers, or computed defaults. The tradeoff is important: loading JavaScript, TypeScript, or ESM runs code. Treat executable config as trusted source code, and use audit or safe inspection before automation reads unknown repositories.
 
+If the dynamic part is just a config-time decision, use [eval variables](/variables/eval) instead. `eval(...)` handles comparisons, arithmetic, boolean checks, and ternaries without loading executable code.
+
 ```mermaid
 graph LR
   A[config.js, config.ts, config.mjs] --> B[load module]

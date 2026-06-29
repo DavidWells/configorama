@@ -5,16 +5,21 @@ description: Reference values from the current config object.
 
 # Self variables
 
-`self` variables read from the current config object. Bare config paths can also resolve as self references when they match values in the config.
+`self` variables read from the current config object. The shorthand form is a bare config path such as `${service}` or `${provider.stage}`. Use `${self:...}` when you want the source to be explicit.
 
 {/* docs CONFIGORAMA_EXAMPLE id="variable-self" lang="yaml" */}
 ```yaml
-service: billing
-baseUrl: https://${self:apiHost}:${self:apiPort}
-serviceUrl: ${self:baseUrl}/${self:stage}/${self:service}
+selfExample:
+  service: billing
+  stage: ${opt:stage, "dev"}
+  apiHost: ${env:DOCS_API_HOST, "localhost"}
+  apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+  baseUrl: https://${selfExample.apiHost}:${selfExample.apiPort}
+  serviceUrl: ${selfExample.baseUrl}/${selfExample.stage}/${selfExample.service}
+  explicitServiceUrl: ${self:selfExample.baseUrl}/${self:selfExample.stage}/${self:selfExample.service}
 ```
 {/* /docs */}
 
-Self references are config-derived values, not external inputs. They can point at values that themselves contain variables, so resolution may take multiple generations.
+Bare self references are config-derived values, not external inputs. They can point at values that themselves contain variables, so resolution may take multiple generations.
 
 See [resolution model](/concepts/resolution-model) for generation behavior and [debug resolution](/guides/inspect-config#debug-resolution) for path-focused troubleshooting.

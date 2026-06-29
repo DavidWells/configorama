@@ -22,4 +22,6 @@ await configorama('config.yml', {
 | `blockCustomFunctions` | `true` in safe mode | Blocks user function code. |
 | `blockDotEnv` | `true` in safe mode | Blocks dotenv mutation. |
 
+`eval(...)` and `if(...)` are sandboxed data-flow expressions, so safe mode does not treat them like executable config. Prefer [eval variables](/variables/eval) for config-time comparisons, arithmetic, ternaries, and boolean checks before reaching for JS or TS files.
+
 See [safe inspection](/guides/inspect-config#audit-risk), [security model](/concepts/security-model), and [audit schema](/schemas/audit).

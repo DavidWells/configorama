@@ -5,7 +5,7 @@ description: Read and parse local files with file variables.
 
 # File variables
 
-`file` variables read another file and parse it when the format is supported. You can import the whole parsed value or select a nested property with `:path` or `.path` accessors.
+`file` variables read another file relative to the current config file. For parsed formats, you can import the whole value or select a nested field with `:path` or `.path` accessors.
 
 {/* docs CONFIGORAMA_EXAMPLE id="variable-file" lang="yaml" */}
 ```yaml
@@ -15,6 +15,109 @@ databasePortFromFile: ${file(./settings.yml).database.port}
 ```
 {/* /docs */}
 
-Supported parsed formats include YAML, JSON, JSON5, TOML, INI, HCL, Markdown frontmatter, JS, TS, and ESM depending on runtime support. JS, TS, and ESM file references execute code and are blocked by safe mode.
+## Field access
+
+Use `:path` or `.path` after the closing `)` to select a nested field. Both forms resolve the same field.
+
+```yaml
+databaseHost: ${file(./settings.yml):database.host}
+databasePort: ${file(./settings.yml).database.port}
+firstReplica: ${file(./settings.yml):database.replicas.0.host}
+```
+
+When no field path is provided, Configorama returns the whole parsed value.
+
+```yaml
+settings: ${file(./settings.yml)}
+database: ${file(./settings.yml):database}
+```
+
+## Parsed files
+
+`file()` can parse YAML, JSON, JSON5, TOML, INI, HCL, and Terraform JSON files.
+
+```yaml
+fromYaml: ${file(./settings.yml):database.host}
+fromJson: ${file(./settings.json):database.host}
+fromJson5: ${file(./settings.json5):database.host}
+fromToml: ${file(./settings.toml):database.host}
+fromIni: ${file(./settings.ini):database.host}
+fromHcl: ${file(./main.tf):locals.0.app_name}
+fromTerraformJson: ${file(./main.tf.json):resource.aws_lambda_function.billing.handler}
+```
+
+The field path follows the parsed object shape. For example, this Terraform file:
+
+```hcl filename="main.tf"
+locals {
+  app_name = "billing-api"
+}
+```
+
+can be read with:
+
+```yaml
+appName: ${file(./main.tf):locals.0.app_name}
+```
+
+## JavaScript files
+
+JavaScript file references execute the referenced file. Export a function and return the value you want Configorama to use.
+
+```js filename="settings.js"
+module.exports = (stage = 'dev', context) => ({
+  service: context.currentConfig.service,
+  database: {
+    host: `${stage}.db.internal`,
+    port: 5432,
+  },
+})
+```
+
+Then select fields from the returned object:
+
+```yaml
+service: billing-api
+databaseHost: ${file(./settings.js, 'prod'):database.host}
+databasePort: ${file(./settings.js, 'prod').database.port}
+```
+
+The last argument passed to the function is a context object with `options`, `originalConfig`, `currentConfig`, and `argsToPass`.
+
+## TypeScript and ESM files
+
+TypeScript and ESM file references work the same way when the runtime support is installed. TypeScript needs `tsx` or `ts-node` available.
+
+```ts filename="settings.ts"
+export default (stage = 'dev') => ({
+  api: {
+    baseUrl: `https://${stage}.api.internal`,
+  },
+  secrets: {
+    databasePassword: `/config/${stage}/database/password`,
+  },
+})
+```
+
+```yaml
+apiBaseUrl: ${file(./settings.ts, 'prod'):api.baseUrl}
+databasePasswordPath: ${file(./settings.ts, 'prod'):secrets.databasePassword}
+```
+
+```js filename="settings.mjs"
+export default (stage = 'dev') => ({
+  queue: {
+    name: `${stage}-billing-events`,
+  },
+})
+```
+
+```yaml
+queueName: ${file(./settings.mjs, 'prod'):queue.name}
+```
+
+## Safety
+
+JS, TS, and ESM file references run code, so safe mode blocks them. File references also obey safe-root restrictions when those policies are enabled.
 
 See [file references](/guides/file-references) for workflow examples and [safe inspection](/guides/inspect-config#audit-risk) for root restrictions and executable file policy.

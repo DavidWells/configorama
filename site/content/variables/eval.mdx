@@ -9,15 +9,58 @@ description: Evaluate sandboxed expressions against resolved config data.
 
 {/* docs CONFIGORAMA_EXAMPLE id="variable-eval" lang="yaml" */}
 ```yaml
+evalStage: ${opt:stage, "dev"}
 replicas: ${opt:replicas, 2 | Number}
 isScaled: ${eval(${self:replicas} > 1)}
+minReplicas: 2
+desiredReplicas: '${eval(${replicas} < ${minReplicas} ? ${minReplicas} : ${replicas})}'
+workerMemoryMb: ${eval(${replicas} * 256)}
+canDeploy: ${eval(${evalStage} == "prod" && ${replicas} >= 3)}
 ```
 {/* /docs */}
 
 Use eval for small boolean, arithmetic, or comparison expressions. Avoid using it as a substitute for a full programming language; executable config belongs in trusted JS/TS modules.
 
-<Callout type="warning">
-  Expressions cannot reach the prototype chain. Access to `constructor`, `prototype`, and `__proto__` — including dynamically computed keys like `["con" + "structor"]` — is rejected before evaluation with the `blocked_eval_escape` error code. This closes the `"".constructor.constructor(...)` route to arbitrary code, with or without safe mode.
-</Callout>
+## Common uses
+
+```yaml
+replicas: ${opt:replicas, 2 | Number}
+minReplicas: 2
+
+isScaled: ${eval(${replicas} > 1)}
+desiredReplicas: '${eval(${replicas} < ${minReplicas} ? ${minReplicas} : ${replicas})}'
+workerMemoryMb: ${eval(${replicas} * 256)}
+```
+
+## Compare inputs
+
+`eval(...)` can use resolved values from any variable source.
+
+```yaml
+stage: ${opt:stage, "dev"}
+region: ${env:AWS_REGION, "us-east-1"}
+databaseTier: ${file(./settings.yml):database.tier}
+
+isProd: ${eval(${stage} == "prod")}
+useMultiAz: ${eval(${stage} == "prod" && ${databaseTier} == "standard")}
+isPrimaryRegion: ${eval(${region} == "us-east-1")}
+```
+
+## Return values
+
+Expressions can return booleans, numbers, or strings.
+
+```yaml
+stage: ${opt:stage, "dev"}
+replicas: ${opt:replicas, 1 | Number}
+
+environmentName: '${eval(${stage} == "prod" ? "production" : "development")}'
+timeoutSeconds: '${eval(${stage} == "prod" ? 30 : 5)}'
+hasWorkers: ${eval(${replicas} > 0)}
+```
+
+## Safety
+
+`eval(...)` uses Configorama's sandboxed expression evaluator. Use it for config-time decisions without turning the config file into executable JS.
 
 See [security model](/concepts/security-model) for the data-flow classification and [dynamic configuration](/guides/dynamic-configuration) for conditional examples.

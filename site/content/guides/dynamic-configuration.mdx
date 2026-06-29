@@ -30,15 +30,15 @@ stageConfig: ${file(./config.${opt:stage}.json)}
 domain: ${param:domain, "example.test"}
 ```
 
-Conditions and expressions are data-flow helpers, not JavaScript execution:
+Conditions and expressions are data-flow helpers, not JavaScript execution. Use them for dynamic config values that do not need a trusted JS or TS module:
 
 ```yaml filename="config.yml"
-isProd: ${eval(self.stage == "prod")}
-replicas: ${if(self.isProd, 4, 1)}
+isProd: ${eval(${stage} == "prod")}
+replicas: '${eval(${isProd} ? 4 : 1)}'
 ```
 
 <Callout type="warning">
   Dynamic file targets are only fully known after their inner variables resolve. Static inspection can report the dynamic surface and partial edges, but it should not pretend every possible file path is known.
 </Callout>
 
-YAML anchors and merge keys can still be useful before variable resolution, especially for shared defaults. Use explicit type filters such as `Number`, `Boolean`, and `Json` when dynamic values must preserve non-string types. For deeper mechanics, read [the resolution model](/concepts/resolution-model) and [variable sources](/variable-sources).
+YAML anchors and merge keys can still be useful before variable resolution, especially for shared defaults. Use explicit type filters such as `Number`, `Boolean`, and `Json` when dynamic values must preserve non-string types. For deeper mechanics, read [the resolution model](/concepts/resolution-model), [eval variables](/variables/eval), and [variable sources](/variable-sources).

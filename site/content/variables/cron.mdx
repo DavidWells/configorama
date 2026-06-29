@@ -10,7 +10,17 @@ description: Convert readable schedules to cron expressions.
 {/* docs CONFIGORAMA_EXAMPLE id="variable-cron" lang="yaml" */}
 ```yaml
 everyFiveMinutes: ${cron(every 5 minutes)}
+# ^ becomes */5 * * * *
 weekdayMorning: ${cron(on monday at 9:00)}
+# ^ becomes 0 9 * * 1
+dailyMidnight: ${cron(every day)}
+# ^ becomes 0 0 * * *
+businessHours: ${cron(business hours)}
+# ^ becomes 0 9-17 * * 1-5
+monthlyBilling: ${cron(on 1st of month at 00:00)}
+# ^ becomes 0 0 1 * *
+existingCron: ${cron(15 10 * * 1-5)}
+# ^ stays 15 10 * * 1-5
 ```
 {/* /docs */}
 
