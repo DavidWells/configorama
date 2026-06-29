@@ -12,8 +12,10 @@ Configorama is useful because a config file can name the values it needs without
 Variables use `${...}` syntax. The basic shape is `${source:name, defaultValue}`: `source` says where to read from, `name` is the key to read, and the optional value after the comma is the fallback.
 
 ```yaml
+service: billing-api
 stage: ${option:stage, "dev"}
 host: ${env:DB_HOST, "localhost"}
+databaseName: ${service}-${stage}
 ```
 
 Filters can run after a value resolves. For example, `| Number` turns the fallback or environment value into a number instead of leaving it as a string.
@@ -40,6 +42,7 @@ npm install configorama
 service: billing-api
 stage: ${option:stage, "dev"}
 database:
+  name: ${service}-${stage}
   host: ${env:DB_HOST, "localhost"}
   port: ${env:DB_PORT, 5432 | Number}
 ```
@@ -59,4 +62,4 @@ database:
   host: ${env:DB_HOST | help("Database host")}
 ```
 
-You now have a resolved object where `stage` comes from the CLI option, `database.host` comes from the environment, and `database.port` comes from the fallback. Next, try [resolving a first config](/guides/first-config) or inspect the same file with the [requirements view](/guides/inspect-requirements).
+You now have a resolved object where `stage` comes from the CLI option, `database.name` is built from the existing `service` and `stage` values, `database.host` comes from the environment, and `database.port` comes from the fallback. Bare references such as `${service}` and `${stage}` are shorthand for reading from the same config object. Next, try [resolving a first config](/guides/first-config) or inspect the same file with the [requirements view](/guides/inspect-requirements).
