@@ -21,7 +21,7 @@ upper: ${opt:name, "demo" | toUpperCase}
 | `oneOf(...)` | Restrict values to an allowed set. |
 | `help(...)` | Add prompt and requirements metadata. |
 
-Functions include `split`, `join`, `length`, `merge`, `upperKeys`, and `md5`. See [debug resolution](/guides/inspect-config#debug-resolution) for failure behavior and [requirements schema](/reference/requirements-schema) for how filters appear in metadata.
+Functions include `split`, `join`, `length`, `merge`, `upperKeys`, and `md5`. See [debug resolution](/guides/inspect-config#debug-resolution) for failure behavior and [requirements schema](/schemas/requirements) for how filters appear in metadata.
 
 Standalone references preserve non-string types where the source resolves to a number, boolean, array, or object. Interpolated strings become strings unless a filter explicitly parses or coerces them.
 

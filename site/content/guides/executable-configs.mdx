@@ -50,4 +50,4 @@ configorama config.ts --stage prod --workers 4
   Do not run JS, TS, or ESM configs from untrusted repositories. Use `configorama inspect config.ts --view audit` first, and expect `--safe` to block executable config files and executable file references.
 </Callout>
 
-The same trust rule applies to `${file(./value.js)}` and `${file(./value.ts)}` references. Pure data file references are covered in [file references](/guides/file-references), while blocked execution behavior is covered in [safe inspection](/guides/inspect-config#audit-risk). For API options such as `dynamicArgs`, see [the API reference](/reference/api).
+The same trust rule applies to `${file(./value.js)}` and `${file(./value.ts)}` references. Pure data file references are covered in [file references](/guides/file-references), while blocked execution behavior is covered in [safe inspection](/guides/inspect-config#audit-risk). For API options such as `dynamicArgs`, see [the API reference](/api).

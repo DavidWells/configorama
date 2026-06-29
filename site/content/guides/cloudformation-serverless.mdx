@@ -100,4 +100,4 @@ With that setup, Configorama resolves `<<opt:stage, "dev">>` and ignores `${...}
   Do not rewrite AWS pseudo parameters or IAM policy variables such as `${aws:username}`. They are intentionally preserved for AWS, not resolved by Configorama.
 </Callout>
 
-Embedded code paths such as Lambda `Code.ZipFile`, CloudFront `FunctionCode`, shell `UserData`, and dynamic references like `{{resolve:ssm:...}}` should pass through unless a Configorama source is explicitly supported there. See [safe inspection](/guides/inspect-config#audit-risk) for trust policy, [the resolution model](/concepts/resolution-model) for pass-through behavior, and [API reference](/reference/api) for resolver settings.
+Embedded code paths such as Lambda `Code.ZipFile`, CloudFront `FunctionCode`, shell `UserData`, and dynamic references like `{{resolve:ssm:...}}` should pass through unless a Configorama source is explicitly supported there. See [safe inspection](/guides/inspect-config#audit-risk) for trust policy, [the resolution model](/concepts/resolution-model) for pass-through behavior, and [API reference](/api) for resolver settings.

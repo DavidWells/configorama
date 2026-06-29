@@ -7,7 +7,7 @@ const pages = listMdxFiles().map(readPage)
 for (const page of pages) {
   const rel = path.relative(process.cwd(), page.filePath)
   const intro = firstParagraph(page.body)
-  const isReference = page.route.startsWith('/reference/') || page.route === '/glossary'
+  const isReference = isReferenceRoute(page.route)
   const isHome = page.route === '/'
   const isIntroGuide = page.route === '/guides/get-started'
 
@@ -23,6 +23,17 @@ for (const page of pages) {
 
 function countInternalLinks(body) {
   return (body.match(/\]\((\/|\.\.?\/)[^)]+\)/g) || []).length
+}
+
+function isReferenceRoute(route) {
+  return route === '/cli' ||
+    route === '/api' ||
+    route === '/variable-sources' ||
+    route === '/filters-functions' ||
+    route === '/security-policies' ||
+    route === '/glossary' ||
+    route.startsWith('/variables') ||
+    route.startsWith('/schemas')
 }
 
 function check(condition, file, label) {

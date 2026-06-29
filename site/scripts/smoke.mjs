@@ -4,8 +4,8 @@ import path from 'node:path'
 const requiredFiles = [
   '.next/server/app/index.html',
   '.next/server/app/guides/get-started.html',
-  '.next/server/app/guides/safe-inspection.html',
-  '.next/server/app/reference/cli.html',
+  '.next/server/app/guides/inspect-config.html',
+  '.next/server/app/cli.html',
   'public/_pagefind/pagefind.js',
   'public/_pagefind/pagefind-entry.json'
 ]

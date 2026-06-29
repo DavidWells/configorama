@@ -41,4 +41,4 @@ replicas: ${if(self.isProd, 4, 1)}
   Dynamic file targets are only fully known after their inner variables resolve. Static inspection can report the dynamic surface and partial edges, but it should not pretend every possible file path is known.
 </Callout>
 
-YAML anchors and merge keys can still be useful before variable resolution, especially for shared defaults. Use explicit type filters such as `Number`, `Boolean`, and `Json` when dynamic values must preserve non-string types. For deeper mechanics, read [the resolution model](/concepts/resolution-model) and [variable sources](/reference/variable-sources).
+YAML anchors and merge keys can still be useful before variable resolution, especially for shared defaults. Use explicit type filters such as `Number`, `Boolean`, and `Json` when dynamic values must preserve non-string types. For deeper mechanics, read [the resolution model](/concepts/resolution-model) and [variable sources](/variable-sources).

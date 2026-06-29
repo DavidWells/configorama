@@ -15,15 +15,15 @@ schedule: ${cron(every 5 minutes)}
 
 | Type | Source class | Page |
 |---|---|---|
-| `env` | `user` | [Environment](/reference/variables/env) |
-| `opt` / `option` | `user` | [Options](/reference/variables/options) |
-| `param` | `user` | [Params](/reference/variables/params) |
-| `self` / bare path | `config` | [Self](/reference/variables/self) |
-| `file` | `config` | [File](/reference/variables/file) |
-| `text` | `config` | [Text](/reference/variables/text) |
-| `git` | `readonly` | [Git](/reference/variables/git) |
-| `cron` | `readonly` | [Cron](/reference/variables/cron) |
-| `eval` | `readonly` data-flow | [Eval](/reference/variables/eval) |
-| `if` | `readonly` data-flow | [If](/reference/variables/if) |
+| `env` | `user` | [Environment](/variables/env) |
+| `opt` / `option` | `user` | [Options](/variables/options) |
+| `param` | `user` | [Params](/variables/params) |
+| `self` / bare path | `config` | [Self](/variables/self) |
+| `file` | `config` | [File](/variables/file) |
+| `text` | `config` | [Text](/variables/text) |
+| `git` | `readonly` | [Git](/variables/git) |
+| `cron` | `readonly` | [Cron](/variables/cron) |
+| `eval` | `readonly` data-flow | [Eval](/variables/eval) |
+| `if` | `readonly` data-flow | [If](/variables/if) |
 
 Custom variable sources are extension points rather than core types. See [write a custom resolver](/guides/custom-resolvers) for the user-provided resolver API and [safe inspection](/guides/inspect-config#audit-risk) for execution policy.

@@ -5,19 +5,25 @@ export default {
     title: 'Home',
     display: 'hidden'
   },
+  gettingStarted: {
+    title: 'Getting started',
+    href: '/guides/get-started'
+  },
+  cli: 'CLI',
+  api: 'API',
+  'variable-sources': 'Variable sources',
+  variables: 'Variable types',
+  'filters-functions': 'Filters and functions',
+  'security-policies': 'Security policies',
+  schemas: 'Schemas',
   guides: 'Guides',
   concepts: {
     title: 'Concepts',
     theme: { typesetting: 'article' }
   },
-  reference: 'Reference',
   _separator_more: {
     type: 'separator',
     title: 'More'
-  },
-  changelog: {
-    title: 'Changelog',
-    theme: { typesetting: 'article' }
   },
   glossary: 'Glossary',
   github: {
