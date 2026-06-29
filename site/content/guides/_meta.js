@@ -1,5 +1,6 @@
 export default {
   'get-started': 'Get started',
+  'for-agents': 'For agents',
   'first-config': 'Resolve your first config',
   'setup-wizard': 'Self-configuring config',
   'inspect-config': 'Inspect config',
