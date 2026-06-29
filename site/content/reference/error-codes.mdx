@@ -29,4 +29,4 @@ configorama config.yml --safe --error-format json
 
 The `inspect` and `capabilities` commands (and the hidden `requirements`/`audit`/`graph` aliases) emit JSON errors by default; pass `--error-format human` for the boxed form. Resolve mode is the reverse: boxed by default, `--error-format json` to opt in. `configorama capabilities` exposes the full code registry under `errorCodes`.
 
-Use these codes in CI instead of scraping styled terminal output. See [debug resolution](/guides/debug-resolution) and [CLI reference](/reference/cli).
+Use these codes in CI instead of scraping styled terminal output. See [debug resolution](/guides/inspect-config#debug-resolution) and [CLI reference](/reference/cli).

@@ -5,7 +5,7 @@ description: Use dependency discovery to walk through configuring a file.
 
 # Self configuring config
 
-A Configorama file can be self configuring because Configorama can inspect it before resolving it, build a graph of the values it depends on, and use that graph to walk someone through the setup process.
+A Configorama file can be self configuring because Configorama can inspect it before resolving it, build a graph of the values it depends on, and use that graph to walk a human or agent through the setup process.
 
 That graph includes environment variables, CLI options, file references, self references, defaults, type filters, allowed values, sensitivity, and prompt text. The setup wizard turns those dependencies into questions, then resolves the config with the answers for the current run.
 
@@ -78,4 +78,4 @@ Defaults are shown as placeholders and used when the prompt is left blank. Type 
 
 For CI and agents, use `configorama inspect config.yml --view requirements` instead. The requirements output is the durable JSON contract behind the wizard, and it is easier to review, diff, and store as an artifact.
 
-See [inspect required inputs](/guides/inspect-requirements) for the JSON shape and [filters and functions](/reference/filters-functions) for `help()` and `oneOf(...)`.
+See [inspect required inputs](/guides/inspect-config#required-inputs) for the JSON shape and [filters and functions](/reference/filters-functions) for `help()` and `oneOf(...)`.

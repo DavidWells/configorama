@@ -62,4 +62,4 @@ database:
   host: ${env:DB_HOST | help("Database host")}
 ```
 
-You now have a resolved object where `stage` comes from the CLI option, `database.name` is built from the existing `service` and `stage` values, `database.host` comes from the environment, and `database.port` comes from the fallback. Bare references such as `${service}` and `${stage}` are shorthand for reading from the same config object. Next, try the [setup wizard](/guides/setup-wizard), [resolve a first config](/guides/first-config), or inspect the same file with the [requirements view](/guides/inspect-requirements).
+You now have a resolved object where `stage` comes from the CLI option, `database.name` is built from the existing `service` and `stage` values, `database.host` comes from the environment, and `database.port` comes from the fallback. Bare references such as `${service}` and `${stage}` are shorthand for reading from the same config object. Next, try the [setup wizard](/guides/setup-wizard), [resolve a first config](/guides/first-config), or inspect the same file with the [requirements view](/guides/inspect-config#required-inputs).

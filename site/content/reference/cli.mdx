@@ -78,4 +78,4 @@ configorama capabilities | jq '.commands, .errorCodes, .formats'
 
 It returns `name`, `version`, `schemaVersion`, `commands`, `views`, `formats`, `errorCodes`, `exitCodes`, and `flags`. Exit codes are `0` for success and `1` for any error, with the specific category in the JSON `error.code` field.
 
-See [structured error codes](/reference/error-codes) and [safe inspection](/guides/safe-inspection).
+See [structured error codes](/reference/error-codes) and [safe inspection](/guides/inspect-config#audit-risk).
