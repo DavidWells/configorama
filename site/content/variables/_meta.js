@@ -12,6 +12,6 @@ export default {
   if: 'If',
   'bring-your-own': {
     title: 'Bring your own',
-    href: '/guides/custom-resolvers'
+    href: '/guides/custom-variable-sources'
   }
 }

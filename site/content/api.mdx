@@ -55,4 +55,14 @@ console.log(result.metadata.fileDependencies.resolvedPaths)
 
 Compatibility helpers still exist for older consumers: `analyze`, `introspect`, `audit`, `graph`, `buildVariableSyntax`, and the `Configorama` class. New code should start with `configorama`, `configorama.sync`, or `configorama.inspect`.
 
-Settings include `options`, `configDir`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, `view` (for `inspect`), and legacy compatibility flags. Read [security policies](/security-policies) and [requirements schema](/schemas/requirements).
+Use `buildVariableSyntax(...)` with the `syntax` setting when `${...}` conflicts with another platform:
+
+```js
+const { buildVariableSyntax } = configorama
+
+const config = await configorama('config.yml', {
+  syntax: buildVariableSyntax('<<', '>>')
+})
+```
+
+Settings include `options`, `configDir`, `syntax`, `variableSources`, `filters`, `functions`, `returnMetadata`, `safeMode`, `allowedFileRoots`, `view` (for `inspect`), and legacy compatibility flags. Read [bring your own syntax](/guides/bring-your-own-syntax), [security policies](/security-policies), and [requirements schema](/schemas/requirements).

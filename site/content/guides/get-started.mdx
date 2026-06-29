@@ -11,6 +11,16 @@ Configorama is useful because a config file can name the values it needs without
 
 Variables use `${...}` syntax. The basic shape is `${source:name, defaultValue}`: `source` says where to read from, `name` is the key to read, and the optional value after the comma is the fallback.
 
+Supported formats:
+
+| Use case | Formats |
+|---|---|
+| Data config | YAML, JSON, JSON5, TOML, INI, HCL |
+| Content metadata | Markdown frontmatter |
+| Trusted executable config | JS, TS, ESM |
+
+Use data formats for normal config, [eval variables](/variables/eval) for small decisions, and [JS or TS config](/guides/executable-configs) only when you intentionally trust executable code. If `${...}` conflicts with another platform, [bring your own syntax](/guides/bring-your-own-syntax).
+
 ```yaml
 service: billing-api
 stage: ${option:stage, "dev"}

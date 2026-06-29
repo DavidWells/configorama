@@ -7,7 +7,7 @@ description: Trust boundaries for data config, expressions, and executable confi
 
 Configorama treats config surfaces by risk, not just by source. Environment variables and CLI options are user inputs, file and text references read local files, git variables spawn git commands, `eval` and `if` evaluate sandboxed expressions, and JavaScript or TypeScript file references execute code.
 
-This distinction matters because not every dynamic feature is code execution. Use [eval variables](/variables/eval) for config-time logic such as comparisons, arithmetic, boolean gates, and ternaries. The expression evaluator is sandboxed and classified as data-flow risk; JS and TS file references, custom resolvers, custom functions, and dotenv mutation are the surfaces safe mode blocks.
+This distinction matters because not every dynamic feature is code execution. Use [eval variables](/variables/eval) for config-time logic such as comparisons, arithmetic, boolean gates, and ternaries. The expression evaluator is sandboxed and classified as data-flow risk; JS and TS file references, custom variable sources, custom functions, and dotenv mutation are the surfaces safe mode blocks.
 
 ```mermaid
 graph TD

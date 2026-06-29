@@ -101,7 +101,7 @@ The graph can show that `database` depends on a file reference and `opt:stage`; 
 
 ## Audit risk
 
-The audit view is for repositories you do not automatically trust. It reports risk surfaces before resolution, especially executable config, JS/TS file references, custom resolvers, dotenv loading, and file reads.
+The audit view is for repositories you do not automatically trust. It reports risk surfaces before resolution, especially executable config, JS/TS file references, custom variable sources, dotenv loading, and file reads.
 
 ```sh
 configorama inspect config.yml --view audit
@@ -127,7 +127,7 @@ In safe mode, the YAML file read can be allowed by root policy, while the JavaSc
   `eval` and `if` are classified as sandboxed data-flow expressions, not JavaScript execution. JS/TS file references are the high-risk execution surface.
 </Callout>
 
-Safe mode defaults file and text references to the config directory unless you pass allowed roots. Root restrictions block traversal outside configured roots, and safe mode also blocks dotenv mutation, custom resolvers, and custom functions unless policy explicitly permits them.
+Safe mode defaults file and text references to the config directory unless you pass allowed roots. Root restrictions block traversal outside configured roots, and safe mode also blocks dotenv mutation, custom variable sources, and custom functions unless policy explicitly permits them.
 
 ## Debug resolution
 

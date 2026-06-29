@@ -47,7 +47,7 @@ database:
 .secrets/
 ```
 
-That keeps the dependency visible without committing the value. If secrets live somewhere else, provide a [custom resolver](/guides/custom-resolvers) instead of a file reference. Custom resolvers can read from local stores such as the macOS Keychain or 1Password CLI, or from remote stores such as AWS Secrets Manager, GCP Secret Manager, Vault, or your own internal service.
+That keeps the dependency visible without committing the value. If secrets live somewhere else, provide a [custom variable source](/guides/custom-variable-sources) instead of a file reference. Custom variable sources can read from local stores such as the macOS Keychain or 1Password CLI, or from remote stores such as AWS Secrets Manager, GCP Secret Manager, Vault, or your own internal service.
 
 <Callout type="warning">
   JavaScript and TypeScript file references execute code. Use plain YAML, JSON, TOML, INI, HCL, Markdown, or text files for untrusted inspection. If you only need derived values, prefer [eval variables](/variables/eval); read [executable config](/guides/executable-configs) before using JS/TS file refs.

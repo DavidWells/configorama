@@ -72,29 +72,7 @@ const template = await configorama('serverless.yml', {
 
 ## Bring your own syntax
 
-Some teams avoid `${...}` entirely so Configorama cannot collide with CloudFormation, Serverless, shell, or framework placeholders. Use `syntax` when a project wants a different wrapper:
-
-```js filename="resolve-template.js"
-const configorama = require('configorama')
-const { buildVariableSyntax } = configorama
-
-const template = await configorama('serverless.yml', {
-  syntax: buildVariableSyntax('<<', '>>')
-})
-```
-
-```yaml filename="serverless.yml"
-provider:
-  stage: <<opt:stage, "dev">>
-
-resources:
-  Outputs:
-    Endpoint:
-      Value:
-        Fn::Sub: https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com
-```
-
-With that setup, Configorama resolves `<<opt:stage, "dev">>` and ignores `${...}` syntax completely. You can also pass a custom regular expression when a project already has its own wrapper convention.
+Some teams avoid `${...}` entirely so Configorama cannot collide with CloudFormation, Serverless, shell, or framework placeholders. Use [bring your own syntax](/guides/bring-your-own-syntax) when a project wants `<<...>>`, a double-curly wrapper, or another wrapper for Configorama variables.
 
 <Callout type="warning">
   Do not rewrite AWS pseudo parameters or IAM policy variables such as `${aws:username}`. They are intentionally preserved for AWS, not resolved by Configorama.

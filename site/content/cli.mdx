@@ -47,6 +47,8 @@ Without `--view`, `inspect` returns all three projections in one object:
 | `--allow-unknown` | boolean | Allow unknown variables to pass through. |
 | `--allow-undefined` | boolean | Allow undefined values in the final output. |
 
+The CLI uses Configorama's configured variable syntax. If `${...}` belongs to another platform in your project, set a custom syntax in the API layer and read [bring your own syntax](/guides/bring-your-own-syntax) for wrapper examples.
+
 Path extraction can appear after the file path or before it, depending on the command shape the user prefers:
 
 ```sh

@@ -1,13 +1,13 @@
 ---
-title: Write a custom resolver
+title: Write a custom variable source
 description: Add a project-specific variable source to Configorama.
 ---
 
-# Write a custom resolver
+# Write a custom variable source
 
-Custom resolvers are for teams that need values from a source Configorama does not ship with, such as an internal secret store or deployment registry. This guide shows the shape of a resolver and where safe mode changes the trust model.
+Custom variable sources are for teams that need values from a source Configorama does not ship with, such as an internal secret store or deployment registry. This guide shows the shape of a source and where safe mode changes the trust model.
 
-The extension point exists so the core resolver can stay framework-agnostic. Instead of adding every possible platform source to Configorama itself, applications can provide a small resolver object with a type, match rule, and async resolver function.
+The extension point exists so the core resolver can stay framework-agnostic. Instead of adding every possible platform source to Configorama itself, applications can provide a small source object with a type, match rule, and async resolver function.
 
 ```mermaid
 graph LR
@@ -34,7 +34,7 @@ await configorama('config.yml', { variableSources: [vault] })
 ```
 
 <Callout type="warning">
-  Custom resolvers are blocked by safe mode because they are user-provided executable code. Audit output reports them as `custom_extension` risk.
+  Custom variable sources are blocked by safe mode because they are user-provided executable code. Audit output reports them as `custom_extension` risk.
 </Callout>
 
 Read [variable sources](/variable-sources) for built-in resolver behavior and [security policies](/security-policies) for safe-mode controls. For API details, see [the API reference](/api).
