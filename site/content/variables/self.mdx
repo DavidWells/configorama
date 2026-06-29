@@ -16,6 +16,15 @@ stage: ${opt:stage, "dev"}
 endpoint: https://api.example.com/${stage}
 ```
 
+Dot paths work the same way for nested values.
+
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-east-1"}
+deploymentName: ${provider.stage}-${provider.region}
+```
+
 ## Explicit self
 
 Use `self:` when you want the reference source to be obvious.

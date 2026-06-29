@@ -16,4 +16,32 @@ region: ${option:region, "us-east-1"}
 
 Use options for invocation-specific values such as `stage`, `region`, `profile`, or output mode. Options are user inputs, so they are reported by requirements and analyze output when required.
 
+## CLI example
+
+Given this config:
+
+```yaml filename="config.yml"
+stage: ${opt:stage, "dev"}
+region: ${option:region, "us-east-1"}
+serviceUrl: https://api.example.com/${stage}/${region}
+```
+
+Pass option values as normal CLI flags:
+
+```sh
+configorama config.yml --stage prod --region eu-west-2
+```
+
+It resolves to:
+
+```json
+{
+  "stage": "prod",
+  "region": "eu-west-2",
+  "serviceUrl": "https://api.example.com/prod/eu-west-2"
+}
+```
+
+If a flag is missing, Configorama uses the fallback in the variable expression.
+
 See [CLI reference](/cli) for command syntax and [API reference](/api) for programmatic options.
