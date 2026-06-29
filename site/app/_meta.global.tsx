@@ -9,12 +9,12 @@ export default {
     title: 'Getting started',
     href: '/guides/get-started'
   },
+  cli: 'CLI',
+  api: 'API',
   forAgents: {
     title: 'For agents',
     href: '/guides/for-agents'
   },
-  cli: 'CLI',
-  api: 'API',
   'variable-sources': 'Variable sources',
   variables: 'Variable types',
   'filters-functions': 'Filters and functions',

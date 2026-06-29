@@ -60,6 +60,30 @@ I inspected config.yml and need these values before I can resolve it:
 Please provide the values or tell me where they should come from.
 ```
 
+## If resolution fails
+
+An agent can also try resolution and let Configorama report what is still missing. When a required value is not available, the CLI exits non-zero and returns a useful error instead of silently leaving a bad config behind.
+
+Use JSON errors when another tool or agent needs to branch on the result:
+
+```sh
+npx --yes configorama config.yml --error-format json
+```
+
+A missing environment value has this shape:
+
+```json
+{
+  "error": {
+    "code": "missing_env",
+    "message": "Unable to resolve config variable \"${env:STRIPE_SECRET_KEY}\".\n\nIn file config.yml at line 12, at location \"secrets.stripe\"\n\nFix this reference, your inputs and/or provide a valid fallback value.\n\nExample of setting a fallback value: ${env:STRIPE_SECRET_KEY, \"fallbackValue\"}\n",
+    "details": {}
+  }
+}
+```
+
+Treat the error as another handoff signal. Inspect requirements, ask for the named value, then retry with the supplied environment variable, option, param, file, or safe-mode approval. Human error output is useful in a terminal; agents and CI should prefer `--error-format json` and branch on `error.code`.
+
 ## Read the dependency graph
 
 The graph view is a directed graph of config paths, variables, files, executable surfaces, and relationships. For normal acyclic config, this gives an agent the order of dependencies it needs to understand before editing or resolving the file.
