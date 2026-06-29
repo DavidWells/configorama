@@ -1,18 +1,22 @@
 ---
 title: Run the setup wizard
-description: Prompt for config inputs interactively before resolving a file.
+description: Use dependency discovery to walk through configuring a file.
 ---
 
 # Run the setup wizard
 
-The setup wizard is for local setup and one-off operator runs. It reads the same requirements data used by `inspect`, prompts for the values that still need input, then resolves the config with those answers for the current run.
+The setup wizard is for local setup and one-off operator runs. Configorama can inspect a file before resolving it, build a graph of the values it depends on, and use that graph to walk someone through configuring the file.
+
+That graph includes environment variables, CLI options, file references, self references, defaults, type filters, allowed values, sensitivity, and prompt text. The wizard turns those dependencies into questions, then resolves the config with the answers for the current run.
 
 ```mermaid
 graph LR
-  A[config.yml] --> B[requirements]
-  B --> C[setup prompts]
-  C --> D[current run inputs]
-  D --> E[resolved config]
+  A[config.yml] --> B[dependency graph]
+  B --> C[required inputs]
+  B --> D[types and defaults]
+  C --> E[setup prompts]
+  D --> E
+  E --> F[resolved config]
 ```
 
 ```sh
@@ -33,7 +37,7 @@ configorama config.yml --setup
 
 ## Add prompt text
 
-The wizard gets better when the config describes where values come from. Use `help()` for short prompt text, or use comments when the prompt needs examples, source notes, grouping, or sensitivity.
+The wizard is strongest when the config explains its own dependencies. Use `help()` for short prompt text, or use comments when the prompt needs examples, source notes, grouping, or sensitivity.
 
 ```yaml filename="config.yml"
 service: billing-api
@@ -51,11 +55,11 @@ secrets:
   stripeKey: ${env:STRIPE_SECRET_KEY}
 ```
 
-In this example, `stage` becomes a select prompt because `oneOf(...)` defines the allowed values. `database.port` is validated as a number. `secrets.stripeKey` is treated as sensitive because the annotation says so, and names such as `secret`, `password`, `token`, and `key` are also masked by default.
+In this example, `stage` becomes a select prompt because `oneOf(...)` defines the allowed values in the dependency graph. `database.port` is validated as a number. `secrets.stripeKey` is treated as sensitive because the annotation says so, and names such as `secret`, `password`, `token`, and `key` are also masked by default.
 
 ## What it prompts for
 
-The wizard groups inputs by source:
+The wizard groups dependency inputs by source:
 
 | Source | Prompt behavior |
 |---|---|
@@ -64,7 +68,7 @@ The wizard groups inputs by source:
 | `file` / `text` | Prompts for file-backed inputs when they appear in requirements output. |
 | `self` and bare config refs | Prompts only when the referenced config value is not already resolved. |
 
-Defaults are shown as placeholders and used when the prompt is left blank. Type filters such as `Number`, boolean filters, JSON/object filters, and array filters are used for validation and normalization.
+Defaults are shown as placeholders and used when the prompt is left blank. Type filters such as `Number`, boolean filters, JSON/object filters, and array filters are used for validation and normalization, so the prompt behavior follows the same dependency data that resolution uses.
 
 <Callout type="warning">
   The wizard fills values for the current resolution run only. It does not edit `config.yml`, write `.env` files, or persist secrets.
