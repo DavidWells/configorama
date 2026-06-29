@@ -16,4 +16,84 @@ databasePort: ${param:databasePort, 5432 | Number}
 
 Use params when a value belongs to the config contract but should not be treated as a raw CLI option. This mirrors Serverless-style stage parameters and keeps reusable deployment inputs explicit.
 
+## Complete example
+
+```yaml filename="config.yml"
+stage: ${opt:stage, "dev"}
+service: billing-api
+
+domain: ${param:domain}
+environmentName: ${param:environment}
+
+database:
+  host: ${param:dbHost}
+  port: ${param:databasePort, 5432 | Number}
+
+serviceUrl: https://${domain}/${stage}/${service}
+
+stages:
+  dev:
+    params:
+      domain: dev.example.test
+      environment: development
+      dbHost: localhost
+  prod:
+    params:
+      domain: billing.example.com
+      environment: production
+      dbHost: prod-db.internal
+  default:
+    params:
+      databasePort: 5432
+```
+
+Run it with a stage and any caller-supplied overrides:
+
+```sh
+configorama config.yml --stage prod --param domain=preview.example.com --param databasePort=6543
+```
+
+The CLI params win over `stages.prod.params`, and `stages.default.params` fills anything the selected stage does not define.
+
+```json
+{
+  "stage": "prod",
+  "service": "billing-api",
+  "domain": "preview.example.com",
+  "environmentName": "production",
+  "database": {
+    "host": "prod-db.internal",
+    "port": 6543
+  },
+  "serviceUrl": "https://preview.example.com/prod/billing-api"
+}
+```
+
+The same input shape works through the API:
+
+```js filename="resolve.js"
+const configorama = require('configorama')
+
+const config = await configorama('config.yml', {
+  options: {
+    stage: 'prod',
+    param: [
+      'domain=preview.example.com',
+      'databasePort=6543',
+    ],
+  },
+})
+```
+
+## Lookup order
+
+For `${param:name}`, Configorama checks:
+
+1. `--param name=value` or `options.param`
+2. `stages.<stage>.params.name`
+3. `stages.default.params.name`
+4. legacy `params.<stage>.name`
+5. legacy `params.default.name`
+6. the fallback in the variable, such as `${param:name, "fallback"}`
+
 See [variable sources](/variable-sources) for source classes and [dynamic configuration](/guides/dynamic-configuration) for stage-driven examples.
