@@ -7,6 +7,19 @@ description: Choose values with sandboxed conditional expressions.
 
 `if(...)` is the conditional expression helper. It uses the same sandboxed expression engine as `eval`, but is written for readable ternary-style config choices.
 
+## Simple condition
+
+Use `if(...)` by itself when you want a boolean.
+
+```yaml
+stage: ${opt:stage, "dev"}
+isProd: ${if(${stage} === "prod")}
+```
+
+## Choose between values
+
+Quote ternary expressions in YAML because the `:` is part of the expression.
+
 {/* docs CONFIGORAMA_EXAMPLE id="variable-if" lang="yaml" */}
 ```yaml
 provider:
@@ -15,6 +28,55 @@ environmentName: '${if(provider.stage === "prod") ? "production" : "development"
 workerCount: '${if(provider.stage === "prod") ? 4 : 1}'
 ```
 {/* /docs */}
+
+## Nested values
+
+Conditions can read nested config paths.
+
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+
+database:
+  local:
+    host: localhost
+  prod:
+    host: prod-db.internal
+
+databaseHost: '${if(provider.stage === "prod") ? database.prod.host : database.local.host}'
+```
+
+## Multiple checks
+
+Use normal boolean operators for compound conditions.
+
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-east-1"}
+
+isPrimaryProd: ${if(provider.stage === "prod" && provider.region === "us-east-1")}
+logRetentionDays: '${if(provider.stage === "prod" || provider.stage === "staging") ? 30 : 7}'
+```
+
+## Nulls and arrays
+
+The selected branch can return non-string values.
+
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+
+roles:
+  prod: arn:aws:iam::123456789012:role/prod-app
+
+tags:
+  prod: ["api", "prod"]
+  dev: ["api", "dev"]
+
+roleArn: '${if(provider.stage === "prod") ? roles.prod : null}'
+activeTags: '${if(provider.stage === "prod") ? tags.prod : tags.dev}'
+```
 
 Use `if` when a value depends on a small condition. It can return strings, numbers, booleans, nulls, arrays, or objects when the expression resolves that way.
 

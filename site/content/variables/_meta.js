@@ -9,5 +9,9 @@ export default {
   git: 'Git',
   cron: 'Cron',
   eval: 'Eval',
-  if: 'If'
+  if: 'If',
+  'bring-your-own': {
+    title: 'Bring your own',
+    href: '/guides/custom-resolvers'
+  }
 }
