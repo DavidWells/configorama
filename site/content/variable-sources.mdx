@@ -5,6 +5,8 @@ description: Built-in variable source syntax and source classes.
 
 # Variable sources
 
+Variable sources describe where each dynamic value comes from. Use this page when you want the syntax for each built-in source in one place, then open the per-variable pages when you need edge cases or policy details.
+
 ```yaml
 stage: ${opt:stage, "dev"}
 secret: ${env:API_KEY}
@@ -21,19 +23,151 @@ fileData: ${file(./config.json):key}
 | File | `${file(./path.yml)}` | `config` | Reads and parses a local file. |
 | Text | `${text(./script.txt)}` | `config` | Reads raw text. |
 | Git | `${git:branch}` | `readonly` | Spawns git commands. |
-| Eval and if | `${eval(...)}`, `${if(...)}` | `readonly` | Sandboxed expression data-flow. |
+| Cron | `${cron(...)}` | `readonly` | Converts readable schedules to cron strings. |
+| Eval | `${eval(...)}` | `readonly` data-flow | Evaluates sandboxed expressions. |
+| If | `${if(...)}` | `readonly` data-flow | Chooses values with sandboxed conditions. |
 
 `opt:` and `option:` are aliases for CLI/API options. `param:` is a separate named parameter source, which is useful when a config has stage params or caller-supplied values that should not be confused with raw CLI flags.
 
+## Environment
+
+Use `env` for values supplied by the process environment. Add a fallback when local development can proceed without the variable.
+
+```yaml
+apiHost: ${env:DOCS_API_HOST, "localhost"}
+apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+```
+
+See [environment variables](/variables/env).
+
+## Options
+
+Use `opt` or `option` for invocation-specific CLI flags or API `options` values.
+
 ```yaml
 stage: ${opt:stage, "dev"}
-stageAgain: ${option:stage, "dev"}
-domain: ${param:domain, "example.test"}
-branch: ${git:branch, "main"}
+region: ${option:region, "us-east-1"}
 ```
+
+See [option variables](/variables/options).
+
+## Params
+
+Use `param` for named parameters that belong to the config contract but should not be treated as raw CLI flags.
+
+```yaml
+domain: ${param:domain, "example.test"}
+databasePort: ${param:databasePort, 5432 | Number}
+```
+
+See [param variables](/variables/params).
+
+## Self
+
+Use `self` for values already present in the current config object. Bare paths can also resolve as self references when they match config values.
+
+```yaml
+service: billing
+stage: ${opt:stage, "dev"}
+baseUrl: https://${self:apiHost}:${self:apiPort}
+serviceUrl: ${baseUrl}/${stage}/${service}
+```
+
+See [self variables](/variables/self).
+
+## File
+
+Use `file(...)` to import another local file. You can read the whole parsed file or select a nested property.
+
+```yaml
+settings: ${file(./settings.yml)}
+databaseHost: ${file(./settings.yml):database.host}
+databasePortFromFile: ${file(./settings.yml).database.port}
+```
+
+See [file variables](/variables/file).
+
+## Text
+
+Use `text(...)` when you need raw file contents instead of parsed YAML, JSON, TOML, or another structured format.
+
+```yaml
+template: ${text(./message.txt)}
+```
+
+See [text variables](/variables/text).
+
+## Git
+
+Use `git` for readonly repository metadata. Add fallbacks when the config may resolve outside a git checkout.
+
+```yaml
+branchName: ${git:branch, "main"}
+shortSha: ${git:sha1, "unknown"}
+```
+
+See [git variables](/variables/git).
+
+## Cron
+
+Use `cron(...)` to convert readable schedules into cron expressions.
+
+```yaml
+everyFiveMinutes: ${cron(every 5 minutes)}
+weekdayMorning: ${cron(on monday at 9:00)}
+```
+
+See [cron variables](/variables/cron).
+
+## Eval
+
+Use `eval(...)` for small sandboxed expressions against resolved config data.
+
+```yaml
+replicas: ${opt:replicas, 2 | Number}
+isScaled: ${eval(${self:replicas} > 1)}
+```
+
+See [eval variables](/variables/eval).
+
+## If
+
+Use `if(...)` for readable conditional choices.
+
+```yaml
+provider:
+  stage: ${opt:stage, "dev"}
+environmentName: '${if(provider.stage === "prod") ? "production" : "development"}'
+workerCount: '${if(provider.stage === "prod") ? 4 : 1}'
+```
+
+See [if variables](/variables/if).
+
+## Custom sources
 
 Custom sources can match by prefix, regex, or function and can expose metadata for downstream inspection. Treat them as executable extensions in safe mode because the resolver function is user-provided code.
 
-See [security model](/concepts/security-model) and [filters and functions](/filters-functions).
+```js filename="resolve-config.js"
+const configorama = require('configorama')
 
-For per-source details and synced examples, use the [variable type reference](/variables).
+const config = await configorama('config.yml', {
+  variableSources: [
+    {
+      type: 'secret',
+      source: 'remote',
+      prefix: 'secret',
+      match: /^secret:/,
+      resolver: async variable => {
+        const key = variable.replace(/^secret:/, '')
+        return readSecretFromStore(key)
+      }
+    }
+  ]
+})
+```
+
+```yaml filename="config.yml"
+apiKey: ${secret:payments/api-key}
+```
+
+See [write a custom resolver](/guides/custom-resolvers), [security model](/concepts/security-model), and [filters and functions](/filters-functions).
