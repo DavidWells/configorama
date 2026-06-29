@@ -18,7 +18,6 @@ export default {
   'variable-sources': 'Variable sources',
   variables: 'Variable types',
   'filters-functions': 'Filters and functions',
-  'security-policies': 'Security policies',
   schemas: 'Schemas',
   guides: 'Guides',
   concepts: {
