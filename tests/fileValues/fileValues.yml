@@ -82,6 +82,13 @@ jsonPartialThirdLevelKeyDot: ${file(./_jsonpartial.json).nested.again.value}
 jsonPartialArrayRefDot: ${file(./_jsonpartial.json).array.0}
 
 ########################
+# Values from .env files
+########################
+envFullFile: ${file(./.env)}
+envPartialDot: ${file(./.env).WSS_URL}
+envPartialColon: ${file(./.env):API_KEY}
+
+########################
 # Dynamic File Names
 ########################
 # Here we resolve the inner config variable then read its file

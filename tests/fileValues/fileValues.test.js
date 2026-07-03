@@ -179,6 +179,22 @@ test('jsonPartialArrayRefDot -> ${file(./_jsonpartial.json).array.0}', () => {
   assert.equal(config.jsonPartialArrayRefDot, 'zero')
 })
 
+test('envFullFile -> ${file(./.env)}', () => {
+  assert.equal(config.envFullFile, {
+    WSS_URL: 'wss://example.test/events',
+    API_KEY: 'test-api-key',
+    FEATURE_ENABLED: true
+  })
+})
+
+test('envPartialDot -> ${file(./.env).WSS_URL}', () => {
+  assert.equal(config.envPartialDot, 'wss://example.test/events')
+})
+
+test('envPartialColon -> ${file(./.env):API_KEY}', () => {
+  assert.equal(config.envPartialColon, 'test-api-key')
+})
+
 test('stageSpecificViaFlag -> ${file(./config.${opt:stage}.json)}', () => {
   assert.equal(config.stageSpecificViaFlag, {
     'CREDS': 'dev creds here'

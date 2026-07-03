@@ -49,6 +49,20 @@ function isNestedFilterArgument(property, matchedString) {
   const closeParenIdx = property.indexOf(')', matchIdx)
   return pipeIdx !== -1 && matchIdx > pipeIdx && openParenIdx > pipeIdx && closeParenIdx > matchIdx
 }
+
+function resolveConfigFilePath(filePath) {
+  const absolutePath = path.resolve(filePath)
+  try {
+    return fs.realpathSync(absolutePath)
+  } catch (err) {
+    return absolutePath
+  }
+}
+
+function getConfigFileDirectory(filePath) {
+  return path.dirname(resolveConfigFilePath(filePath))
+}
+
 const dotProp = require('dot-prop')
 
 function resolveStaticFilterArg(arg, config) {
@@ -212,7 +226,7 @@ class Configorama {
     }
 
     this.safetyPolicy = normalizeSafetyPolicy(this.settings, {
-      configDir: options.configDir || (typeof fileOrObject === 'string' ? path.dirname(path.resolve(fileOrObject)) : process.cwd())
+      configDir: options.configDir || (typeof fileOrObject === 'string' ? getConfigFileDirectory(fileOrObject) : process.cwd())
     })
 
     assertCustomResolversAllowed(options.variableSources, this.safetyPolicy)
@@ -317,7 +331,7 @@ class Configorama {
       assertSafeConfigInput(fileOrObject, this.safetyPolicy)
       // read and parse file
       const fileContents = fs.readFileSync(fileOrObject, 'utf-8')
-      const fileDirectory = path.dirname(path.resolve(fileOrObject))
+      const fileDirectory = getConfigFileDirectory(fileOrObject)
       const fileType = path.extname(fileOrObject)
 
       this.configFilePath = fileOrObject

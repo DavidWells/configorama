@@ -85,12 +85,16 @@ function parseFileContents(content, filePath) {
   if (ext === 'toml' || ext === 'tml') {
     return TOML.parse(content)
   }
-  if (ext === 'ini') {
+  if (isIniLikeExtension(ext)) {
     return INI.parse(content)
   }
 
   // Return raw content for other files
   return content
+}
+
+function isIniLikeExtension(ext) {
+  return ext === 'ini' || ext === 'env'
 }
 
 /**
@@ -407,7 +411,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       if (fileExtension === 'toml' || fileExtension === 'tml') {
         valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
       }
-      if (fileExtension === 'ini') {
+      if (isIniLikeExtension(fileExtension)) {
         valueToPopulate = INI.toJson(valueToPopulate)
       }
       if (fileExtension === 'tf' || fileExtension === 'hcl') {
@@ -447,7 +451,7 @@ Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
       return Promise.resolve(valueToPopulate)
     }
 
-    if (fileExtension === 'ini') {
+    if (isIniLikeExtension(fileExtension)) {
       valueToPopulate = INI.parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }
