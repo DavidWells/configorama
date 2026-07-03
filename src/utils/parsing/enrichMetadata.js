@@ -5,6 +5,7 @@ const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVaria
 const { preResolveString, preResolveSingle } = require('../resolution/preResolveVariable')
 const { parseOneOfFilter } = require('../filters/oneOf')
 const { extractComment } = require('./extractComment')
+const { applyDotenvFileRefMetadata, normalizeDotenvFileVariable } = require('../security/dotenvFileRefs')
 
 // Type filters that indicate expected value types
 const TYPE_FILTERS = ['Boolean', 'String', 'Number', 'Array', 'Object', 'Json']
@@ -107,6 +108,12 @@ function getSourceForType(variableType, variableTypes) {
   if (!variableTypes || !variableType) return undefined
   const typeDef = variableTypes.find(vt => vt.type === variableType)
   return typeDef?.source
+}
+
+function sameFileRefPath(left, right) {
+  if (!left || !right) return false
+  const normalize = value => String(value).replace(/^\.\//, '')
+  return normalize(left) === normalize(right)
 }
 
 /**
@@ -388,6 +395,7 @@ async function enrichMetadata(
             containsVariables: !!ref.hasInnerVariable,
             exists: details.exists,
           }
+          applyDotenvFileRefMetadata(confDetails, details)
           if (ref.pattern) {
             confDetails.pattern = ref.pattern
           }
@@ -478,7 +486,7 @@ async function enrichMetadata(
     }
 
     // Normalize file() and text() references
-    baseVar = normalizeFileVariable(baseVar)
+    baseVar = normalizeDotenvFileVariable(baseVar) || normalizeFileVariable(baseVar)
 
     if (!uniqueVariablesMap.has(baseVar)) {
       uniqueVariablesMap.set(baseVar, {
@@ -536,7 +544,7 @@ async function enrichMetadata(
             const siblingBaseVar = detail.valueBeforeFallback || detail.variable
 
             // Normalize file/text references for sibling too
-            const normalizedSiblingVar = normalizeFileVariable(siblingBaseVar)
+            const normalizedSiblingVar = normalizeDotenvFileVariable(siblingBaseVar) || normalizeFileVariable(siblingBaseVar)
 
             // Create or get entry for this sibling variable
             if (!uniqueVariablesMap.has(normalizedSiblingVar)) {
@@ -665,7 +673,7 @@ async function enrichMetadata(
         }
 
         // Normalize file paths after variable substitution
-        resolvedVariable = normalizeFileVariable(resolvedVariable)
+        resolvedVariable = normalizeDotenvFileVariable(resolvedVariable) || normalizeFileVariable(resolvedVariable)
 
         // Update the variable to the resolved version and update map key
         if (resolvedVariable !== baseVar) {
@@ -712,13 +720,22 @@ async function enrichMetadata(
 
         if (!hasVariables) {
           // Look up in fileRefsFound to see if file exists
-          const fileRef = fileRefsFound.find(ref => ref.relativePath === filePath)
+          const fileRef = fileRefsFound.find(ref => sameFileRefPath(ref.relativePath, filePath))
           if (fileRef) {
             entry.fileExists = fileRef.exists
+            applyDotenvFileRefMetadata(entry, {
+              ...fileRef,
+              variable: entry.variable,
+            })
           } else if (configPath) {
             const thePath = path.resolve(path.dirname(configPath), filePath)
             const fileExists = fs.existsSync(thePath)
             entry.fileExists = fileExists
+            applyDotenvFileRefMetadata(entry, {
+              filePath: thePath,
+              relativePath: filePath,
+              variable: entry.variable,
+            })
           }
         }
       }

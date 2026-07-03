@@ -123,6 +123,8 @@ unsafeData: [redacted]
 
 In safe mode, the YAML file read can be allowed by root policy, while the JavaScript file reference is blocked because loading it would execute code. Audit mode can report that executable surface before resolution.
 
+Dotenv file references are reported as sensitive local file reads. `${file(.env)}` is medium severity because it imports the whole dotenv file; `${file(.env).API_KEY}` and `${file(.env):API_KEY}` are low severity key reads with `sensitive: true`, `sensitivityReason: "dotenv_file"`, and `dotenvReadScope: "key"`. Audit reports the reference shape, not the resolved secret value.
+
 <Callout type="warning">
   `eval` and `if` are classified as sandboxed data-flow expressions, not JavaScript execution. JS/TS file references are the high-risk execution surface.
 </Callout>

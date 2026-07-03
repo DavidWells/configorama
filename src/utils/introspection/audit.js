@@ -12,7 +12,7 @@ function buildAuditReport(introspection, options = {}) {
 
   for (const node of introspection.nodes || []) {
     if (!node.risk || node.risk === 'none') continue
-    findings.push({
+    const finding = {
       id: node.id,
       severity: node.severity || severityForRisk(node.risk),
       risk: node.risk,
@@ -22,7 +22,12 @@ function buildAuditReport(introspection, options = {}) {
       relativePath: node.relativePath,
       configPaths: node.paths || [],
       message: messageForNode(node),
-    })
+    }
+    if (node.sensitive === true) finding.sensitive = true
+    if (node.sensitivityReason) finding.sensitivityReason = node.sensitivityReason
+    if (node.dotenvFile !== undefined) finding.dotenvFile = node.dotenvFile
+    if (node.dotenvReadScope) finding.dotenvReadScope = node.dotenvReadScope
+    findings.push(finding)
   }
 
   if (options.dotenv === true) {
@@ -68,6 +73,8 @@ function buildAuditReport(introspection, options = {}) {
 function messageForNode(node) {
   if (node.risk === 'executable_code') return 'Reference may execute JavaScript or TypeScript.'
   if (node.risk === 'process_spawn') return 'Reference may spawn a git process.'
+  if (node.sensitivityReason === 'dotenv_file' && node.dotenvReadScope === 'full_file') return 'Reference reads an entire dotenv file; resolved output may contain secrets.'
+  if (node.sensitivityReason === 'dotenv_file') return 'Reference reads a key from a dotenv file.'
   if (node.risk === 'local_file_read') return 'Reference reads a local file.'
   if (node.risk === 'data_flow_expression') return 'Expression can read resolved config values but is not JavaScript execution.'
   return `Risk surface: ${node.risk}`

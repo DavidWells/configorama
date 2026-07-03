@@ -68,6 +68,21 @@ database:
 .secrets/
 ```
 
+Dotenv files can be read directly when the dependency should stay explicit and should not mutate `process.env`.
+
+```dotenv filename=".env"
+API_KEY=local-secret
+WSS_URL=wss://example.test/events
+```
+
+```yaml filename="config.yml"
+remoteEvents:
+  wsUrl: ${file(.env).WSS_URL}
+  apiKey: ${file(.env).API_KEY}
+```
+
+Prefer key-level reads for dotenv files. `file(.env)` imports every key in the file and audit reports it as a medium-severity sensitive file read; `file(.env).API_KEY` and `file(.env):API_KEY` are still sensitive, but are reported as key-scope reads.
+
 That keeps the dependency visible without committing the value. If secrets live somewhere else, provide a [custom variable source](/guides/custom-variable-sources) instead of a file reference. Custom variable sources can read from local stores such as the macOS Keychain or 1Password CLI, or from remote stores such as AWS Secrets Manager, GCP Secret Manager, Vault, or your own internal service.
 
 ## Override file paths

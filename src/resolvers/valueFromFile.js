@@ -9,6 +9,7 @@ const { findNestedVariables } = require('../utils/variables/findNestedVariables'
 const { makeBox } = require('@davidwells/box-logger')
 const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 const { checkFileAccess } = require('../utils/security/safetyPolicy')
+const { applyDotenvFileRefMetadata, isIniLikeFilePath } = require('../utils/security/dotenvFileRefs')
 
 /* File Parsers */
 const YAML = require('../parsers/yaml')
@@ -85,7 +86,7 @@ function parseFileContents(content, filePath) {
   if (ext === 'toml' || ext === 'tml') {
     return TOML.parse(content)
   }
-  if (isIniLikeExtension(ext)) {
+  if (isIniLikeExtension(ext, filePath)) {
     return INI.parse(content)
   }
 
@@ -93,8 +94,8 @@ function parseFileContents(content, filePath) {
   return content
 }
 
-function isIniLikeExtension(ext) {
-  return ext === 'ini' || ext === 'env'
+function isIniLikeExtension(ext, filePath) {
+  return ext === 'ini' || ext === 'env' || isIniLikeFilePath(filePath)
 }
 
 /**
@@ -205,6 +206,14 @@ async function getValueFromFile(ctx, variableString, options) {
     containsVariables: options.context.value !== options.context.originalSource,
     exists,
   }
+  applyDotenvFileRefMetadata(fileRefEntry, {
+    filePath: fullFilePath,
+    relativePath,
+    resolvedPath,
+    variableString,
+    originalVariableString: options.context.originalSource,
+    resolvedVariableString: options.context.value,
+  })
 
   if (wasOverridden) {
     fileRefEntry.wasOverridden = true
@@ -411,7 +420,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       if (fileExtension === 'toml' || fileExtension === 'tml') {
         valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
       }
-      if (isIniLikeExtension(fileExtension)) {
+      if (isIniLikeExtension(fileExtension, relativePath)) {
         valueToPopulate = INI.toJson(valueToPopulate)
       }
       if (fileExtension === 'tf' || fileExtension === 'hcl') {
@@ -451,7 +460,7 @@ Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
       return Promise.resolve(valueToPopulate)
     }
 
-    if (isIniLikeExtension(fileExtension)) {
+    if (isIniLikeExtension(fileExtension, relativePath)) {
       valueToPopulate = INI.parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }

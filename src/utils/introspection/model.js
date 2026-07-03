@@ -1,6 +1,7 @@
 const path = require('path')
 const { EXECUTABLE_EXTENSIONS } = require('../security/safetyPolicy')
 const { redactRequirementValue } = require('../redaction/redact')
+const { getDotenvFileRefMetadata } = require('../security/dotenvFileRefs')
 
 const SCHEMA_VERSION = 1
 
@@ -42,6 +43,25 @@ function severityForRisk(risk) {
   return 'info'
 }
 
+function severityForNode(risk, metadata) {
+  if (metadata && metadata.dotenvFile && metadata.dotenvReadScope === 'full_file') return 'medium'
+  return severityForRisk(risk)
+}
+
+function firstOccurrenceVariable(entry) {
+  const occurrence = entry && Array.isArray(entry.occurrences) ? entry.occurrences[0] : null
+  return occurrence ? (occurrence.varMatch || occurrence.originalString) : null
+}
+
+function assignSensitivity(target, metadata) {
+  if (!metadata) return target
+  if (metadata.sensitive === true) target.sensitive = true
+  if (metadata.sensitivityReason) target.sensitivityReason = metadata.sensitivityReason
+  if (metadata.dotenvFile !== undefined) target.dotenvFile = metadata.dotenvFile
+  if (metadata.dotenvReadScope) target.dotenvReadScope = metadata.dotenvReadScope
+  return target
+}
+
 function buildIntrospection(enrichedMetadata = {}, options = {}) {
   const uniqueVariables = enrichedMetadata.uniqueVariables || {}
   const requirements = options.requirements || []
@@ -55,6 +75,11 @@ function buildIntrospection(enrichedMetadata = {}, options = {}) {
     const variableType = normalizeVariableType(entry.variableType)
     const requirement = requirementsByVariable.get(variable)
     const risk = riskForVariable(variableType, variable)
+    const dotenvMetadata = getDotenvFileRefMetadata({
+      ...entry,
+      variable,
+      originalVariableString: firstOccurrenceVariable(entry),
+    })
     const node = {
       id: `variable:${variable}`,
       kind: variableType === 'file' || variableType === 'text'
@@ -64,10 +89,11 @@ function buildIntrospection(enrichedMetadata = {}, options = {}) {
       variableType,
       sourceClass: entry.variableSourceType || entry.sourceClass || requirement?.sourceClass || null,
       risk,
-      severity: severityForRisk(risk),
+      severity: severityForNode(risk, dotenvMetadata || entry),
       paths: [...new Set((entry.occurrences || []).map(occ => occ.path).filter(Boolean))].sort(),
-      sensitive: requirement ? requirement.sensitive === true : false,
+      sensitive: requirement ? requirement.sensitive === true : entry.sensitive === true,
     }
+    assignSensitivity(node, dotenvMetadata || entry)
     if (requirement) {
       node.required = requirement.required
       node.default = redactRequirementValue(requirement, requirement.default)
@@ -104,16 +130,20 @@ function buildIntrospection(enrichedMetadata = {}, options = {}) {
   const fileDeps = enrichedMetadata.fileDependencies || {}
   for (const dep of fileDeps.byConfigPath || []) {
     const id = `file:${dep.relativePath || dep.filePath}`
+    const dotenvMetadata = getDotenvFileRefMetadata(dep)
+    const risk = EXECUTABLE_EXTENSIONS.has(path.extname(dep.relativePath || dep.filePath || '').toLowerCase()) ? 'executable_code' : 'local_file_read'
     if (!nodes.some(node => node.id === id)) {
-      nodes.push({
+      const node = {
         id,
         kind: EXECUTABLE_EXTENSIONS.has(path.extname(dep.relativePath || dep.filePath || '').toLowerCase()) ? 'executable' : 'file',
         path: dep.filePath,
         relativePath: dep.relativePath,
         exists: dep.exists,
-        risk: EXECUTABLE_EXTENSIONS.has(path.extname(dep.relativePath || dep.filePath || '').toLowerCase()) ? 'executable_code' : 'local_file_read',
-        severity: EXECUTABLE_EXTENSIONS.has(path.extname(dep.relativePath || dep.filePath || '').toLowerCase()) ? 'high' : 'low',
-      })
+        risk,
+        severity: severityForNode(risk, dotenvMetadata || dep),
+      }
+      assignSensitivity(node, dotenvMetadata || dep)
+      nodes.push(node)
     }
     if (dep.location) {
       edges.push({

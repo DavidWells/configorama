@@ -34,7 +34,7 @@ database: ${file(./settings.yml):database}
 
 ## Parsed files
 
-`file()` can parse YAML, JSON, JSON5, TOML, INI, HCL, and Terraform JSON files.
+`file()` can parse YAML, JSON, JSON5, TOML, INI, `.env`, HCL, and Terraform JSON files.
 
 ```yaml
 fromYaml: ${file(./settings.yml):database.host}
@@ -42,6 +42,7 @@ fromJson: ${file(./settings.json):database.host}
 fromJson5: ${file(./settings.json5):database.host}
 fromToml: ${file(./settings.toml):database.host}
 fromIni: ${file(./settings.ini):database.host}
+fromDotenv: ${file(./.env).API_KEY}
 fromHcl: ${file(./main.tf):locals.0.app_name}
 fromTerraformJson: ${file(./main.tf.json):resource.aws_lambda_function.billing.handler}
 ```
@@ -59,6 +60,22 @@ can be read with:
 ```yaml
 appName: ${file(./main.tf):locals.0.app_name}
 ```
+
+## Dotenv files
+
+`.env` and `.env.*` files are parsed like INI files, so key-level reads work with either accessor form.
+
+```dotenv filename=".env"
+API_KEY=local-secret
+WSS_URL=wss://example.test/events
+```
+
+```yaml filename="config.yml"
+apiKey: ${file(.env).API_KEY}
+wsUrl: ${file(.env):WSS_URL}
+```
+
+`file(.env)` reads the whole parsed dotenv object. Inspection and audit output mark dotenv file references as sensitive: full-file reads are medium severity, while key-level reads are low severity with `dotenvReadScope: "key"`. This is different from `useDotenv`, which loads dotenv values into `process.env`.
 
 ## JavaScript files
 

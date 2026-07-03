@@ -9,6 +9,7 @@ const { normalizePath, extractFilePath, resolveInnerVariables } = require('./uti
 const { shouldIgnorePath } = require('./utils/paths/ignorePaths')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
+const { applyDotenvFileRefMetadata } = require('./utils/security/dotenvFileRefs')
 
 /**
  * Collect metadata about all variables found in the configuration
@@ -329,6 +330,12 @@ function collectVariableMetadata({
               containsVariables,
               exists: fileExists,
             }
+            applyDotenvFileRefMetadata(configPathEntry, {
+              filePath: absolutePath,
+              relativePath: resolvedPath,
+              originalVariableString: rawValue,
+              resolvedVariableString: resolvedVarString,
+            })
             if (globPattern) {
               configPathEntry.pattern = globPattern
             }
