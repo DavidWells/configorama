@@ -75,10 +75,35 @@ function redact(value, enabled) {
   return value
     .split('\n')
     .map(line => {
-      if (!secretPattern.test(line)) return line
-      return line.replace(/(:\s*)(['"]?)[^'",\]}#\s]+(['"]?)/, '$1$2[redacted]$3')
+      return redactSecretLine(line)
     })
     .join('\n')
+}
+
+function redactSecretLine(line) {
+  const keyMatch = line.match(/^([^:#\n]+:\s*)/)
+  if (!keyMatch) return line
+
+  const prefix = keyMatch[1]
+  const rest = line.slice(prefix.length)
+  if (!secretPattern.test(prefix) && !hasSecretReference(rest)) return line
+  const quote = rest[0] === '"' || rest[0] === "'" ? rest[0] : ''
+
+  if (quote) {
+    const closingQuote = rest.lastIndexOf(quote)
+    if (closingQuote <= 0) return `${prefix}${quote}[redacted]`
+    return `${prefix}${quote}[redacted]${rest.slice(closingQuote)}`
+  }
+
+  const commentIndex = rest.search(/\s#/)
+  const secretValue = commentIndex === -1 ? rest : rest.slice(0, commentIndex)
+  const comment = commentIndex === -1 ? '' : rest.slice(commentIndex)
+  if (!secretValue.trim()) return line
+  return `${prefix}[redacted]${comment}`
+}
+
+function hasSecretReference(value) {
+  return /\$\{[^}]*?(api[_-]?key|password|passwd|secret|token|credential)[^}]*\}/i.test(value)
 }
 
 function fence(value, lang) {

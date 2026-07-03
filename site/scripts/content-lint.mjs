@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { firstParagraph, listMdxFiles, readPage, wordCount } from './content-utils.mjs'
+import { firstParagraph, listMdxFiles, readPage, stripMarkdownCode, wordCount } from './content-utils.mjs'
 
 const failures = []
 const pages = listMdxFiles().map(readPage)
@@ -7,6 +7,7 @@ const pages = listMdxFiles().map(readPage)
 for (const page of pages) {
   const rel = path.relative(process.cwd(), page.filePath)
   const intro = firstParagraph(page.body)
+  const proseBody = stripMarkdownCode(page.body)
   const isReference = isReferenceRoute(page.route)
   const isCredits = page.route === '/credits'
   const isHome = page.route === '/'
@@ -18,8 +19,8 @@ for (const page of pages) {
   check(/```mermaid|<FileTree|<Cards|graph [A-Z]+|sequenceDiagram/.test(page.body) || isReference, rel, 'has mental model')
   check(/```[a-zA-Z0-9]+/.test(page.body) || isCredits, rel, 'has language-tagged example')
   check(isHome || isReference || isIntroGuide || /Callout type="(warning|error|important)"|gotcha|pitfall|caveat|common mistake/i.test(page.body), rel, 'has pitfall or warning')
-  check(isHome || countInternalLinks(page.body) >= 2 || isReference, rel, 'has cross-links')
-  check(!hasPlaceholder(page.body), rel, 'has no placeholders')
+  check(isHome || countInternalLinks(proseBody) >= 2 || isReference, rel, 'has cross-links')
+  check(!hasPlaceholder(proseBody), rel, 'has no placeholders')
 }
 
 function countInternalLinks(body) {
@@ -44,7 +45,7 @@ function check(condition, file, label) {
 
 function hasPlaceholder(body) {
   const withoutAwsDynamicRefs = body.replace(/\{\{resolve:[^}]+}}/g, '')
-  return /TODO|FIXME|XXX|lorem|\{\{/.test(withoutAwsDynamicRefs)
+  return /TODO|FIXME|XXX|lorem|(^|[^=])\{\{/.test(withoutAwsDynamicRefs)
 }
 
 if (failures.length) {

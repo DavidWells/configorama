@@ -45,7 +45,7 @@ configorama requirements config.yml
 {/* docs CONFIGORAMA_EXAMPLE id="requirements-config" lang="yaml" */}
 ```yaml
 service: requirements-cli
-apiKey: [redacted] | help("API key")}
+apiKey: [redacted]
 stage: ${opt:stage, "dev"}
 ```
 {/* /docs */}
@@ -117,7 +117,7 @@ configorama audit config.yml
 {/* docs CONFIGORAMA_EXAMPLE id="safe-inspection-config" lang="yaml" */}
 ```yaml
 safeData: ${file(./data.yml):value}
-unsafeData: [redacted]}
+unsafeData: [redacted]
 ```
 {/* /docs */}
 

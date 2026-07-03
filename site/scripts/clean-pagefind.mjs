@@ -1,5 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const siteRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const generatedSearchDirs = [
   'out/_pagefind',
@@ -7,5 +10,5 @@ const generatedSearchDirs = [
 ]
 
 for (const dir of generatedSearchDirs) {
-  fs.rmSync(path.resolve(dir), { recursive: true, force: true })
+  fs.rmSync(path.join(siteRoot, dir), { recursive: true, force: true })
 }

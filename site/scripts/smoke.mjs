@@ -1,5 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const siteRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const requiredFiles = [
   'out/index.html',
@@ -10,14 +13,14 @@ const requiredFiles = [
   'out/_pagefind/pagefind-entry.json'
 ]
 
-const missing = requiredFiles.filter(file => !fs.existsSync(path.resolve(file)))
+const missing = requiredFiles.filter(file => !fs.existsSync(path.join(siteRoot, file)))
 if (missing.length) {
   console.error('Smoke check failed. Missing built routes:')
   for (const file of missing) console.error(`- ${file}`)
   process.exit(1)
 }
 
-const home = fs.readFileSync('out/index.html', 'utf8')
+const home = fs.readFileSync(path.join(siteRoot, 'out/index.html'), 'utf8')
 if (!home.includes('Configorama')) {
   console.error('Smoke check failed. Home page does not include Configorama.')
   process.exit(1)

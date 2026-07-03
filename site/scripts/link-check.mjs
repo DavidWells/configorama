@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { contentRoot, listMdxFiles, readPage } from './content-utils.mjs'
+import { contentRoot, listMdxFiles, readPage, stripMarkdownCode } from './content-utils.mjs'
 
 const pages = listMdxFiles().map(readPage)
 const routes = new Set(pages.map(page => page.route))
 const failures = []
 
 for (const page of pages) {
-  const links = [...page.raw.matchAll(/\]\(([^)]+)\)/g)].map(match => match[1])
+  const links = [...stripMarkdownCode(page.raw).matchAll(/\]\(([^)]+)\)/g)].map(match => match[1])
   for (const link of links) {
     if (/^(https?:|mailto:|#)/.test(link)) continue
     if (link.startsWith('/')) {

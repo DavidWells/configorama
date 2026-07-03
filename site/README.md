@@ -15,4 +15,4 @@ npm run dev
 npm run validate
 ```
 
-The site deploys to Netlify from the repository root with `base = "site"` and `publish = ".next"`.
+The site deploys to Netlify from the repository root with `base = "site"` and `publish = "out"`.

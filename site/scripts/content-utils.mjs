@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-export const siteRoot = path.resolve(new URL('..', import.meta.url).pathname)
+export const siteRoot = fileURLToPath(new URL('..', import.meta.url))
 export const contentRoot = path.join(siteRoot, 'content')
 
 export function listMdxFiles(dir = contentRoot) {
@@ -17,11 +18,22 @@ export function listMdxFiles(dir = contentRoot) {
 }
 
 export function readPage(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8')
+  const raw = normalizeLineEndings(fs.readFileSync(filePath, 'utf8'))
   const frontmatterMatch = raw.match(/^---\n[\s\S]*?\n---\n?/)
   const body = frontmatterMatch ? raw.slice(frontmatterMatch[0].length) : raw
   const route = routeForFile(filePath)
   return { filePath, raw, body, route }
+}
+
+export function normalizeLineEndings(value) {
+  return value.replace(/\r\n?/g, '\n')
+}
+
+export function stripMarkdownCode(value) {
+  return value
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '')
+    .replace(/`[^`\n]*`/g, '')
 }
 
 export function routeForFile(filePath) {

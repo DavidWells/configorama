@@ -9,6 +9,7 @@ node_modules
 site/out
 
 .specstory
+.oldnax
 
 # Stray generated .d.ts files (should only be in /types)
 /parsers
@@ -48,3 +49,6 @@ _misc
 # bv (beads viewer) local config and caches
 .bv/
 /_wizard-demo.yml
+
+# Added by nax
+.nax/

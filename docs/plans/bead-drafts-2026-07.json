@@ -1,0 +1,889 @@
+[
+  {
+    "id": "configorama-wne.4",
+    "title": "Epic: conformance gap-close — missing goldens, edge/security fixtures, DISC-001",
+    "description": "## Background\nEpic wne.2 (conformance and performance guardrails) was batch-closed 2026-06-28 with a single boilerplate close reason across all children. Disk evidence shows the implementation is REAL but thinner than the plan and the closed bead titles claim:\n\nDONE (verified on disk, do NOT redo):\n- Harness with normalization + UPDATE_GOLDENS=1 (tests/conformance/harness.js).\n- Goldens: audit JSON (api+cli), graph JSON, cross-format equivalence + differences.\n- Cross-format fixtures for 8 formats (tests/conformance/fixtures/equivalent.*).\n- Memory smoke test (tests/performance/memorySmoke.test.js).\n- bench.js --json with schemaVersion:1 and mode scenarios: metadata/analyze/requirements/safe-audit/graph/filters/large-object (scripts/bench.js:42-109).\n- CI perf artifact workflow (.github/workflows/performance.yml).\n\nMISSING vs docs/plans/conformance-and-performance-guardrails.md (this epic's scope):\n1. Goldens for the remaining \"freeze first\" list: requirements JSON, structured error JSON, capabilities JSON, CLI raw scalar extraction, API resolved config (child bead wne.4.1).\n2. Resolver edge-case conformance fixtures — wne.2.3.1 is closed but tests/conformance/fixtures/ contains only the equivalent.* matrix; the plan's edge-case list has no conformance-level artifacts (child bead wne.4.2 audits coverage across ALL test suites and adds only true gaps).\n3. Security fixture gaps, notably the audit-does-not-execute sentinel proof (child bead wne.4.3).\n4. DISC-001 HCL Boolean divergence still INVESTIGATING (child bead wne.4.4).\n\n## Constraints\n- Never silently rewrite goldens; UPDATE_GOLDENS=1 only.\n- Freeze stable machine outputs, not decorative human output.\n- Deterministic, no network.\n- Before adding any fixture, check tests/ for existing coverage of the same rule — this repo has ~1051 tests; duplicate coverage is noise.\n\n## Success\nPlan's freeze-first list fully goldened; edge/security coverage audit shows no unprotected rules; DISCREPANCIES.md has no INVESTIGATING entries.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "epic",
+    "created_at": "2026-07-02T03:57:15.049518Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:05:24.400994Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne",
+        "title": "Roadmap: Runtime introspection, conformance guardrails, and Nextra docs",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-wne.4.4",
+        "title": "Fix DISC-001: HCL Boolean filter divergence in cross-format matrix",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-wne.4.3",
+        "title": "Close security conformance gaps: blocked-error goldens and non-execution proof",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-wne.4.2",
+        "title": "Audit resolver edge-case coverage and add missing conformance fixtures",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-wne.4.1",
+        "title": "Freeze machine JSON outputs and wire test:conformance script",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-wne"
+  },
+  {
+    "id": "configorama-wne.4.1",
+    "title": "Freeze machine JSON outputs and wire test:conformance script",
+    "description": "## Background\nwne.2.1.3 froze audit JSON (api+cli), graph JSON, and cross-format goldens. The plan's \"What To Freeze First\" list (docs/plans/conformance-and-performance-guardrails.md:65-77) has five remaining unfrozen surfaces. These are the contracts agents/CI already consume — a refactor could silently break them today.\n\n## Scope: add goldens via the EXISTING harness (tests/conformance/harness.js — do not build new infrastructure)\n- cli-requirements-json.golden: `configorama inspect <fixture> --view requirements` with a pinned env in the test (set/unset specific vars so environment-aware ask[] is deterministic).\n- api-requirements-json.golden: analyze(file, { instructions: true }).\n- cli-error-json.golden: fixture with a missing required variable, --error-format json; freeze error code (src/errors.js) AND exit code.\n- cli-capabilities-json.golden: `configorama capabilities`.\n- cli-raw-scalar.golden: `configorama -r <fixture> .database.host` — freeze exact stdout bytes including trailing-newline behavior.\n- api-resolved-config.golden: full resolve of a deterministic fixture (no git/env volatility).\n\n## Also\n- Harness must capture and compare CLI exit codes, not just stdout — extend if it does not.\n- Convenience script \"test:conformance\": \"uvu tests/conformance \\\".*\\\\.test.js$\\\"\" in package.json (conformance already runs inside npm test via the tests glob; the script is for the UPDATE_GOLDENS workflow ergonomics documented in the plan).\n- Each new fixture carries a header comment naming the contract it freezes.\n\n## Acceptance\n- npm run test:conformance passes; UPDATE_GOLDENS=1 regenerates; two consecutive runs byte-identical.\n- Failure output shows command, fixture, expected/actual paths, unified diff.\n- Exit codes asserted for the CLI cases.\n- Test log states each frozen surface as it passes (\"conformance: requirements JSON stable\").",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-07-02T03:57:51.256320Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:05:57.249637Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne.4",
+        "title": "Epic: conformance gap-close — missing goldens, edge/security fixtures, DISC-001",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-wne.4.3",
+        "title": "Close security conformance gaps: blocked-error goldens and non-execution proof",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-wne.4.2",
+        "title": "Audit resolver edge-case coverage and add missing conformance fixtures",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-v6sx",
+        "title": "Ship JSON Schema files for machine output contracts",
+        "status": "open",
+        "priority": 3,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-wne.4"
+  },
+  {
+    "id": "configorama-wne.4.2",
+    "title": "Audit resolver edge-case coverage and add missing conformance fixtures",
+    "description": "## Background\nwne.2.3.1 (\"Add resolver edge-case fixtures\") is CLOSED, but tests/conformance/fixtures/ contains only the cross-format equivalent.* matrix — the plan's edge-case list (docs/plans/conformance-and-performance-guardrails.md:125-143) left no conformance artifacts. The behaviors ARE likely covered piecemeal across the ~1051 existing tests (tests/advancedVariables/, tests/dynamic-key tests, filter tests, etc.). Do not assume either way: audit first.\n\n## Task\n1. Coverage audit: for each plan edge case below, locate the existing test that protects it (any suite counts, not just conformance). Record in tests/conformance/COVERAGE.md as a table: rule -> protecting test file -> assertion style.\n   - Nested variables inside filter args (${commas | split(${self:inner}, 2)}).\n   - oneOf inline literals and oneOf(${listVar}).\n   - Deep refs / ${deep:N} deferral.\n   - Fallbacks containing spaces and commas (known quirk note at src/main.js:2702 — if current behavior is wrong, golden the CORRECT behavior and file a bug bead, never freeze a bug).\n   - Fallbacks that are themselves variables.\n   - if() bare refs; eval() data-flow expressions.\n   - file() refs with subpaths; dynamic file paths with inner variables.\n   - param stage/default precedence.\n   - allowUnknownVars true vs false.\n   - Type coercion filters incl. filter-order ${option:threads | Number | oneOf(1, 2, 4)}.\n   - git values in-repo (normalized) and out-of-repo (error path).\n2. For rules with NO existing protection: add a conformance fixture + golden via the existing harness, header comment naming the rule.\n3. For rules protected only by value assertions where byte-stable output matters (e.g. anything feeding requirements/graph JSON): judgement call per case, documented in COVERAGE.md.\n\n## Acceptance\n- COVERAGE.md lists every plan edge case with its protector — zero unaccounted rows.\n- New fixtures deterministic across machines; suite green.\n- Any discovered real bug becomes a linked bug bead, not a frozen golden.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-07-02T03:57:51.354661Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:05:57.343013Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne.4.1",
+        "title": "Freeze machine JSON outputs and wire test:conformance script",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-wne.4",
+        "title": "Epic: conformance gap-close — missing goldens, edge/security fixtures, DISC-001",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-wne.4"
+  },
+  {
+    "id": "configorama-wne.4.3",
+    "title": "Close security conformance gaps: blocked-error goldens and non-execution proof",
+    "description": "## Background\nwne.2.3.2/wne.2.3.3 closed security conformance work; on disk only audit-safe JSON goldens exist (tests/conformance/goldens/{api,cli}-audit-safe-json.golden). Safe-mode enforcement itself is unit-tested from the wne.1.3.* implementation. The unfrozen surfaces are the ERROR contracts users script against and the strongest property of all: audit never executes what it reports.\n\n## Task (audit-first, same method as the edge-case sibling bead)\n1. Verify what wne.1.3.x unit tests already cover for: JS/TS ref blocked in safe mode, safe-root traversal blocked, symlink escape, custom resolver/function blocked, eval/if classified data_flow_expression, prototype/constructor escape attempts (wne.1.3.4 landed sandbox tests — locate them). Record in the same COVERAGE.md.\n2. Add conformance goldens for the gaps, expected minimum:\n   - Blocked-error JSON golden per blocked surface (stable error code + exit code frozen — these are scriptable contracts).\n   - Symlink-escape behavior: blocked, or if permitted, documented in DISCREPANCIES.md as a known limitation with an audit-finding golden.\n   - Non-execution sentinel proof: fixture whose JS file ref would write a sentinel file if executed; run `inspect --view audit`; assert sentinel absent AND the audit finding present. This is the property everything else rests on and it is cheap to prove.\n3. Deterministic, no network; expected errors captured and asserted (pristine output rule).\n\n## Acceptance\n- COVERAGE.md security section complete; goldens for all gaps; sentinel test in place; exit codes frozen for blocked cases.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-07-02T03:57:51.446756Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:05:57.428955Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne.4.1",
+        "title": "Freeze machine JSON outputs and wire test:conformance script",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-wne.4",
+        "title": "Epic: conformance gap-close — missing goldens, edge/security fixtures, DISC-001",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-wne.4"
+  },
+  {
+    "id": "configorama-wne.4.4",
+    "title": "Fix DISC-001: HCL Boolean filter divergence in cross-format matrix",
+    "description": "## Background\ntests/conformance/DISCREPANCIES.md DISC-001 (review date 2026-06-28, status INVESTIGATING): YAML/JSON/TOML/INI/Markdown/JS/TS fixtures resolve `${opt:enabled, true | Boolean}` to boolean false, but the HCL fixture (`$[opt:enabled, true | Boolean]` syntax) resolves to string \"false\". The cross-format equivalence test currently works around this by comparing only shared scalar fields and recording the difference as a golden artifact.\n\n## Task\nRoot-cause per the systematic debugging process: reproduce with a minimal HCL fixture, then trace whether the Boolean filter is skipped, applied before stringification, or the HCL parser path (src/parsers/hcl.js via @cdktf/hcl2json) stringifies values after filtering. Compare against the working YAML path. Form ONE hypothesis, test minimally.\n\n## Outcomes (either)\n- It is a bug: fix it, update cross-format-differences.golden to remove the exception, update DISCREPANCIES.md to RESOLVED with the root cause.\n- It is inherent to HCL semantics (@cdktf/hcl2json type model): document the precise mechanism in DISCREPANCIES.md, change status INVESTIGATING -> DOCUMENTED, and note it in site/content/concepts/cross-format-semantics page.\n\n## Acceptance\n- DISCREPANCIES.md has no INVESTIGATING entries.\n- A regression test exists either way (fixed behavior golden, or documented divergence golden with explanation).\n- Requires optional peer dep @cdktf/hcl2json present locally (hcl tests are in the slow-test group — keep this fixture consistent with src/parsers/hcl.slow-test.js placement).",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "bug",
+    "created_at": "2026-07-02T03:58:22.398077Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T03:58:22.398077Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne.4",
+        "title": "Epic: conformance gap-close — missing goldens, edge/security fixtures, DISC-001",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-wne.4"
+  },
+  {
+    "id": "configorama-kmp",
+    "title": "Epic: explain command — per-path resolution trace",
+    "description": "## Background\nThe #1 debugging question for any config tool is \"why is this value X / where did it come from?\". configorama already RECORDS the answer: resolutionHistory per value object (src/main.js:1507-1664, resolutionTracking at main.js:1352-1355) with source, filters, and fallback steps, surfaced today only via --return-metadata blobs and the -V/--verify display. There is no ergonomic per-path view.\n\n## Feature\n`configorama explain <file> <path>` (e.g. `configorama explain config.yml .database.name`) prints the resolution chain for one config path:\n- original raw expression, each variable occurrence, which source matched (env/option/self/file/git/...), fallback hops taken, filters applied in order with before/after values, final value.\n- Sensitive values redacted using the shared redaction helper (wne.1.2.1) — explain must never leak what setup/summary redacts.\n- --format json emits a stable schemaVersion:1 trace object for agents; default human output is an indented tree.\n\n## Why confident\n- Data already exists; work is projection + display, not new resolution machinery. Mirrors how inspect/graph were built as projections of the introspection model (src/utils/introspection/model.js).\n- Complements inspect: inspect answers \"what does this config need\", explain answers \"what did this value do\".\n\n## Scope (children)\n1. Trace model projection from resolutionHistory (schemaVersion:1 JSON).\n2. CLI subcommand + human tree renderer + redaction.\n3. Tests (unit + conformance goldens) + docs guide + capabilities.js registration.\n\n## Non-goals\nNo time-travel/step debugging, no watch mode, no cross-file explain beyond what resolutionHistory already links.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "epic",
+    "created_at": "2026-07-02T03:59:05.074216Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T03:59:05.074216Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependents": [
+      {
+        "id": "configorama-kmp.3",
+        "title": "Explain: conformance goldens, docs guide, README row",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-kmp.2",
+        "title": "Add explain CLI subcommand with human tree and JSON output",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-kmp.1",
+        "title": "Build explain trace model from resolutionHistory",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ]
+  },
+  {
+    "id": "configorama-kmp.1",
+    "title": "Build explain trace model from resolutionHistory",
+    "description": "## Background\nParent epic: explain command. resolutionHistory entries are pushed at src/main.js:1635 and mirrored into resolutionTracking at main.js:1664; enrichMetadata (src/utils/parsing/enrichMetadata.js) already consumes them for occurrence tracking. Known wart: .iterate-plan.md T1 claims a historyEntry.resultType check-before-assignment bug in the history pipeline — verify whether it is still live while building this; if live, fix it here (it corrupts the data explain depends on).\n\n## Design\n- New src/utils/introspection/trace.js: buildTrace(introspection|resolvedMeta, path) -> { schemaVersion: 1, path, raw, finalValue, steps: [{ kind: 'source'|'fallback'|'filter'|'function', expression, source, input, output, location }] }.\n- Resolve the config with metadata tracking enabled internally (same path analyze/introspect use) — explain must work even when resolution FAILS partway: emit steps up to the failure plus the structured error, because failed resolution is exactly when users need explain.\n- Path syntax: reuse the existing jq-style path parser from the CLI extraction feature (do NOT write a second path parser).\n- Redact outputs for variables flagged sensitive (annotation @sensitive or heuristic) via the shared redaction helper before values enter the trace object.\n- Deterministic ordering of steps (resolution order, then filter order).\n\n## Acceptance\n- Unit tests (uvu, in src/utils/introspection/trace.test.js): env source, option with fallback, self-ref chain (a -> b -> c shows transitive steps), filter before/after values, sensitive redaction, failing resolution partial trace, unknown path -> structured error with ERROR_CODES entry.\n- Trace for the same fixture is byte-identical across runs (feeds conformance golden in the tests child).\n- File starts with the required 2-line header comment.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T03:59:05.168344Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T03:59:05.168344Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-kmp",
+        "title": "Epic: explain command — per-path resolution trace",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-kmp.2",
+        "title": "Add explain CLI subcommand with human tree and JSON output",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-kmp"
+  },
+  {
+    "id": "configorama-kmp.2",
+    "title": "Add explain CLI subcommand with human tree and JSON output",
+    "description": "## Background\nParent epic: explain command. Depends on the trace model bead. CLI conventions already established in cli.js: subcommand table at cli.js:18-28, --format, --error-format json default for machine commands, structured errors on stderr.\n\n## Safety posture (decided here, deliberately)\nexplain RESOLVES the config — its whole value is showing what resolution actually did. Safe-by-default would silently produce a DIFFERENT trace than the user's real resolve (JS/TS refs blocked, custom resolvers disabled), which is worse than useless for debugging. Therefore explain follows RESOLVE's safety posture (executes the same surfaces), with --safe/--safe-root available as opt-in, exactly like the diff command's approach. Document this prominently in --help and the guide: \"explain runs your config like resolve does; use --safe to trace without executing risky surfaces (trace may then differ from a real resolve).\" If implementation reveals a strong reason to flip the default, stop and confirm with David — it changes the epic's stated contract.\n\n## Design\n- `configorama explain <file> <path>`: --format json -> trace JSON to stdout; default human renderer: indented tree using existing display helpers (src/display.js patterns, @davidwells/box-logger dep), one line per step: `${env:DB_HOST} -> \"localhost\" (fallback: env DB_HOST unset)`, filters as `| Number: \"5432\" -> 5432`.\n- Redacted values render as the shared mask token in BOTH formats; never print raw sensitive values.\n- No path argument: list explainable paths (top-level summary) instead of erroring — matches inspect discoverability.\n- Register in src/capabilities.js (commands, flags, error codes); update capabilities conformance golden in the same change if frozen by then.\n- Exit codes: 0 success, existing stable codes for parse/resolve/unknown-path errors.\n\n## Acceptance\n- e2e uvu tests spawning cli.js: human snapshot for a fixture; JSON parses to trace model; unknown path -> structured JSON error on stderr + documented exit code; sensitive fixture masked in both formats; --safe on an executable-ref fixture yields blocked-step trace (not a crash).\n- capabilities includes explain; --help lists it; expected-error stderr captured (pristine output rule).",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T03:59:05.251860Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:06:53.796798Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-kmp.1",
+        "title": "Build explain trace model from resolutionHistory",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-kmp",
+        "title": "Epic: explain command — per-path resolution trace",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-kmp.3",
+        "title": "Explain: conformance goldens, docs guide, README row",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-kmp"
+  },
+  {
+    "id": "configorama-kmp.3",
+    "title": "Explain: conformance goldens, docs guide, README row",
+    "description": "## Background\nParent epic: explain command. Depends on CLI bead. Freezing + documenting is a first-class step because explain's JSON is an agent-facing contract like requirements/audit/graph.\n\n## Scope\n1. Conformance goldens: cli-explain-json.golden + cli-explain-human.golden for a deterministic fixture via tests/conformance/harness.js (UPDATE_GOLDENS workflow). Human output IS frozen here intentionally — explain's tree is a primary interface; if that is judged too strict during implementation, freeze JSON only and note the decision in the bead close reason.\n2. Docs: site/content/guides/ gains explain-values guide (or extend inspect-config.mdx — follow the site IA established by the docs epic: guides for workflows, schemas for contracts). Add schema page site/content/schemas/explain.mdx mirroring requirements/audit/graph schema pages. Use the markdown-magic example-sync infra (site/scripts/markdown-magic.config.cjs + docs-example-registry.cjs) so examples come from real fixtures/tests, not hand-typed blocks.\n3. README: add row to the use-case table and \"What We Added Recently\" table (README is doc-gen managed — run npm run docs to regenerate TOC).\n4. site validation: npm run site:validate (content-lint, link-check) passes.\n\n## Acceptance\n- Goldens stable across two consecutive runs.\n- Docs page shows a real trace from a synced example; link-check and content-lint green.\n- for-agents guide mentions explain --format json alongside requirements JSON.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-07-02T03:59:05.339135Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:13.973410Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-kmp.2",
+        "title": "Add explain CLI subcommand with human tree and JSON output",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-kmp",
+        "title": "Epic: explain command — per-path resolution trace",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-kmp"
+  },
+  {
+    "id": "configorama-7geg",
+    "title": "Epic: non-interactive setup and answers flow",
+    "description": "## Background\nThe setup wizard (src/utils/ui/configWizard.js, `configorama setup`) prompts interactively with type-aware prompts, enum selects from oneOf, annotation display, and redacted summaries — but the loop is only half closed:\n1. It cannot run non-interactively, so agents/CI cannot use it despite requirements JSON telling them exactly what to provide (ask[] with how-to-supply hints).\n2. Collected values go nowhere durable: src/main.js:937 `// TODO set values` — the wizard gathers answers but the write-back is unfinished.\n\n## Vision\nClose the agent loop the whole introspection stack was built for:\nrequirements JSON (what is missing) -> answers file (agent/human fills it) -> setup --answers (values applied, non-interactive) -> resolved config. A human in a terminal and an agent in CI use the same machinery.\n\n## Scope (children)\n1. setup --answers <file> --non-interactive: consume answers keyed by requirement name, fail structured on missing/invalid.\n2. Finish value write-back: emit collected values as .env file, updated config, or stdout JSON (explicit --write target, never mutate files implicitly).\n3. --format dotenv output for resolved scalar configs (general resolve feature, also the natural --write env target).\n4. e2e tests + docs (setup-wizard + for-agents guides).\n\n## Constraints\n- Validation MUST reuse the requirements model (type filters, oneOf, conflicts) — no second validation path.\n- Sensitive redaction rules apply to all new stdout (reuse shared redaction helper from wne.1.2.1).\n- Never write files without an explicit flag; print what would be written in dry-run.\n\n## Success\nAn agent can run: inspect --view requirements -> generate answers.json -> setup config.yml --answers answers.json --write env:.env -> resolve succeeds with zero prompts.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "epic",
+    "created_at": "2026-07-02T03:59:57.874943Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T03:59:57.874943Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependents": [
+      {
+        "id": "configorama-7geg.4",
+        "title": "Setup flow e2e tests and docs: agent loop end-to-end",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-7geg.3",
+        "title": "Add dotenv output format for resolved configs",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-7geg.2",
+        "title": "Finish setup value write-back with explicit --write targets",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-7geg.1",
+        "title": "setup --answers file and --non-interactive mode",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ]
+  },
+  {
+    "id": "configorama-7geg.1",
+    "title": "setup --answers file and --non-interactive mode",
+    "description": "## Background\nParent epic: non-interactive setup. The wizard already consumes prompt descriptors derived from the requirements model (bead configorama-qlk closed) — this bead feeds those descriptors from a file instead of prompts.\n\n## Design\n- `configorama setup config.yml --answers answers.json [--non-interactive]`.\n- answers.json shape: flat object keyed by requirement name as it appears in requirements[].name / ask[].name — document that the key contract IS the requirements JSON name field, so the two features stay coupled by test.\n- Behavior: answers file pre-fills; interactive mode prompts only for what is still missing; --non-interactive never prompts and exits nonzero with a structured JSON error listing every missing/invalid requirement (agents need the complete list in one pass, not fail-on-first).\n- Validation reuses the wizard's existing descriptor validation (type filters, oneOf enums, annotation constraints). Invalid answer -> same error shape as missing, with reason field.\n- Sensitive values from answers files: accept, but redact in all output (setup summary already redacts — extend to the non-interactive result report).\n- Also accept answers via stdin (`--answers -`) so CI can pipe secrets without touching disk.\n\n## Acceptance\n- e2e uvu tests spawning cli.js: full answers file -> zero prompts, exit 0; partial answers + --non-interactive -> exit nonzero, JSON error lists ALL missing names; invalid enum value -> listed with reason; stdin path works; sensitive answer never appears raw in stdout (assert on captured output).\n- TDD: write the failing e2e for the full-answers path first.\n- capabilities.js updated with new flags.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T03:59:57.963810Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T03:59:57.963810Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-7geg",
+        "title": "Epic: non-interactive setup and answers flow",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-7geg.4",
+        "title": "Setup flow e2e tests and docs: agent loop end-to-end",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-7geg"
+  },
+  {
+    "id": "configorama-7geg.2",
+    "title": "Finish setup value write-back with explicit --write targets",
+    "description": "## Background\nParent epic: non-interactive setup. src/main.js:937 `// TODO set values` — the wizard collects validated values but never persists them. Without write-back, setup is a dead end: the user answers prompts and the answers evaporate.\n\n## Design\n- Explicit targets, never implicit mutation:\n  - --write env:.env — append/update KEY=value lines for env-type requirements (create file if absent; preserve unrelated existing lines; update-in-place for existing keys). Depends on the dotenv formatting bead for serialization rules.\n  - --write json:answers.json — persist collected answers in the same shape --answers consumes (round-trip: setup output feeds future setup input; test this exact loop).\n  - --write stdout — JSON of collected values to stdout (redacted fields marked, raw values only with an explicit --unmask flag).\n- No --write: print redacted summary (current behavior) plus a hint listing available write targets.\n- --dry-run with any --write: print the diff/content that WOULD be written, write nothing.\n- Only requirement kinds that map to the target get written (env vars to env:; option-type values have no env target — report them in the summary as \"pass as CLI flags\" using the existing how strings from ask[]).\n- Wizard and --answers flows share this write-back path (one implementation).\n\n## Acceptance\n- e2e tests: env write creates and updates .env preserving unrelated lines and file ordering; json write round-trips through --answers; dry-run writes nothing (assert file mtime/absence); sensitive values written to files ARE the real values (files are the point) but stdout stays redacted; interactive path exercised via scripted stdin.\n- The main.js:937 TODO is removed with the implementation (functionality lands, so the comment removal is legitimate).",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T03:59:58.044531Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:14.072378Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-7geg.3",
+        "title": "Add dotenv output format for resolved configs",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-7geg",
+        "title": "Epic: non-interactive setup and answers flow",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-7geg.4",
+        "title": "Setup flow e2e tests and docs: agent loop end-to-end",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-7geg"
+  },
+  {
+    "id": "configorama-7geg.3",
+    "title": "Add dotenv output format for resolved configs",
+    "description": "## Background\nParent epic: non-interactive setup. `--format {json|yaml|js|esm|mermaid|dot}` exists (cli.js); dotenv is the missing lingua franca for deploy tooling (Docker, docker-compose, systemd EnvironmentFile, Netlify/Vercel env import). Also the serialization engine for the write-back bead's env: target — build it once here.\n\n## Design\n- `configorama config.yml --format dotenv` (alias: env).\n- Flattening rules (document in the schema/docs, freeze in conformance):\n  - Nested keys join with underscore and uppercase: database.host -> DATABASE_HOST. Collisions (e.g. `a.b-c` vs `a.bC` both -> A_B_C) are a hard structured error listing both source paths — never silent last-wins.\n  - Scalars only; arrays/objects serialize as JSON strings with a warning list on stderr (machine-readable with --error-format json), or hard-error with --strict.\n  - Quoting per dotenv conventions: values with spaces/newlines/#/quotes get double-quoted with escaping; target the motdotla/dotenv parse dialect (the de facto standard, and what env-stage-loader — already a dependency — wraps).\n- Implement as src/utils/output/dotenv.js with pure serialize function so wizard write-back reuses it (2-line file header comment per repo convention).\n\n## Acceptance\n- Unit tests: flattening, collision error, quoting edge cases (spaces, #, =, newlines, unicode), array/object JSON fallback + strict mode.\n- Round-trip test: output parsed back yields the flattened values exactly. NOTE: dotenv is only a TRANSITIVE dep today (via env-stage-loader) — add dotenv as an explicit devDependency for this test rather than reaching into transitive node_modules; no mocks, real parser.\n- Conformance golden: cli-format-dotenv.golden.\n- capabilities.js formats list updated; README format table row added.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T03:59:58.124834Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:08:00.931362Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-7geg",
+        "title": "Epic: non-interactive setup and answers flow",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-7geg.2",
+        "title": "Finish setup value write-back with explicit --write targets",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-7geg"
+  },
+  {
+    "id": "configorama-7geg.4",
+    "title": "Setup flow e2e tests and docs: agent loop end-to-end",
+    "description": "## Background\nParent epic: non-interactive setup. Depends on the answers, write-back, and dotenv beads. This bead proves the epic's success criterion as ONE real end-to-end script and documents the workflow.\n\n## Scope\n1. e2e script tests/setup-flow/agent-loop.test.js (uvu, spawning real cli.js, real files in temp dirs, no mocks):\n   - Step 1: `inspect fixture.yml --view requirements` -> parse ask[].\n   - Step 2: programmatically build answers.json from ask[] (simulating an agent).\n   - Step 3: `setup fixture.yml --answers answers.json --non-interactive --write env:.env`.\n   - Step 4: resolve fixture.yml with the .env applied -> assert final config values.\n   - Log each step's command, exit code, and key outputs as labeled lines (console.log('step1 requirements', ...)) so failures pinpoint the broken stage.\n2. Docs: rewrite site/content/guides/setup-wizard guide to cover both interactive and non-interactive modes; extend for-agents guide with the 4-step loop above using markdown-magic example sync from the e2e fixture (single source of truth).\n3. README: update setup rows in use-case + recently-added tables; npm run docs for TOC.\n4. npm run site:validate green.\n\n## Acceptance\n- The e2e passes 3 consecutive runs (temp-dir isolated, parallel-safe).\n- Docs examples are synced from the real e2e fixture, not hand-written.\n- for-agents guide shows the exact commands an agent should run, in order.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-07-02T03:59:58.205495Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:14.295530Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-7geg.2",
+        "title": "Finish setup value write-back with explicit --write targets",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-7geg.1",
+        "title": "setup --answers file and --non-interactive mode",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-7geg",
+        "title": "Epic: non-interactive setup and answers flow",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-7geg"
+  },
+  {
+    "id": "configorama-rxi1",
+    "title": "Epic: diff command — compare resolved configs across stages",
+    "description": "## Background\nConfigs exist to vary by stage/env, and \"what actually changes between dev and prod?\" is answered today by resolving twice and eyeballing. A first-class diff makes stage promotion reviewable and CI-checkable, and pairs naturally with explain (diff says WHAT differs, explain says WHY).\n\n## Feature\n`configorama diff config.yml --left \"--stage dev\" --right \"--stage prod\"` (final flag syntax decided in the CLI child bead — repeated flag groups vs comma syntax; pick what stays parseable with the existing minimist-style arg handling in cli.js):\n- Resolves the same file twice under different options/env overlays, deep-diffs the results, prints changed/added/removed paths with before/after values.\n- Sensitive values: show CHANGED/UNCHANGED verdict but mask the values (redaction helper) — the killer feature for secret rotation review. --unmask to override.\n- --format json emits schemaVersion:1 diff for CI gates (\"fail promotion if prod removes a key\"); human format is a colored path list.\n- Exit code contract: 0 identical, 1 differences, >1 errors — enables `configorama diff ... && deploy` gating directly.\n\n## Why p2\nHigh leverage but new surface; conformance + agent loop (p1 epics) protect existing contracts first. No existing users are blocked on diff.\n\n## Scope (children)\n1. Diff engine (resolve twice + deep diff + redaction + deterministic ordering).\n2. CLI subcommand, formats, exit codes, capabilities registration.\n3. Tests, conformance goldens, docs guide.\n\n## Non-goals\nDiffing two DIFFERENT files (v1 is one file, two contexts — one file two contexts covers the stage story; file-vs-file can extend later without breaking the contract if the JSON design keys on left/right descriptors).",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "epic",
+    "created_at": "2026-07-02T04:00:37.488777Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:00:37.488777Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependents": [
+      {
+        "id": "configorama-rxi1.3",
+        "title": "Diff: conformance goldens and docs guide",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-rxi1.2",
+        "title": "Add diff CLI subcommand with human and JSON output",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-rxi1.1",
+        "title": "Build diff engine: dual resolve, deep diff, redaction",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ]
+  },
+  {
+    "id": "configorama-rxi1.1",
+    "title": "Build diff engine: dual resolve, deep diff, redaction",
+    "description": "## Background\nParent epic: diff command. Engine is API-first (module export) so programmatic users get it too; CLI child wraps it.\n\n## Design\n- src/utils/diff/diffResolved.js: diffConfigs(configPath, leftSettings, rightSettings) -> { schemaVersion: 1, left: {options, envOverlay}, right: {...}, changes: [{ path, kind: 'changed'|'added'|'removed', left, right, sensitive: bool }] }.\n- Two independent resolutions with isolated option contexts. Options/params already flow through settings; env does NOT: src/resolvers/valueFromEnv.js:18 reads process.env directly with no overlay hook. Decide the isolation mechanism here (record rationale in close reason):\n  - Option A (recommended): thread an optional envOverlay map through settings into the env resolver (overlay checked before process.env). Small, benefits other callers (tests stop needing env mutation too), keeps diff in-process.\n  - Option B: resolve each side in a spawned child process with modified env. Zero resolver changes but slower, complicates the API return path, and process-spawn is a surface the audit model tracks.\n  - Rejected: temporarily patching process.env in-process — global mutation, unsafe with any concurrent resolution, and the wne epic constraints already call out dotenv mutation as a surface to avoid adding to.\n- Deep diff: arrays compared by index (document; keyed-array diff out of scope v1); undefined vs missing distinguished; NaN/±0 handled explicitly.\n- changes[] sorted by path for determinism.\n- sensitive flag from the requirements model / annotations; sensitive values pre-masked IN engine output by default so no caller can accidentally leak (unmask option mirrors the CLI flag).\n- Resolution failure on either side: structured error identifying WHICH side failed, with the underlying ConfigoramaError nested.\n\n## Acceptance\n- Unit tests: changed/added/removed, nested paths, array index changes, sensitive masking both sides, one-side-fails error shape, deterministic ordering (two runs byte-identical), and — if Option A — process.env unchanged after diff (assert snapshot before/after).\n- TDD: failing test for the basic changed-path case first.",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:00:37.570914Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:08:37.102409Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-rxi1",
+        "title": "Epic: diff command — compare resolved configs across stages",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-rxi1.2",
+        "title": "Add diff CLI subcommand with human and JSON output",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-rxi1"
+  },
+  {
+    "id": "configorama-rxi1.2",
+    "title": "Add diff CLI subcommand with human and JSON output",
+    "description": "## Background\nParent epic: diff command. Depends on diff engine bead. Follows cli.js conventions (subcommand table cli.js:18-28, structured errors, safe-mode defaults for non-executing commands do NOT apply here — diff resolves, so it follows resolve's safety posture; document that clearly, mirroring explain's approach).\n\n## Design\n- Flag syntax decision (record rationale in close reason): recommend repeated flag groups `--left.stage dev --right.stage prod` OR two option strings; must compose with existing --param/--stage passthrough. Whatever is chosen gets frozen in capabilities.js.\n- Human output: grouped by kind, colored (respect NO_COLOR), path in clickable-style dot notation, masked sensitive values as <redacted> with a changed/unchanged badge.\n- --format json -> engine output verbatim.\n- Exit codes: 0 identical, 1 differences found, existing error codes otherwise. This is load-bearing for CI gating — freeze in conformance.\n- Register in capabilities.js + --help.\n\n## Acceptance\n- e2e uvu tests spawning cli.js: identical contexts -> exit 0 empty changes; differing stage -> exit 1 with expected paths; JSON parses to engine shape; sensitive fixture masked in both formats; NO_COLOR honored (assert no ANSI codes).\n- Expected-failure cases capture stderr (pristine output rule).",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:00:37.652115Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:14.405549Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-rxi1.1",
+        "title": "Build diff engine: dual resolve, deep diff, redaction",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-rxi1",
+        "title": "Epic: diff command — compare resolved configs across stages",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "dependents": [
+      {
+        "id": "configorama-rxi1.3",
+        "title": "Diff: conformance goldens and docs guide",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "configorama-rxi1"
+  },
+  {
+    "id": "configorama-rxi1.3",
+    "title": "Diff: conformance goldens and docs guide",
+    "description": "## Background\nParent epic: diff command. Depends on the CLI bead. Same freeze+document pattern as explain (see the explain docs bead for the template — schema page + guide + README rows + site:validate).\n\n## Scope\n1. Conformance goldens: cli-diff-json.golden (differing stages fixture) + exit-code assertions for the 0/1 contract.\n2. site/content/schemas/diff.mdx schema page; guide content either new stage-promotion guide or extension of use-in-ci.mdx showing the `diff --format json` CI gate pattern (recommend use-in-ci extension — the CI story is where diff earns its keep).\n3. README rows (use-case table, recently-added), npm run docs.\n4. markdown-magic sync examples from the diff e2e fixtures.\n\n## Acceptance\n- Goldens stable across two runs; npm run site:validate green; examples synced not hand-written; for-agents guide cross-links diff JSON.",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:00:37.734995Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:14.509049Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-rxi1.2",
+        "title": "Add diff CLI subcommand with human and JSON output",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "configorama-rxi1",
+        "title": "Epic: diff command — compare resolved configs across stages",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-rxi1"
+  },
+  {
+    "id": "configorama-qw23",
+    "title": "Epic: error UX — did-you-mean, doctor, source-line coverage",
+    "description": "## Background\nStructured errors landed (ConfigoramaError model, stable ERROR_CODES in src/errors.js, JSON on stderr), and 0.9.16 added source line numbers to SOME errors plus content-based format detection. Three gaps keep error UX below the bar the rest of the tool sets:\n1. Unknown variable/source errors state facts without suggesting fixes — `${evn:HOME}` should say \"did you mean env:?\".\n2. Environment problems (missing optional peer deps like @cdktf/hcl2json for HCL or tsx for TS configs, git absent, node too old) surface as confusing failures deep in resolution instead of a upfront diagnosis.\n3. Source line coverage is partial — some error paths still lack file:line even where derivable.\n\n## Why\nError quality is the highest-leverage UX surface a library has: every user hits errors, few read guides. All three children are small, independent, and additive to the existing structured error model (no new error architecture).\n\n## Scope (children)\n1. Did-you-mean suggestions in unknown-source and unknown-self-ref errors.\n2. doctor command: environment diagnosis with JSON + human output.\n3. Source-line coverage audit: every ERROR_CODE that can carry file:line does.\n\n## Constraints\n- Suggestions/diagnoses extend existing error objects (a suggestions field), never replace codes or messages agents already parse — additive to the frozen error contract.",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "epic",
+    "created_at": "2026-07-02T04:01:23.055469Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:01:23.055469Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependents": [
+      {
+        "id": "configorama-qw23.3",
+        "title": "Audit and complete source line coverage in errors",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-qw23.2",
+        "title": "Add doctor command for environment diagnosis",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "configorama-qw23.1",
+        "title": "Add did-you-mean suggestions to unknown source and self-ref errors",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ]
+  },
+  {
+    "id": "configorama-qw23.1",
+    "title": "Add did-you-mean suggestions to unknown source and self-ref errors",
+    "description": "## Background\nParent epic: error UX. Typos are the most common config error: ${evn:X}, ${otions:stage}, ${self:sevice}. The resolver knows the full candidate list in both cases: registered source names (built-ins + custom variableSources + plugin sources) and, for self:, the actual key paths in the config.\n\n## Design\n- src/utils/strings/didYouMean.js: closest(input, candidates, {threshold}) using Levenshtein or Damerau-Levenshtein; threshold scaled to input length (edit distance <= 2 for short names); return top 1-3. Check node_modules first — leven or similar may already be in the dep tree; do not add a dependency if a 30-line implementation suffices (YAGNI on deps).\n- Unknown source error path: append suggestion to message (\"Unknown variable source 'evn'. Did you mean 'env'?\") AND add suggestions: ['env'] array to the structured error object.\n- Unknown self: reference: suggest nearest existing config key paths (candidates from the introspection model's known paths).\n- Unknown option/param when a near-miss CLI flag or param exists: same treatment.\n- Never suggest when nothing is within threshold (bad suggestions are worse than none).\n\n## Acceptance\n- Unit tests for didYouMean: exact-adjacent typos, transpositions, no-match-below-threshold returns empty, unicode-safe.\n- Integration tests: each error path (source, self, option, param) shows suggestion in human message and suggestions[] in JSON error; error CODE unchanged (assert same code as before — contract preserved).\n- Conformance: existing cli-error golden unchanged OR regenerated with suggestions field — decide with the conformance freeze bead and note in close reason.",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:01:23.155587Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:01:23.155587Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-qw23",
+        "title": "Epic: error UX — did-you-mean, doctor, source-line coverage",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-qw23"
+  },
+  {
+    "id": "configorama-qw23.2",
+    "title": "Add doctor command for environment diagnosis",
+    "description": "## Background\nParent epic: error UX. Failures caused by the ENVIRONMENT (not the config) waste the most support time: HCL configs need optional peer @cdktf/hcl2json, TS configs need tsx or ts-node, git: sources need git on PATH and a repo, node version floors apply. Today each surfaces mid-resolution with varying clarity.\n\n## Design\n- `configorama doctor [file]` subcommand:\n  - Always: node version check (package.json currently has NO engines field — add one as part of this bead after confirming the actual floor with David; doctor reads it rather than hardcoding), package version, optional capability availability (hcl parser dep, tsx/ts-node, git binary + inside-repo check), writable tmp.\n  - With a file argument: parse it (no resolution), list which variable sources/formats it USES, and flag specifically the capabilities it needs that are missing — \"config.tf.json uses HCL: @cdktf/hcl2json not installed. npm install @cdktf/hcl2json\".\n  - Checks are a declarative array {name, check(), remedy} so new capabilities self-register — capability detection should align with src/capabilities.js concerns, not become a second registry.\n- Output: human checklist (pass/warn/fail marks) and --format json {schemaVersion:1, checks:[{name, status, detail, remedy}]}.\n- Exit code: 0 all pass or only warns for unused capabilities; 1 only when a capability the GIVEN file needs is missing — doctor without a file never fails CI accidentally.\n- Register in capabilities.js.\n\n## Acceptance\n- Unit tests for individual checks with real environment probing where deterministic (node version) — for machine-varying probes (git present), test both branches by controlling PATH/cwd of a spawned child process, not by mocking modules.\n- e2e: doctor on an HCL fixture reports the used-capability detection correctly; the missing-dep branch is exercised via a spawned child with a stripped module resolution path — implementer picks the honest mechanism and documents it in the test header.\n- Docs: short doctor section in get-started or debug guide.\n- engines field addition confirmed with David before landing (back-compat-adjacent: it changes npm install warnings for old-node users).",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:01:23.241779Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:08:01.020056Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-qw23",
+        "title": "Epic: error UX — did-you-mean, doctor, source-line coverage",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-qw23"
+  },
+  {
+    "id": "configorama-qw23.3",
+    "title": "Audit and complete source line coverage in errors",
+    "description": "## Background\nParent epic: error UX. 0.9.16 added source line numbers to errors via key-location lookup (findLineForKey infrastructure exists in the comment-annotation work, src/utils/parsing/). Coverage is partial: some resolution/filter/validation error paths still emit no file:line even though the failing key's location is derivable.\n\n## Task\n1. Inventory: for each ERROR_CODE in src/errors.js, produce a fixture that triggers it and record whether the error carries file + line. Check in the inventory as a table in the test file header or tests/errors/COVERAGE.md.\n2. For every code where the failing config key is known at throw time, thread location through (the ConfigoramaError model from wne.1.2.3 defines where location lives — extend instances, not the model).\n3. Where location is genuinely unknowable (e.g. errors before parse completes, cross-file indirection), document why in the inventory instead of forcing it.\n4. Line numbers must be from the ORIGINAL source file (YAML with comments/anchors), not a normalized intermediate — verify against fixtures with anchors and multi-line values where off-by-N bugs live.\n\n## Acceptance\n- Inventory table complete for all ERROR_CODES with has-location yes/no/why-not.\n- Tests per newly-located error asserting exact file:line against fixtures (uvu; expected errors captured, output pristine).\n- No error message format changes beyond adding location (agent contract preserved); conformance error goldens updated deliberately via UPDATE_GOLDENS if shapes gain fields.",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:01:23.329125Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:01:23.329125Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-qw23",
+        "title": "Epic: error UX — did-you-mean, doctor, source-line coverage",
+        "status": "open",
+        "priority": 2,
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "configorama-qw23"
+  },
+  {
+    "id": "configorama-v6sx",
+    "title": "Ship JSON Schema files for machine output contracts",
+    "description": "## Background\nrequirements/audit/graph/capabilities/error JSON all carry schemaVersion:1 and have prose schema pages under site/content/schemas/, but no actual JSON Schema files exist. Agents and CI validators want machine-checkable schemas, and WE want them: conformance can validate every golden against its schema, catching drift the goldens alone miss (a golden freezes one instance; a schema constrains all instances).\n\n## Design\n- schemas/ directory in the package (add to package.json files[]): requirements.schema.json, audit.schema.json, graph.schema.json, capabilities.schema.json, error.schema.json, plus explain/diff when those land.\n- Draft 2020-12, $id URLs pointing at the docs site schema pages.\n- Conformance harness gains a validation step: every JSON golden validates against its schema (ajv as devDependency only).\n- capabilities output gains schemaUrls map so agents can discover schemas programmatically.\n- Site schema pages embed or link the actual files via markdown-magic sync (single source of truth — the .schema.json files, not the prose).\n\n## Acceptance\n- All existing JSON goldens validate; a deliberately-broken golden fails validation (prove the validator validates, then revert).\n- npm pack contains schemas/; require('configorama/package.json') consumers can resolve them.\n- Site pages synced from real schema files; site:validate green.",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:02:10.162481Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:03:14.608486Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0,
+    "dependencies": [
+      {
+        "id": "configorama-wne.4.1",
+        "title": "Freeze machine JSON outputs and wire test:conformance script",
+        "status": "open",
+        "priority": 1,
+        "dependency_type": "blocks"
+      }
+    ]
+  },
+  {
+    "id": "configorama-rhdg",
+    "title": "Add variable-syntax fuzzing harness",
+    "description": "## Background\nThe variable parser (regex-driven, src/main.js pre-process + match layers, plus preProcess.js) handles deeply nestable grammar: nested vars in filter args, fallbacks containing commas/quotes/variables, deep refs, multi-filter chains. Historic bugs cluster exactly there (main.js:2702 fallback-space note, 0.9.9 changelog if()-edge-case fixes). A fuzzer finds the crashes and hangs tests do not.\n\n## Design\n- tests/fuzz/variable-syntax.fuzz.js: grammar-based generator (seeded PRNG, seed logged and settable via env for reproduction) composing valid-ish expressions from the real grammar: sources x fallbacks x filters x nesting depth x quote styles x junk mutations (unbalanced braces, stray pipes, unicode).\n- Feed through resolve with allowUnknownVars:true and through analyze() (introspection path has its own parser consumers).\n- Assertions: no throw other than ConfigoramaError types, no hang (per-case timeout), no RangeError/stack overflow, resolution either succeeds or errors with a stable code. Any failure logs the exact input + seed as a one-line repro command.\n- Run N=10k cases in test:slow group; a 30-second budget cap so CI stays sane.\n- Crashing inputs get minimized by hand and checked in as permanent regression fixtures (tests/fuzz/regressions/).\n\n## Acceptance\n- Harness runs green in test:slow; seed reproduction works (same seed -> same cases, verified in a unit test — note Date/random determinism matters here).\n- At least the regression-fixture mechanism is demonstrated with one known-tricky historical case (e.g. the 0.9.9 if() null case).\n- Findings, if any, become bug beads — do not fix parser bugs inside this bead beyond trivial guards.",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:02:10.254178Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:10.254178Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-zrwz",
+    "title": "Slim README to npm-friendly size, delegate depth to docs site",
+    "description": "## Background\nREADME.md is 103KB — heavier than npmjs.com renders comfortably, slow to skim, and now redundant: the Nextra site (docs epic, closed) carries guides/concepts/schemas with test-synced examples. The README predates the site and still tries to be the whole manual.\n\n## Design\n- Target: <25KB. Keep: hero/badges, TL;DR, quick example, use-case table, install, CLI one-screen tour, links into site sections, contributing/license. Cut: deep per-feature manuals that have site guide equivalents — each cut section becomes a link to its site page.\n- README is doc-gen managed (markdown-magic TOC + example sync) — restructure within that system, npm run docs regenerates.\n- Preserve anchors external links may target: leave stub headings with links where inbound traffic is likely (check site link-check config and GitHub search for deep-link usage before deleting anchors).\n- Do NOT delete content that has no site equivalent — inventory first; anything README-only either moves to the site (small PR-sized moves) or stays.\n\n## Acceptance\n- README <25KB, npm run docs clean, site link-check green including README links.\n- Inventory table (section -> kept/moved-to-page/cut-with-link) in the PR/bead close reason so nothing silently vanishes.\n- David reviews the inventory before the cut lands (explicit approval gate — restructuring existing docs is a delete-heavy change).",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:02:10.325761Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:10.325761Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-3ya9",
+    "title": "Add --watch mode for re-resolve on change",
+    "description": "## Background\nConfig authoring is iterative: edit config, re-run resolve, read error, repeat. `configorama config.yml --watch` closes the loop for humans the way conformance closes it for CI.\n\n## Design\n- Watch the config file PLUS its discovered file dependencies (introspection model already tracks file deps — reuse fileDependencies from src/utils/parsing/enrichMetadata.js output; re-derive the watch set after each successful resolve since file() refs can change).\n- fs.watch with debounce (~100ms) and polling fallback flag for network drives; clear screen + timestamp header per run (respect --no-clear).\n- On error: show the structured human error (with did-you-mean suggestions if that bead landed) and KEEP WATCHING — never exit on resolve failure.\n- Composes with path extraction and --format (watch + -r .database.host is a live value monitor).\n- Refuses to combine with --output (repeated file writes) unless --force; refuses with setup/inspect subcommands (resolve-only feature v1).\n\n## Acceptance\n- e2e test: spawn cli.js --watch on a temp fixture, mutate the file, assert re-resolution output arrives (bounded wait, real fs events, no mocks); mutate a file() dependency, assert re-resolve; introduce an error, assert error shown and process still alive; SIGINT exits 0 cleanly.\n- Watch-set re-derivation covered: change a file() target path in the config, assert the NEW target is watched.\n- Docs: short section in first-config or debug guide.",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:02:10.404064Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:10.404064Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-qx4n",
+    "title": "AWS SSM/Secrets Manager resolver plugin + plugin authoring guide",
+    "description": "## Background\nplugins/cloudformation/ proved the bundled-plugin pattern (multi-account resolver, own tests). The most-requested source class configorama lacks is secret stores; AWS SSM Parameter Store + Secrets Manager are the highest-coverage first target: ${ssm:/path/to/param} and ${secretsmanager:name.jsonKey} in serverless-framework style (familiar syntax to the migration audience).\n\n## Design\n- plugins/aws-secrets/ following the cloudformation plugin layout: opt-in require('configorama/plugins/aws-secrets'), aws-sdk v3 clients as OPTIONAL peers (@aws-sdk/client-ssm, @aws-sdk/client-secrets-manager) — never hard deps.\n- Region/profile syntax mirroring cf plugin's (account:region) convention; WithDecryption default true for SSM SecureString; values auto-flagged sensitive so redaction/setup/diff/explain mask them for free (this is the integration test that matters most).\n- Safe mode: classify as a network/custom_extension surface — blocked under --safe like other custom resolvers, visible in audit as a finding.\n- Doctor integration: report missing peer deps when config uses these sources.\n- Second deliverable, same bead: plugin authoring guide (site/content/guides/) extracted from what cloudformation + this plugin share — the checklist a third-party author follows (source registration, sensitivity flagging, safe-mode classification, testing pattern).\n\n## Testing (no-mocks rule tension, resolved explicitly)\n- Unit: syntax parsing, arg handling, sensitivity flagging — pure, no AWS.\n- e2e against REAL AWS is gated: test file runs only when CONFIGORAMA_AWS_E2E=1 with creds present (David runs locally/CI-with-secrets); CI without creds skips WITH a visible skip log line, never a silent pass. No mocked AWS clients anywhere — per repo testing rules, if we cannot hit the real API in a context, we skip loudly.\n\n## Acceptance\n- Plugin resolves real SSM + SM values in the gated e2e; sensitive masking verified in setup summary, diff output, and explain trace; audit lists the surface; guide published and site:validate green.",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "feature",
+    "created_at": "2026-07-02T04:02:56.904215Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:56.904215Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-68o5",
+    "title": "Deprecation messaging for legacy alias subcommands",
+    "description": "## Background\nrequirements/audit/graph subcommands are deprecated aliases of inspect --view X (cli.js:18-28 table marks them back-compat). They work silently, so scripts keep accreting on the old names, making eventual removal (2.0) costlier every month.\n\n## Design\n- On alias use: one-line notice to STDERR only (stdout contracts untouched — machine consumers parse stdout): \"note: 'configorama audit' is an alias of 'configorama inspect --view audit' and may be removed in 2.0\".\n- Suppressed when --error-format json? No — notice goes to stderr as a plain line regardless, but NEVER inside the JSON error stream; verify JSON-mode stderr consumers: if structured commands emit JSON on stderr (they do), the notice must go to stderr BEFORE the JSON or move to a --quiet-suppressible channel — resolve this interaction deliberately and freeze it in a conformance golden (stderr byte-exactness matters here).\n- capabilities.js marks aliases with deprecated: true + replacement field (additive to the contract).\n- Docs/README stop showing alias forms anywhere except one migration note.\n\n## Acceptance\n- Conformance: alias invocation golden captures stdout unchanged vs canonical command, stderr notice present, exit codes identical.\n- capabilities golden updated with deprecated flags.\n- No notice on canonical commands (asserted).\n## Explicitly ask David\nThis is back-compat policy — confirm the 2.0 removal intent and notice wording before implementing (per working agreement on backward-compat decisions).",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:02:56.985884Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:56.985884Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-wl7x",
+    "title": "Lazy-load format parsers to cut startup cost",
+    "description": "## Background\nCLI startup pays require() cost for all 7 parsers even though a run touches one format (plus file() ref formats). js-yaml/toml/ini/json5 are light-moderate; the HCL path already lazy-guards its optional peer. For a CLI invoked per-shell-command (scripts, watch mode, CI loops), startup ms are user-visible.\n\n## Design\n- MEASURE FIRST (extreme-optimization discipline): node --cpu-prof or simple hrtime probes around requires; record baseline in the bead before changing anything. If parser requires are <10ms total, close this bead as wont-fix with the numbers — do not add indirection for nothing.\n- If warranted: src/parsers/index.js registry maps extension/format -> () => require(...) thunk; content-based format detection (0.9.16 feature) triggers load on demand; error paths preserved (missing optional peer messages unchanged — doctor and HCL guidance depend on exact wording).\n- No API change: parse-file export (package.json exports ./parse-file) keeps working.\n\n## Acceptance\n- Before/after startup numbers in close reason (bench methodology consistent with PERF.md A/B style, alternating runs).\n- Full test suite green — parser tests exercise every format so lazy paths all load under test.\n- A test asserting a YAML-only resolve never requires the toml/ini/hcl modules (inspect require.cache in a child process).",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:02:57.065298Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:02:57.065298Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  },
+  {
+    "id": "configorama-6me0",
+    "title": "Close out .iterate-plan.md: audit T1-T15 against current code",
+    "description": "## Background\n.iterate-plan.md (root, dated ~March 2026) lists 15 tasks. Spot-checks show several already landed without the plan being updated: T8/T9 (git execFile + cachedSafeGit — src/resolvers/valueFromGit.js:53,136), replaceAll regex cache is BoundedMap(200) (src/utils/strings/replaceAll.js:5, was a deferred item), bench --json exists. Others unverified: T1 resultType-before-assignment bug (line numbers shifted; may or may not survive), T2 stack-trace loss in parse.js, T12 resolution-tracking guard when returnMetadata:false, T14 preProcess early exits, dead-code items T3/T4/T5/T10/T13.\n\n## Task\nFor each T1-T15: verify against current code (grep/read, NOT the stale doc's line numbers), mark DONE / STILL-LIVE / OBSOLETE in the doc with evidence. For STILL-LIVE items: fix trivial ones (dead code, single-line bugs) inside this bead with tests per TDD where behavior changes; anything non-trivial (T12 tracking guard is a perf-behavior change; T14 traversal changes are regression-prone) becomes its own bead linked from the doc.\n\n## Ownership exception — T1\nIf T1 (historyEntry.resultType check-before-assignment) is STILL-LIVE, do NOT fix it here: the explain trace model bead (configorama-kmp.1) owns that fix because it corrupts the resolutionHistory data explain surfaces, and the fix needs explain's test fixtures around it. Record the status here and cross-link.\n\n## Acceptance\n- .iterate-plan.md updated with per-task status and evidence (file:line or commit) — 15 statuses, none silently dropped.\n- Trivial live items fixed with tests; non-trivial ones exist as beads.",
+    "status": "open",
+    "priority": 3,
+    "issue_type": "task",
+    "created_at": "2026-07-02T04:02:57.143612Z",
+    "created_by": "david",
+    "updated_at": "2026-07-02T04:06:53.898132Z",
+    "source_repo": ".",
+    "compaction_level": 0,
+    "original_size": 0
+  }
+]
