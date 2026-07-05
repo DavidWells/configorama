@@ -66,7 +66,7 @@ function parseSetupArgs(rawArgs) {
     opts[key] = value
   }
 
-  return { file, command, target, argv, opts }
+  return { file, command, target, argv, opts, rawArgs }
 }
 
 /**
@@ -221,24 +221,55 @@ async function runCommandTarget(parsed, settingsFile, configorama) {
   return runChild(parsed.command[0], parsed.command.slice(1), childEnv)
 }
 
+// One readline interface for the whole setup session, with a line queue:
+// piped stdin can deliver several answers in one chunk, and lines emitted
+// between questions would otherwise be dropped.
+let promptState = null
+
+function getPromptState() {
+  if (!promptState) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
+    const state = { rl, queue: [], pending: null, closed: false }
+    rl.on('line', (line) => {
+      if (state.pending) {
+        const resolvePending = state.pending
+        state.pending = null
+        resolvePending(line)
+      } else {
+        state.queue.push(line)
+      }
+    })
+    rl.on('close', () => {
+      state.closed = true
+      if (state.pending) {
+        const resolvePending = state.pending
+        state.pending = null
+        resolvePending('')
+      }
+    })
+    promptState = state
+  }
+  return promptState
+}
+
+function closePromptInterface() {
+  if (promptState && !promptState.closed) promptState.rl.close()
+  promptState = null
+}
+
 /**
- * Ask a yes/no question on stderr, reading the answer from stdin.
- * EOF or a missing answer counts as "no" (fail closed).
+ * Ask a question on stderr, reading the answer from stdin.
+ * EOF or a missing answer resolves to '' (callers fail closed).
  * @param {string} promptText - question to render
  * @returns {Promise<string>} the raw answer line
  */
 function askLine(promptText) {
+  const state = getPromptState()
+  process.stderr.write(promptText)
+  if (state.queue.length > 0) return Promise.resolve(state.queue.shift())
+  if (state.closed) return Promise.resolve('')
   return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
-    let settled = false
-    rl.question(promptText, (answer) => {
-      settled = true
-      rl.close()
-      resolve(answer)
-    })
-    rl.on('close', () => {
-      if (!settled) resolve('')
-    })
+    state.pending = resolve
   })
 }
 
@@ -307,11 +338,25 @@ async function runWriteTarget(parsed, settingsFile, configorama) {
     return 0
   }
 
-  await confirmSensitiveWrite(sensitiveKeysIn(setupResult.requirements, keys), targetPath, parsed.argv)
+  return confirmAndWriteDotenv(setupResult, values, targetPath, parsed.argv, configorama)
+}
+
+/**
+ * Confirm sensitive values, write the dotenv file, and summarize by key name.
+ * @param {Object} setupResult - setup engine result (for sensitivity classification)
+ * @param {Object.<string, any>} values - env key/value pairs to write
+ * @param {string} targetPath - dotenv file to write
+ * @param {Object} argv - setup argv (--yes/--merge/--force)
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} exit code
+ */
+async function confirmAndWriteDotenv(setupResult, values, targetPath, argv, configorama) {
+  const keys = Object.keys(values)
+  await confirmSensitiveWrite(sensitiveKeysIn(setupResult.requirements, keys), targetPath, argv)
 
   const result = configorama.writeDotenv(targetPath, values, {
-    merge: parsed.argv.merge === true,
-    force: parsed.argv.force === true,
+    merge: argv.merge === true,
+    force: argv.force === true,
   })
   process.stdout.write(`configx: wrote ${result.keys.length} value(s) to ${result.path}: ${result.keys.join(', ')}\n`)
   return 0
@@ -352,6 +397,70 @@ async function runWriteAnswersTarget(parsed, settingsFile, configorama) {
 }
 
 /**
+ * Show the apply-target menu after prompting (plain `configx setup <file>`).
+ * A normal CLI cannot set its parent shell, so option 1 prints the exact
+ * config-env command instead of pretending anything was applied.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} exit code
+ */
+async function runMenuTarget(parsed, settingsFile, configorama) {
+  const setupResult = await promptForAnswers(parsed, settingsFile, configorama)
+  const originalArgs = parsed.rawArgs.join(' ')
+
+  process.stderr.write([
+    '',
+    'configx: setup complete. Apply the answers:',
+    '',
+    '  1. Load into current shell (shows the command to run)',
+    '  2. Write .env.local',
+    '  3. Print export lines',
+    '  4. Exit without applying',
+    '',
+    'To run a single command with these values:',
+    `  configx setup ${originalArgs} -- <command>`,
+    '',
+  ].join('\n'))
+
+  const choice = (await askLine('Choose [1-4] ')).trim()
+
+  if (choice === '1') {
+    process.stderr.write([
+      '',
+      'To set this terminal, run:',
+      '',
+      `  config-env setup ${originalArgs}`,
+      '',
+      'If config-env is not available, install the shell integration first:',
+      '',
+      '  configx setup-shell',
+      '',
+    ].join('\n'))
+    return 0
+  }
+
+  if (choice === '2') {
+    return confirmAndWriteDotenv(setupResult, setupResult.answers.env, '.env.local', parsed.argv, configorama)
+  }
+
+  if (choice === '3') {
+    const resolved = await resolveWithAnswers(parsed, settingsFile, configorama, setupResult.answers)
+    const entries = mergeAnsweredEnv(configEntries(resolved), setupResult.answers.env)
+    const lines = shellExport(entries)
+    if (lines) process.stdout.write(lines + '\n')
+    return 0
+  }
+
+  if (choice === '4') {
+    process.stderr.write('configx: nothing applied\n')
+    return 0
+  }
+
+  throw new ConfigxError('setup_menu_cancelled', 'no target chosen; nothing applied')
+}
+
+/**
  * Run the configx setup command.
  * @param {string[]} rawArgs - argv after the `setup` positional
  * @returns {Promise<number>} process exit code
@@ -372,20 +481,23 @@ async function runSetupConfig(rawArgs) {
   const settingsFile = loadSettingsFile(parsed.argv.config, process.cwd())
   const configorama = loadConfigorama()
 
-  if (parsed.target === 'export') {
-    return runExportTarget(parsed, settingsFile, configorama)
+  try {
+    if (parsed.target === 'export') {
+      return await runExportTarget(parsed, settingsFile, configorama)
+    }
+    if (parsed.target === 'command') {
+      return await runCommandTarget(parsed, settingsFile, configorama)
+    }
+    if (parsed.target === 'write' || parsed.target === 'write-resolved') {
+      return await runWriteTarget(parsed, settingsFile, configorama)
+    }
+    if (parsed.target === 'write-answers') {
+      return await runWriteAnswersTarget(parsed, settingsFile, configorama)
+    }
+    return await runMenuTarget(parsed, settingsFile, configorama)
+  } finally {
+    closePromptInterface()
   }
-  if (parsed.target === 'command') {
-    return runCommandTarget(parsed, settingsFile, configorama)
-  }
-  if (parsed.target === 'write' || parsed.target === 'write-resolved') {
-    return runWriteTarget(parsed, settingsFile, configorama)
-  }
-  if (parsed.target === 'write-answers') {
-    return runWriteAnswersTarget(parsed, settingsFile, configorama)
-  }
-
-  throw new ConfigxError('setup_target_unimplemented', `setup target "${parsed.target}" is not implemented yet`)
 }
 
 module.exports = {

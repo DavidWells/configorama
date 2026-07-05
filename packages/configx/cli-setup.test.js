@@ -246,6 +246,53 @@ test('setup --write-answers --dry-run shows groups and keys, writes nothing', ()
   assert.not.ok(r.stdout.includes('sk-test-secret-value'), 'values redacted')
 })
 
+test('setup menu renders four options and exit applies nothing', () => {
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig], '4\n')
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.ok(r.stderr.includes('1.'), 'menu options render')
+  assert.ok(r.stderr.includes('4.'), 'four options')
+  assert.not.ok(/run a command now/i.test(r.stderr), 'no interactive command option')
+  assert.ok(r.stderr.includes('-- <command>'), 'explicit command form shown instead')
+  assert.is(r.stdout, '', 'nothing applied')
+})
+
+test('setup menu current-shell option prints the config-env command', () => {
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig, '--stage', 'qa'], '1\n')
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.ok(r.stderr.includes('config-env setup'), 'names the config-env command')
+  assert.ok(r.stderr.includes('--stage qa'), 'echoes original options')
+  assert.ok(r.stderr.includes('configx setup-shell'), 'offers shell integration install')
+  assert.not.ok(r.stderr.includes('sk-test-secret-value'), 'no secrets in guidance')
+})
+
+test('setup menu export option prints export lines on stdout', () => {
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig], '3\n')
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.ok(r.stdout.includes(`export API_KEY='sk-test-secret-value'`))
+  assert.ok(r.stdout.includes(`export SETUP_TEST_REGION='us-west-2'`))
+})
+
+test('setup menu write option writes .env.local in cwd after confirmation', () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'configx-menu-'))
+  const result = spawnSync(process.execPath, [cli, 'setup', setupBasic, '--config', answersConfig], {
+    encoding: 'utf8',
+    input: '2\ny\n',
+    cwd,
+    env: { ...process.env },
+  })
+  assert.is(result.status, 0, `stderr: ${result.stderr}`)
+  const written = path.join(cwd, '.env.local')
+  assert.ok(fs.existsSync(written), '.env.local created in cwd')
+  assert.ok(fs.readFileSync(written, 'utf8').includes('SETUP_TEST_API_KEY=sk-test-secret-value'))
+})
+
+test('setup menu EOF applies nothing and exits non-zero', () => {
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig], '')
+  assert.is.not(r.status, 0)
+  assert.is(r.stdout, '')
+  assert.match(r.stderr, /nothing applied/i)
+})
+
 test('parseSetupArgs identifies each target', () => {
   const { parseSetupArgs } = require('./src/setupConfig')
 
