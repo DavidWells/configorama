@@ -69,6 +69,12 @@ async function main() {
     process.exit(code)
   }
 
+  if (process.argv[2] === 'setup') {
+    const { runSetupConfig } = require('./src/setupConfig')
+    const code = await runSetupConfig(process.argv.slice(3))
+    process.exit(code)
+  }
+
   const argv = minimist(process.argv.slice(2), {
     '--': true,
     boolean: ['export', 'preflight'],

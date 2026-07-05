@@ -7,7 +7,7 @@
   },
   "main": "src/resolveEnv.js",
   "scripts": {
-    "test": "node src/resolveEnv.test.js && node cli.test.js",
+    "test": "node src/resolveEnv.test.js && node cli.test.js && node cli-setup.test.js",
     "release:patch": "pnpm version patch && pnpm publish",
     "release:minor": "pnpm version minor && pnpm publish",
     "release:major": "pnpm version major && pnpm publish"
@@ -16,6 +16,7 @@
     "cli.js",
     "src/resolveEnv.js",
     "src/setupShell.js",
+    "src/setupConfig.js",
     "README.md",
     "LICENSE"
   ],
