@@ -133,6 +133,17 @@ test('--export output is safe to eval (no shell injection)', () => {
   assert.is(require('fs').existsSync('/tmp/configx-pwned'), false)
 })
 
+test('configx sets CONFIGORAMA_PROGRAM_NAME during resolution but not in the child', () => {
+  const r = runConfigx([
+    path.join(fixtures, 'host.yml'),
+    '--config', path.join(fixtures, 'host.config.js'),
+    '--', 'node', '-e', 'process.stdout.write(process.env.HOST_SEEN + "|" + (process.env.CONFIGORAMA_PROGRAM_NAME || "unset"))',
+  ])
+  assert.is(r.status, 0)
+  // resolver saw 'configx'; the child does not inherit the marker
+  assert.is(r.stdout, 'configx|unset')
+})
+
 test('--export keeps stdout to export lines only (confirmation not on stdout)', () => {
   const r = runConfigx([path.join(fixtures, 'exec.yml'), '--export'])
   assert.is(r.status, 0)

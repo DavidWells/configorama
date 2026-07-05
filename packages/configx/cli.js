@@ -114,6 +114,10 @@ async function main() {
 
   const configorama = loadConfigorama()
   let resolved
+  // Let resolvers (e.g. the 1Password plugin's auth-prompt hint) attribute the
+  // request to configx. Restored afterwards so it never reaches the child env.
+  const priorProgramName = process.env.CONFIGORAMA_PROGRAM_NAME
+  process.env.CONFIGORAMA_PROGRAM_NAME = 'configx'
   try {
     resolved = await configorama(input, {
       ...settingsFile,
@@ -122,6 +126,9 @@ async function main() {
     })
   } catch (err) {
     fail(err.message)
+  } finally {
+    if (priorProgramName === undefined) delete process.env.CONFIGORAMA_PROGRAM_NAME
+    else process.env.CONFIGORAMA_PROGRAM_NAME = priorProgramName
   }
 
   // ConfigxError messages are secret-free by construction.
