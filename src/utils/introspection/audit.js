@@ -41,15 +41,11 @@ function buildAuditReport(introspection, options = {}) {
   }
 
   if (options.customResolvers && options.customResolvers.length) {
-    for (const resolver of options.customResolvers.slice().sort()) {
-      findings.push({
-        id: `customResolver:${resolver}`,
-        severity: 'high',
-        risk: 'custom_extension',
-        kind: 'source',
-        variableType: resolver,
-        message: `Custom resolver "${resolver}" can execute user-provided code.`,
-      })
+    const sorted = options.customResolvers.slice().sort((a, b) => {
+      return String(a.type || a).localeCompare(String(b.type || b))
+    })
+    for (const resolver of sorted) {
+      findings.push(customResolverFinding(resolver))
     }
   }
 
@@ -67,6 +63,40 @@ function buildAuditReport(introspection, options = {}) {
       info: findings.filter(finding => finding.severity === 'info').length,
       total: findings.length,
     }
+  }
+}
+
+/**
+ * Build the audit finding for one custom resolver.
+ * Resolvers that self-describe as sensitive/risky get a specific finding
+ * instead of the generic custom_extension one - never both.
+ * @param {string|{type: string, sensitive?: boolean, risk?: string, description?: string}} resolver
+ * @returns {object} Audit finding
+ */
+function customResolverFinding(resolver) {
+  const source = typeof resolver === 'string' ? { type: resolver } : resolver
+  const { type, sensitive, risk, description } = source
+
+  if (sensitive === true || risk) {
+    const finding = {
+      id: `customResolver:${type}`,
+      severity: 'high',
+      risk: risk || 'custom_extension',
+      kind: 'source',
+      variableType: type,
+      message: `Custom resolver "${type}" reads secret values.${description ? ` ${description}.` : ''}`,
+    }
+    if (sensitive === true) finding.sensitive = true
+    return finding
+  }
+
+  return {
+    id: `customResolver:${type}`,
+    severity: 'high',
+    risk: 'custom_extension',
+    kind: 'source',
+    variableType: type,
+    message: `Custom resolver "${type}" can execute user-provided code.`,
   }
 }
 

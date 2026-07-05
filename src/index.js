@@ -163,7 +163,14 @@ module.exports.audit = async (configPathOrObject, settings = {}) => {
   const requirements = buildConfigRequirements(analysis)
   const introspection = buildIntrospection(analysis, { requirements })
   const customResolvers = Array.isArray(settings.variableSources)
-    ? settings.variableSources.map(source => source.type).filter(Boolean)
+    ? settings.variableSources
+      .filter(source => source.type)
+      .map(source => ({
+        type: source.type,
+        sensitive: source.sensitive,
+        risk: source.risk,
+        description: source.description,
+      }))
     : []
   const originalConfig = analysis.originalConfig || {}
   return buildAuditReport(introspection, {
