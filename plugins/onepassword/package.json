@@ -1,0 +1,15 @@
+{
+  "name": "configorama-onepassword",
+  "version": "0.1.0",
+  "description": "1Password variable source plugin for configorama",
+  "main": "index.js",
+  "scripts": {
+    "test": "node parser.test.js && node op-cli.test.js && node index.test.js"
+  },
+  "keywords": [
+    "configorama",
+    "1password",
+    "secrets"
+  ],
+  "license": "MIT"
+}
