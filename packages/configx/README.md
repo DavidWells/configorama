@@ -48,17 +48,44 @@ configx secrets.yml -- npm publish
 # NPM_TOKEN is fetched from 1Password at run time and passed to npm publish
 ```
 
-## Loading into the current shell (`--export`)
+## Loading into the current shell
 
-A child process can't change its parent shell's environment, so to set values in your *current* terminal, use `--export` and have the shell evaluate the output:
+A child process can't change its parent shell's environment, so `configx <file> -- <command>` only affects that one command. To load resolved values into your current terminal, install the shell helper once:
+
+```bash
+configx setup-shell
+```
+
+Then use:
+
+```bash
+config-env .env --stage prod
+```
+
+`config-env` is a shell function, not a separate binary. It evaluates `configx --export` in your current shell so the resolved values are available to commands you run afterward.
+
+The setup command also installs the explicit long-form alias:
+
+```bash
+configx-env .env --stage prod
+```
+
+For manual installation:
+
+```bash
+configx setup-shell --shell zsh --print >> ~/.zshrc
+source ~/.zshrc
+```
+
+`--export` prints `export KEY='value'` lines to stdout instead of running a command. Values are single-quoted with embedded quotes escaped, so a secret containing shell metacharacters (`$`, `` ` ``, `;`, `'`) cannot inject commands when evaluated. Diagnostics go to stderr, so only the export lines reach `eval`.
+
+Advanced/manual current-shell loading still works:
 
 ```bash
 eval "$(configx .env --export)"
 # or
 source <(configx .env --export)
 ```
-
-`--export` prints `export KEY='value'` lines to stdout instead of running a command. Values are single-quoted with embedded quotes escaped, so a secret containing shell metacharacters (`$`, `` ` ``, `;`, `'`) cannot inject commands when evaluated. Diagnostics go to stderr, so only the export lines reach `eval`.
 
 This puts resolved values (including secrets) into your interactive shell and every command you run after — convenient, but they're then visible to `env` and child processes. Prefer `configx <file> -- <command>` when you only need them for one command.
 
@@ -85,6 +112,7 @@ configx .env -- ./my-app
 - **Portable key names required.** Keys must match `^[A-Za-z_][A-Za-z0-9_]*$`, else `configx` errors before running the command.
 - **Parent environment wins.** A value already present in the shell environment is not overwritten by the resolved config. This keeps CI/platform-injected variables authoritative.
 - **`--` is the separator.** Configorama options go on the left; the command and its flags go on the right. There is no shell-string form — the command is spawned with `shell: false`, so there is no shell-injection surface.
+- **Current-shell loading uses shell functions.** Run `configx setup-shell`, then `config-env <file> [options]` when you intentionally want values in the current terminal.
 - **Status and signals propagate.** The child inherits stdio; `configx` forwards `SIGINT`/`SIGTERM`/`SIGHUP` and exits with the child's code (or `128 + signal` if the child was killed).
 
 ## Pre-flight (avoids prompting on a doomed run)

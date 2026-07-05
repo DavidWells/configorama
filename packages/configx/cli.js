@@ -7,6 +7,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
+const { runSetupShell, SetupShellError } = require('./src/setupShell')
 
 // Stand-in value returned by stubbed custom resolvers during the pre-flight pass.
 const PREFLIGHT_PLACEHOLDER = 'configx-preflight'
@@ -63,6 +64,11 @@ function loadSettingsFile(explicitPath, cwd) {
 }
 
 async function main() {
+  if (process.argv[2] === 'setup-shell') {
+    const code = await runSetupShell(process.argv.slice(3))
+    process.exit(code)
+  }
+
   const argv = minimist(process.argv.slice(2), {
     '--': true,
     boolean: ['export', 'preflight'],
@@ -194,6 +200,7 @@ function runChild(program, args, env) {
 }
 
 main().catch((err) => {
+  if (err instanceof SetupShellError) fail(err.message, err.exitCode)
   if (err instanceof ConfigxError) fail(err.message, 2)
   fail(err && err.message ? err.message : String(err))
 })

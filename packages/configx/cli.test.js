@@ -2,6 +2,8 @@
    Spawns the real CLI against real configorama resolution; no mocks */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 const { spawnSync } = require('child_process')
 
@@ -23,6 +25,10 @@ function runConfigx(args, env = {}) {
 }
 
 const printEnv = (name) => ['node', '-e', `process.stdout.write(String(process.env.${name}))`]
+
+function tempPath(name) {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'configx-test-')), name)
+}
 
 test('resolves scalars, opt, and env into the child environment', () => {
   const r = runConfigx(
@@ -206,6 +212,130 @@ test('--no-preflight skips the pre-flight pass', () => {
   // without pre-flight, the side-effecting resolver DID run (this is what pre-flight prevents)
   assert.is(fs.existsSync(sentinel), true)
   fs.unlinkSync(sentinel)
+})
+
+test('setup-shell --shell zsh --print prints shell functions to stdout', () => {
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--print'])
+  assert.is(r.status, 0)
+  assert.match(r.stdout, /# >>> configx shell integration >>>/)
+  assert.match(r.stdout, /configx-env\(\) \{/)
+  assert.match(r.stdout, /config-env\(\) \{/)
+  assert.match(r.stdout, /# <<< configx shell integration <<</)
+  assert.is(r.stderr, '')
+})
+
+test('setup-shell --shell bash --print prints shell functions to stdout', () => {
+  const r = runConfigx(['setup-shell', '--shell', 'bash', '--print'])
+  assert.is(r.status, 0)
+  assert.match(r.stdout, /configx-env\(\) \{/)
+  assert.match(r.stdout, /config-env\(\) \{/)
+})
+
+test('setup-shell print mode does not write rc files', () => {
+  const rcFile = tempPath('zshrc')
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--print', '--rc-file', rcFile])
+  assert.is(r.status, 0)
+  assert.is(fs.existsSync(rcFile), false)
+})
+
+test('setup-shell installs a managed block into an empty rc file', () => {
+  const rcFile = tempPath('zshrc')
+  fs.writeFileSync(rcFile, '')
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--install', '--rc-file', rcFile])
+  assert.is(r.status, 0)
+  const content = fs.readFileSync(rcFile, 'utf8')
+  assert.match(content, /# >>> configx shell integration >>>/)
+  assert.match(content, /config-env\(\) \{/)
+  assert.match(content, /configx-env\(\) \{/)
+})
+
+test('setup-shell replaces an existing managed block instead of duplicating it', () => {
+  const rcFile = tempPath('zshrc')
+  fs.writeFileSync(rcFile, [
+    'before',
+    '# >>> configx shell integration >>>',
+    'old-configx-env() { :; }',
+    '# <<< configx shell integration <<<',
+    'after',
+    '',
+  ].join('\n'))
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--install', '--rc-file', rcFile])
+  assert.is(r.status, 0)
+  const content = fs.readFileSync(rcFile, 'utf8')
+  assert.is((content.match(/# >>> configx shell integration >>>/g) || []).length, 1)
+  assert.match(content, /^before\n/)
+  assert.match(content, /\nafter\n$/)
+  assert.not.match(content, /old-configx-env/)
+})
+
+test('setup-shell uninstall removes a managed block', () => {
+  const rcFile = tempPath('zshrc')
+  const install = runConfigx(['setup-shell', '--shell', 'zsh', '--install', '--rc-file', rcFile])
+  assert.is(install.status, 0)
+  const uninstall = runConfigx(['setup-shell', '--shell', 'zsh', '--uninstall', '--rc-file', rcFile])
+  assert.is(uninstall.status, 0)
+  assert.not.match(fs.readFileSync(rcFile, 'utf8'), /configx shell integration/)
+})
+
+test('setup-shell uninstall exits 0 when no managed block exists', () => {
+  const rcFile = tempPath('zshrc')
+  fs.writeFileSync(rcFile, 'export KEEP_ME=1\n')
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--uninstall', '--rc-file', rcFile])
+  assert.is(r.status, 0)
+  assert.is(fs.readFileSync(rcFile, 'utf8'), 'export KEEP_ME=1\n')
+})
+
+test('setup-shell fails on multiple managed blocks without editing', () => {
+  const rcFile = tempPath('zshrc')
+  const block = [
+    '# >>> configx shell integration >>>',
+    'config-env() { :; }',
+    '# <<< configx shell integration <<<',
+  ].join('\n')
+  const original = `${block}\nkeep=1\n${block}\n`
+  fs.writeFileSync(rcFile, original)
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--install', '--rc-file', rcFile])
+  assert.is(r.status, 1)
+  assert.match(r.stderr, /multiple or incomplete/)
+  assert.is(fs.readFileSync(rcFile, 'utf8'), original)
+})
+
+test('setup-shell unsupported shell fails clearly', () => {
+  const r = runConfigx(['setup-shell', '--shell', 'tcsh', '--print'])
+  assert.is(r.status, 2)
+  assert.match(r.stderr, /supported shell/)
+})
+
+test('setup-shell defaults to print mode when not attached to a TTY', () => {
+  const r = runConfigx(['setup-shell'], { SHELL: '/bin/zsh' })
+  assert.is(r.status, 0)
+  assert.match(r.stdout, /config-env\(\) \{/)
+})
+
+test('setup-shell rejects unsafe custom function names', () => {
+  const r = runConfigx(['setup-shell', '--shell', 'zsh', '--print', '--function-name', 'bad;name'])
+  assert.is(r.status, 2)
+  assert.match(r.stderr, /invalid shell function name/)
+})
+
+test('generated config-env and configx-env functions load values in bash', () => {
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'configx-bin-'))
+  const shim = path.join(binDir, 'configx')
+  fs.writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`)
+  fs.chmodSync(shim, 0o755)
+
+  const script = [
+    `eval "$("${process.execPath}" "${cli}" setup-shell --shell bash --print)"`,
+    `config-env "${path.join(fixtures, 'sample.env')}" --name Dave >/dev/null`,
+    'test "$GREETING" = "Dave"',
+    `configx-env "${path.join(fixtures, 'sample.env')}" --name Ada >/dev/null`,
+    'test "$GREETING" = "Ada"',
+  ].join('; ')
+  const r = spawnSync('bash', ['-lc', script], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH}`, CONFX_TEST_SRC: 'shellval' },
+  })
+  assert.is(r.status, 0)
 })
 
 test.run()

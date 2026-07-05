@@ -1,6 +1,6 @@
 {
   "name": "@davidwells/configx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Resolve a configorama config and exec a command with it as environment",
   "bin": {
     "configx": "./cli.js"
@@ -8,13 +8,14 @@
   "main": "src/resolveEnv.js",
   "scripts": {
     "test": "node src/resolveEnv.test.js && node cli.test.js",
-    "release:patch": "npm version patch && npm publish",
-    "release:minor": "npm version minor && npm publish",
-    "release:major": "npm version major && npm publish"
+    "release:patch": "pnpm version patch && pnpm publish",
+    "release:minor": "pnpm version minor && pnpm publish",
+    "release:major": "pnpm version major && pnpm publish"
   },
   "files": [
     "cli.js",
     "src/resolveEnv.js",
+    "src/setupShell.js",
     "README.md",
     "LICENSE"
   ],
@@ -43,7 +44,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "configorama": "^1.1.0",
+    "configorama": "workspace:^",
     "minimist": "^1.2.8"
   },
   "devDependencies": {
