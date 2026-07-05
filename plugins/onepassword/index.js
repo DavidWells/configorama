@@ -8,14 +8,19 @@ const { parseStructuredSecret, getKeyPath } = require('./parser')
 const OP_PREFIX = 'op'
 
 /**
- * Tell interactive users why an authorization prompt is about to appear.
- * The 1Password dialog only names the terminal app (OS-attributed), so this
- * line supplies the configorama context. TTY-only: silent in CI and pipes.
- * @param {number} count - Distinct op calls at cold start
+ * Tell interactive users why an authorization prompt is about to appear,
+ * naming what is being fetched. The 1Password dialog only names the terminal
+ * app (OS-attributed), so this line supplies the configorama context. Labels
+ * are config keys / aliases / fields — references, never secret values.
+ * TTY-only: silent in CI and pipes.
+ * @param {string[]} labels - Human labels for the values being fetched
  */
-function logAuthHint(count) {
+function logAuthHint(labels) {
   if (!process.stderr.isTTY) return
-  process.stderr.write(`configorama: requesting ${count} item${count === 1 ? '' : 's'} from 1Password (expect an authorization prompt)\n`)
+  const unique = [...new Set(labels)]
+  const n = unique.length
+  const what = n > 0 && n <= 8 ? unique.join(', ') : `${n} value${n === 1 ? '' : 's'}`
+  process.stderr.write(`configorama: fetching ${what} from 1Password (expect an authorization prompt)\n`)
 }
 // Supports: op:alias, op:alias.KEY, op(item), op(item).KEY
 const opVariableSyntax = /^op(?::|\()/
@@ -71,13 +76,14 @@ function createOnePasswordResolver(options = {}) {
    * @param {Map} cache - Promise cache
    * @param {string} key - Cache key
    * @param {Function} fn - Producer returning a promise
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<*>} Shared promise
    */
-  function cached(cache, key, fn) {
+  function cached(cache, key, fn, label) {
     if (cache.has(key)) {
       return cache.get(key)
     }
-    const promise = withColdStartLatch(fn).catch((err) => {
+    const promise = withColdStartLatch(fn, label).catch((err) => {
       cache.delete(key)
       throw err
     })
@@ -91,20 +97,21 @@ function createOnePasswordResolver(options = {}) {
   // op call runs alone; everything else queues behind its settlement and
   // then fans out in parallel against the authorized session.
   let coldStartCall = null
-  let coldStartCount = 0
   let hintScheduled = false
+  const pendingLabels = []
 
   /**
    * @param {Function} fn - Producer returning a promise
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<*>} Producer result, gated behind the first call
    */
-  function withColdStartLatch(fn) {
-    coldStartCount++
+  function withColdStartLatch(fn, label) {
+    if (label) pendingLabels.push(label)
     if (!hintScheduled) {
       hintScheduled = true
       // setImmediate lets the whole parallel fan-out register first so the
-      // hint reports an accurate item count.
-      setImmediate(() => logAuthHint(coldStartCount))
+      // hint names every value being fetched.
+      setImmediate(() => logAuthHint(pendingLabels))
     }
     if (!coldStartCall) {
       coldStartCall = fn()
@@ -183,13 +190,14 @@ function createOnePasswordResolver(options = {}) {
    * treats NPM_TOKEN as an INI key inside the inferred field.
    * @param {object} reference - Normalized reference
    * @param {string|undefined} keyPath - Requested key path
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<{value: string, fieldName: string, remainingKeyPath: string|undefined}>} Selected value
    */
-  async function fetchValue(reference, keyPath) {
+  async function fetchValue(reference, keyPath, label) {
     if (reference.kind === 'secretRef') {
       const value = await cached(secretRefCache, `${scopeKey}|${reference.ref}`, () => {
         return readSecretRef(reference.ref, cliOptions)
-      })
+      }, label)
       return { value, fieldName: reference.ref, remainingKeyPath: keyPath }
     }
 
@@ -197,7 +205,7 @@ function createOnePasswordResolver(options = {}) {
     const itemKey = `${scopeKey}|${vault || ''}|${reference.item}`
     const item = await cached(itemCache, itemKey, () => {
       return getItem(reference.item, { ...cliOptions, vault })
-    })
+    }, label)
 
     // Field selection is a pure function over the cached item JSON, so it
     // needs no cache of its own - no op call is ever saved by one.
@@ -262,7 +270,13 @@ function createOnePasswordResolver(options = {}) {
       return placeholderFor(parsed)
     }
 
-    const { value, fieldName, remainingKeyPath } = await fetchValue(reference, keyPath)
+    // Auth-hint label: what the user recognizes — the alias, else the config
+    // key being set, else the field. Never a secret value.
+    const label = alias
+      || (configPath ? configPath.split('.').pop() : undefined)
+      || reference.field
+      || (reference.kind === 'secretRef' ? reference.ref : reference.item)
+    const { value, fieldName, remainingKeyPath } = await fetchValue(reference, keyPath, label)
     if (entry.field === undefined && reference.kind !== 'secretRef') {
       entry.field = fieldName
     }
@@ -291,8 +305,8 @@ function createOnePasswordResolver(options = {}) {
       itemCache.clear()
       opReferences.length = 0
       coldStartCall = null
-      coldStartCount = 0
       hintScheduled = false
+      pendingLabels.length = 0
     },
     syncFactory: require.resolve('./sync-factory'),
     syncOptions: buildSyncOptions(),

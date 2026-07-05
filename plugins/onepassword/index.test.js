@@ -381,11 +381,11 @@ test('queued calls still run when the cold-start call fails', async () => {
   assert.is(results[1].value, 'db-secret')
 })
 
-test('auth hint on stderr names the number of items at cold start', async () => {
+test('auth hint on stderr names the values at cold start (by alias)', async () => {
   // drain hint timers scheduled by instances from earlier tests
   await new Promise((resolve) => setImmediate(resolve))
   const fake = fakeOp()
-  const source = createOnePasswordResolver({ refs: { a: 'note-item', b: 'database-prod' }, execFile: fake.execFile })
+  const source = createOnePasswordResolver({ refs: { alpha: 'note-item', bravo: 'database-prod' }, execFile: fake.execFile })
 
   const written = []
   const originalWrite = process.stderr.write
@@ -394,8 +394,8 @@ test('auth hint on stderr names the number of items at cold start', async () => 
   process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
   try {
     await Promise.all([
-      source.resolver('op:a', {}, {}, vo('op:a')),
-      source.resolver('op:b', {}, {}, vo('op:b')),
+      source.resolver('op:alpha', {}, {}, vo('op:alpha')),
+      source.resolver('op:bravo', {}, {}, vo('op:bravo')),
     ])
     // the hint is scheduled with setImmediate; let it flush before restoring
     await new Promise((resolve) => setImmediate(resolve))
@@ -405,7 +405,31 @@ test('auth hint on stderr names the number of items at cold start', async () => 
   }
   const hints = written.filter((line) => line.includes('1Password'))
   assert.is(hints.length, 1, 'exactly one hint per resolution run')
-  assert.match(hints[0], /configorama: requesting 2 items from 1Password \(expect an authorization prompt\)/)
+  assert.match(hints[0], /configorama: fetching .*alpha.*bravo.* from 1Password \(expect an authorization prompt\)/)
+  assert.is(hints[0].includes('npm_xxx'), false)
+})
+
+test('auth hint names the config key for bare op:// refs', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = true
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    // valueObject path last segment is the env key the user recognizes
+    await source.resolver('op://vault/item/field', {}, {}, { originalSource: '${op://vault/item/field}', path: ['DB_PASSWORD'] })
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /fetching DB_PASSWORD from 1Password/)
 })
 
 test('auth hint is silent when stderr is not a TTY', async () => {
