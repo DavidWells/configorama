@@ -27,6 +27,9 @@
   ],
   "author": "David Wells",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://github.com/DavidWells/configorama/tree/master/packages/configx#readme",
   "repository": {
     "type": "git",
