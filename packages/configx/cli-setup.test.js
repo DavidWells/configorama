@@ -293,6 +293,26 @@ test('setup menu EOF applies nothing and exits non-zero', () => {
   assert.match(r.stderr, /nothing applied/i)
 })
 
+test('setup --write-answers cancellation leaves no file behind', () => {
+  const target = writeTarget('answers.json')
+  const r = runConfigx(['setup', setupBasic, '--config', path.join(fixtures, 'setup-cancel.config.js'), '--write-answers', target, '--yes'])
+  assert.is.not(r.status, 0)
+  assert.not.ok(fs.existsSync(target))
+  assert.match(r.stderr, /cancelled/i)
+})
+
+test('real wizard cancel (stdin EOF) fails closed in --export mode', () => {
+  // No promptRenderer: the actual clack wizard runs and stdin EOF cancels it
+  const result = spawnSync(process.execPath, [cli, 'setup', setupBasic, '--export'], {
+    encoding: 'utf8',
+    input: '',
+    timeout: 20000,
+    env: { ...process.env },
+  })
+  assert.is.not(result.status, 0, 'cancellation exits non-zero')
+  assert.is(result.stdout, '', 'no partial exports on stdout')
+})
+
 test('parseSetupArgs identifies each target', () => {
   const { parseSetupArgs } = require('./src/setupConfig')
 

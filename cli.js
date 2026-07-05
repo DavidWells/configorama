@@ -449,6 +449,17 @@ if (requirementsMode) {
 // Process the configuration
 const shouldRedactSetupStdout = options.setup && !argv.output && !argv.copy
 let setupRequirementsForRedaction = []
+
+// If stdin ends mid-wizard the pending prompt promise never settles, the event
+// loop drains, and node would exit 0 as if setup succeeded. Fail closed instead.
+const onSetupBeforeExit = () => {
+  process.stderr.write('configorama: setup cancelled (input ended before completion)\n')
+  process.exit(1)
+}
+if (options.setup) {
+  process.on('beforeExit', onSetupBeforeExit)
+}
+
 const configPromise = shouldRedactSetupStdout
   ? (() => {
       const instance = new Configorama(inputFile, options)
@@ -461,6 +472,7 @@ const configPromise = shouldRedactSetupStdout
 
 configPromise
   .then((config) => {
+    process.removeListener('beforeExit', onSetupBeforeExit)
     let outputConfig = shouldRedactSetupStdout
       ? redactConfigByRequirements(config, setupRequirementsForRedaction)
       : config

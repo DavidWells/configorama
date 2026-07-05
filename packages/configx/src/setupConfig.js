@@ -481,6 +481,15 @@ async function runSetupConfig(rawArgs) {
   const settingsFile = loadSettingsFile(parsed.argv.config, process.cwd())
   const configorama = loadConfigorama()
 
+  // If stdin ends mid-prompt the pending prompt promise never settles, the
+  // event loop drains, and node would exit 0 as if setup succeeded. Fail
+  // closed instead: no target ran, so nothing was applied.
+  const onBeforeExit = () => {
+    process.stderr.write('configx: setup cancelled (input ended before completion)\n')
+    process.exit(1)
+  }
+  process.on('beforeExit', onBeforeExit)
+
   try {
     if (parsed.target === 'export') {
       return await runExportTarget(parsed, settingsFile, configorama)
@@ -496,6 +505,7 @@ async function runSetupConfig(rawArgs) {
     }
     return await runMenuTarget(parsed, settingsFile, configorama)
   } finally {
+    process.removeListener('beforeExit', onBeforeExit)
     closePromptInterface()
   }
 }
