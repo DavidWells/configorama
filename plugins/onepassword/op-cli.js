@@ -57,6 +57,20 @@ function translateError(err, stderr, subject) {
 }
 
 /**
+ * Reject config-controlled values that would be parsed as an op flag.
+ * execFile takes no shell, so this is not command injection - but a
+ * leading "-" turns a positional/vault value into an option that changes
+ * op's behavior. Secret refs are exempt: they always start with "op://".
+ * @param {string} value - Value destined for the op argument list
+ * @param {string} label - Human label for the error message
+ */
+function assertNotFlag(value, label) {
+  if (typeof value === 'string' && value.startsWith('-')) {
+    throw new Error(`Invalid 1Password ${label} "${value}": ${label} cannot start with "-" (it would be read as an op flag). Use the item ID or an op:// secret reference.`)
+  }
+}
+
+/**
  * Read a secret reference with op read.
  * @param {string} ref - op://vault/item/field reference
  * @param {object} [options] - { execFile, account, configDir }
@@ -80,8 +94,10 @@ function readSecretRef(ref, options = {}) {
  * @returns {Promise<object>} Parsed item JSON
  */
 async function getItem(spec, options = {}) {
+  assertNotFlag(spec, 'item')
   const args = ['item', 'get', spec, '--format', 'json', '--reveal']
   if (options.vault) {
+    assertNotFlag(options.vault, 'vault')
     args.push('--vault', options.vault)
   }
   const stdout = await runOp(args, {

@@ -95,6 +95,29 @@ test('generic failure is sanitized without stderr', async () => {
   }
 })
 
+test('item spec starting with dash is rejected before spawning op', async () => {
+  const fake = fakeExecFile({ stdout: '{}' })
+  try {
+    await getItem('--help', { execFile: fake.execFile })
+    assert.unreachable('should have thrown')
+  } catch (err) {
+    assert.match(err.message, /cannot start with "-"/)
+    assert.is(err.message.includes('op flag'), true)
+  }
+  assert.is(fake.calls.length, 0, 'op must not be spawned for a flag-like spec')
+})
+
+test('vault starting with dash is rejected before spawning op', async () => {
+  const fake = fakeExecFile({ stdout: '{}' })
+  try {
+    await getItem('item-1', { execFile: fake.execFile, vault: '--config' })
+    assert.unreachable('should have thrown')
+  } catch (err) {
+    assert.match(err.message, /cannot start with "-"/)
+  }
+  assert.is(fake.calls.length, 0)
+})
+
 test('malformed JSON from item get becomes sanitized parse error', async () => {
   const fake = fakeExecFile({ stdout: 'not-json secret-body' })
   try {
