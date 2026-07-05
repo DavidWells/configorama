@@ -2,6 +2,7 @@
    one explicit target (child command, --export, --write, --write-answers, menu) */
 const fs = require('fs')
 const path = require('path')
+const readline = require('readline')
 const minimist = require('minimist')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./resolveEnv')
 const { loadConfigorama, loadConfigParser, loadSettingsFile } = require('./loaders')
@@ -85,23 +86,32 @@ function setByPath(target, dotPath, value) {
 }
 
 /**
- * Prompt for missing values via the setup engine, then resolve the config
- * with the answers applied. Prompt UI renders on stderr so stdout stays
- * machine-clean for --export.
+ * Prompt for missing values via the setup engine.
+ * Prompt UI renders on stderr so stdout stays machine-clean for --export.
  * @param {SetupInvocation} parsed - parsed invocation
  * @param {Object} settingsFile - configx settings file contents
  * @param {Function} configorama - configorama async API
- * @returns {Promise<{ answers: Object, resolved: Object }>} answers and resolved config
+ * @returns {Promise<Object>} setup engine result (answers, requirements, ...)
  */
-async function promptAndResolve(parsed, settingsFile, configorama) {
+async function promptForAnswers(parsed, settingsFile, configorama) {
   const baseOptions = { ...(settingsFile.options || {}), ...parsed.opts }
-
-  const setupResult = await configorama.setup(parsed.file, {
+  return configorama.setup(parsed.file, {
     ...settingsFile,
     options: baseOptions,
     streams: { output: process.stderr },
   })
-  const answers = setupResult.answers
+}
+
+/**
+ * Resolve the config with wizard answers applied to the resolution context.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @param {Object} answers - answer groups from the setup engine
+ * @returns {Promise<Object>} resolved config
+ */
+async function resolveWithAnswers(parsed, settingsFile, configorama, answers) {
+  const baseOptions = { ...(settingsFile.options || {}), ...parsed.opts }
 
   // Answered env feeds ${env:} refs during resolution; configx exits after,
   // and the parent shell is never affected by this process-local mutation.
@@ -138,7 +148,20 @@ async function promptAndResolve(parsed, settingsFile, configorama) {
     else process.env.CONFIGORAMA_PROGRAM_NAME = priorProgramName
   }
 
-  return { answers, resolved }
+  return resolved
+}
+
+/**
+ * Prompt for missing values, then resolve the config with answers applied.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<{ answers: Object, resolved: Object }>} answers and resolved config
+ */
+async function promptAndResolve(parsed, settingsFile, configorama) {
+  const setupResult = await promptForAnswers(parsed, settingsFile, configorama)
+  const resolved = await resolveWithAnswers(parsed, settingsFile, configorama, setupResult.answers)
+  return { answers: setupResult.answers, resolved }
 }
 
 /**
@@ -199,6 +222,136 @@ async function runCommandTarget(parsed, settingsFile, configorama) {
 }
 
 /**
+ * Ask a yes/no question on stderr, reading the answer from stdin.
+ * EOF or a missing answer counts as "no" (fail closed).
+ * @param {string} promptText - question to render
+ * @returns {Promise<string>} the raw answer line
+ */
+function askLine(promptText) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stderr })
+    let settled = false
+    rl.question(promptText, (answer) => {
+      settled = true
+      rl.close()
+      resolve(answer)
+    })
+    rl.on('close', () => {
+      if (!settled) resolve('')
+    })
+  })
+}
+
+/**
+ * Warn and confirm before persisting sensitive values to disk.
+ * @param {string[]} sensitiveKeys - answered keys classified sensitive
+ * @param {string} targetPath - file about to be written
+ * @param {Object} argv - setup argv (checks --yes)
+ * @returns {Promise<void>} resolves when confirmed; throws when declined
+ */
+async function confirmSensitiveWrite(sensitiveKeys, targetPath, argv) {
+  if (sensitiveKeys.length === 0 || argv.yes === true) return
+  for (const key of sensitiveKeys) {
+    process.stderr.write(`configx: ${key} looks sensitive and will be written to ${targetPath}.\n`)
+  }
+  process.stderr.write('configx: prefer a 1Password reference when possible.\n')
+  const answer = await askLine('Continue? [y/N] ')
+  if (!/^y(es)?$/i.test(answer.trim())) {
+    throw new ConfigxError('sensitive_write_declined', 'aborted: sensitive values were not written')
+  }
+}
+
+/**
+ * Keys classified sensitive by the setup requirements
+ * @param {Array<Object>} requirements - setup engine requirements
+ * @param {string[]} keys - candidate key names
+ * @returns {string[]} sensitive key names
+ */
+function sensitiveKeysIn(requirements, keys) {
+  return keys.filter((key) =>
+    (requirements || []).some((req) => req && req.name === key && req.sensitive === true)
+  )
+}
+
+/**
+ * Write env answers (or resolved values for --write-resolved) to a dotenv file.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} exit code
+ */
+async function runWriteTarget(parsed, settingsFile, configorama) {
+  const targetPath = parsed.target === 'write-resolved' ? parsed.argv['write-resolved'] : parsed.argv.write
+  if (!targetPath) {
+    throw new ConfigxError('missing_write_target', `missing file path for --${parsed.target}`)
+  }
+
+  const setupResult = await promptForAnswers(parsed, settingsFile, configorama)
+
+  let values
+  if (parsed.target === 'write-resolved') {
+    const resolved = await resolveWithAnswers(parsed, settingsFile, configorama, setupResult.answers)
+    values = Object.fromEntries(mergeAnsweredEnv(configEntries(resolved), setupResult.answers.env))
+  } else {
+    values = setupResult.answers.env
+  }
+
+  const keys = Object.keys(values)
+  if (keys.length === 0) {
+    process.stderr.write(`configx: no env values to write to ${targetPath}\n`)
+    return 0
+  }
+
+  if (parsed.argv['dry-run'] === true) {
+    process.stdout.write(`configx: would write ${keys.length} value(s) to ${targetPath}: ${keys.join(', ')}\n`)
+    return 0
+  }
+
+  await confirmSensitiveWrite(sensitiveKeysIn(setupResult.requirements, keys), targetPath, parsed.argv)
+
+  const result = configorama.writeDotenv(targetPath, values, {
+    merge: parsed.argv.merge === true,
+    force: parsed.argv.force === true,
+  })
+  process.stdout.write(`configx: wrote ${result.keys.length} value(s) to ${result.path}: ${result.keys.join(', ')}\n`)
+  return 0
+}
+
+/**
+ * Write all answer groups to a versioned JSON file for automation.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} exit code
+ */
+async function runWriteAnswersTarget(parsed, settingsFile, configorama) {
+  const targetPath = parsed.argv['write-answers']
+  if (!targetPath) {
+    throw new ConfigxError('missing_write_target', 'missing file path for --write-answers')
+  }
+
+  const setupResult = await promptForAnswers(parsed, settingsFile, configorama)
+  const answers = setupResult.answers
+
+  const groupSummary = Object.entries(answers)
+    .filter(([, values]) => Object.keys(values).length > 0)
+    .map(([group, values]) => `${group}: ${Object.keys(values).join(', ')}`)
+    .join('; ')
+
+  if (parsed.argv['dry-run'] === true) {
+    process.stdout.write(`configx: would write answers to ${targetPath} (${groupSummary || 'no answers'})\n`)
+    return 0
+  }
+
+  const allKeys = Object.values(answers).flatMap((values) => Object.keys(values))
+  await confirmSensitiveWrite(sensitiveKeysIn(setupResult.requirements, allKeys), targetPath, parsed.argv)
+
+  const result = configorama.writeAnswers(targetPath, answers, { force: parsed.argv.force === true })
+  process.stdout.write(`configx: wrote answers to ${result.path} (${groupSummary || 'no answers'})\n`)
+  return 0
+}
+
+/**
  * Run the configx setup command.
  * @param {string[]} rawArgs - argv after the `setup` positional
  * @returns {Promise<number>} process exit code
@@ -224,6 +377,12 @@ async function runSetupConfig(rawArgs) {
   }
   if (parsed.target === 'command') {
     return runCommandTarget(parsed, settingsFile, configorama)
+  }
+  if (parsed.target === 'write' || parsed.target === 'write-resolved') {
+    return runWriteTarget(parsed, settingsFile, configorama)
+  }
+  if (parsed.target === 'write-answers') {
+    return runWriteAnswersTarget(parsed, settingsFile, configorama)
   }
 
   throw new ConfigxError('setup_target_unimplemented', `setup target "${parsed.target}" is not implemented yet`)

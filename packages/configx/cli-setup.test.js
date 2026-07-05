@@ -141,6 +141,111 @@ test('setup -- <command> cancellation never spawns the child', () => {
   assert.match(r.stderr, /cancelled/i)
 })
 
+/**
+ * Run configx with piped stdin (for confirmation prompts).
+ * @param {string[]} args - CLI arguments
+ * @param {string} input - stdin content
+ * @returns {{status: number, stdout: string, stderr: string}} Result
+ */
+function runConfigxWithInput(args, input) {
+  const result = spawnSync(process.execPath, [cli, ...args], {
+    encoding: 'utf8',
+    input,
+    env: { ...process.env },
+  })
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr }
+}
+
+function writeTarget(name) {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'configx-write-')), name)
+}
+
+test('setup --write persists env answers with 0600 and prints key names only', () => {
+  const target = writeTarget('.env.local')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write', target, '--yes'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+
+  const content = fs.readFileSync(target, 'utf8')
+  assert.ok(content.includes('SETUP_TEST_API_KEY=sk-test-secret-value'), 'answered env written')
+  assert.ok(content.includes('SETUP_TEST_REGION=us-west-2'))
+  assert.is(fs.statSync(target).mode & 0o777, 0o600, 'restrictive permissions')
+
+  assert.ok(r.stdout.includes('SETUP_TEST_API_KEY'), 'key names printed')
+  assert.not.ok(r.stdout.includes('sk-test-secret-value'), 'values never printed')
+  assert.not.ok(r.stderr.includes('sk-test-secret-value'), 'values never on stderr')
+})
+
+test('setup --write requires confirmation for sensitive values', () => {
+  const target = writeTarget('.env.local')
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig, '--write', target], 'n\n')
+  assert.is.not(r.status, 0)
+  assert.match(r.stderr, /sensitive/)
+  assert.not.ok(fs.existsSync(target), 'declined confirmation writes nothing')
+})
+
+test('setup --write proceeds when confirmation is accepted', () => {
+  const target = writeTarget('.env.local')
+  const r = runConfigxWithInput(['setup', setupBasic, '--config', answersConfig, '--write', target], 'y\n')
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.ok(fs.existsSync(target))
+})
+
+test('setup --write --dry-run shows keys and path but writes nothing', () => {
+  const target = writeTarget('.env.local')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write', target, '--dry-run'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.not.ok(fs.existsSync(target), 'dry run writes nothing')
+  assert.ok(r.stdout.includes(target), 'target path shown')
+  assert.ok(r.stdout.includes('SETUP_TEST_API_KEY'), 'key names shown')
+  assert.not.ok(r.stdout.includes('sk-test-secret-value'), 'values redacted')
+})
+
+test('setup --write refuses an existing file without --merge or --force', () => {
+  const target = writeTarget('.env.local')
+  fs.writeFileSync(target, 'EXISTING=1\n')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write', target, '--yes'])
+  assert.is.not(r.status, 0)
+  assert.match(r.stderr, /already exists/)
+  assert.is(fs.readFileSync(target, 'utf8'), 'EXISTING=1\n', 'file untouched')
+})
+
+test('setup --write cancellation leaves no file behind', () => {
+  const target = writeTarget('.env.local')
+  const r = runConfigx(['setup', setupBasic, '--config', path.join(fixtures, 'setup-cancel.config.js'), '--write', target, '--yes'])
+  assert.is.not(r.status, 0)
+  assert.not.ok(fs.existsSync(target))
+})
+
+test('setup --write-answers persists versioned JSON answers', () => {
+  const target = writeTarget('answers.json')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write-answers', target, '--yes'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+
+  const parsed = JSON.parse(fs.readFileSync(target, 'utf8'))
+  assert.is(parsed.schemaVersion, 1)
+  assert.is(parsed.answers.env.SETUP_TEST_API_KEY, 'sk-test-secret-value')
+  assert.is(fs.statSync(target).mode & 0o777, 0o600)
+  assert.not.ok(r.stdout.includes('sk-test-secret-value'), 'values never printed')
+})
+
+test('setup --write-answers refuses overwrite without --force', () => {
+  const target = writeTarget('answers.json')
+  fs.writeFileSync(target, '{"mine":true}')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write-answers', target, '--yes'])
+  assert.is.not(r.status, 0)
+  assert.match(r.stderr, /already exists/)
+  assert.is(fs.readFileSync(target, 'utf8'), '{"mine":true}')
+})
+
+test('setup --write-answers --dry-run shows groups and keys, writes nothing', () => {
+  const target = writeTarget('answers.json')
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--write-answers', target, '--dry-run'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.not.ok(fs.existsSync(target))
+  assert.ok(r.stdout.includes('SETUP_TEST_REGION'), 'key names shown')
+  assert.not.ok(r.stdout.includes('sk-test-secret-value'), 'values redacted')
+})
+
 test('parseSetupArgs identifies each target', () => {
   const { parseSetupArgs } = require('./src/setupConfig')
 

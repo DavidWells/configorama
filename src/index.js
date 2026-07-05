@@ -5,6 +5,8 @@ const { buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { serializeRequirements } = require('./utils/requirements/serializeRequirements')
 const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
 const { runSetup } = require('./utils/setup/setupEngine')
+const { writeDotenv } = require('./utils/setup/writeDotenv')
+const { writeAnswers } = require('./utils/setup/writeAnswers')
 const { buildIntrospection } = require('./utils/introspection/model')
 const { buildAuditReport } = require('./utils/introspection/audit')
 const { formatGraph } = require('./utils/introspection/graph')
@@ -152,6 +154,12 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
 module.exports.setup = async (configPathOrObject, settings = {}) => {
   return runSetup(configPathOrObject, settings, { analyze: module.exports.analyze })
 }
+
+/**
+ * Safe writers for persisting setup answers (0600, atomic, overwrite-guarded)
+ */
+module.exports.writeDotenv = writeDotenv
+module.exports.writeAnswers = writeAnswers
 
 module.exports.introspect = async (configPathOrObject, settings = {}) => {
   const analysis = await module.exports.analyze(configPathOrObject, {
