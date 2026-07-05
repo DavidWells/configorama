@@ -48,7 +48,10 @@
     "publish": "git push origin && git push origin --tags",
     "release:patch": "npm version patch && npm publish",
     "release:minor": "npm version minor && npm publish",
-    "release:major": "npm version major && npm publish"
+    "release:major": "npm version major && npm publish",
+    "release": "lerna publish",
+    "version:all": "lerna version --no-push --no-git-tag-version",
+    "test:all": "pnpm -r test"
   },
   "author": "David Wells",
   "license": "MIT",
@@ -86,7 +89,8 @@
     "tsx": "^4.7.0",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6",
-    "watchlist": "^0.3.1"
+    "watchlist": "^0.3.1",
+    "lerna": "^9.0.0"
   },
   "overrides": {
     "lodash": "^4.18.1"
@@ -106,5 +110,6 @@
     "ts-node": {
       "optional": true
     }
-  }
+  },
+  "packageManager": "pnpm@10.33.0"
 }
