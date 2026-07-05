@@ -9,12 +9,9 @@ async function testWizardHelpText() {
   const configFile = path.join(__dirname, 'help-filter.yml')
 
   // Get metadata without resolving
-  const result = await configorama(configFile, {
+  const metadata = await configorama.analyze(configFile, {
     options: { stage: 'prod' },
-    returnMetadata: true
   })
-
-  const { metadata } = result
 
   console.log('Metadata:', JSON.stringify(metadata, null, 2))
 
