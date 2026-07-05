@@ -1,5 +1,5 @@
 {
-  "name": "configx",
+  "name": "@davidwells/configx",
   "version": "0.1.0",
   "description": "Resolve a configorama config and exec a command with it as environment",
   "bin": {
