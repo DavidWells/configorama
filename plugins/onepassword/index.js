@@ -6,6 +6,17 @@ const { selectField, trySelectField } = require('./fields')
 const { parseStructuredSecret, getKeyPath } = require('./parser')
 
 const OP_PREFIX = 'op'
+
+/**
+ * Tell interactive users why an authorization prompt is about to appear.
+ * The 1Password dialog only names the terminal app (OS-attributed), so this
+ * line supplies the configorama context. TTY-only: silent in CI and pipes.
+ * @param {number} count - Distinct op calls at cold start
+ */
+function logAuthHint(count) {
+  if (!process.stderr.isTTY) return
+  process.stderr.write(`configorama: requesting ${count} item${count === 1 ? '' : 's'} from 1Password (expect an authorization prompt)\n`)
+}
 // Supports: op:alias, op:alias.KEY, op(item), op(item).KEY
 const opVariableSyntax = /^op(?::|\()/
 
@@ -80,12 +91,21 @@ function createOnePasswordResolver(options = {}) {
   // op call runs alone; everything else queues behind its settlement and
   // then fans out in parallel against the authorized session.
   let coldStartCall = null
+  let coldStartCount = 0
+  let hintScheduled = false
 
   /**
    * @param {Function} fn - Producer returning a promise
    * @returns {Promise<*>} Producer result, gated behind the first call
    */
   function withColdStartLatch(fn) {
+    coldStartCount++
+    if (!hintScheduled) {
+      hintScheduled = true
+      // setImmediate lets the whole parallel fan-out register first so the
+      // hint reports an accurate item count.
+      setImmediate(() => logAuthHint(coldStartCount))
+    }
     if (!coldStartCall) {
       coldStartCall = fn()
       return coldStartCall
@@ -263,6 +283,8 @@ function createOnePasswordResolver(options = {}) {
       itemCache.clear()
       opReferences.length = 0
       coldStartCall = null
+      coldStartCount = 0
+      hintScheduled = false
     },
     syncFactory: require.resolve('./sync-factory'),
     syncOptions: buildSyncOptions(),

@@ -152,6 +152,14 @@ Sync mode rebuilds the resolver inside a worker process from JSON-serializable o
 
 1Password app-integration auth is per `op` process. The resolver runs the first `op` call alone and queues the rest behind it, so a config referencing many items triggers at most one biometric/authorization prompt per resolution run instead of one per item.
 
+The 1Password dialog names the terminal app (OS-attributed, not customizable), so before the first call the resolver prints a context line to stderr in interactive terminals:
+
+```text
+configorama: requesting 3 items from 1Password (expect an authorization prompt)
+```
+
+The hint is TTY-only — silent in CI and pipes.
+
 ## Safe mode and audit
 
 - `safeMode: true` blocks all custom resolvers during resolution, including this one.

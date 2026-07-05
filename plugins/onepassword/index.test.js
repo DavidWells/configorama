@@ -361,6 +361,52 @@ test('queued calls still run when the cold-start call fails', async () => {
   assert.is(results[1].value, 'db-secret')
 })
 
+test('auth hint on stderr names the number of items at cold start', async () => {
+  // drain hint timers scheduled by instances from earlier tests
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item', b: 'database-prod' }, execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = true
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await Promise.all([
+      source.resolver('op:a', {}, {}, vo('op:a')),
+      source.resolver('op:b', {}, {}, vo('op:b')),
+    ])
+    // the hint is scheduled with setImmediate; let it flush before restoring
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1, 'exactly one hint per resolution run')
+  assert.match(hints[0], /configorama: requesting 2 items from 1Password \(expect an authorization prompt\)/)
+})
+
+test('auth hint is silent when stderr is not a TTY', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item' }, execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = false
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await source.resolver('op:a', {}, {}, vo('op:a'))
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  assert.is(written.filter((line) => line.includes('1Password')).length, 0)
+})
+
 /* Source contract */
 
 test('returned source carries sensitive metadata and sync contract', () => {
