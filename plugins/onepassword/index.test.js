@@ -409,6 +409,54 @@ test('auth hint on stderr names the values at cold start (by alias)', async () =
   assert.is(hints[0].includes('npm_xxx'), false)
 })
 
+test('auth hint prefix honors the programName option', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item' }, programName: 'configx', execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = true
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await source.resolver('op:a', {}, {}, vo('op:a'))
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /^configx: fetching/)
+})
+
+test('auth hint prefix falls back to CONFIGORAMA_PROGRAM_NAME env var', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item' }, execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  const originalEnv = process.env.CONFIGORAMA_PROGRAM_NAME
+  process.stderr.isTTY = true
+  process.env.CONFIGORAMA_PROGRAM_NAME = 'confx-host'
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await source.resolver('op:a', {}, {}, vo('op:a'))
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+    if (originalEnv === undefined) delete process.env.CONFIGORAMA_PROGRAM_NAME
+    else process.env.CONFIGORAMA_PROGRAM_NAME = originalEnv
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /^confx-host: fetching/)
+})
+
 test('auth hint names the config key for bare op:// refs', async () => {
   await new Promise((resolve) => setImmediate(resolve))
   const fake = fakeOp()

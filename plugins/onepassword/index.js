@@ -14,13 +14,14 @@ const OP_PREFIX = 'op'
  * are config keys / aliases / fields — references, never secret values.
  * TTY-only: silent in CI and pipes.
  * @param {string[]} labels - Human labels for the values being fetched
+ * @param {string} programName - Host tool name shown as the message prefix
  */
-function logAuthHint(labels) {
+function logAuthHint(labels, programName) {
   if (!process.stderr.isTTY) return
   const unique = [...new Set(labels)]
   const n = unique.length
   const what = n > 0 && n <= 8 ? unique.join(', ') : `${n} value${n === 1 ? '' : 's'}`
-  process.stderr.write(`configorama: fetching ${what} from 1Password (expect an authorization prompt)\n`)
+  process.stderr.write(`${programName}: fetching ${what} from 1Password (expect an authorization prompt)\n`)
 }
 // Supports: op:alias, op:alias.KEY, op(item), op(item).KEY
 const opVariableSyntax = /^op(?::|\()/
@@ -42,6 +43,7 @@ const opVariableSyntax = /^op(?::|\()/
  * @param {string} [options.account] - Passed to op as --account
  * @param {string} [options.configDir] - Passed to op as --config
  * @param {string} [options.opPath] - Path to the op binary (defaults to "op" on PATH)
+ * @param {string} [options.programName] - Host tool name for the auth-prompt hint (defaults to $CONFIGORAMA_PROGRAM_NAME or "configorama")
  * @param {boolean} [options.skipResolution] - Collect metadata and return placeholders without calling op
  * @param {Function} [options.execFile] - execFile injection for tests (not serializable; unavailable in sync mode)
  * @returns {object} Variable source configuration with resolver and metadata collector
@@ -52,6 +54,7 @@ function createOnePasswordResolver(options = {}) {
     account,
     configDir,
     opPath,
+    programName,
     skipResolution = false,
     execFile,
   } = options
@@ -110,8 +113,13 @@ function createOnePasswordResolver(options = {}) {
     if (!hintScheduled) {
       hintScheduled = true
       // setImmediate lets the whole parallel fan-out register first so the
-      // hint names every value being fetched.
-      setImmediate(() => logAuthHint(pendingLabels))
+      // hint names every value being fetched. The prefix is read here (not at
+      // factory time) so a host tool can set CONFIGORAMA_PROGRAM_NAME after the
+      // resolver is constructed but before resolution runs.
+      setImmediate(() => {
+        const prefix = programName || process.env.CONFIGORAMA_PROGRAM_NAME || 'configorama'
+        logAuthHint(pendingLabels, prefix)
+      })
     }
     if (!coldStartCall) {
       coldStartCall = fn()
