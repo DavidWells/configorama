@@ -314,7 +314,7 @@ test('returned source carries sensitive metadata and sync contract', () => {
   assert.is(source.match.test('op(item)'), true)
   assert.is(source.match.test('opt:stage'), false)
   assert.is(typeof source.syncFactory, 'string')
-  assert.equal(source.syncOptions, { refs: { npm: 'note-item' }, account: 'my', configDir: undefined, skipResolution: false })
+  assert.equal(source.syncOptions, { refs: { npm: 'note-item' }, account: 'my', configDir: undefined, opPath: undefined, skipResolution: false })
 })
 
 test.run()

@@ -9,11 +9,12 @@ const NOT_FOUND_PATTERN = /isn'?t an? (item|vault)|not found|no item|no vault|do
  * Run the op binary with the given args.
  * No `command -v op` preflight: translating ENOENT is the existence check.
  * @param {string[]} args - CLI arguments
- * @param {object} [options] - { execFile, account, configDir, subject }
+ * @param {object} [options] - { execFile, opPath, account, configDir, subject }
  * @returns {Promise<string>} stdout
  */
 function runOp(args, options = {}) {
   const execFile = options.execFile || childProcess.execFile
+  const binary = options.opPath || 'op'
   const finalArgs = args.slice()
   if (options.account) {
     finalArgs.push('--account', options.account)
@@ -23,7 +24,7 @@ function runOp(args, options = {}) {
   }
 
   return new Promise((resolve, reject) => {
-    execFile('op', finalArgs, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(binary, finalArgs, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         return reject(translateError(err, stderr, options.subject))
       }
@@ -64,6 +65,7 @@ function translateError(err, stderr, subject) {
 function readSecretRef(ref, options = {}) {
   return runOp(['read', '--no-newline', ref], {
     execFile: options.execFile,
+    opPath: options.opPath,
     account: options.account,
     configDir: options.configDir,
     subject: ref,
@@ -84,6 +86,7 @@ async function getItem(spec, options = {}) {
   }
   const stdout = await runOp(args, {
     execFile: options.execFile,
+    opPath: options.opPath,
     account: options.account,
     configDir: options.configDir,
     subject: spec,

@@ -48,6 +48,7 @@ Options:
 | `refs` | object | Alias map. Values may be an `op://` secret reference, an item ID/name, a private item link, or `{ item, vault, section, field }` / `{ ref }` / `{ url }` |
 | `account` | string | Passed to `op` as `--account` |
 | `configDir` | string | Passed to `op` as `--config` |
+| `opPath` | string | Path to the `op` binary (defaults to `op` on `PATH`) |
 | `skipResolution` | boolean | Record metadata and return deterministic placeholders without calling `op` |
 
 ## Alias syntax (recommended)

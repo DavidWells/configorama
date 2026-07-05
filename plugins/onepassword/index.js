@@ -25,6 +25,7 @@ const opVariableSyntax = /^op(?::|\()/
  * @param {object} [options.refs] - Alias map: name -> string ref, item name, private link, or { item, vault, section, field } / { ref } / { url }
  * @param {string} [options.account] - Passed to op as --account
  * @param {string} [options.configDir] - Passed to op as --config
+ * @param {string} [options.opPath] - Path to the op binary (defaults to "op" on PATH)
  * @param {boolean} [options.skipResolution] - Collect metadata and return placeholders without calling op
  * @param {Function} [options.execFile] - execFile injection for tests (not serializable; unavailable in sync mode)
  * @returns {object} Variable source configuration with resolver and metadata collector
@@ -34,6 +35,7 @@ function createOnePasswordResolver(options = {}) {
     refs = {},
     account,
     configDir,
+    opPath,
     skipResolution = false,
     execFile,
   } = options
@@ -51,7 +53,7 @@ function createOnePasswordResolver(options = {}) {
   const secretRefCache = new Map()
   const itemCache = new Map()
 
-  const cliOptions = { account, configDir, execFile }
+  const cliOptions = { account, configDir, opPath, execFile }
   const scopeKey = `${account || ''}|${configDir || ''}`
 
   /**
@@ -246,7 +248,7 @@ function createOnePasswordResolver(options = {}) {
    * @returns {object} JSON-serializable options for the sync worker
    */
   function buildSyncOptions() {
-    const syncOptions = { refs, account, configDir, skipResolution }
+    const syncOptions = { refs, account, configDir, opPath, skipResolution }
     if (execFile) {
       // Functions cannot cross the JSON boundary into the sync worker;
       // flag it so sync-factory can fail loudly instead of silently
