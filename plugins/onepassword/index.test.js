@@ -135,6 +135,26 @@ test('raw alias returns whole field text and section key paths work', async () =
   assert.is(config.dbPassword, 's3cr3t')
 })
 
+test('bare op:// URI resolves as a direct secret ref', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+  const config = await configorama(
+    { token: '${op://vault/item/notesPlain}' },
+    { variableSources: [source] }
+  )
+  assert.is(config.token, INI_NOTE)
+  assert.equal(fake.calls[0].args.slice(0, 3), ['read', '--no-newline', 'op://vault/item/notesPlain'])
+})
+
+test('bare op:// URI records a secretRef metadata entry with the ref', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+  await configorama({ token: '${op://vault/item/field}' }, { variableSources: [source] })
+  const [entry] = source.collectMetadata()
+  assert.is(entry.referenceKind, 'secretRef')
+  assert.is(entry.ref, 'op://vault/item/field')
+})
+
 test('direct function syntax with op:// ref and key path', async () => {
   const fake = fakeOp()
   const source = createOnePasswordResolver({ execFile: fake.execFile })

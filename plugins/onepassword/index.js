@@ -130,6 +130,14 @@ function createOnePasswordResolver(options = {}) {
       return { reference: normalizeRefValue(spec), keyPath: funcMatch[2], alias: undefined }
     }
 
+    // Bare 1Password secret reference: ${op://vault/item/field}. This is the
+    // native op:// URI and is treated as a direct secret ref (op read). Key
+    // paths are not supported here because op:// refs contain dots and slashes;
+    // use alias or function syntax for a structured-note key path.
+    if (trimmed.startsWith('op://')) {
+      return { reference: { kind: 'secretRef', ref: trimmed }, keyPath: undefined, alias: undefined }
+    }
+
     if (!trimmed.startsWith('op:')) {
       throw new Error(`Invalid 1Password variable "${varString}".`)
     }
