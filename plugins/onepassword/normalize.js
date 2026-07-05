@@ -2,7 +2,19 @@
    Validates aliases, parses private item links, rejects public share links */
 
 const ALIAS_PATTERN = /^[A-Za-z0-9_]+$/
+// 1Password item and vault IDs are 26-character lowercase base32 strings.
+const ITEM_ID_PATTERN = /^[a-z0-9]{26}$/
 const PRIVATE_LINK_PREFIXES = ['https://start.1password.com/open/i', 'onepassword://open/i']
+
+/**
+ * Whether a string has the shape of a 1Password item ID (26-char base32).
+ * Used to let colon syntax accept a bare item ID where an alias would go.
+ * @param {string} value - Candidate string
+ * @returns {boolean} True when it looks like an item ID
+ */
+function isItemId(value) {
+  return ITEM_ID_PATTERN.test(value)
+}
 
 /**
  * Validate an alias name from the refs config.
@@ -142,4 +154,4 @@ function normalizeObjectRef(value) {
   }
 }
 
-module.exports = { validateAliasName, normalizeRefValue, parsePrivateLink, isPrivateLink }
+module.exports = { validateAliasName, normalizeRefValue, parsePrivateLink, isPrivateLink, isItemId }

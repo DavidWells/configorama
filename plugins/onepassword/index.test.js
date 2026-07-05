@@ -36,6 +36,11 @@ const items = {
     title: 'My Database Login',
     fields: [{ id: 'password', type: 'CONCEALED', purpose: 'PASSWORD', label: 'password', value: 'login-secret' }],
   },
+  'a1b2c3d4e5f6g7h8i9j0k1l2m3': {
+    id: 'a1b2c3d4e5f6g7h8i9j0k1l2m3',
+    title: 'By UUID',
+    fields: [{ id: 'credential', type: 'CONCEALED', label: 'credential', value: 'uuid-secret' }],
+  },
 }
 
 /**
@@ -236,6 +241,43 @@ test('unknown alias names the missing ref', async () => {
     assert.unreachable('should have thrown')
   } catch (err) {
     assert.match(err.message, /Unknown 1Password alias "npm". Configure refs.npm/)
+  }
+})
+
+test('colon syntax accepts a bare 1Password item ID (26-char base32)', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: {}, execFile: fake.execFile })
+  const config = await configorama({ k: '${op:a1b2c3d4e5f6g7h8i9j0k1l2m3}' }, { variableSources: [source] })
+  assert.is(config.k, 'uuid-secret')
+  assert.equal(fake.calls[0].args.slice(0, 3), ['item', 'get', 'a1b2c3d4e5f6g7h8i9j0k1l2m3'])
+})
+
+test('colon-syntax item ID supports a key path', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: {}, execFile: fake.execFile })
+  const config = await configorama({ k: '${op:a1b2c3d4e5f6g7h8i9j0k1l2m3.credential}' }, { variableSources: [source] })
+  assert.is(config.k, 'uuid-secret')
+})
+
+test('a configured alias always wins over item-ID detection', async () => {
+  const fake = fakeOp()
+  // alias whose NAME happens to be a 26-char id points at a different item
+  const source = createOnePasswordResolver({
+    refs: { a1b2c3d4e5f6g7h8i9j0k1l2m3: 'database-prod' },
+    execFile: fake.execFile,
+  })
+  const config = await configorama({ k: '${op:a1b2c3d4e5f6g7h8i9j0k1l2m3}' }, { variableSources: [source] })
+  assert.is(config.k, 'db-secret')
+  assert.is(fake.calls[0].args[2], 'database-prod')
+})
+
+test('a short unknown alias still errors (not treated as an item ID)', async () => {
+  const source = createOnePasswordResolver({ refs: {}, execFile: fakeOp().execFile })
+  try {
+    await source.resolver('op:npm', {}, {}, vo('op:npm'))
+    assert.unreachable('should have thrown')
+  } catch (err) {
+    assert.match(err.message, /Unknown 1Password alias "npm"/)
   }
 })
 

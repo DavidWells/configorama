@@ -1,7 +1,7 @@
 /* 1Password variable source for configorama
    Resolves ${op:alias} and ${op(item)} references through the op CLI */
 const { readSecretRef, getItem } = require('./op-cli')
-const { validateAliasName, normalizeRefValue } = require('./normalize')
+const { validateAliasName, normalizeRefValue, isItemId } = require('./normalize')
 const { selectField, trySelectField } = require('./fields')
 const { parseStructuredSecret, getKeyPath } = require('./parser')
 
@@ -173,10 +173,21 @@ function createOnePasswordResolver(options = {}) {
 
     validateAliasName(alias)
     const reference = aliasRefs[alias]
-    if (!reference) {
-      throw new Error(`Unknown 1Password alias "${alias}". Configure refs.${alias}.`)
+    if (reference) {
+      return { reference, keyPath, alias }
     }
-    return { reference, keyPath, alias }
+    // Not a configured alias. A bare 1Password item ID (26-char base32) is
+    // unambiguous, so accept it as a direct item reference. Configured aliases
+    // always take precedence (checked above), so this only affects strings that
+    // would otherwise error as an unknown alias.
+    if (isItemId(alias)) {
+      return {
+        reference: { kind: 'item', item: alias, vault: undefined, section: undefined, field: undefined },
+        keyPath,
+        alias: undefined,
+      }
+    }
+    throw new Error(`Unknown 1Password alias "${alias}". Configure refs.${alias}.`)
   }
 
   /**
