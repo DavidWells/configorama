@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.1](https://github.com/DavidWells/configorama/compare/configorama@1.2.0...configorama@1.2.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* **setup:** resolve tsc errors blocking publish; document type-check rule ([3279988](https://github.com/DavidWells/configorama/commit/3279988220394e7832b8142e079ca179e7ac0124))
+
+
+
+
+
 # 1.2.0 (2026-07-05)
 
 
