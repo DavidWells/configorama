@@ -266,7 +266,8 @@ Default fallback value will be used if provided.
 
 ${JSON.stringify(options.context, null, 2)}`,
       })
-      console.log(errorMsg)
+      // Diagnostic goes to stderr so it never pollutes resolved-config stdout
+      console.error(errorMsg)
     }
     // TODO maybe reject. YAML does not allow for null/undefined values
     // return Promise.reject(new Error(errorMsg))
