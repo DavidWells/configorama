@@ -3,6 +3,22 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const PromiseTracker = require('./PromiseTracker')
 
+test('start() does not enable progress logging by default', () => {
+  const tracker = new PromiseTracker()
+  tracker.start()
+  const hasInterval = !!tracker.interval
+  tracker.stop()
+  assert.is(hasInterval, false, 'no interval timer unless progress is requested')
+})
+
+test('start(true) enables the progress interval; stop() clears it', () => {
+  const tracker = new PromiseTracker()
+  tracker.start(true)
+  assert.ok(tracker.interval, 'interval set when progress requested')
+  tracker.stop()
+  assert.is(tracker.interval, null, 'interval cleared on stop')
+})
+
 test('report() writes progress to stderr, not stdout', () => {
   const tracker = new PromiseTracker()
   const pending = Promise.resolve()

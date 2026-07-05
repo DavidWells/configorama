@@ -13,9 +13,13 @@ class PromiseTracker {
     this.startTime = Date.now()
     this.cursor = 0
   }
-  start() {
+  start(enableProgress = false) {
     this.reset()
-    this.interval = setInterval(this.report.bind(this), 2500)
+    // The tracker's job is cycle detection and promise coordination; the
+    // periodic progress report is a debug-only aid, off unless requested.
+    if (enableProgress) {
+      this.interval = setInterval(this.report.bind(this), 2500)
+    }
   }
   report() {
     const delta = Date.now() - this.startTime
@@ -42,7 +46,8 @@ class PromiseTracker {
     /**/
   }
   stop() {
-    clearInterval(this.interval)
+    if (this.interval) clearInterval(this.interval)
+    this.interval = null
     this.reset()
   }
   add(variable, promise, specifier, hasFilter, promiseKey) {

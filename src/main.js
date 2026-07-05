@@ -3050,7 +3050,9 @@ Missing Value ${missingValue} - ${matchedString}
   // ###############
   initialCall(func) {
     this.deep = []
-    this.tracker.start()
+    // Progress reporting is a debug-only aid; the tracker still coordinates
+    // promises and detects cycles regardless.
+    this.tracker.start(DEBUG)
     return func().finally(() => {
       this.tracker.stop()
       this.deep = []
