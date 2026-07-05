@@ -92,6 +92,7 @@ const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
 /* Utils - paths */
 const { findLineByPath } = require('./utils/paths/findLineForKey')
+const { configFileType } = require('./utils/paths/fileType')
 const { normalizeIgnorePaths, compileIgnorePaths, shouldIgnorePath } = require('./utils/paths/ignorePaths')
 /* Utils - regex */
 const { combineRegexes, funcRegex, fileRefSyntax, textRefSyntax } = require('./utils/regex')
@@ -2574,8 +2575,8 @@ Missing Value ${missingValue} - ${matchedString}
           if (valueCount.length === 1 && noNestedVars) {
             let lineInfo = ''
             if (this.originalString && this.configFilePath && valueObject.path) {
-              const ext = path.extname(this.configFilePath)
-              if (ext === '.yml' || ext === '.yaml' || ext === '.json') {
+              const ext = configFileType(this.configFilePath)
+              if (ext === '.yml' || ext === '.yaml' || ext === '.json' || ext === '.env') {
                 const rawLines = this.originalString.split('\n')
                 const lineNum = findLineByPath(arrayToJsonPath(valueObject.path), rawLines, ext)
                 if (lineNum) lineInfo = ` at line ${lineNum},`

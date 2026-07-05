@@ -4,8 +4,10 @@ const path = require('path')
 const YAML = require('../../parsers/yaml')
 const TOML = require('../../parsers/toml')
 const INI = require('../../parsers/ini')
+const DOTENV = require('../../parsers/dotenv')
 const JSON5 = require('../../parsers/json5')
 const HCL = require('../../parsers/hcl')
+const { isEnvFile } = require('../paths/fileType')
 const { executeTypeScriptFileSync } = require('../../parsers/typescript')
 const { executeESMFileSync } = require('../../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
@@ -72,8 +74,12 @@ function detectFormat(contents) {
 function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
   let fileType = path.extname(filePath)
 
-  // Content-based detection for extensionless or unrecognized files
-  if (!fileType || !KNOWN_EXTENSIONS.has(fileType.toLowerCase())) {
+  // Dotenv files have no extension (path.extname('.env') === ''), so detect
+  // them by name before falling back to content sniffing.
+  if (isEnvFile(filePath)) {
+    fileType = '.env'
+  } else if (!fileType || !KNOWN_EXTENSIONS.has(fileType.toLowerCase())) {
+    // Content-based detection for extensionless or unrecognized files
     fileType = detectFormat(contents)
   }
 
@@ -105,6 +111,8 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
     configObject = TOML.parse(contents)
   } else if (fileType.match(/\.(ini)/i)) {
     configObject = INI.parse(contents)
+  } else if (fileType === '.env') {
+    configObject = DOTENV.parse(contents)
   } else if (fileType.match(/\.(json|json5|jsonc)/i)) {
     configObject = JSON5.parse(contents)
   } else if (fileType.match(/\.(tf|hcl)$/i) || filePath.match(/\.tf\.json$/i)) {
