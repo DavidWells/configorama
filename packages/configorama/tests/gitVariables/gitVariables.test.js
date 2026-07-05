@@ -60,7 +60,7 @@ test("repo urls", () => {
 })
 
 test('${git:dir}', () => {
-  assert.is(config.dir, `https://github.com/DavidWells/configorama/tree/${currentBranch}/tests/gitVariables`)
+  assert.is(config.dir, `https://github.com/DavidWells/configorama/tree/${currentBranch}/packages/configorama/tests/gitVariables`)
 })
 
 test('${git:branch} matches current branch', () => {
