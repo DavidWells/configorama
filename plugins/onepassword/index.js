@@ -66,12 +66,31 @@ function createOnePasswordResolver(options = {}) {
     if (cache.has(key)) {
       return cache.get(key)
     }
-    const promise = fn().catch((err) => {
+    const promise = withColdStartLatch(fn).catch((err) => {
       cache.delete(key)
       throw err
     })
     cache.set(key, promise)
     return promise
+  }
+
+  // 1Password app-integration auth prompts once per op PROCESS until a
+  // session exists. Parallel resolution of N distinct items would spawn N
+  // processes at cold start and trigger N biometric prompts, so the first
+  // op call runs alone; everything else queues behind its settlement and
+  // then fans out in parallel against the authorized session.
+  let coldStartCall = null
+
+  /**
+   * @param {Function} fn - Producer returning a promise
+   * @returns {Promise<*>} Producer result, gated behind the first call
+   */
+  function withColdStartLatch(fn) {
+    if (!coldStartCall) {
+      coldStartCall = fn()
+      return coldStartCall
+    }
+    return coldStartCall.catch(() => {}).then(fn)
   }
 
   /**
@@ -243,6 +262,7 @@ function createOnePasswordResolver(options = {}) {
       secretRefCache.clear()
       itemCache.clear()
       opReferences.length = 0
+      coldStartCall = null
     },
     syncFactory: require.resolve('./sync-factory'),
     syncOptions: buildSyncOptions(),

@@ -148,6 +148,10 @@ const config = configorama.sync('config.yml', {
 
 Sync mode rebuilds the resolver inside a worker process from JSON-serializable options and always uses the real `op` binary.
 
+## Auth prompts
+
+1Password app-integration auth is per `op` process. The resolver runs the first `op` call alone and queues the rest behind it, so a config referencing many items triggers at most one biometric/authorization prompt per resolution run instead of one per item.
+
 ## Safe mode and audit
 
 - `safeMode: true` blocks all custom resolvers during resolution, including this one.

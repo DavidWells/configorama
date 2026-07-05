@@ -314,6 +314,53 @@ test('clearCache clears caches and metadata', async () => {
   assert.is(fake.calls.length, 2)
 })
 
+test('cold start serializes the first op call before parallel fan-out', async () => {
+  const calls = []
+  let releaseFirst
+  function execFile(cmd, args, opts, cb) {
+    calls.push(args[2])
+    if (calls.length === 1) {
+      releaseFirst = () => cb(null, JSON.stringify(items['note-item']), '')
+      return
+    }
+    cb(null, JSON.stringify(items['database-prod']), '')
+  }
+  const source = createOnePasswordResolver({ refs: { a: 'note-item', b: 'database-prod' }, execFile })
+
+  const first = source.resolver('op:a', {}, {}, vo('op:a'))
+  const second = source.resolver('op:b', {}, {}, vo('op:b'))
+
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.is(calls.length, 1, 'second op call must wait for the first to settle')
+
+  releaseFirst()
+  const [firstValue, secondValue] = await Promise.all([first, second])
+  assert.is(calls.length, 2)
+  assert.is(firstValue, INI_NOTE)
+  assert.is(secondValue, 'db-secret')
+})
+
+test('queued calls still run when the cold-start call fails', async () => {
+  const calls = []
+  function execFile(cmd, args, opts, cb) {
+    calls.push(args[2])
+    if (calls.length === 1) {
+      const err = Object.assign(new Error('fail'), { code: 1 })
+      return cb(err, '', 'item not found')
+    }
+    cb(null, JSON.stringify(items['database-prod']), '')
+  }
+  const source = createOnePasswordResolver({ refs: { a: 'missing-item', b: 'database-prod' }, execFile })
+
+  const results = await Promise.allSettled([
+    source.resolver('op:a', {}, {}, vo('op:a')),
+    source.resolver('op:b', {}, {}, vo('op:b')),
+  ])
+  assert.is(results[0].status, 'rejected')
+  assert.is(results[1].status, 'fulfilled')
+  assert.is(results[1].value, 'db-secret')
+})
+
 /* Source contract */
 
 test('returned source carries sensitive metadata and sync contract', () => {
