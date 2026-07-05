@@ -15,7 +15,8 @@
   "files": [
     "cli.js",
     "src/resolveEnv.js",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "configorama",
@@ -24,9 +25,22 @@
     "dotenv",
     "secrets"
   ],
+  "author": "David Wells",
   "license": "MIT",
+  "homepage": "https://github.com/DavidWells/configorama/tree/master/packages/configx#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DavidWells/configorama",
+    "directory": "packages/configx"
+  },
+  "bugs": {
+    "url": "https://github.com/DavidWells/configorama/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "configorama": "^1.0.2",
+    "configorama": "^1.1.0",
     "minimist": "^1.2.8"
   },
   "devDependencies": {
