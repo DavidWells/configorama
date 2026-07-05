@@ -2,6 +2,35 @@
 
 Guidance for agents and contributors working on configorama.
 
+## Monorepo layout (read first)
+
+This is a pnpm + lerna monorepo. The repo root is a **private container**
+(`configorama-monorepo`), not a published package. The published packages live
+under `packages/`:
+
+- `packages/configorama` — the `configorama` library + CLI + bundled plugins.
+- `packages/configx` — `@davidwells/configx`, depends on `configorama` via `workspace:^`.
+
+Paths are relative to a package's own directory (e.g. configorama's `src/`,
+`tests/`, `tsconfig.json` are all under `packages/configorama/`). Don't add code
+at the repo root — it belongs in a package.
+
+### Testing
+
+- `pnpm test` at the root runs **every** package's tests (`pnpm -r test`).
+- Per package: `cd packages/<pkg> && npm test`, or run a single file with `node`.
+- CI (`.github/workflows/test.yml`) runs `pnpm -r --if-present typecheck` and
+  `pnpm -r test` on every PR — keep both green.
+
+### Releasing
+
+- **Publish through pnpm/lerna, never `npm publish`.** Only pnpm/lerna rewrite
+  `workspace:^` to a real range; `npm publish` ships a literal `workspace:^` and
+  breaks installs.
+- **Both packages changed** → `pnpm run release` (`lerna publish`).
+- **One package changed** → publish just it (`cd packages/<pkg> && pnpm version <bump> && pnpm publish`)
+  **and create the matching `<name>@<version>` git tag**, or lerna's history drifts behind npm.
+
 ## Always type-check after changes (load-bearing)
 
 This is a JavaScript project type-checked with TypeScript via JSDoc. **After any
