@@ -159,4 +159,53 @@ test('--export does not require a command', () => {
   assert.match(r.stdout, /export APP_NAME='configx-test'/)
 })
 
+test('pre-flight fails on a cheap-variable error without invoking custom resolvers', () => {
+  const fs = require('fs')
+  const sentinel = path.join(require('os').tmpdir(), `configx-sentinel-${process.pid}-a`)
+  if (fs.existsSync(sentinel)) fs.unlinkSync(sentinel)
+
+  const r = runConfigx(
+    [path.join(fixtures, 'preflight-bad.yml'), '--config', path.join(fixtures, 'preflight.config.js'), '--', 'true'],
+    { CONFIGX_SENTINEL: sentinel }
+  )
+  assert.is.not(r.status, 0)
+  assert.match(r.stderr, /Unable to resolve|definitely_missing/)
+  // the side-effecting resolver (stand-in for the 1Password prompt) never ran
+  assert.is(fs.existsSync(sentinel), false)
+})
+
+test('pre-flight passes and the real resolver runs when all cheap vars resolve', () => {
+  const fs = require('fs')
+  const sentinel = path.join(require('os').tmpdir(), `configx-sentinel-${process.pid}-b`)
+  if (fs.existsSync(sentinel)) fs.unlinkSync(sentinel)
+
+  const r = runConfigx(
+    [path.join(fixtures, 'preflight-ok.yml'), '--config', path.join(fixtures, 'preflight.config.js'), '--',
+      'node', '-e', 'process.stdout.write(process.env.GOOD + "|" + process.env.STAGE)'],
+    { CONFIGX_SENTINEL: sentinel }
+  )
+  assert.is(r.status, 0)
+  assert.is(r.stdout, 'secret-value|dev')
+  // the real resolver ran exactly once (in the real pass, not the stubbed pre-flight)
+  assert.is(fs.existsSync(sentinel), true)
+  assert.is(fs.readFileSync(sentinel, 'utf8'), 'resolver-ran')
+  fs.unlinkSync(sentinel)
+})
+
+test('--no-preflight skips the pre-flight pass', () => {
+  const fs = require('fs')
+  const sentinel = path.join(require('os').tmpdir(), `configx-sentinel-${process.pid}-c`)
+  if (fs.existsSync(sentinel)) fs.unlinkSync(sentinel)
+
+  // with the bad var, --no-preflight lets the real pass run (and invoke the resolver) before failing
+  const r = runConfigx(
+    [path.join(fixtures, 'preflight-bad.yml'), '--config', path.join(fixtures, 'preflight.config.js'), '--no-preflight', '--', 'true'],
+    { CONFIGX_SENTINEL: sentinel }
+  )
+  assert.is.not(r.status, 0)
+  // without pre-flight, the side-effecting resolver DID run (this is what pre-flight prevents)
+  assert.is(fs.existsSync(sentinel), true)
+  fs.unlinkSync(sentinel)
+})
+
 test.run()

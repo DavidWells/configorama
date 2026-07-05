@@ -1,0 +1,2 @@
+GOOD: ${sidefx:x}
+BAD: ${option:definitely_missing_no_fallback}

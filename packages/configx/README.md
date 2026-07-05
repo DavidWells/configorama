@@ -87,6 +87,15 @@ configx .env -- ./my-app
 - **`--` is the separator.** Configorama options go on the left; the command and its flags go on the right. There is no shell-string form — the command is spawned with `shell: false`, so there is no shell-injection surface.
 - **Status and signals propagate.** The child inherits stdio; `configx` forwards `SIGINT`/`SIGTERM`/`SIGHUP` and exits with the child's code (or `128 + signal` if the child was killed).
 
+## Pre-flight (avoids prompting on a doomed run)
+
+configorama resolves variables in parallel, so a secret resolver can fire its side effect — like a 1Password prompt — before an unrelated variable fails and aborts the run. To avoid prompting for a run that was going to fail anyway, configx does a **pre-flight pass** whenever a resolver (custom `variableSources`) is configured:
+
+- It resolves the config once with the custom resolvers stubbed out. Built-in resolvers (`opt`/`env`/`self`) run for real, so a missing `${opt:...}` value with no fallback, a missing env var, or a bad reference fails **here** — before any secret resolver runs.
+- Only if the pre-flight passes does configx do the real resolve (where secret resolvers actually fetch).
+
+Pre-flight catches structural/input failures only. A reference that is valid but fails at fetch time (a deleted item, a revoked session) still reaches the real pass and may prompt. Disable with `--no-preflight`.
+
 ## Security
 
 - Resolved values may be secrets. `configx` never prints them; errors name offending keys and types, never values.

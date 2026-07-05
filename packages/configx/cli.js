@@ -9,6 +9,9 @@ const minimist = require('minimist')
 const dotenv = require('dotenv')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
 
+// Stand-in value returned by stubbed custom resolvers during the pre-flight pass.
+const PREFLIGHT_PLACEHOLDER = 'configx-preflight'
+
 /**
  * Detect a dotenv file by name (.env, .env.local, deploy.env, ...).
  * These are parsed as dotenv rather than left to configorama's format
@@ -75,8 +78,9 @@ function loadSettingsFile(explicitPath, cwd) {
 async function main() {
   const argv = minimist(process.argv.slice(2), {
     '--': true,
-    boolean: ['export'],
+    boolean: ['export', 'preflight'],
     string: ['config', 'stage', 'param'],
+    default: { preflight: true },
   })
 
   const file = argv._[0]
@@ -99,7 +103,7 @@ async function main() {
 
   // configorama options for ${opt:...} come from the CLI flags (minus
   // positionals, the -- command, and configx's own --config/--export).
-  const { _, config: _configFlag, export: _exportFlag, ...opts } = argv
+  const { _, config: _configFlag, export: _exportFlag, preflight: _preflightFlag, ...opts } = argv
   delete opts['--']
 
   // dotenv files are parsed here into a { KEY: rawValue } object so
@@ -113,6 +117,25 @@ async function main() {
   }
 
   const configorama = loadConfigorama()
+  const resolveOptions = { ...(settingsFile.options || {}), ...opts }
+
+  // Pre-flight: resolve once with the custom resolvers stubbed out. Built-in
+  // resolvers (opt/env/self) run for real and surface missing-value or bad-ref
+  // errors, while side-effecting resolvers (e.g. the 1Password prompt) never
+  // fire. So a doomed run fails here without ever prompting for a secret. This
+  // only catches structural/input failures — a valid ref that fails at fetch
+  // time (deleted item, revoked session) still reaches the real pass.
+  const sources = settingsFile.variableSources
+  if (Array.isArray(sources) && sources.length && argv.preflight !== false) {
+    const stubbed = sources.map((src) => ({ ...src, resolver: async () => PREFLIGHT_PLACEHOLDER }))
+    const preflightInput = typeof input === 'object' ? JSON.parse(JSON.stringify(input)) : input
+    try {
+      await configorama(preflightInput, { ...settingsFile, configDir, variableSources: stubbed, options: resolveOptions })
+    } catch (err) {
+      fail(err.message)
+    }
+  }
+
   let resolved
   // Let resolvers (e.g. the 1Password plugin's auth-prompt hint) attribute the
   // request to configx. Restored afterwards so it never reaches the child env.
@@ -122,7 +145,7 @@ async function main() {
     resolved = await configorama(input, {
       ...settingsFile,
       configDir,
-      options: { ...(settingsFile.options || {}), ...opts },
+      options: resolveOptions,
     })
   } catch (err) {
     fail(err.message)
