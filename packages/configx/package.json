@@ -7,7 +7,7 @@
   },
   "main": "src/resolveEnv.js",
   "scripts": {
-    "test": "node src/resolveEnv.test.js && node cli.test.js && node cli-setup.test.js",
+    "test": "node src/resolveEnv.test.js && node cli.test.js && node cli-setup.test.js && node shell-e2e.test.js",
     "release:patch": "pnpm version patch && pnpm publish",
     "release:minor": "pnpm version minor && pnpm publish",
     "release:major": "pnpm version major && pnpm publish"

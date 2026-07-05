@@ -46,13 +46,21 @@ function validateFunctionName(name) {
   }
 }
 
+// Capture exports first so a configx failure propagates its exit status;
+// a bare eval "$(configx ...)" would swallow it and return 0.
+const EVAL_BODY_LINES = [
+  '  local __configx_exports',
+  '  __configx_exports="$(configx "$@" --export)" || return $?',
+  '  eval "$__configx_exports"',
+]
+
 function functionBody(functionName = DEFAULT_FUNCTION_NAME, includeLongAlias = true) {
   validateFunctionName(functionName)
 
   const lines = [START_MARKER]
   if (includeLongAlias || functionName === LONG_ALIAS_NAME) {
     lines.push(`${LONG_ALIAS_NAME}() {`)
-    lines.push('  eval "$(configx "$@" --export)"')
+    lines.push(...EVAL_BODY_LINES)
     lines.push('}')
     if (functionName !== LONG_ALIAS_NAME) {
       lines.push('')
@@ -62,7 +70,7 @@ function functionBody(functionName = DEFAULT_FUNCTION_NAME, includeLongAlias = t
     }
   } else {
     lines.push(`${functionName}() {`)
-    lines.push('  eval "$(configx "$@" --export)"')
+    lines.push(...EVAL_BODY_LINES)
     lines.push('}')
   }
   lines.push(END_MARKER)
