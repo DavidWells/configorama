@@ -6,23 +6,10 @@ const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
-const dotenv = require('dotenv')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
 
 // Stand-in value returned by stubbed custom resolvers during the pre-flight pass.
 const PREFLIGHT_PLACEHOLDER = 'configx-preflight'
-
-/**
- * Detect a dotenv file by name (.env, .env.local, deploy.env, ...).
- * These are parsed as dotenv rather than left to configorama's format
- * detection, which reads a single KEY=VALUE line as a scalar string.
- * @param {string} file - Config file path
- * @returns {boolean} True when the file is a dotenv file
- */
-function isEnvFile(file) {
-  const base = path.basename(file)
-  return base === '.env' || base.startsWith('.env.') || base.endsWith('.env')
-}
 
 /**
  * Load configorama from the installed dependency, falling back to the
@@ -106,15 +93,10 @@ async function main() {
   const { _, config: _configFlag, export: _exportFlag, preflight: _preflightFlag, ...opts } = argv
   delete opts['--']
 
-  // dotenv files are parsed here into a { KEY: rawValue } object so
-  // configorama resolves ${...} refs in the values; other formats are
-  // handed to configorama by path for its own parsing.
-  let input = file
-  let configDir = settingsFile.configDir
-  if (isEnvFile(file)) {
-    input = dotenv.parse(fs.readFileSync(file))
-    configDir = configDir || path.dirname(path.resolve(file))
-  }
+  // configorama parses the config file itself (including .env), so it keeps
+  // the file path and reports errors with file + line.
+  const input = file
+  const configDir = settingsFile.configDir
 
   const configorama = loadConfigorama()
   const resolveOptions = { ...(settingsFile.options || {}), ...opts }
@@ -128,9 +110,8 @@ async function main() {
   const sources = settingsFile.variableSources
   if (Array.isArray(sources) && sources.length && argv.preflight !== false) {
     const stubbed = sources.map((src) => ({ ...src, resolver: async () => PREFLIGHT_PLACEHOLDER }))
-    const preflightInput = typeof input === 'object' ? JSON.parse(JSON.stringify(input)) : input
     try {
-      await configorama(preflightInput, { ...settingsFile, configDir, variableSources: stubbed, options: resolveOptions })
+      await configorama(input, { ...settingsFile, configDir, variableSources: stubbed, options: resolveOptions })
     } catch (err) {
       fail(err.message)
     }
