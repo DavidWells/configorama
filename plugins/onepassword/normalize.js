@@ -25,15 +25,29 @@ function isPrivateLink(value) {
 }
 
 /**
- * Parse a "Copy Private Link" URL into item and vault IDs.
- * The a (account) and h (host) params identify the account and are
+ * Recognize abbreviated private-link forms where the scheme, host, and/or
+ * path have been stripped, leaving the query params (e.g. "open/i?...&i=ID",
+ * or a bare "v=VAULT&i=ID"). Requires an "i=" param plus a 1Password marker
+ * or a pure query string, so ordinary item names and unrelated URLs are not
+ * misread as links.
+ * @param {string} value - Candidate string
+ * @returns {boolean} True when the string looks like private-link query params
+ */
+function looksLikeLinkParams(value) {
+  const query = value.includes('?') ? value.slice(value.indexOf('?') + 1) : value
+  if (!/(?:^|&)i=[^&]/.test(query)) return false
+  return /1password\.com/.test(value) || /(?:^|\/)open\/i/.test(value) || !value.includes('/')
+}
+
+/**
+ * Parse a "Copy Private Link" URL (or an abbreviated form) into item and
+ * vault IDs. The a (account) and h (host) params identify the account and are
  * intentionally dropped; item + vault IDs are all op item get needs.
- * @param {string} url - Private item link
+ * @param {string} url - Private item link or its query params
  * @returns {{kind: string, item: string, vault: string|undefined, warnings: Array<{code: string, message: string}>}} Normalized reference
  */
 function parsePrivateLink(url) {
-  const queryIndex = url.indexOf('?')
-  const query = queryIndex === -1 ? '' : url.slice(queryIndex + 1)
+  const query = url.includes('?') ? url.slice(url.indexOf('?') + 1) : url
   const params = new URLSearchParams(query)
   const item = params.get('i')
   const vault = params.get('v')
@@ -79,13 +93,16 @@ function normalizeStringRef(value) {
   if (value.startsWith('op://')) {
     return { kind: 'secretRef', ref: value }
   }
-  if (isPrivateLink(value)) {
+  // Public share links are rejected in any form (full URL or share token).
+  if (value.includes('share.1password.com') || /1password\.com\/s#/.test(value)) {
+    throw new Error('Public 1Password share links are not supported. Use Copy Private Link or an op:// secret reference.')
+  }
+  // Private links: full URL, onepassword://, or an abbreviated form carrying
+  // the query params (scheme/host/path stripped).
+  if (isPrivateLink(value) || looksLikeLinkParams(value)) {
     return parsePrivateLink(value)
   }
   if (/^https?:\/\/|^onepassword:\/\//.test(value)) {
-    if (value.includes('share.1password.com') || /1password\.com\/s#/.test(value)) {
-      throw new Error('Public 1Password share links are not supported. Use Copy Private Link or an op:// secret reference.')
-    }
     throw new Error('Unrecognized 1Password link. Use Copy Private Link or an op:// secret reference.')
   }
   return { kind: 'item', item: value, vault: undefined, section: undefined, field: undefined }
