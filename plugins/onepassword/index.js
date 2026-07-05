@@ -160,6 +160,12 @@ function createOnePasswordResolver(options = {}) {
     if (rest.startsWith('op://')) {
       throw new Error(`Use \${op(${rest})} for direct secret references.`)
     }
+    // A private link (or any URL) after the colon is a common mistake — colon
+    // syntax is alias-only. Point to function syntax without echoing the link
+    // (it carries account/host params we treat as sensitive).
+    if (/^https?:\/\//.test(rest) || rest.startsWith('onepassword://')) {
+      throw new Error('1Password private links are not supported in colon syntax. Use function syntax: ${op(<private link>)}, or an op:// secret reference.')
+    }
 
     const dotIndex = rest.indexOf('.')
     const alias = dotIndex === -1 ? rest : rest.slice(0, dotIndex)

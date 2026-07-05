@@ -195,13 +195,27 @@ test('raw op:// in colon syntax is rejected with pointer to function syntax', as
   }
 })
 
-test('private link in colon syntax is rejected', async () => {
+test('private link in colon syntax is rejected with an actionable message', async () => {
   const source = createOnePasswordResolver({ execFile: fakeOp().execFile })
   try {
-    await source.resolver('op:https://start.1password.com/open/i?i=x', {}, {}, vo('op:https://...'))
+    await source.resolver('op:https://start.1password.com/open/i?i=x&a=ACCT', {}, {}, vo('op:https://...'))
     assert.unreachable('should have thrown')
   } catch (err) {
-    assert.match(err.message, /letters, numbers, and underscores|aliases/i)
+    assert.match(err.message, /private links are not supported in colon syntax/i)
+    assert.match(err.message, /\$\{op\(/)
+    // the account param and full link are not echoed back
+    assert.is(err.message.includes('ACCT'), false)
+    assert.is(err.message.includes('start.1password.com'), false)
+  }
+})
+
+test('onepassword:// link in colon syntax is rejected the same way', async () => {
+  const source = createOnePasswordResolver({ execFile: fakeOp().execFile })
+  try {
+    await source.resolver('op:onepassword://open/i?i=x', {}, {}, vo('op:onepassword://...'))
+    assert.unreachable('should have thrown')
+  } catch (err) {
+    assert.match(err.message, /private links are not supported in colon syntax/i)
   }
 })
 
