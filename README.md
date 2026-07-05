@@ -141,6 +141,7 @@ npx configorama inspect config.yml
   - [Functions (Experimental)](#functions-experimental)
 - [Bundled Plugins](#bundled-plugins)
   - [CloudFormation](#cloudformation)
+  - [1Password](#1password)
 - [API Reference](#api-reference)
   - [Async API](#async-api)
   - [Sync API](#sync-api)
@@ -1549,6 +1550,36 @@ Peer dependency (install separately):
 ```bash
 npm install @aws-sdk/client-cloudformation @aws-sdk/credential-providers
 ```
+
+### 1Password
+
+Resolves secret values through the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`). Secrets are fetched at resolution time — never persisted, never logged.
+
+```yaml
+npmToken: ${op:npm.NPM_TOKEN}
+dbPassword: ${op:database}
+directRef: ${op(op://vault/item/field)}
+```
+
+```javascript
+const configorama = require('configorama')
+const createOnePasswordResolver = require('configorama/plugins/onepassword')
+
+const opResolver = createOnePasswordResolver({
+  refs: {
+    npm: 'op://production/npm-automation/notesPlain',
+    database: { item: 'database-prod', vault: 'production', field: 'password' },
+  },
+})
+
+const config = await configorama('config.yml', {
+  variableSources: [opResolver]
+})
+```
+
+Full docs: [`plugins/onepassword/README.md`](./plugins/onepassword/README.md). Covers alias refs, private item links, field inference and ambiguity rules, INI/dotenv key paths, `skipResolution`, and sync usage.
+
+No npm dependencies — requires the `op` binary on `PATH` and a signed-in CLI (or `OP_SERVICE_ACCOUNT_TOKEN`).
 
 ---
 
