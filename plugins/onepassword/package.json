@@ -4,7 +4,7 @@
   "description": "1Password variable source plugin for configorama",
   "main": "index.js",
   "scripts": {
-    "test": "node parser.test.js && node op-cli.test.js && node index.test.js"
+    "test": "node parser.test.js && node normalize.test.js && node op-cli.test.js && node fields.test.js && node index.test.js && node smoke.test.js"
   },
   "keywords": [
     "configorama",
