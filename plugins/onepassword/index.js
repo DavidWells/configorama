@@ -185,9 +185,13 @@ function createOnePasswordResolver(options = {}) {
     const { reference, keyPath, alias } = parsed
     const configPath = valueObject && valueObject.path ? valueObject.path.join('.') : undefined
 
+    // Direct private links put the full URL (with account/host params) in
+    // the variable string itself - redact it from opReferences entries.
+    const isDirectLink = reference.kind === 'privateLink' && !alias
+    const redacted = `\${op(...)${keyPath ? `.${keyPath}` : ''}}`
     const entry = {
-      raw: valueObject ? valueObject.originalSource : `\${${varString}}`,
-      resolved: `\${${varString}}`,
+      raw: isDirectLink ? redacted : (valueObject ? valueObject.originalSource : `\${${varString}}`),
+      resolved: isDirectLink ? redacted : `\${${varString}}`,
       alias,
       referenceKind: reference.kind,
       ref: reference.kind === 'secretRef' ? reference.ref : undefined,

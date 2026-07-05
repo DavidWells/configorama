@@ -240,6 +240,19 @@ test('metadata records references but never secret values or URLs', async () => 
   assert.is(linkEntry.risk, 'remote_secret_read')
 })
 
+test('direct private link syntax is redacted in metadata', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+  const linkVar = 'op(https://start.1password.com/open/i?a=ACCT&v=vault-id-123&i=item-id-456&h=my.1password.com).NPM_TOKEN'
+  await source.resolver(linkVar, {}, {}, vo(linkVar))
+  const [entry] = source.collectMetadata()
+  assert.is(entry.raw, '${op(...).NPM_TOKEN}')
+  assert.is(entry.resolved, '${op(...).NPM_TOKEN}')
+  const serialized = JSON.stringify(source.collectMetadata())
+  assert.is(serialized.includes('start.1password.com'), false)
+  assert.is(serialized.includes('ACCT'), false)
+})
+
 /* skipResolution */
 
 test('skipResolution returns placeholders and records skipped metadata', async () => {
