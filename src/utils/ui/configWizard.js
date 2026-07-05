@@ -8,6 +8,7 @@ const { toClickablePath } = require('./createEditorLink')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { createPromptDescriptors } = require('./promptDescriptors')
 const { isSensitiveVariable } = require('../redaction/redact')
+const { withStdoutRedirected } = require('../setup/stdoutRedirect')
 
 const INVISIBLE_SPACE = '\u2800\u2800\u2800'
 
@@ -613,9 +614,27 @@ function createPromptMessage(varInfo) {
  * Runs config setup wizard
  * @param {object} metadata - Enriched metadata from configorama
  * @param {object} originalConfig - The original config before resolution
+ * @param {string} [configFilePath] - Path to the config file for display
+ * @param {object} [streams] - Stream overrides for the prompt UI
+ * @param {import('stream').Writable} [streams.output] - Where prompt UI renders; stdout stays clean when set
  * @returns {Promise<object>} User inputs by variable type
  */
-async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '') {
+async function runConfigWizard(metadata, originalConfig = {}, configFilePath = '', streams) {
+  const output = streams && streams.output
+  if (output && output !== process.stdout) {
+    return withStdoutRedirected(output, () => renderConfigWizard(metadata, originalConfig, configFilePath))
+  }
+  return renderConfigWizard(metadata, originalConfig, configFilePath)
+}
+
+/**
+ * Renders the wizard prompts on process.stdout
+ * @param {object} metadata - Enriched metadata from configorama
+ * @param {object} originalConfig - The original config before resolution
+ * @param {string} [configFilePath] - Path to the config file for display
+ * @returns {Promise<object>} User inputs by variable type
+ */
+async function renderConfigWizard(metadata, originalConfig = {}, configFilePath = '') {
   const { uniqueVariables } = metadata
 
   if (!uniqueVariables || Object.keys(uniqueVariables).length === 0) {
