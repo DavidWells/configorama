@@ -1,7 +1,7 @@
 // Test wizard help text extraction
 const path = require('path')
 const configorama = require('../../src')
-const { getHelpText } = require('../../src/utils/configWizard')
+const { getHelpText } = require('../../src/utils/ui/configWizard')
 
 async function testWizardHelpText() {
   console.log('Testing wizard help text extraction...')
