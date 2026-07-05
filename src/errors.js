@@ -16,6 +16,9 @@ const ERROR_CODES = [
   { code: 'no_input_file', description: 'No config file was provided on the command line.' },
   { code: 'file_not_found', description: 'The provided config file path does not exist.' },
   { code: 'path_not_found', description: 'A jq-style extraction path matched nothing in the resolved config.' },
+  { code: 'invalid_env_key', description: 'A setup write target received a key that is not a valid dotenv name.' },
+  { code: 'target_file_exists', description: 'A setup write target already exists and neither --merge nor --force was passed.' },
+  { code: 'managed_block_invalid', description: 'A dotenv merge target has missing, duplicated, or out-of-order managed block markers.' },
   { code: 'configorama_error', description: 'Generic, unclassified configorama error.' },
 ]
 
