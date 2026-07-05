@@ -4,6 +4,17 @@ All notable changes to configorama. Format roughly follows [Keep a Changelog](ht
 
 ## Unreleased
 
+### Added
+- **1Password plugin** at `plugins/onepassword/` resolving config values through the `op` CLI. Alias refs (`${op:npm.NPM_TOKEN}`), direct function syntax (`${op(op://vault/item/field)}`, item IDs/names, private item links), INI/dotenv key paths into secure notes, and field inference with ambiguity-is-an-error semantics (never silently prefers `notesPlain` over `password`). Marked `sensitive: true` / `risk: 'remote_secret_read'`; secrets are fetched at resolution time, never persisted or logged by the plugin. No npm dependencies — requires the `op` binary on `PATH`. Works through both async `configorama()` and `configorama.sync()`.
+- **`syncFactory` variable-source contract** in `src/sync.js`: plugins can carry a `syncFactory` path plus JSON-serializable `syncOptions`, which the sync worker rebuilds into a real resolver. The worker now also runs the `collectMetadata` loop so plugin metadata (e.g. `opReferences`) reaches `configorama.sync()` callers with `returnMetadata: true`.
+- **Bundled-plugin subpath exports**: `require('configorama/plugins/cloudformation')` and `require('configorama/plugins/onepassword')` now resolve from an installed package (previously the documented CloudFormation subpath did not work). `files` publishes `plugins/` while excluding plugin tests, examples, and nested `node_modules`.
+
+### Changed
+- `configorama.audit()` reports a specific high-severity `remote_secret_read` finding (with `sensitive: true`) for custom resolvers that self-describe as sensitive, instead of the generic `custom_extension` message. Plain custom resolvers are unchanged.
+
+### Docs
+- README gains a 1Password entry in Bundled Plugins; full plugin docs at `plugins/onepassword/README.md`.
+
 ## [0.10.0] — 2026-05-27
 
 ### Added

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Fake 1Password CLI for configorama sync e2e tests
+# Serves fixture data for `op read` and `op item get`
+
+if [ "$1" = "read" ]; then
+  printf '# npm automation token\nNPM_TOKEN=npm_xxx\n\n[database]\npassword=s3cr3t\n'
+  exit 0
+fi
+
+if [ "$1" = "item" ] && [ "$2" = "get" ]; then
+  cat "$(dirname "$0")/../item-fixture.json"
+  exit 0
+fi
+
+echo "[ERROR] unsupported fake op invocation: $*" >&2
+exit 1

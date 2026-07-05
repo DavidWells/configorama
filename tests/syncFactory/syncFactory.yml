@@ -1,0 +1,3 @@
+plain: no variables here
+value: ${mock:hello}
+other: ${mock:world}

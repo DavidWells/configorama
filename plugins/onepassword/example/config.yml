@@ -1,0 +1,3 @@
+npmToken: ${op:npm.NPM_TOKEN}
+dbPassword: ${op:database}
+rawNote: ${op:npm}
