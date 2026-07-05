@@ -110,9 +110,8 @@ const { validateOneOf } = require('./utils/filters/oneOf')
 const chalk = require('./utils/ui/chalk')
 const deepLog = require('./utils/ui/deep-log')
 const { logHeader } = require('./utils/ui/logs')
-const { runConfigWizard } = require('./utils/ui/configWizard')
-const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
-const { redactUserInputsByRequirements } = require('./utils/redaction/setupRedaction')
+const { runSetup } = require('./utils/setup/setupEngine')
+const { applyAnswers } = require('./utils/setup/applyAnswers')
 /* Display */
 const { displayNoVariablesFound, displayVariableDetails, displayUniqueVariables, displayConfigurableVariables } = require('./display')
 /* Metadata */
@@ -939,34 +938,25 @@ class Configorama {
       if (this.setupMode) {
         logHeader('Setup Mode')
         // deepLog('enrich', enrich)
-        const userInputs = await runConfigWizard(enrich, this.originalConfig, this.configFilePath)
-        const setupRequirements = buildConfigRequirements(enrich)
-        this.setupRequirements = setupRequirements
-        const displayInputs = redactUserInputsByRequirements(userInputs, setupRequirements)
+        const setupResult = await runSetup(this.configFilePath || this.config, this.settings, {
+          analysis: Object.assign({ originalConfig: this.originalConfig }, enrich),
+        })
+        this.setupRequirements = setupResult.requirements
+
+        // Summary shows only answered groups, sensitive values redacted
+        const displayInputs = {}
+        for (const [group, values] of Object.entries(setupResult.redactedAnswers)) {
+          if (Object.keys(values).length > 0) {
+            displayInputs[group] = values
+          }
+        }
 
         logHeader('User Inputs Summary')
         console.log()
         console.log(JSON.stringify(displayInputs, null, 2))
 
-        // TODO set values
-
-        // Apply user inputs to options and environment
-        if (userInputs.options) {
-          Object.assign(this.options, userInputs.options)
-        }
-        if (userInputs.env) {
-          Object.assign(process.env, userInputs.env)
-        }
-
-        if (userInputs.self) {
-          Object.assign(this.config, userInputs.self)
-        }
-
-        if (userInputs.dotProp) {
-          for (const [key, value] of Object.entries(userInputs.dotProp)) {
-            dotProp.set(this.config, key, value)
-          }
-        }
+        // Apply user inputs to options, environment, and config
+        applyAnswers({ options: this.options, env: process.env, config: this.config }, setupResult.answers)
 
         console.log()
         logHeader('Resolving Configuration')

@@ -45,17 +45,18 @@ function normalizeAnswerGroups(userInputs) {
  * @param {Function} [settings.promptRenderer] - replaces the interactive wizard (mocks, answers files)
  * @param {Object} [settings.streams] - stream overrides forwarded to the prompt renderer
  * @param {Object} deps - injected dependencies
- * @param {Function} deps.analyze - configorama.analyze, injected to avoid a require cycle
+ * @param {Function} [deps.analyze] - configorama.analyze, injected to avoid a require cycle
+ * @param {Object} [deps.analysis] - pre-computed analysis; skips the analyze call
  * @returns {Promise<SetupResult>} collected answers and requirements
  */
 async function runSetup(configPathOrObject, settings = {}, deps = {}) {
   const { analyze } = deps
-  if (typeof analyze !== 'function') {
-    throw new Error('setup engine requires an analyze function')
+  if (!deps.analysis && typeof analyze !== 'function') {
+    throw new Error('setup engine requires an analyze function or a pre-computed analysis')
   }
   const { promptRenderer, streams, ...analyzeSettings } = settings
 
-  const analysis = await analyze(configPathOrObject, analyzeSettings)
+  const analysis = deps.analysis || await analyze(configPathOrObject, analyzeSettings)
   const requirements = buildConfigRequirements(analysis)
 
   const configPath = typeof configPathOrObject === 'string'
