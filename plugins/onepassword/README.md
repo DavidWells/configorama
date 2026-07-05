@@ -160,6 +160,11 @@ configorama: requesting 3 items from 1Password (expect an authorization prompt)
 
 The hint is TTY-only — silent in CI and pipes.
 
+## Security model
+
+- Secrets are fetched from `op` at resolution time. The plugin never writes them to disk, never logs CLI output, and never passes resolved values as command-line arguments. Resolved values **do** enter the config object returned to your code — treat that object as sensitive (don't log it, commit it, or emit it to an untrusted sink).
+- **Direct syntax reads whatever your `op` session can reach.** `${op(op://any-vault/any-item/field)}`, direct item IDs, and private links are not restricted to the aliases in `refs`. If you resolve a config file you do not fully trust while a 1Password session is unlocked, that config can read any secret the session can access. For untrusted config, run with `safeMode: true` (which blocks all custom resolvers) or audit first — `configorama.audit()` flags this resolver as high-severity `remote_secret_read`.
+
 ## Safe mode and audit
 
 - `safeMode: true` blocks all custom resolvers during resolution, including this one.
