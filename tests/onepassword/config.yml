@@ -1,0 +1,3 @@
+token: ${op:npm.NPM_TOKEN}
+dbPassword: ${op:npm.database.password}
+password: ${op:db}

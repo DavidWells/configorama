@@ -7,5 +7,9 @@ const createOnePasswordResolver = require('./index')
  * @returns {object} Variable source
  */
 module.exports = function createSyncOnePasswordResolver(options = {}) {
-  return createOnePasswordResolver(options)
+  if (options.hasInjectedExecFile) {
+    throw new Error('1Password resolver options are not serializable for sync usage. Remove the injected execFile or use the async API.')
+  }
+  const { hasInjectedExecFile, ...factoryOptions } = options
+  return createOnePasswordResolver(factoryOptions)
 }

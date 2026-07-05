@@ -239,7 +239,21 @@ function createOnePasswordResolver(options = {}) {
       opReferences.length = 0
     },
     syncFactory: require.resolve('./sync-factory'),
-    syncOptions: { refs, account, configDir, skipResolution },
+    syncOptions: buildSyncOptions(),
+  }
+
+  /**
+   * @returns {object} JSON-serializable options for the sync worker
+   */
+  function buildSyncOptions() {
+    const syncOptions = { refs, account, configDir, skipResolution }
+    if (execFile) {
+      // Functions cannot cross the JSON boundary into the sync worker;
+      // flag it so sync-factory can fail loudly instead of silently
+      // running the real op binary.
+      syncOptions.hasInjectedExecFile = true
+    }
+    return syncOptions
   }
 }
 
