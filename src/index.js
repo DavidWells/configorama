@@ -4,6 +4,7 @@ const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { serializeRequirements } = require('./utils/requirements/serializeRequirements')
 const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
+const { runSetup } = require('./utils/setup/setupEngine')
 const { buildIntrospection } = require('./utils/introspection/model')
 const { buildAuditReport } = require('./utils/introspection/audit')
 const { formatGraph } = require('./utils/introspection/graph')
@@ -140,6 +141,16 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
     return serializeRequirements(analysis, { configPathOrObject })
   }
   return analysis
+}
+
+/**
+ * Run the interactive setup wizard and return grouped answers without applying them
+ * @param {string|Object} configPathOrObject - Path to config file or raw config object
+ * @param {object} [settings] - Same settings as the main API, plus promptRenderer/streams
+ * @return {Promise<object>} { schemaVersion, configPath, requirements, answers, redactedAnswers }
+ */
+module.exports.setup = async (configPathOrObject, settings = {}) => {
+  return runSetup(configPathOrObject, settings, { analyze: module.exports.analyze })
 }
 
 module.exports.introspect = async (configPathOrObject, settings = {}) => {
