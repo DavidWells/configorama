@@ -176,7 +176,6 @@ const functionPrefixPattern = /^> function /
 
 let DEBUG = process.argv.includes('--debug') ? true : false
 let VERBOSE = process.argv.includes('--verbose') ? true : false
-let SETUP_MODE = process.argv.includes('--setup') ? true : false
 // DEBUG = true
 let DEBUG_TYPE = false
 
@@ -188,8 +187,8 @@ class Configorama {
     }
   
     const options = opts || {}
-    // Setup wizard runs when --setup flag is passed (CLI) or options.setup is true (library)
-    this.setupMode = SETUP_MODE || options.setup === true
+    // Setup wizard is explicit opt-in: the CLI translates --setup/`setup` into options.setup
+    this.setupMode = options.setup === true
     // Set opts to pass into JS file calls
     this.settings = Object.assign({}, {
       // Allow unknown ${xyz:...} syntax where xyz is not a registered resolver
