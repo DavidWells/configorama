@@ -7,7 +7,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
 const dotenv = require('dotenv')
-const { resolveEnv, configEntries, shellExport, ConfigxError } = require('./src/resolveEnv')
+const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
 
 /**
  * Detect a dotenv file by name (.env, .env.local, deploy.env, ...).
@@ -126,13 +126,20 @@ async function main() {
 
   // ConfigxError messages are secret-free by construction.
   if (exportMode) {
-    let lines
+    let entries
     try {
-      lines = shellExport(configEntries(resolved))
+      entries = configEntries(resolved)
     } catch (err) {
       fail(err.message)
     }
+    const lines = shellExport(entries)
     if (lines) process.stdout.write(lines + '\n')
+    // Confirmation goes to stderr (stdout is consumed by eval) and names only
+    // the keys, never the values. TTY-only so scripts/pipes stay quiet.
+    const summary = exportSummary(entries)
+    if (summary && process.stderr.isTTY) {
+      process.stderr.write(`configx: ${summary}\n`)
+    }
     process.exit(0)
   }
 

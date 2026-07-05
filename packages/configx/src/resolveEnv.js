@@ -83,4 +83,15 @@ function shellExport(entries) {
     .join('\n')
 }
 
-module.exports = { resolveEnv, configEntries, shellExport, ConfigxError, ENV_KEY_PATTERN }
+/**
+ * Human-facing summary of what --export set, naming keys only (never values).
+ * @param {Array<[string, string]>} entries - Validated [key, value] pairs
+ * @returns {string} Summary line, or '' when there is nothing to report
+ */
+function exportSummary(entries) {
+  if (!entries.length) return ''
+  const keys = entries.map(([key]) => key).join(', ')
+  return `set ${entries.length} variable${entries.length === 1 ? '' : 's'} in your shell: ${keys}`
+}
+
+module.exports = { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError, ENV_KEY_PATTERN }

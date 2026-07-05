@@ -2,7 +2,7 @@
    Covers key validation, scalar conversion, and parent-env precedence */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { resolveEnv, configEntries, shellExport, ConfigxError } = require('./resolveEnv')
+const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./resolveEnv')
 
 test('flat scalar keys become env additions', () => {
   const env = resolveEnv({ API_URL: 'https://x', TIMEOUT_MS: 5000, FEATURE_ENABLED: true }, {})
@@ -122,6 +122,20 @@ test('shellExport neutralizes shell metacharacters (no injection)', () => {
 test('shellExport preserves newlines inside single quotes', () => {
   const out = shellExport([['MULTILINE', 'line1\nline2']])
   assert.is(out, "export MULTILINE='line1\nline2'")
+})
+
+/* exportSummary: keys only, never values */
+
+test('exportSummary names keys and count, not values', () => {
+  const summary = exportSummary([['DB_PASSWORD', 's3cret'], ['API_KEY', 'abc123']])
+  assert.is(summary, 'set 2 variables in your shell: DB_PASSWORD, API_KEY')
+  assert.is(summary.includes('s3cret'), false)
+  assert.is(summary.includes('abc123'), false)
+})
+
+test('exportSummary is singular for one key and empty for none', () => {
+  assert.is(exportSummary([['ONLY', 'x']]), 'set 1 variable in your shell: ONLY')
+  assert.is(exportSummary([]), '')
 })
 
 test.run()

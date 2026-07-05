@@ -133,6 +133,15 @@ test('--export output is safe to eval (no shell injection)', () => {
   assert.is(require('fs').existsSync('/tmp/configx-pwned'), false)
 })
 
+test('--export keeps stdout to export lines only (confirmation not on stdout)', () => {
+  const r = runConfigx([path.join(fixtures, 'exec.yml'), '--export'])
+  assert.is(r.status, 0)
+  // every non-empty stdout line is an export statement — nothing else leaks
+  const lines = r.stdout.split('\n').filter(Boolean)
+  assert.ok(lines.length > 0)
+  assert.ok(lines.every((line) => line.startsWith('export ')))
+})
+
 test('--export does not require a command', () => {
   const r = runConfigx([path.join(fixtures, 'exec.yml'), '--export'])
   assert.is(r.status, 0)
