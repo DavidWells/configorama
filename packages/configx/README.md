@@ -89,6 +89,83 @@ source <(configx .env --export)
 
 This puts resolved values (including secrets) into your interactive shell and every command you run after — convenient, but they're then visible to `env` and child processes. Prefer `configx <file> -- <command>` when you only need them for one command.
 
+## Setup wizard
+
+`configx setup <file>` walks through the config's unresolved values (missing env vars, CLI flags, config references), prompts for each, and applies the answers to exactly one target you choose. It shares the prompt engine with `configorama setup`, so both wizards behave identically.
+
+Two commands, two jobs:
+
+- `configx setup-shell` — install the `config-env` helper function once.
+- `configx setup <file>` — walk through config values and apply them to a target.
+
+### Current shell
+
+A child process cannot set variables in your terminal, so current-shell setup goes through the `config-env` shell function:
+
+```bash
+configx setup-shell            # once
+config-env setup .env --stage dev
+```
+
+This prompts for missing values (prompt UI on stderr), then sets the answered and resolved values in your current shell. Prefer this over the raw form it expands to:
+
+```bash
+eval "$(configx setup .env --stage dev --export)"
+```
+
+### One command
+
+Safest for secrets — values live only in the `configx` process and the child command's environment, never in your shell or on disk:
+
+```bash
+configx setup .env --stage dev -- npm run dev
+```
+
+### Write to a local env file
+
+Explicit persistence, guarded:
+
+```bash
+configx setup .env --stage dev --write .env.local
+```
+
+- Writes only the answered env values, in dotenv syntax, with `0600` permissions.
+- Refuses an existing file unless `--merge` (updates only a `configx` managed block) or `--force`.
+- Warns and asks for confirmation before writing values that look sensitive (`--yes` skips for scripted runs).
+- `--dry-run` shows the keys and target path without writing.
+
+Note: `config-env setup .env --write x` fails with a target conflict because the shell function appends `--export`. Call `configx setup .env --write x` directly for file writes.
+
+### Answers file (automation)
+
+```bash
+configx setup app.yml --write-answers configx.answers.json
+```
+
+Writes all answer groups as versioned JSON (`schemaVersion: 1`) with the same safety rules (0600, `--force` to overwrite, confirmation for sensitive values). Useful for agents and CI.
+
+### Targets
+
+Exactly one apply target per invocation:
+
+| Target | Example | Effect |
+| --- | --- | --- |
+| Child command | `configx setup .env -- npm run dev` | Prompt, resolve, run command with env. |
+| Shell exports | `configx setup .env --export` | Prompt, print export lines to stdout. |
+| Current shell | `config-env setup .env` | Shell function evals the `--export` form. |
+| Dotenv write | `configx setup .env --write .env.local` | Prompt, write env answers to a dotenv file. |
+| Answers write | `configx setup app.yml --write-answers a.json` | Prompt, write structured answers JSON. |
+
+Plain `configx setup .env` (no target) shows a menu after prompting. It never claims to have set your current shell — it prints the exact `config-env` command to run instead.
+
+Cancelling the wizard (Ctrl-C or closed input) is fail-closed: non-zero exit, no exports on stdout, no child command, no files written.
+
+### Secrets guidance
+
+- Prefer storing a 1Password reference (`${op://vault/item/field}`) in the config and resolving at run time over persisting raw secret values.
+- `configx` never writes secrets to `.zshrc`/`.bashrc` or any shell startup file, and never prints secret values in summaries or errors.
+- Safest to riskiest: `configx setup <file> -- <command>` → `config-env setup <file>` → `--write-answers` → `--write`.
+
 ## .env files
 
 `.env` files (`.env`, `.env.local`, `deploy.env`, ...) are parsed as dotenv, then their values are resolved by configorama. This lets you keep secret references in a `.env` and have them fetched at run time:

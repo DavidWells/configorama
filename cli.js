@@ -61,7 +61,8 @@ Commands:
   (default)                 Resolve <file> and print the result
   inspect <file>            Introspect a config without resolving it (full model)
                               --view requirements|audit|graph for a single slice
-  setup <file>              Run the interactive config wizard (experimental)
+  setup <file>              Prompt for missing config values, then resolve with the
+                              answers applied (summary redacts sensitive values)
   capabilities              Print the machine-readable CLI contract (JSON)
 
 Options:

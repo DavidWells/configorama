@@ -2304,7 +2304,16 @@ stage: ${opt:stage | help('Deployment stage, e.g. dev or prod')}
 
 The [Variable Source Types](#variable-source-types) table describes how the wizard treats each source.
 
-> **Experimental:** the wizard fills in values for the current resolution run only. It does not write your answers back to the config file yet.
+The wizard prints a summary of your answers with sensitive values redacted, applies them to the current resolution run, and never edits the source config file.
+
+Programmatic access to the same engine returns the answers without applying them anywhere:
+
+```javascript
+const result = await configorama.setup('config.yml')
+// { schemaVersion, configPath, requirements, answers, redactedAnswers }
+```
+
+To apply answers to explicit targets - your current shell, a one-off command, a `.env.local`, or a JSON answers file - use [`configx setup`](./packages/configx/README.md#setup-wizard). Its safe write behavior (0600 permissions, managed-block merge, sensitive-value confirmation) is built on the same engine.
 
 ---
 

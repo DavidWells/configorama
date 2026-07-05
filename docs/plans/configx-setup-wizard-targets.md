@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft plan only. No implementation should happen until this plan is reviewed and accepted.
+Implemented (2026-07-05). Tracked as beads `configorama-idrd` / `configorama-idrd.1` through `.16`. Deviations from plan: clack 0.11 lacks per-prompt output streams, so stream routing uses a scoped stdout redirect in the wizard runner instead of a prompt adapter; the emitted `config-env` shell function captures exports before `eval` so configx failures propagate their exit status.
 
 ## Goal
 
