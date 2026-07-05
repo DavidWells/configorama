@@ -1,9 +1,9 @@
 {
-  "name": "confx",
+  "name": "configx",
   "version": "0.1.0",
   "description": "Resolve a configorama config and exec a command with it as environment",
   "bin": {
-    "confx": "./cli.js"
+    "configx": "./cli.js"
   },
   "main": "src/resolveEnv.js",
   "scripts": {

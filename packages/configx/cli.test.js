@@ -1,4 +1,4 @@
-/* End-to-end tests for the confx CLI
+/* End-to-end tests for the configx CLI
    Spawns the real CLI against real configorama resolution; no mocks */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
@@ -9,12 +9,12 @@ const cli = path.join(__dirname, 'cli.js')
 const fixtures = path.join(__dirname, 'test')
 
 /**
- * Run the confx CLI as a child process.
+ * Run the configx CLI as a child process.
  * @param {string[]} args - CLI arguments
- * @param {object} [env] - Extra env vars for the confx process
+ * @param {object} [env] - Extra env vars for the configx process
  * @returns {{status: number, stdout: string, stderr: string}} Result
  */
-function runConfx(args, env = {}) {
+function runConfigx(args, env = {}) {
   const result = spawnSync(process.execPath, [cli, ...args], {
     encoding: 'utf8',
     env: { ...process.env, ...env },
@@ -25,7 +25,7 @@ function runConfx(args, env = {}) {
 const printEnv = (name) => ['node', '-e', `process.stdout.write(String(process.env.${name}))`]
 
 test('resolves scalars, opt, and env into the child environment', () => {
-  const r = runConfx(
+  const r = runConfigx(
     [path.join(fixtures, 'basic.yml'), '--stage', 'prod', '--', ...printEnv('STAGE')],
     { CONFX_TEST_SRC: 'from-shell' }
   )
@@ -34,7 +34,7 @@ test('resolves scalars, opt, and env into the child environment', () => {
 })
 
 test('env-sourced and scalar values reach the child', () => {
-  const r = runConfx(
+  const r = runConfigx(
     [path.join(fixtures, 'basic.yml'), '--', 'node', '-e', 'process.stdout.write([process.env.API_URL, process.env.FROM_ENV, process.env.FEATURE, process.env.TIMEOUT_MS].join("|"))'],
     { CONFX_TEST_SRC: 'from-shell' }
   )
@@ -43,7 +43,7 @@ test('env-sourced and scalar values reach the child', () => {
 })
 
 test('parent environment wins over resolved config', () => {
-  const r = runConfx(
+  const r = runConfigx(
     [path.join(fixtures, 'parentwins.yml'), '--', ...printEnv('STAGE')],
     { STAGE: 'staging' }
   )
@@ -52,37 +52,37 @@ test('parent environment wins over resolved config', () => {
 })
 
 test('missing command exits 2 before resolving', () => {
-  const r = runConfx([path.join(fixtures, 'basic.yml')])
+  const r = runConfigx([path.join(fixtures, 'basic.yml')])
   assert.is(r.status, 2)
   assert.match(r.stderr, /no command given/)
 })
 
 test('missing file exits 2', () => {
-  const r = runConfx([path.join(fixtures, 'does-not-exist.yml'), '--', 'true'])
+  const r = runConfigx([path.join(fixtures, 'does-not-exist.yml'), '--', 'true'])
   assert.is(r.status, 2)
   assert.match(r.stderr, /not found/)
 })
 
 test('non-scalar top-level value errors and does not run the child', () => {
-  const r = runConfx([path.join(fixtures, 'nonscalar.yml'), '--', ...printEnv('database')])
+  const r = runConfigx([path.join(fixtures, 'nonscalar.yml'), '--', ...printEnv('database')])
   assert.is.not(r.status, 0)
   assert.match(r.stderr, /non-scalar/)
   assert.is(r.stdout, '')
 })
 
 test('child exit code is propagated', () => {
-  const r = runConfx([path.join(fixtures, 'exec.yml'), '--', 'node', '-e', 'process.exit(3)'])
+  const r = runConfigx([path.join(fixtures, 'exec.yml'), '--', 'node', '-e', 'process.exit(3)'])
   assert.is(r.status, 3)
 })
 
 test('command not found exits 127', () => {
-  const r = runConfx([path.join(fixtures, 'exec.yml'), '--', 'definitely-not-a-real-binary-xyz'])
+  const r = runConfigx([path.join(fixtures, 'exec.yml'), '--', 'definitely-not-a-real-binary-xyz'])
   assert.is(r.status, 127)
   assert.match(r.stderr, /command not found/)
 })
 
 test('custom variable source from a config file resolves', () => {
-  const r = runConfx([
+  const r = runConfigx([
     path.join(fixtures, 'mock.yml'),
     '--config', path.join(fixtures, 'mock.config.js'),
     '--', ...printEnv('TOKEN'),
@@ -92,7 +92,7 @@ test('custom variable source from a config file resolves', () => {
 })
 
 test('flag args after -- go to the child, not configorama', () => {
-  const r = runConfx([
+  const r = runConfigx([
     path.join(fixtures, 'exec.yml'),
     '--', 'node', path.join(fixtures, 'print-args.js'), '--dry-run', '-x',
   ])

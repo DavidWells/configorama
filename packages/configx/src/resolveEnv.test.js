@@ -2,7 +2,7 @@
    Covers key validation, scalar conversion, and parent-env precedence */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { resolveEnv, ConfxError } = require('./resolveEnv')
+const { resolveEnv, ConfigxError } = require('./resolveEnv')
 
 test('flat scalar keys become env additions', () => {
   const env = resolveEnv({ API_URL: 'https://x', TIMEOUT_MS: 5000, FEATURE_ENABLED: true }, {})
@@ -42,7 +42,7 @@ test('non-portable key names are rejected', () => {
       resolveEnv({ [key]: 'x' }, {})
       assert.unreachable(`should reject "${key}"`)
     } catch (err) {
-      assert.is(err instanceof ConfxError, true)
+      assert.is(err instanceof ConfigxError, true)
       assert.is(err.code, 'invalid_exec_env_key')
       assert.match(err.message, /environment variable name/)
     }

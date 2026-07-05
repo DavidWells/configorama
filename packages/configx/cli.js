@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/* confx: resolve a configorama config and exec a command with it as environment
-   confx <file> [configorama options] -- <command and args...> */
+/* configx: resolve a configorama config and exec a command with it as environment
+   configx <file> [configorama options] -- <command and args...> */
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
-const { resolveEnv, ConfxError } = require('./src/resolveEnv')
+const { resolveEnv, ConfigxError } = require('./src/resolveEnv')
 
 /**
  * Load configorama from the installed dependency, falling back to the
@@ -27,22 +27,22 @@ function loadConfigorama() {
  * @param {number} [code] - Exit code
  */
 function fail(message, code = 1) {
-  process.stderr.write(`confx: ${message}\n`)
+  process.stderr.write(`configx: ${message}\n`)
   process.exit(code)
 }
 
 /**
- * Load an optional confx settings file exporting configorama settings
+ * Load an optional configx settings file exporting configorama settings
  * (variableSources, filters, functions, safeMode, ...). This file is
- * executed — confx is an execution tool and treats it as trusted.
+ * executed — configx is an execution tool and treats it as trusted.
  * @param {string|undefined} explicitPath - Path from --config
- * @param {string} cwd - Working directory to discover confx.config.js
+ * @param {string} cwd - Working directory to discover configx.config.js
  * @returns {object} Settings object (empty when no file found)
  */
 function loadSettingsFile(explicitPath, cwd) {
   const target = explicitPath
     ? path.resolve(cwd, explicitPath)
-    : path.join(cwd, 'confx.config.js')
+    : path.join(cwd, 'configx.config.js')
 
   if (!fs.existsSync(target)) {
     if (explicitPath) fail(`config file not found: ${target}`)
@@ -71,17 +71,17 @@ async function main() {
   // Validate invocation BEFORE resolving: resolution can trigger secret
   // prompts (e.g. the 1Password resolver), so never prompt for a run that
   // was going to fail on a missing file or command anyway.
-  if (!file) fail('missing config file. Usage: confx <file> [options] -- <command>', 2)
+  if (!file) fail('missing config file. Usage: configx <file> [options] -- <command>', 2)
   if (!fs.existsSync(file)) fail(`config file not found: ${file}`, 2)
   if (command.length === 0) {
-    throw new ConfxError('missing_exec_command', 'no command given. Usage: confx <file> [options] -- <command>')
+    throw new ConfigxError('missing_exec_command', 'no command given. Usage: configx <file> [options] -- <command>')
   }
 
   const cwd = process.cwd()
   const settingsFile = loadSettingsFile(argv.config, cwd)
 
   // configorama options for ${opt:...} come from the CLI flags (minus
-  // positionals, the -- command, and confx's own --config).
+  // positionals, the -- command, and configx's own --config).
   const { _, config: _configFlag, ...opts } = argv
   delete opts['--']
 
@@ -100,7 +100,7 @@ async function main() {
   try {
     childEnv = resolveEnv(resolved, process.env)
   } catch (err) {
-    // ConfxError messages are secret-free by construction
+    // ConfigxError messages are secret-free by construction
     fail(err.message)
   }
 
@@ -123,7 +123,7 @@ function runChild(program, args, env) {
 
   child.on('error', (err) => {
     const message = err.code === 'ENOENT' ? `command not found: ${program}` : `failed to spawn ${program}: ${err.message}`
-    process.stderr.write(`confx: ${message}\n`)
+    process.stderr.write(`configx: ${message}\n`)
     process.exit(127)
   })
 
@@ -137,6 +137,6 @@ function runChild(program, args, env) {
 }
 
 main().catch((err) => {
-  if (err instanceof ConfxError) fail(err.message, 2)
+  if (err instanceof ConfigxError) fail(err.message, 2)
   fail(err && err.message ? err.message : String(err))
 })
