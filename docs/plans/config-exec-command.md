@@ -270,27 +270,27 @@ Options:
 | Option | Example | Pros | Cons |
 | --- | --- | --- | --- |
 | Configorama subcommand only | `config exec app.yml -- npm run deploy` | Clear ownership; no new package or binary name; easiest to document with existing CLI. | Slightly longer; users must remember the `exec` subcommand. |
-| Separate package/CLI | `confx app.yml -- npm run deploy` | Very short; focused mental model as "config execute"; avoids adding more surface to the main CLI. | Splits packaging, docs, versioning, support, and bug reports; may confuse users about whether `confx` and Configorama resolve config identically. |
-| Same package with alias binary | `confx app.yml -- npm run deploy` | Short command while sharing implementation, version, resolver behavior, docs, tests, and release lifecycle. | Adds another public binary name that must be maintained; potential name collision with existing tools. |
+| Separate package/CLI | `configx app.yml -- npm run deploy` | Shorter command; focused mental model as "config execute"; avoids adding more surface to the main CLI. | Splits packaging, docs, versioning, support, and bug reports if it drifts from Configorama internals. |
+| Same repo/package workspace wrapper | `configx app.yml -- npm run deploy` | Short command while sharing resolver behavior, docs, tests, and release lifecycle with Configorama. | Adds another public binary/package surface that must be maintained. |
 
-Recommended v1 decision: implement `exec` inside Configorama first, and optionally expose `confx` as a thin same-package binary alias after the behavior is tested.
+Recommended v1 decision: use `configx` as the focused execution wrapper, and keep it tied to the same resolver behavior as Configorama.
 
-The alias should not be a separate implementation. It should call the same code path as `config exec` so config resolution, environment merge semantics, error handling, and security behavior cannot drift.
+The wrapper should not be an independently drifting implementation. It should share the same resolution, environment merge semantics, error handling, and security behavior.
 
-If `confx` is added, recommended alias syntax:
+Recommended wrapper syntax:
 
 ```bash
-confx <file> [configorama options] -- <command and args...>
+configx <file> [configorama options] -- <command and args...>
 ```
 
 Equivalent commands:
 
 ```bash
 config exec deploy.yml --stage prod -- npm run deploy
-confx deploy.yml --stage prod -- npm run deploy
+configx deploy.yml --stage prod -- npm run deploy
 ```
 
-The `confx` alias should be documented as a convenience wrapper for execution only. It should not become a second general-purpose Configorama CLI.
+The `configx` wrapper should be documented as an execution/current-env helper only. It should not become a second general-purpose Configorama CLI.
 
 ## Option Passing
 
@@ -420,7 +420,7 @@ Docs must include:
 - Explicit statement that quoted command-string form is shell-executed.
 - Explicit statement that injected values may be secrets and can be read by the child process.
 - Explicit statement that top-level keys must be portable env var names.
-- If `confx` is added, explain that it is an alias for the same implementation rather than a separate resolver.
+- Explain that `configx` is the focused execution wrapper and must not drift from Configorama resolver behavior.
 
 Suggested docs example:
 
@@ -458,7 +458,7 @@ Required tests:
 11. Invalid env keys fail with a clear error and do not run the child command.
 12. Error messages do not include secret values from resolved config.
 13. Existing inspect/requirements CLI tests still pass.
-14. If `confx` is added, it behaves identically to `config exec` for env merge, validation, child status, and errors.
+14. `configx` behaves identically to `config exec` for env merge, validation, child status, and errors if both surfaces exist.
 
 Example test fixture:
 
@@ -492,7 +492,7 @@ Proposed implementation steps:
 9. Spawn the child process with inherited stdio.
 10. Use `shell: false` for `--` syntax and `shell: true` only for the single-string convenience syntax.
 11. Propagate child status.
-12. If accepted, add `confx` as a same-package thin alias to the same exec handler.
+12. If both surfaces exist, keep `configx` and `config exec` on the same exec handler or shared implementation.
 13. Update capabilities only after behavior is final.
 14. Update README only after tests lock the behavior.
 
@@ -502,8 +502,8 @@ Proposed implementation steps:
 2. Should there be an explicit `--override-env` flag in v1, or should parent-env precedence be the only behavior initially?
 3. Should file-first syntax ever be supported, or should `exec <file> -- <command>` be the only documented form?
 4. Should command execution require `--` for reliability, or should quoted commands remain fully supported?
-5. Should `confx` be included in v1 as a same-package alias, or wait until `config exec` proves useful?
-6. Is `confx` the right alias name, or is there an existing command/package conflict that makes another name safer?
+5. Should `config exec` exist if `configx` already covers the execution workflow?
+6. Should `configx` stay focused on execution/current-env loading only, or also expose other Configorama subcommands later?
 
 ## Recommended V1 Decisions
 
@@ -511,7 +511,7 @@ Recommended starting point:
 
 - Syntax: `config exec <file> [configorama options] -- <command>`.
 - Convenience syntax: `config exec <file> 'command string'`.
-- Optional same-package alias: `confx <file> [configorama options] -- <command>`.
+- Focused wrapper: `configx <file> [configorama options] -- <command>`.
 - Env mapping: top-level keys only.
 - Env key validation: require `^[A-Za-z_][A-Za-z0-9_]*$`.
 - Existing env precedence: parent environment wins.
