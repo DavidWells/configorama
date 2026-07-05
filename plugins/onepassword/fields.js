@@ -47,19 +47,36 @@ function selectField(item, options = {}) {
  * @returns {object} Matched field
  */
 function selectExplicit(item, fields, wanted, section) {
+  const found = trySelectField(item, { field: wanted, section })
+  if (!found) {
+    throw new Error(`Field "${wanted}" was not found in 1Password item "${itemName(item)}".`)
+  }
+  return found
+}
+
+/**
+ * Match a field by name, returning null when nothing matches.
+ * Still throws on ambiguity - duplicate labels always need a section.
+ * @param {object} item - Parsed op item get JSON
+ * @param {object} options - { field, section }
+ * @returns {object|null} Matched field or null
+ */
+function trySelectField(item, options) {
+  const fields = item.fields || []
+  const wanted = options.field
   let candidates = fields.filter((field) => {
     return matches(field.id, wanted) || matches(field.label, wanted) || matches(field.purpose, wanted)
   })
 
-  if (section) {
+  if (options.section) {
     candidates = candidates.filter((field) => {
       const fieldSection = field.section || {}
-      return matches(fieldSection.id, section) || matches(fieldSection.label, section)
+      return matches(fieldSection.id, options.section) || matches(fieldSection.label, options.section)
     })
   }
 
   if (candidates.length === 0) {
-    throw new Error(`Field "${wanted}" was not found in 1Password item "${itemName(item)}".`)
+    return null
   }
   if (candidates.length > 1) {
     throw new Error(`1Password item "${itemName(item)}" has multiple fields labeled "${wanted}". Set section explicitly.`)
@@ -106,4 +123,4 @@ function inferField(item, fields) {
   throw new Error(`1Password item "${itemName(item)}" has no obvious secret field. Set field explicitly.`)
 }
 
-module.exports = { selectField }
+module.exports = { selectField, trySelectField }
