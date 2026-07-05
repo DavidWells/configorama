@@ -7,7 +7,10 @@
   },
   "main": "src/resolveEnv.js",
   "scripts": {
-    "test": "node src/resolveEnv.test.js && node cli.test.js"
+    "test": "node src/resolveEnv.test.js && node cli.test.js",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish"
   },
   "files": [
     "cli.js",
