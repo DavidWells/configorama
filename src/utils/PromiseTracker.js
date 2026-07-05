@@ -21,7 +21,9 @@ class PromiseTracker {
     const delta = Date.now() - this.startTime
     const pending = this.getPending()
     const dots = dotDotDot(this.cursor++, 100, '...')
-    console.log([
+    // Diagnostic progress goes to stderr so it never pollutes stdout (resolved
+    // config output, or `configx --export` lines consumed by eval).
+    console.error([
       `Fetching Async values${dots}`,
     ].concat(
       pending.map((promise) => `- ${promise.waitList}`)
