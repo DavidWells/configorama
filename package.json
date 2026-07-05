@@ -6,16 +6,22 @@
   "types": "index.d.ts",
   "exports": {
     ".": "./src/index.js",
-    "./parse-file": "./src/utils/parsing/parse.js"
+    "./parse-file": "./src/utils/parsing/parse.js",
+    "./plugins/cloudformation": "./plugins/cloudformation/index.js",
+    "./plugins/onepassword": "./plugins/onepassword/index.js"
   },
   "files": [
     "cli.js",
     "src",
+    "plugins",
     "types",
     "index.d.ts",
     "package.json",
     "package-lock.json",
-    "README.md"
+    "README.md",
+    "!plugins/*/*.test.js",
+    "!plugins/*/example",
+    "!plugins/*/node_modules"
   ],
   "bin": {
     "config": "./cli.js",
