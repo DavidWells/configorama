@@ -48,6 +48,23 @@ configx secrets.yml -- npm publish
 # NPM_TOKEN is fetched from 1Password at run time and passed to npm publish
 ```
 
+## .env files
+
+`.env` files (`.env`, `.env.local`, `deploy.env`, ...) are parsed as dotenv, then their values are resolved by configorama. This lets you keep secret references in a `.env` and have them fetched at run time:
+
+```bash
+# .env
+DB_PASSWORD=${op://vault/database/password}
+API_URL=https://api.example.com
+```
+
+```bash
+configx .env -- ./my-app
+# DB_PASSWORD is fetched from 1Password; API_URL passes through
+```
+
+`${op://vault/item/field}` is the 1Password secret-reference URI — it points directly at a single field. For a key path into a structured note (`${op:alias.KEY}`), use the alias form via a `configx.config.js`. Both need the 1Password resolver registered.
+
 ## Behavior
 
 - **Top-level scalar keys only.** `string`, `number`, and `boolean` values become env vars (numbers/booleans stringified). `null`/`undefined` are skipped. Nested objects/arrays are an error — env vars are flat.

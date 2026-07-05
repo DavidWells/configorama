@@ -81,6 +81,15 @@ test('command not found exits 127', () => {
   assert.match(r.stderr, /command not found/)
 })
 
+test('a .env file is parsed as dotenv and its values are resolved', () => {
+  const r = runConfigx(
+    [path.join(fixtures, 'sample.env'), '--name', 'Dave', '--', 'node', '-e', 'process.stdout.write([process.env.GREETING, process.env.STATIC, process.env.FROM_SHELL, process.env.EXPORTED].join("|"))'],
+    { CONFX_TEST_SRC: 'shellval' }
+  )
+  assert.is(r.status, 0)
+  assert.is(r.stdout, 'Dave|hello|shellval|exported-value')
+})
+
 test('custom variable source from a config file resolves', () => {
   const r = runConfigx([
     path.join(fixtures, 'mock.yml'),

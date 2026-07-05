@@ -6,7 +6,20 @@ const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
+const dotenv = require('dotenv')
 const { resolveEnv, ConfigxError } = require('./src/resolveEnv')
+
+/**
+ * Detect a dotenv file by name (.env, .env.local, deploy.env, ...).
+ * These are parsed as dotenv rather than left to configorama's format
+ * detection, which reads a single KEY=VALUE line as a scalar string.
+ * @param {string} file - Config file path
+ * @returns {boolean} True when the file is a dotenv file
+ */
+function isEnvFile(file) {
+  const base = path.basename(file)
+  return base === '.env' || base.startsWith('.env.') || base.endsWith('.env')
+}
 
 /**
  * Load configorama from the installed dependency, falling back to the
@@ -85,11 +98,22 @@ async function main() {
   const { _, config: _configFlag, ...opts } = argv
   delete opts['--']
 
+  // dotenv files are parsed here into a { KEY: rawValue } object so
+  // configorama resolves ${...} refs in the values; other formats are
+  // handed to configorama by path for its own parsing.
+  let input = file
+  let configDir = settingsFile.configDir
+  if (isEnvFile(file)) {
+    input = dotenv.parse(fs.readFileSync(file))
+    configDir = configDir || path.dirname(path.resolve(file))
+  }
+
   const configorama = loadConfigorama()
   let resolved
   try {
-    resolved = await configorama(file, {
+    resolved = await configorama(input, {
       ...settingsFile,
+      configDir,
       options: { ...(settingsFile.options || {}), ...opts },
     })
   } catch (err) {
