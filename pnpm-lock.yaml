@@ -7,6 +7,12 @@ settings:
 importers:
 
   .:
+    devDependencies:
+      lerna:
+        specifier: ^9.0.0
+        version: 9.0.7(@types/node@24.13.2)
+
+  packages/configorama:
     dependencies:
       '@clack/prompts':
         specifier: ^0.11.0
@@ -78,9 +84,6 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.2
-      lerna:
-        specifier: ^9.0.0
-        version: 9.0.7(@types/node@24.13.2)
       markdown-magic:
         specifier: ^4.8.0
         version: 4.11.0(encoding@0.1.13)
@@ -101,7 +104,7 @@ importers:
     dependencies:
       configorama:
         specifier: workspace:^
-        version: link:../..
+        version: link:../configorama
       minimist:
         specifier: ^1.2.8
         version: 1.2.8

@@ -13,7 +13,7 @@ function loadConfigorama() {
   try {
     return require('configorama')
   } catch (err) {
-    if (err.code === 'MODULE_NOT_FOUND') return require('../../../src')
+    if (err.code === 'MODULE_NOT_FOUND') return require('../../configorama/src')
     throw err
   }
 }
@@ -26,7 +26,7 @@ function loadConfigParser() {
   try {
     return require('configorama/parse-file')
   } catch (err) {
-    if (err.code === 'MODULE_NOT_FOUND') return require('../../../src/utils/parsing/parse')
+    if (err.code === 'MODULE_NOT_FOUND') return require('../../configorama/src/utils/parsing/parse')
     throw err
   }
 }

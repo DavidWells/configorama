@@ -1,114 +1,18 @@
 {
-  "name": "configorama",
-  "version": "1.2.2",
-  "description": "Variable support for configuration files",
-  "main": "src/index.js",
-  "types": "index.d.ts",
-  "exports": {
-    ".": "./src/index.js",
-    "./parse-file": "./src/utils/parsing/parse.js",
-    "./plugins/cloudformation": "./plugins/cloudformation/index.js",
-    "./plugins/onepassword": "./plugins/onepassword/index.js"
-  },
-  "files": [
-    "cli.js",
-    "src",
-    "plugins",
-    "types",
-    "index.d.ts",
-    "package.json",
-    "README.md",
-    "!plugins/*/*.test.js",
-    "!plugins/*/example",
-    "!plugins/*/node_modules"
-  ],
-  "bin": {
-    "config": "./cli.js",
-    "configorama": "./cli.js"
-  },
+  "name": "configorama-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "info": "repomix --include \"cli.js,src/**/*.js\" --ignore \"**/*.test.js\" --copy",
-    "docs": "node ./scripts/docs.js",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "release": "lerna publish",
+    "version:all": "lerna version --no-push --no-git-tag-version",
     "site:dev": "cd site && npm run dev",
     "site:build": "cd site && npm run build",
     "site:validate": "cd site && npm run validate",
-    "site:deploy": "cd site && npm run deploy",
-    "t": "./scripts/run-tests.sh",
-    "test": "npm run test:slow && npm run test:lib && uvu tests \".*\\.test.js$\"",
-    "test:tests": "uvu tests \".*\\.test.js$\" ",
-    "test:api": "uvu tests/api api.test.js",
-    "test:lib": "uvu src \".*\\.test.js$\"",
-    "test:slow": "uvu src \".*\\.slow-test.js$\" && uvu tests \".*\\.slow-test.js$\"",
-    "watch": "watchlist tests -- npm test",
-    "typecheck": "tsc --noEmit",
-    "types": "tsc",
-    "types:watch": "tsc --watch",
-    "prepublishOnly": "npm run types",
-    "publish": "git push origin && git push origin --tags",
-    "release:patch": "npm version patch && npm publish",
-    "release:minor": "npm version minor && npm publish",
-    "release:major": "npm version major && npm publish",
-    "release": "lerna publish",
-    "version:all": "lerna version --no-push --no-git-tag-version",
-    "test:all": "pnpm -r test"
-  },
-  "author": "David Wells",
-  "license": "MIT",
-  "homepage": "https://github.com/DavidWells/configorama#readme",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/DavidWells/configorama"
-  },
-  "dependencies": {
-    "@clack/prompts": "^0.11.0",
-    "@davidwells/box-logger": "^2.0.3",
-    "@iarna/toml": "^2.2.5",
-    "dot-prop": "^5.3.0",
-    "dotenv": "^17.2.2",
-    "env-stage-loader": "^1.1.3",
-    "find-up": "^3.0.0",
-    "git-url-parse": "^14.0.0",
-    "ini": "^5.0.0",
-    "jiti": "^2.4.2",
-    "js-yaml": "^3.14.1",
-    "json5": "^2.2.3",
-    "lodash.camelcase": "^4.3.0",
-    "lodash.clonedeep": "^4.5.0",
-    "lodash.kebabcase": "^4.1.1",
-    "minimist": "^1.2.8",
-    "safe-chalk": "^1.0.4",
-    "subscript": "^9.1.0",
-    "sync-rpc": "^1.3.6",
-    "traverse": "^0.6.8"
+    "site:deploy": "cd site && npm run deploy"
   },
   "devDependencies": {
-    "@cdktf/hcl2json": "^0.21.0",
-    "@types/node": "^24.10.1",
-    "lerna": "^9.0.0",
-    "markdown-magic": "^4.8.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.8.3",
-    "uvu": "^0.5.6",
-    "watchlist": "^0.3.1"
-  },
-  "overrides": {
-    "lodash": "^4.18.1"
-  },
-  "peerDependencies": {
-    "@cdktf/hcl2json": ">=0.20.0",
-    "ts-node": ">=10.0.0",
-    "tsx": ">=4.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@cdktf/hcl2json": {
-      "optional": true
-    },
-    "tsx": {
-      "optional": true
-    },
-    "ts-node": {
-      "optional": true
-    }
-  },
-  "packageManager": "pnpm@10.33.0"
+    "lerna": "^9.0.0"
+  }
 }
