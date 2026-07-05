@@ -53,3 +53,4 @@ _misc
 # Added by nax
 .nax/
 /refactor
+/packages/configorama/_result.json
