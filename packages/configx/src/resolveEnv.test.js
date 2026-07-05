@@ -2,7 +2,7 @@
    Covers key validation, scalar conversion, and parent-env precedence */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { resolveEnv, ConfigxError } = require('./resolveEnv')
+const { resolveEnv, configEntries, shellExport, ConfigxError } = require('./resolveEnv')
 
 test('flat scalar keys become env additions', () => {
   const env = resolveEnv({ API_URL: 'https://x', TIMEOUT_MS: 5000, FEATURE_ENABLED: true }, {})
@@ -82,6 +82,46 @@ test('error message never includes a rejected scalar value', () => {
     assert.is(err.message.includes('super-secret-value'), false)
     assert.match(err.message, /BAD KEY/)
   }
+})
+
+/* configEntries: validated config-only entries (no base-env merge) */
+
+test('configEntries returns validated scalar entries only', () => {
+  const entries = configEntries({ A: 'x', N: 3, B: true, SKIP: null })
+  assert.equal(entries, [['A', 'x'], ['N', '3'], ['B', 'true']])
+})
+
+test('configEntries applies the same key and value validation', () => {
+  assert.throws(() => configEntries({ 'BAD KEY': 'x' }), (err) => err.code === 'invalid_exec_env_key')
+  assert.throws(() => configEntries({ obj: {} }), (err) => err.code === 'invalid_exec_env_value')
+})
+
+/* shellExport: POSIX-safe export lines */
+
+test('shellExport produces export lines', () => {
+  const out = shellExport([['API_URL', 'https://x'], ['STAGE', 'prod']])
+  assert.is(out, "export API_URL='https://x'\nexport STAGE='prod'")
+})
+
+test('shellExport single-quotes and escapes embedded single quotes', () => {
+  const out = shellExport([['SECRET', "a'b"]])
+  assert.is(out, "export SECRET='a'\\''b'")
+})
+
+test('shellExport neutralizes shell metacharacters (no injection)', () => {
+  const nasty = "$(touch /tmp/pwned); `id`; \"x\"; a'b; end"
+  const out = shellExport([['SECRET', nasty]])
+  // Everything sits inside a single-quoted string; only ' is broken out and re-escaped
+  assert.is(out, "export SECRET='" + nasty.replace(/'/g, "'\\''") + "'")
+  assert.is(out.includes("$(touch"), true)
+  // The value is fully enclosed: it starts and ends with a single quote wrapper
+  assert.is(out.startsWith("export SECRET='"), true)
+  assert.is(out.endsWith("'"), true)
+})
+
+test('shellExport preserves newlines inside single quotes', () => {
+  const out = shellExport([['MULTILINE', 'line1\nline2']])
+  assert.is(out, "export MULTILINE='line1\nline2'")
 })
 
 test.run()

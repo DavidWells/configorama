@@ -48,6 +48,20 @@ configx secrets.yml -- npm publish
 # NPM_TOKEN is fetched from 1Password at run time and passed to npm publish
 ```
 
+## Loading into the current shell (`--export`)
+
+A child process can't change its parent shell's environment, so to set values in your *current* terminal, use `--export` and have the shell evaluate the output:
+
+```bash
+eval "$(configx .env --export)"
+# or
+source <(configx .env --export)
+```
+
+`--export` prints `export KEY='value'` lines to stdout instead of running a command. Values are single-quoted with embedded quotes escaped, so a secret containing shell metacharacters (`$`, `` ` ``, `;`, `'`) cannot inject commands when evaluated. Diagnostics go to stderr, so only the export lines reach `eval`.
+
+This puts resolved values (including secrets) into your interactive shell and every command you run after — convenient, but they're then visible to `env` and child processes. Prefer `configx <file> -- <command>` when you only need them for one command.
+
 ## .env files
 
 `.env` files (`.env`, `.env.local`, `deploy.env`, ...) are parsed as dotenv, then their values are resolved by configorama. This lets you keep secret references in a `.env` and have them fetched at run time:

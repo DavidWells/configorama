@@ -1,0 +1,2 @@
+DANGER: "$(touch /tmp/configx-pwned); echo pwned; a'b"
+SAFE: plain-value

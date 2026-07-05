@@ -7,7 +7,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
 const dotenv = require('dotenv')
-const { resolveEnv, ConfigxError } = require('./src/resolveEnv')
+const { resolveEnv, configEntries, shellExport, ConfigxError } = require('./src/resolveEnv')
 
 /**
  * Detect a dotenv file by name (.env, .env.local, deploy.env, ...).
@@ -75,27 +75,31 @@ function loadSettingsFile(explicitPath, cwd) {
 async function main() {
   const argv = minimist(process.argv.slice(2), {
     '--': true,
+    boolean: ['export'],
     string: ['config', 'stage', 'param'],
   })
 
   const file = argv._[0]
   const command = argv['--'] || []
+  // Print `export KEY=...` to stdout instead of running a command, so the
+  // caller can load values into the current shell: eval "$(configx .env --export)"
+  const exportMode = argv.export === true
 
   // Validate invocation BEFORE resolving: resolution can trigger secret
   // prompts (e.g. the 1Password resolver), so never prompt for a run that
   // was going to fail on a missing file or command anyway.
   if (!file) fail('missing config file. Usage: configx <file> [options] -- <command>', 2)
   if (!fs.existsSync(file)) fail(`config file not found: ${file}`, 2)
-  if (command.length === 0) {
-    throw new ConfigxError('missing_exec_command', 'no command given. Usage: configx <file> [options] -- <command>')
+  if (!exportMode && command.length === 0) {
+    throw new ConfigxError('missing_exec_command', 'no command given. Usage: configx <file> [options] -- <command> (or --export)')
   }
 
   const cwd = process.cwd()
   const settingsFile = loadSettingsFile(argv.config, cwd)
 
   // configorama options for ${opt:...} come from the CLI flags (minus
-  // positionals, the -- command, and configx's own --config).
-  const { _, config: _configFlag, ...opts } = argv
+  // positionals, the -- command, and configx's own --config/--export).
+  const { _, config: _configFlag, export: _exportFlag, ...opts } = argv
   delete opts['--']
 
   // dotenv files are parsed here into a { KEY: rawValue } object so
@@ -120,11 +124,22 @@ async function main() {
     fail(err.message)
   }
 
+  // ConfigxError messages are secret-free by construction.
+  if (exportMode) {
+    let lines
+    try {
+      lines = shellExport(configEntries(resolved))
+    } catch (err) {
+      fail(err.message)
+    }
+    if (lines) process.stdout.write(lines + '\n')
+    process.exit(0)
+  }
+
   let childEnv
   try {
     childEnv = resolveEnv(resolved, process.env)
   } catch (err) {
-    // ConfigxError messages are secret-free by construction
     fail(err.message)
   }
 

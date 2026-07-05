@@ -109,4 +109,34 @@ test('flag args after -- go to the child, not configorama', () => {
   assert.is(r.stdout, '--dry-run,-x')
 })
 
+test('--export prints shell export lines instead of running a command', () => {
+  const r = runConfigx(
+    [path.join(fixtures, 'sample.env'), '--name', 'Dave', '--export'],
+    { CONFX_TEST_SRC: 'shellval' }
+  )
+  assert.is(r.status, 0)
+  assert.match(r.stdout, /export GREETING='Dave'/)
+  assert.match(r.stdout, /export STATIC='hello'/)
+  assert.match(r.stdout, /export EXPORTED='exported-value'/)
+})
+
+test('--export output is safe to eval (no shell injection)', () => {
+  const r = runConfigx([path.join(fixtures, 'inject.yml'), '--export'])
+  assert.is(r.status, 0)
+
+  // eval the exports in a real shell, then read the value back
+  const evaluated = spawnSync('bash', ['-c', 'eval "$1"; printf "%s" "$DANGER"', '_', r.stdout], { encoding: 'utf8' })
+  assert.is(evaluated.status, 0)
+  // The value is the literal string, not the result of executing $(...)
+  assert.is(evaluated.stdout, "$(touch /tmp/configx-pwned); echo pwned; a'b")
+  // Prove the injected command never ran
+  assert.is(require('fs').existsSync('/tmp/configx-pwned'), false)
+})
+
+test('--export does not require a command', () => {
+  const r = runConfigx([path.join(fixtures, 'exec.yml'), '--export'])
+  assert.is(r.status, 0)
+  assert.match(r.stdout, /export APP_NAME='configx-test'/)
+})
+
 test.run()
