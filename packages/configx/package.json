@@ -14,10 +14,8 @@
   },
   "files": [
     "cli.js",
-    "src/resolveEnv.js",
-    "src/setupShell.js",
-    "src/setupConfig.js",
-    "src/loaders.js",
+    "src",
+    "!src/*.test.js",
     "README.md",
     "LICENSE"
   ],
