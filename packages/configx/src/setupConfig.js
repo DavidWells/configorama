@@ -1,8 +1,10 @@
 /* configx setup: prompt for missing config values, then apply them to exactly
    one explicit target (child command, --export, --write, --write-answers, menu) */
 const fs = require('fs')
+const path = require('path')
 const minimist = require('minimist')
-const { ConfigxError } = require('./resolveEnv')
+const { configEntries, shellExport, exportSummary, ConfigxError } = require('./resolveEnv')
+const { loadConfigorama, loadConfigParser, loadSettingsFile } = require('./loaders')
 
 // Flags owned by the setup command; never forwarded into configorama options
 const SETUP_ONLY_FLAGS = [
@@ -66,6 +68,120 @@ function parseSetupArgs(rawArgs) {
 }
 
 /**
+ * Set a dot-separated path on an object (answers.dotProp entries)
+ * @param {Object} target - object to mutate
+ * @param {string} dotPath - e.g. "nested.key"
+ * @param {*} value - value to set
+ */
+function setByPath(target, dotPath, value) {
+  const parts = dotPath.split('.')
+  let node = target
+  for (const part of parts.slice(0, -1)) {
+    if (node[part] === null || typeof node[part] !== 'object') node[part] = {}
+    node = node[part]
+  }
+  node[parts[parts.length - 1]] = value
+}
+
+/**
+ * Prompt for missing values via the setup engine, then resolve the config
+ * with the answers applied. Prompt UI renders on stderr so stdout stays
+ * machine-clean for --export.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<{ answers: Object, resolved: Object }>} answers and resolved config
+ */
+async function promptAndResolve(parsed, settingsFile, configorama) {
+  const baseOptions = { ...(settingsFile.options || {}), ...parsed.opts }
+
+  const setupResult = await configorama.setup(parsed.file, {
+    ...settingsFile,
+    options: baseOptions,
+    streams: { output: process.stderr },
+  })
+  const answers = setupResult.answers
+
+  // Answered env feeds ${env:} refs during resolution; configx exits after,
+  // and the parent shell is never affected by this process-local mutation.
+  Object.assign(process.env, answers.env)
+  const resolveOptions = { ...baseOptions, ...answers.options }
+
+  // self/dotProp answers patch the parsed config object before resolution
+  let input = parsed.file
+  let configDir = settingsFile.configDir
+  if (Object.keys(answers.self).length > 0 || Object.keys(answers.dotProp).length > 0) {
+    const { parseFile } = loadConfigParser()
+    const configObject = parseFile(path.resolve(parsed.file))
+    Object.assign(configObject, answers.self)
+    for (const [key, value] of Object.entries(answers.dotProp)) {
+      setByPath(configObject, key, value)
+    }
+    input = configObject
+    configDir = configDir || path.dirname(path.resolve(parsed.file))
+  }
+
+  // Let resolvers (e.g. the 1Password plugin's auth-prompt hint) attribute the
+  // request to configx. Restored afterwards so it never reaches child targets.
+  const priorProgramName = process.env.CONFIGORAMA_PROGRAM_NAME
+  process.env.CONFIGORAMA_PROGRAM_NAME = 'configx'
+  let resolved
+  try {
+    resolved = await configorama(input, {
+      ...settingsFile,
+      configDir,
+      options: resolveOptions,
+    })
+  } finally {
+    if (priorProgramName === undefined) delete process.env.CONFIGORAMA_PROGRAM_NAME
+    else process.env.CONFIGORAMA_PROGRAM_NAME = priorProgramName
+  }
+
+  return { answers, resolved }
+}
+
+/**
+ * Merge answered env vars into resolved config entries for export.
+ * Answered values win on key collisions - they are what the user just typed.
+ * @param {Array<[string, string]>} entries - validated resolved config entries
+ * @param {Object.<string, any>} answeredEnv - env answers from the wizard
+ * @returns {Array<[string, string]>} merged entries
+ */
+function mergeAnsweredEnv(entries, answeredEnv) {
+  const merged = entries.map(([key, value]) => (
+    Object.prototype.hasOwnProperty.call(answeredEnv, key)
+      ? [key, String(answeredEnv[key])]
+      : [key, value]
+  ))
+  const seen = new Set(entries.map(([key]) => key))
+  for (const [key, value] of Object.entries(answeredEnv)) {
+    if (!seen.has(key)) merged.push([key, String(value)])
+  }
+  return merged
+}
+
+/**
+ * Print export lines for the answered + resolved values.
+ * Stdout carries only export lines; summaries go to stderr.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} exit code
+ */
+async function runExportTarget(parsed, settingsFile, configorama) {
+  const { answers, resolved } = await promptAndResolve(parsed, settingsFile, configorama)
+  const entries = mergeAnsweredEnv(configEntries(resolved), answers.env)
+
+  const lines = shellExport(entries)
+  if (lines) process.stdout.write(lines + '\n')
+  const summary = exportSummary(entries)
+  if (summary && process.stderr.isTTY) {
+    process.stderr.write(`configx: ${summary}\n`)
+  }
+  return 0
+}
+
+/**
  * Run the configx setup command.
  * @param {string[]} rawArgs - argv after the `setup` positional
  * @returns {Promise<number>} process exit code
@@ -81,6 +197,13 @@ async function runSetupConfig(rawArgs) {
   }
   if (!fs.existsSync(parsed.file)) {
     throw new ConfigxError('setup_file_not_found', `config file not found: ${parsed.file}`)
+  }
+
+  const settingsFile = loadSettingsFile(parsed.argv.config, process.cwd())
+  const configorama = loadConfigorama()
+
+  if (parsed.target === 'export') {
+    return runExportTarget(parsed, settingsFile, configorama)
   }
 
   throw new ConfigxError('setup_target_unimplemented', `setup target "${parsed.target}" is not implemented yet`)

@@ -3,28 +3,14 @@
    configx <file> [configorama options] -- <command and args...> */
 const fs = require('fs')
 const os = require('os')
-const path = require('path')
 const { spawn } = require('child_process')
 const minimist = require('minimist')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
 const { runSetupShell, SetupShellError } = require('./src/setupShell')
+const { loadConfigorama, loadSettingsFile } = require('./src/loaders')
 
 // Stand-in value returned by stubbed custom resolvers during the pre-flight pass.
 const PREFLIGHT_PLACEHOLDER = 'configx-preflight'
-
-/**
- * Load configorama from the installed dependency, falling back to the
- * in-repo source when running inside the configorama monorepo.
- * @returns {Function} configorama async API
- */
-function loadConfigorama() {
-  try {
-    return require('configorama')
-  } catch (err) {
-    if (err.code === 'MODULE_NOT_FOUND') return require('../../src')
-    throw err
-  }
-}
 
 /**
  * @param {string} message - Error text
@@ -33,34 +19,6 @@ function loadConfigorama() {
 function fail(message, code = 1) {
   process.stderr.write(`configx: ${message}\n`)
   process.exit(code)
-}
-
-/**
- * Load an optional configx settings file exporting configorama settings
- * (variableSources, filters, functions, safeMode, ...). This file is
- * executed — configx is an execution tool and treats it as trusted.
- * @param {string|undefined} explicitPath - Path from --config
- * @param {string} cwd - Working directory to discover configx.config.js
- * @returns {object} Settings object (empty when no file found)
- */
-function loadSettingsFile(explicitPath, cwd) {
-  const target = explicitPath
-    ? path.resolve(cwd, explicitPath)
-    : path.join(cwd, 'configx.config.js')
-
-  if (!fs.existsSync(target)) {
-    if (explicitPath) fail(`config file not found: ${target}`)
-    return {}
-  }
-
-  let loaded
-  try {
-    loaded = require(target)
-  } catch (err) {
-    fail(`failed to load config file ${target}: ${err.message}`)
-  }
-  if (loaded && typeof loaded === 'object') return loaded
-  fail(`config file ${target} must export a settings object`)
 }
 
 async function main() {

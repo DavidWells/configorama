@@ -17,6 +17,7 @@
     "src/resolveEnv.js",
     "src/setupShell.js",
     "src/setupConfig.js",
+    "src/loaders.js",
     "README.md",
     "LICENSE"
   ],

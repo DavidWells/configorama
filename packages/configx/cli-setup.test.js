@@ -82,6 +82,40 @@ test('setup-only flags are stripped from configorama options', () => {
   }
 })
 
+const setupBasic = path.join(fixtures, 'setup-basic.yml')
+const answersConfig = path.join(fixtures, 'setup-answers.config.js')
+const EXPORT_LINE = /^export [A-Za-z_][A-Za-z0-9_]*='(?:[^'\\]|'\\'')*'$/
+
+test('setup --export prints only export lines to stdout', () => {
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--export'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+
+  const lines = r.stdout.split('\n').filter(Boolean)
+  assert.ok(lines.length >= 4, 'exports resolved keys and answered env')
+  for (const line of lines) {
+    assert.match(line, EXPORT_LINE, `valid export grammar: ${line}`)
+  }
+
+  assert.ok(r.stdout.includes(`export API_KEY='sk-test-secret-value'`), 'resolved key exported')
+  assert.ok(r.stdout.includes(`export SETUP_TEST_API_KEY='sk-test-secret-value'`), 'answered env var exported')
+  assert.ok(r.stdout.includes(`export STAGE='dev'`), 'option fallback resolves')
+  assert.not.ok(r.stderr.includes('sk-test-secret-value'), 'no secret values on stderr')
+})
+
+test('setup --export does not export option answers directly', () => {
+  const r = runConfigx(['setup', setupBasic, '--config', path.join(fixtures, 'setup-options.config.js'), '--export'])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.ok(r.stdout.includes(`export STAGE='qa'`), 'option answer affects resolution')
+  assert.not.ok(r.stdout.includes('export stage='), 'raw option answer never exported')
+})
+
+test('setup --export cancellation exits non-zero with empty stdout', () => {
+  const r = runConfigx(['setup', setupBasic, '--config', path.join(fixtures, 'setup-cancel.config.js'), '--export'])
+  assert.is.not(r.status, 0)
+  assert.is(r.stdout, '', 'no partial exports for eval to apply')
+  assert.match(r.stderr, /cancelled/i)
+})
+
 test('parseSetupArgs identifies each target', () => {
   const { parseSetupArgs } = require('./src/setupConfig')
 

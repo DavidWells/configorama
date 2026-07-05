@@ -1,0 +1,4 @@
+SERVICE: my-app
+STAGE: ${opt:stage, dev}
+API_KEY: ${env:SETUP_TEST_API_KEY}
+REGION: ${env:SETUP_TEST_REGION}
