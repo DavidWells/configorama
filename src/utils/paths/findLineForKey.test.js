@@ -3,7 +3,7 @@
  */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { findLineForKey } = require('./findLineForKey')
+const { findLineForKey, findLineByPath } = require('./findLineForKey')
 
 // YAML tests
 test('YAML - finds key at start of line', () => {
@@ -121,6 +121,25 @@ test('escapes special regex characters in key', () => {
 test('unknown file type falls back to YAML-style', () => {
   const lines = ['foo: bar']
   assert.equal(findLineForKey('foo', lines, '.unknown'), 1)
+})
+
+// dotenv
+test('dotenv - finds KEY= line', () => {
+  const lines = ['API_URL=https://x', 'stage=${opt:stage}']
+  assert.equal(findLineForKey('stage', lines, '.env'), 2)
+  assert.equal(findLineForKey('API_URL', lines, '.env'), 1)
+})
+
+test('dotenv - finds export-prefixed and whitespace-padded keys', () => {
+  const lines = ['# comment', 'export TOKEN=abc', '  PADDED = x']
+  assert.equal(findLineForKey('TOKEN', lines, '.env'), 2)
+  assert.equal(findLineForKey('PADDED', lines, '.env'), 3)
+})
+
+test('findLineByPath - dotenv key lookup', () => {
+  const lines = ['A=1', 'stage=${opt:stage}', 'B=2']
+  assert.equal(findLineByPath('stage', lines, '.env'), 2)
+  assert.equal(findLineByPath('missing', lines, '.env'), 0)
 })
 
 test.run()

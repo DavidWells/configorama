@@ -31,6 +31,10 @@ function findLineForKey(keyToFind, lines, fileType) {
     if (fileType === '.ini') {
       return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
     }
+    // dotenv: KEY= or export KEY=
+    if (fileType === '.env') {
+      return new RegExp(`^\\s*(?:export\\s+)?${escapedKey}\\s*=`).test(line)
+    }
     // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
     if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
       return new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`).test(line)
@@ -55,11 +59,30 @@ function findLineByPath(configPath, lines, fileType) {
 
   const isYaml = fileType === '.yml' || fileType === '.yaml'
   const isJson = fileType === '.json' || fileType === '.json5' || fileType === '.jsonc'
-  if (!isYaml && !isJson) return 0
+  const isEnv = fileType === '.env'
+  if (!isYaml && !isJson && !isEnv) return 0
 
   const segments = configPath.split('.')
+  if (isEnv) return findLineByPathEnv(segments, lines)
   if (isYaml) return findLineByPathYaml(segments, lines)
   return findLineByPathJson(segments, lines)
+}
+
+/**
+ * Find a dotenv key's line. .env is flat, so the key is the first path segment.
+ * Handles leading whitespace and an optional `export ` prefix.
+ * @param {string[]} segments
+ * @param {string[]} lines
+ * @returns {number}
+ */
+function findLineByPathEnv(segments, lines) {
+  const key = segments[0]
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`^\\s*(?:export\\s+)?${escaped}\\s*=`)
+  for (let li = 0; li < lines.length; li++) {
+    if (pattern.test(lines[li])) return li + 1
+  }
+  return 0
 }
 
 /**

@@ -1,0 +1,2 @@
+GOOD: ${sidefx:x}
+STAGE: ${option:stage, "dev"}

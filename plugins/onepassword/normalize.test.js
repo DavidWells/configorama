@@ -110,6 +110,48 @@ test('section without field is rejected', () => {
 
 /* Private link parsing */
 
+/* Abbreviated private-link forms (scheme/host/path progressively stripped) */
+
+test('scheme-less link (start.1password.com/open/i?...) is a private link', () => {
+  const ref = normalizeRefValue('start.1password.com/open/i?a=ACCT&v=vault-id-123&i=item-id-456&h=my.1password.com')
+  assert.is(ref.kind, 'privateLink')
+  assert.is(ref.item, 'item-id-456')
+  assert.is(ref.vault, 'vault-id-123')
+})
+
+test('path-only link (open/i?...) is a private link', () => {
+  const ref = normalizeRefValue('open/i?a=ACCT&v=vault-id-123&i=item-id-456&h=my.1password.com')
+  assert.is(ref.kind, 'privateLink')
+  assert.is(ref.item, 'item-id-456')
+  assert.is(ref.vault, 'vault-id-123')
+})
+
+test('bare query params (v=..&i=..&h=..) is a private link', () => {
+  const ref = normalizeRefValue('v=vault-id-123&i=item-id-456&h=my.1password.com')
+  assert.is(ref.kind, 'privateLink')
+  assert.is(ref.item, 'item-id-456')
+  assert.is(ref.vault, 'vault-id-123')
+})
+
+test('bare query params with only v and i is a private link', () => {
+  const ref = normalizeRefValue('v=vault-id-123&i=item-id-456')
+  assert.is(ref.kind, 'privateLink')
+  assert.is(ref.item, 'item-id-456')
+})
+
+test('abbreviated link forms drop a and h from the normalized ref', () => {
+  const ref = normalizeRefValue('open/i?a=ACCT&v=V&i=I&h=my.1password.com')
+  const serialized = JSON.stringify(ref)
+  assert.is(serialized.includes('ACCT'), false)
+  assert.is(serialized.includes('my.1password.com'), false)
+})
+
+test('a non-1Password URL with an i= query is NOT treated as a link', () => {
+  const ref = normalizeRefValue('My Item i=5')
+  assert.is(ref.kind, 'item')
+  assert.is(ref.item, 'My Item i=5')
+})
+
 test('missing i throws invalid private link', () => {
   try {
     parsePrivateLink('https://start.1password.com/open/i?a=ACCT&v=vault-id')

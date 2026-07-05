@@ -135,6 +135,26 @@ test('raw alias returns whole field text and section key paths work', async () =
   assert.is(config.dbPassword, 's3cr3t')
 })
 
+test('bare op:// URI resolves as a direct secret ref', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+  const config = await configorama(
+    { token: '${op://vault/item/notesPlain}' },
+    { variableSources: [source] }
+  )
+  assert.is(config.token, INI_NOTE)
+  assert.equal(fake.calls[0].args.slice(0, 3), ['read', '--no-newline', 'op://vault/item/notesPlain'])
+})
+
+test('bare op:// URI records a secretRef metadata entry with the ref', async () => {
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+  await configorama({ token: '${op://vault/item/field}' }, { variableSources: [source] })
+  const [entry] = source.collectMetadata()
+  assert.is(entry.referenceKind, 'secretRef')
+  assert.is(entry.ref, 'op://vault/item/field')
+})
+
 test('direct function syntax with op:// ref and key path', async () => {
   const fake = fakeOp()
   const source = createOnePasswordResolver({ execFile: fake.execFile })
@@ -175,13 +195,27 @@ test('raw op:// in colon syntax is rejected with pointer to function syntax', as
   }
 })
 
-test('private link in colon syntax is rejected', async () => {
+test('private link in colon syntax is rejected with an actionable message', async () => {
   const source = createOnePasswordResolver({ execFile: fakeOp().execFile })
   try {
-    await source.resolver('op:https://start.1password.com/open/i?i=x', {}, {}, vo('op:https://...'))
+    await source.resolver('op:https://start.1password.com/open/i?i=x&a=ACCT', {}, {}, vo('op:https://...'))
     assert.unreachable('should have thrown')
   } catch (err) {
-    assert.match(err.message, /letters, numbers, and underscores|aliases/i)
+    assert.match(err.message, /private links are not supported in colon syntax/i)
+    assert.match(err.message, /\$\{op\(/)
+    // the account param and full link are not echoed back
+    assert.is(err.message.includes('ACCT'), false)
+    assert.is(err.message.includes('start.1password.com'), false)
+  }
+})
+
+test('onepassword:// link in colon syntax is rejected the same way', async () => {
+  const source = createOnePasswordResolver({ execFile: fakeOp().execFile })
+  try {
+    await source.resolver('op:onepassword://open/i?i=x', {}, {}, vo('op:onepassword://...'))
+    assert.unreachable('should have thrown')
+  } catch (err) {
+    assert.match(err.message, /private links are not supported in colon syntax/i)
   }
 })
 
@@ -361,11 +395,11 @@ test('queued calls still run when the cold-start call fails', async () => {
   assert.is(results[1].value, 'db-secret')
 })
 
-test('auth hint on stderr names the number of items at cold start', async () => {
+test('auth hint on stderr names the values at cold start (by alias)', async () => {
   // drain hint timers scheduled by instances from earlier tests
   await new Promise((resolve) => setImmediate(resolve))
   const fake = fakeOp()
-  const source = createOnePasswordResolver({ refs: { a: 'note-item', b: 'database-prod' }, execFile: fake.execFile })
+  const source = createOnePasswordResolver({ refs: { alpha: 'note-item', bravo: 'database-prod' }, execFile: fake.execFile })
 
   const written = []
   const originalWrite = process.stderr.write
@@ -374,8 +408,8 @@ test('auth hint on stderr names the number of items at cold start', async () => 
   process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
   try {
     await Promise.all([
-      source.resolver('op:a', {}, {}, vo('op:a')),
-      source.resolver('op:b', {}, {}, vo('op:b')),
+      source.resolver('op:alpha', {}, {}, vo('op:alpha')),
+      source.resolver('op:bravo', {}, {}, vo('op:bravo')),
     ])
     // the hint is scheduled with setImmediate; let it flush before restoring
     await new Promise((resolve) => setImmediate(resolve))
@@ -385,7 +419,79 @@ test('auth hint on stderr names the number of items at cold start', async () => 
   }
   const hints = written.filter((line) => line.includes('1Password'))
   assert.is(hints.length, 1, 'exactly one hint per resolution run')
-  assert.match(hints[0], /configorama: requesting 2 items from 1Password \(expect an authorization prompt\)/)
+  assert.match(hints[0], /configorama: fetching .*alpha.*bravo.* from 1Password \(expect an authorization prompt\)/)
+  assert.is(hints[0].includes('npm_xxx'), false)
+})
+
+test('auth hint prefix honors the programName option', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item' }, programName: 'configx', execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = true
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await source.resolver('op:a', {}, {}, vo('op:a'))
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /^configx: fetching/)
+})
+
+test('auth hint prefix falls back to CONFIGORAMA_PROGRAM_NAME env var', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ refs: { a: 'note-item' }, execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  const originalEnv = process.env.CONFIGORAMA_PROGRAM_NAME
+  process.stderr.isTTY = true
+  process.env.CONFIGORAMA_PROGRAM_NAME = 'confx-host'
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    await source.resolver('op:a', {}, {}, vo('op:a'))
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+    if (originalEnv === undefined) delete process.env.CONFIGORAMA_PROGRAM_NAME
+    else process.env.CONFIGORAMA_PROGRAM_NAME = originalEnv
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /^confx-host: fetching/)
+})
+
+test('auth hint names the config key for bare op:// refs', async () => {
+  await new Promise((resolve) => setImmediate(resolve))
+  const fake = fakeOp()
+  const source = createOnePasswordResolver({ execFile: fake.execFile })
+
+  const written = []
+  const originalWrite = process.stderr.write
+  const originalIsTTY = process.stderr.isTTY
+  process.stderr.isTTY = true
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true }
+  try {
+    // valueObject path last segment is the env key the user recognizes
+    await source.resolver('op://vault/item/field', {}, {}, { originalSource: '${op://vault/item/field}', path: ['DB_PASSWORD'] })
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.stderr.write = originalWrite
+    process.stderr.isTTY = originalIsTTY
+  }
+  const hints = written.filter((line) => line.includes('1Password'))
+  assert.is(hints.length, 1)
+  assert.match(hints[0], /fetching DB_PASSWORD from 1Password/)
 })
 
 test('auth hint is silent when stderr is not a TTY', async () => {

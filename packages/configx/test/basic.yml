@@ -1,0 +1,5 @@
+API_URL: https://api.example.com
+STAGE: ${opt:stage, "dev"}
+FROM_ENV: ${env:CONFX_TEST_SRC}
+FEATURE: true
+TIMEOUT_MS: 5000

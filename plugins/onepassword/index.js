@@ -8,14 +8,20 @@ const { parseStructuredSecret, getKeyPath } = require('./parser')
 const OP_PREFIX = 'op'
 
 /**
- * Tell interactive users why an authorization prompt is about to appear.
- * The 1Password dialog only names the terminal app (OS-attributed), so this
- * line supplies the configorama context. TTY-only: silent in CI and pipes.
- * @param {number} count - Distinct op calls at cold start
+ * Tell interactive users why an authorization prompt is about to appear,
+ * naming what is being fetched. The 1Password dialog only names the terminal
+ * app (OS-attributed), so this line supplies the configorama context. Labels
+ * are config keys / aliases / fields — references, never secret values.
+ * TTY-only: silent in CI and pipes.
+ * @param {string[]} labels - Human labels for the values being fetched
+ * @param {string} programName - Host tool name shown as the message prefix
  */
-function logAuthHint(count) {
+function logAuthHint(labels, programName) {
   if (!process.stderr.isTTY) return
-  process.stderr.write(`configorama: requesting ${count} item${count === 1 ? '' : 's'} from 1Password (expect an authorization prompt)\n`)
+  const unique = [...new Set(labels)]
+  const n = unique.length
+  const what = n > 0 && n <= 8 ? unique.join(', ') : `${n} value${n === 1 ? '' : 's'}`
+  process.stderr.write(`${programName}: fetching ${what} from 1Password (expect an authorization prompt)\n`)
 }
 // Supports: op:alias, op:alias.KEY, op(item), op(item).KEY
 const opVariableSyntax = /^op(?::|\()/
@@ -37,6 +43,7 @@ const opVariableSyntax = /^op(?::|\()/
  * @param {string} [options.account] - Passed to op as --account
  * @param {string} [options.configDir] - Passed to op as --config
  * @param {string} [options.opPath] - Path to the op binary (defaults to "op" on PATH)
+ * @param {string} [options.programName] - Host tool name for the auth-prompt hint (defaults to $CONFIGORAMA_PROGRAM_NAME or "configorama")
  * @param {boolean} [options.skipResolution] - Collect metadata and return placeholders without calling op
  * @param {Function} [options.execFile] - execFile injection for tests (not serializable; unavailable in sync mode)
  * @returns {object} Variable source configuration with resolver and metadata collector
@@ -47,6 +54,7 @@ function createOnePasswordResolver(options = {}) {
     account,
     configDir,
     opPath,
+    programName,
     skipResolution = false,
     execFile,
   } = options
@@ -71,13 +79,14 @@ function createOnePasswordResolver(options = {}) {
    * @param {Map} cache - Promise cache
    * @param {string} key - Cache key
    * @param {Function} fn - Producer returning a promise
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<*>} Shared promise
    */
-  function cached(cache, key, fn) {
+  function cached(cache, key, fn, label) {
     if (cache.has(key)) {
       return cache.get(key)
     }
-    const promise = withColdStartLatch(fn).catch((err) => {
+    const promise = withColdStartLatch(fn, label).catch((err) => {
       cache.delete(key)
       throw err
     })
@@ -91,20 +100,26 @@ function createOnePasswordResolver(options = {}) {
   // op call runs alone; everything else queues behind its settlement and
   // then fans out in parallel against the authorized session.
   let coldStartCall = null
-  let coldStartCount = 0
   let hintScheduled = false
+  const pendingLabels = []
 
   /**
    * @param {Function} fn - Producer returning a promise
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<*>} Producer result, gated behind the first call
    */
-  function withColdStartLatch(fn) {
-    coldStartCount++
+  function withColdStartLatch(fn, label) {
+    if (label) pendingLabels.push(label)
     if (!hintScheduled) {
       hintScheduled = true
       // setImmediate lets the whole parallel fan-out register first so the
-      // hint reports an accurate item count.
-      setImmediate(() => logAuthHint(coldStartCount))
+      // hint names every value being fetched. The prefix is read here (not at
+      // factory time) so a host tool can set CONFIGORAMA_PROGRAM_NAME after the
+      // resolver is constructed but before resolution runs.
+      setImmediate(() => {
+        const prefix = programName || process.env.CONFIGORAMA_PROGRAM_NAME || 'configorama'
+        logAuthHint(pendingLabels, prefix)
+      })
     }
     if (!coldStartCall) {
       coldStartCall = fn()
@@ -130,12 +145,26 @@ function createOnePasswordResolver(options = {}) {
       return { reference: normalizeRefValue(spec), keyPath: funcMatch[2], alias: undefined }
     }
 
+    // Bare 1Password secret reference: ${op://vault/item/field}. This is the
+    // native op:// URI and is treated as a direct secret ref (op read). Key
+    // paths are not supported here because op:// refs contain dots and slashes;
+    // use alias or function syntax for a structured-note key path.
+    if (trimmed.startsWith('op://')) {
+      return { reference: { kind: 'secretRef', ref: trimmed }, keyPath: undefined, alias: undefined }
+    }
+
     if (!trimmed.startsWith('op:')) {
       throw new Error(`Invalid 1Password variable "${varString}".`)
     }
     const rest = trimmed.slice(3)
     if (rest.startsWith('op://')) {
       throw new Error(`Use \${op(${rest})} for direct secret references.`)
+    }
+    // A private link (or any URL) after the colon is a common mistake — colon
+    // syntax is alias-only. Point to function syntax without echoing the link
+    // (it carries account/host params we treat as sensitive).
+    if (/^https?:\/\//.test(rest) || rest.startsWith('onepassword://')) {
+      throw new Error('1Password private links are not supported in colon syntax. Use function syntax: ${op(<private link>)}, or an op:// secret reference.')
     }
 
     const dotIndex = rest.indexOf('.')
@@ -175,13 +204,14 @@ function createOnePasswordResolver(options = {}) {
    * treats NPM_TOKEN as an INI key inside the inferred field.
    * @param {object} reference - Normalized reference
    * @param {string|undefined} keyPath - Requested key path
+   * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<{value: string, fieldName: string, remainingKeyPath: string|undefined}>} Selected value
    */
-  async function fetchValue(reference, keyPath) {
+  async function fetchValue(reference, keyPath, label) {
     if (reference.kind === 'secretRef') {
       const value = await cached(secretRefCache, `${scopeKey}|${reference.ref}`, () => {
         return readSecretRef(reference.ref, cliOptions)
-      })
+      }, label)
       return { value, fieldName: reference.ref, remainingKeyPath: keyPath }
     }
 
@@ -189,7 +219,7 @@ function createOnePasswordResolver(options = {}) {
     const itemKey = `${scopeKey}|${vault || ''}|${reference.item}`
     const item = await cached(itemCache, itemKey, () => {
       return getItem(reference.item, { ...cliOptions, vault })
-    })
+    }, label)
 
     // Field selection is a pure function over the cached item JSON, so it
     // needs no cache of its own - no op call is ever saved by one.
@@ -254,7 +284,13 @@ function createOnePasswordResolver(options = {}) {
       return placeholderFor(parsed)
     }
 
-    const { value, fieldName, remainingKeyPath } = await fetchValue(reference, keyPath)
+    // Auth-hint label: what the user recognizes — the alias, else the config
+    // key being set, else the field. Never a secret value.
+    const label = alias
+      || (configPath ? configPath.split('.').pop() : undefined)
+      || reference.field
+      || (reference.kind === 'secretRef' ? reference.ref : reference.item)
+    const { value, fieldName, remainingKeyPath } = await fetchValue(reference, keyPath, label)
     if (entry.field === undefined && reference.kind !== 'secretRef') {
       entry.field = fieldName
     }
@@ -283,8 +319,8 @@ function createOnePasswordResolver(options = {}) {
       itemCache.clear()
       opReferences.length = 0
       coldStartCall = null
-      coldStartCount = 0
       hintScheduled = false
+      pendingLabels.length = 0
     },
     syncFactory: require.resolve('./sync-factory'),
     syncOptions: buildSyncOptions(),
