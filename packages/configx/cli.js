@@ -20,6 +20,33 @@ function fail(message, code = 1) {
   process.exit(code)
 }
 
+/**
+ * @returns {string} Usage/help text
+ */
+function helpText() {
+  return `configx — resolve a configorama config and run a command with it as environment
+
+Usage: configx <file> [options] -- <command and args...>
+       configx <file> --export        Print export lines to load into the current shell
+       configx setup <file>           Interactive setup wizard
+       configx setup-shell            Shell integration for setup
+
+Options:
+  --export            Print 'export KEY=value' to stdout instead of running a command
+                      (use: eval "$(configx .env --export)")
+  --config <path>     Settings file that registers resolvers (default: ./configx.config.js)
+  --no-preflight      Skip the pre-flight validation pass
+  --stage, --param    Passed through to configorama for \${opt:...} resolution
+  -h, --help          Show this help
+  -v, --version       Show the version
+
+Examples:
+  configx config.yml --stage prod -- npm run deploy
+  configx .env -- ./my-app
+  eval "$(configx .env --export)"
+`
+}
+
 async function main() {
   if (process.argv[2] === 'setup-shell') {
     const code = await runSetupShell(process.argv.slice(3))
@@ -34,10 +61,21 @@ async function main() {
 
   const argv = minimist(process.argv.slice(2), {
     '--': true,
-    boolean: ['export', 'preflight'],
+    boolean: ['export', 'preflight', 'help', 'version'],
     string: ['config', 'stage', 'param'],
+    alias: { h: 'help', v: 'version' },
     default: { preflight: true },
   })
+
+  // Help/version print to stdout and exit 0 (also help when invoked with no args).
+  if (argv.help || process.argv.length <= 2) {
+    process.stdout.write(helpText())
+    process.exit(0)
+  }
+  if (argv.version) {
+    process.stdout.write(`${require('./package.json').version}\n`)
+    process.exit(0)
+  }
 
   const file = argv._[0]
   const command = argv['--'] || []
