@@ -15,7 +15,9 @@ async function withStdoutRedirected(target, fn) {
   const originalWrite = process.stdout.write
   const savedDescriptors = {}
 
-  process.stdout.write = (chunk, encoding, callback) => target.write(chunk, encoding, callback)
+  process.stdout.write = /** @type {typeof process.stdout.write} */ (
+    (chunk, encoding, callback) => target.write(chunk, encoding, callback)
+  )
 
   for (const prop of MIRRORED_TTY_PROPS) {
     if (target[prop] === undefined) continue

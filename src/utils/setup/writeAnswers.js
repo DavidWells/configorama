@@ -37,6 +37,7 @@ function writeAnswers(filePath, answers, opts = {}) {
     throw err
   }
 
+  /** @type {Object.<string, string[]>} */
   const groups = {}
   for (const [group, values] of Object.entries(normalized)) {
     groups[group] = Object.keys(values)

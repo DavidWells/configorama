@@ -5,7 +5,7 @@ const { runConfigWizard } = require('../ui/configWizard')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { redactUserInputsByRequirements } = require('../redaction/setupRedaction')
 
-const ANSWER_GROUPS = ['options', 'env', 'self', 'dotProp']
+const ANSWER_GROUPS = /** @type {const} */ (['options', 'env', 'self', 'dotProp'])
 
 /**
  * @typedef {Object} SetupAnswers
@@ -30,7 +30,8 @@ const ANSWER_GROUPS = ['options', 'env', 'self', 'dotProp']
  * @returns {SetupAnswers} answers with all groups present
  */
 function normalizeAnswerGroups(userInputs) {
-  const normalized = {}
+  /** @type {SetupAnswers} */
+  const normalized = { options: {}, env: {}, self: {}, dotProp: {} }
   for (const group of ANSWER_GROUPS) {
     normalized[group] = Object.assign({}, userInputs && userInputs[group])
   }

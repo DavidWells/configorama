@@ -2,6 +2,28 @@
 
 Guidance for agents and contributors working on configorama.
 
+## Always type-check after changes (load-bearing)
+
+This is a JavaScript project type-checked with TypeScript via JSDoc. **After any
+code change, run the type check before committing:**
+
+```bash
+npm run typecheck   # tsc --noEmit — fast, no output
+```
+
+`prepublishOnly` runs `npm run types` (`tsc`, which emits declarations), so **a
+type error blocks publishing** — a failed `tsc` in the middle of `lerna publish`
+leaves a half-done release (versions bumped and tagged, nothing on npm). Catch it
+before you tag, not during publish.
+
+Type rules (from the project conventions):
+
+- Use **JSDoc** for types; never `/** @type {any} */`.
+- Objects built by dynamically assigning keys are inferred as `{}` and won't match
+  a declared shape — initialize with the full shape (`{ a: {}, b: {} }`) or
+  annotate the variable (`/** @type {Record<string, string[]>} */ const x = {}`).
+- Use `/** @type {const} */ ([...])` for key lists so they index a typed object.
+
 ## stdout hygiene (load-bearing)
 
 **Library code under `src/` must never write to `stdout` during resolution.**
