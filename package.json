@@ -17,7 +17,6 @@
     "types",
     "index.d.ts",
     "package.json",
-    "package-lock.json",
     "README.md",
     "!plugins/*/*.test.js",
     "!plugins/*/example",
