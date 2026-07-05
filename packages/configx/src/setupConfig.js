@@ -3,8 +3,9 @@
 const fs = require('fs')
 const path = require('path')
 const minimist = require('minimist')
-const { configEntries, shellExport, exportSummary, ConfigxError } = require('./resolveEnv')
+const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./resolveEnv')
 const { loadConfigorama, loadConfigParser, loadSettingsFile } = require('./loaders')
+const { runChild } = require('./runChild')
 
 // Flags owned by the setup command; never forwarded into configorama options
 const SETUP_ONLY_FLAGS = [
@@ -182,6 +183,22 @@ async function runExportTarget(parsed, settingsFile, configorama) {
 }
 
 /**
+ * Run the child command with answered + resolved values in its environment.
+ * Values live only in this process and the child; nothing persists.
+ * @param {SetupInvocation} parsed - parsed invocation
+ * @param {Object} settingsFile - configx settings file contents
+ * @param {Function} configorama - configorama async API
+ * @returns {Promise<number>} the child's exit status
+ */
+async function runCommandTarget(parsed, settingsFile, configorama) {
+  const { resolved } = await promptAndResolve(parsed, settingsFile, configorama)
+  // promptAndResolve applied answered env to process.env, so answered values
+  // reach the child and win over resolved config keys (parent-wins semantics)
+  const childEnv = resolveEnv(resolved, process.env)
+  return runChild(parsed.command[0], parsed.command.slice(1), childEnv)
+}
+
+/**
  * Run the configx setup command.
  * @param {string[]} rawArgs - argv after the `setup` positional
  * @returns {Promise<number>} process exit code
@@ -204,6 +221,9 @@ async function runSetupConfig(rawArgs) {
 
   if (parsed.target === 'export') {
     return runExportTarget(parsed, settingsFile, configorama)
+  }
+  if (parsed.target === 'command') {
+    return runCommandTarget(parsed, settingsFile, configorama)
   }
 
   throw new ConfigxError('setup_target_unimplemented', `setup target "${parsed.target}" is not implemented yet`)

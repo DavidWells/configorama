@@ -2,12 +2,11 @@
 /* configx: resolve a configorama config and exec a command with it as environment
    configx <file> [configorama options] -- <command and args...> */
 const fs = require('fs')
-const os = require('os')
-const { spawn } = require('child_process')
 const minimist = require('minimist')
 const { resolveEnv, configEntries, shellExport, exportSummary, ConfigxError } = require('./src/resolveEnv')
 const { runSetupShell, SetupShellError } = require('./src/setupShell')
 const { loadConfigorama, loadSettingsFile } = require('./src/loaders')
+const { runChild } = require('./src/runChild')
 
 // Stand-in value returned by stubbed custom resolvers during the pre-flight pass.
 const PREFLIGHT_PLACEHOLDER = 'configx-preflight'
@@ -131,36 +130,7 @@ async function main() {
     fail(err.message)
   }
 
-  runChild(command[0], command.slice(1), childEnv)
-}
-
-/**
- * Spawn the child, inherit stdio, forward signals, and propagate status.
- * @param {string} program - Command
- * @param {string[]} args - Command arguments
- * @param {object} env - Child environment
- */
-function runChild(program, args, env) {
-  const child = spawn(program, args, { stdio: 'inherit', env, shell: false })
-
-  const forwarded = ['SIGINT', 'SIGTERM', 'SIGHUP']
-  for (const signal of forwarded) {
-    process.on(signal, () => child.kill(signal))
-  }
-
-  child.on('error', (err) => {
-    const message = err.code === 'ENOENT' ? `command not found: ${program}` : `failed to spawn ${program}: ${err.message}`
-    process.stderr.write(`configx: ${message}\n`)
-    process.exit(127)
-  })
-
-  child.on('exit', (code, signal) => {
-    if (signal) {
-      const num = os.constants.signals[signal] || 0
-      process.exit(128 + num)
-    }
-    process.exit(code == null ? 0 : code)
-  })
+  process.exit(await runChild(command[0], command.slice(1), childEnv))
 }
 
 main().catch((err) => {

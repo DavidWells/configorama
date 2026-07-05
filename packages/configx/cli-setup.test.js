@@ -116,6 +116,31 @@ test('setup --export cancellation exits non-zero with empty stdout', () => {
   assert.match(r.stderr, /cancelled/i)
 })
 
+test('setup -- <command> runs the child with answered values', () => {
+  const r = runConfigx([
+    'setup', setupBasic, '--config', answersConfig, '--',
+    'node', '-e', 'process.stdout.write([process.env.API_KEY, process.env.SETUP_TEST_REGION, process.env.STAGE].join("|"))',
+  ])
+  assert.is(r.status, 0, `stderr: ${r.stderr}`)
+  assert.is(r.stdout, 'sk-test-secret-value|us-west-2|dev')
+})
+
+test('setup -- <command> propagates the child exit status', () => {
+  const r = runConfigx(['setup', setupBasic, '--config', answersConfig, '--', 'node', '-e', 'process.exit(3)'])
+  assert.is(r.status, 3)
+})
+
+test('setup -- <command> cancellation never spawns the child', () => {
+  const sentinel = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'configx-setup-')), 'ran.txt')
+  const r = runConfigx([
+    'setup', setupBasic, '--config', path.join(fixtures, 'setup-cancel.config.js'), '--',
+    'node', '-e', `require("fs").writeFileSync(${JSON.stringify(sentinel)}, "ran")`,
+  ])
+  assert.is.not(r.status, 0)
+  assert.not.ok(fs.existsSync(sentinel), 'child never ran')
+  assert.match(r.stderr, /cancelled/i)
+})
+
 test('parseSetupArgs identifies each target', () => {
   const { parseSetupArgs } = require('./src/setupConfig')
 
