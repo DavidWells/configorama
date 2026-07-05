@@ -9,6 +9,21 @@ const enrichMetadata = require('./utils/parsing/enrichMetadata')
  */
 module.exports = function configoramaSync(variableSources = []) {
   const customVariableSources = variableSources.map((varSrc) => {
+    /* Plugin factories: match/resolver do not survive the JSON trip through
+       sync-rpc, so plugins carry a syncFactory path + JSON syncOptions and
+       the real source is rebuilt here inside the worker process */
+    if (varSrc.syncFactory) {
+      const factoryPath = getFullPath(varSrc.syncFactory)
+      if (!fs.existsSync(factoryPath)) {
+        throw new Error(`Sync factory missing. Can't find ${factoryPath}`)
+      }
+      const createSource = require(factoryPath)
+      if (typeof createSource !== 'function') {
+        throw new Error(`Sync factory must export a function. Check ${factoryPath}`)
+      }
+      return createSource(varSrc.syncOptions || {})
+    }
+
     if (!varSrc.match || typeof varSrc.match !== 'string') {
       throw new Error('Variable source must be string for .sync usage')
     }
@@ -66,6 +81,18 @@ module.exports = function configoramaSync(variableSources = []) {
         options,
         instance.variableTypes
       )
+
+      /* Collect custom metadata from worker-side sources, mirroring the
+         collectMetadata loop the async API runs in src/index.js */
+      for (const source of customVariableSources) {
+        if (typeof source.collectMetadata === 'function') {
+          const customData = source.collectMetadata()
+          if (customData !== undefined && customData !== null) {
+            const metadataKey = source.metadataKey || `${source.type}References`
+            enrichedMetadata[metadataKey] = customData
+          }
+        }
+      }
 
       return {
         variableSyntax: instance.variableSyntax,
