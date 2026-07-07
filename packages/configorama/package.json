@@ -77,6 +77,7 @@
   },
   "devDependencies": {
     "@cdktf/hcl2json": "^0.21.0",
+    "@davidwells/op-cache": "workspace:^",
     "@types/node": "^24.10.1",
     "markdown-magic": "^4.8.0",
     "tsx": "^4.7.0",
@@ -88,11 +89,15 @@
     "lodash": "^4.18.1"
   },
   "peerDependencies": {
+    "@davidwells/op-cache": ">=0.1.0",
     "@cdktf/hcl2json": ">=0.20.0",
     "ts-node": ">=10.0.0",
     "tsx": ">=4.0.0"
   },
   "peerDependenciesMeta": {
+    "@davidwells/op-cache": {
+      "optional": true
+    },
     "@cdktf/hcl2json": {
       "optional": true
     },

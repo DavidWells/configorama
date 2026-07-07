@@ -45,6 +45,7 @@ const opVariableSyntax = /^op(?::|\()/
  * @param {string} [options.opPath] - Path to the op binary (defaults to "op" on PATH)
  * @param {string} [options.programName] - Host tool name for the auth-prompt hint (defaults to $CONFIGORAMA_PROGRAM_NAME or "configorama")
  * @param {boolean} [options.skipResolution] - Collect metadata and return placeholders without calling op
+ * @param {object} [options.cache] - Optional cache provider config ({ provider: 'op-cache', ttlSeconds, scope, fallbackToOp, allowServiceAccountTokenCache })
  * @param {Function} [options.execFile] - execFile injection for tests (not serializable; unavailable in sync mode)
  * @returns {object} Variable source configuration with resolver and metadata collector
  */
@@ -56,8 +57,11 @@ function createOnePasswordResolver(options = {}) {
     opPath,
     programName,
     skipResolution = false,
+    cache,
     execFile,
   } = options
+
+  const opCache = cache && cache.provider === 'op-cache' ? loadOpCache() : undefined
 
   const aliasRefs = {}
   for (const alias of Object.keys(refs)) {
@@ -221,7 +225,7 @@ function createOnePasswordResolver(options = {}) {
   async function fetchValue(reference, keyPath, label) {
     if (reference.kind === 'secretRef') {
       const value = await cached(secretRefCache, `${scopeKey}|${reference.ref}`, () => {
-        return readSecretRef(reference.ref, cliOptions)
+        return readSecretRefWithOptionalCache(reference.ref)
       }, label)
       return { value, fieldName: reference.ref, remainingKeyPath: keyPath }
     }
@@ -342,6 +346,7 @@ function createOnePasswordResolver(options = {}) {
    */
   function buildSyncOptions() {
     const syncOptions = { refs, account, configDir, opPath, skipResolution }
+    if (cache !== undefined) syncOptions.cache = cache
     if (execFile) {
       // Functions cannot cross the JSON boundary into the sync worker;
       // flag it so sync-factory can fail loudly instead of silently
@@ -349,6 +354,48 @@ function createOnePasswordResolver(options = {}) {
       syncOptions.hasInjectedExecFile = true
     }
     return syncOptions
+  }
+
+  /**
+   * @param {string} ref - Direct op:// secret reference
+   * @returns {Promise<string>} Secret value
+   */
+  function readSecretRefWithOptionalCache(ref) {
+    if (!opCache || shouldBypassOpCache()) {
+      return readSecretRef(ref, cliOptions)
+    }
+    return opCache.read(ref, {
+      account,
+      configDir,
+      opPath,
+      ttlSeconds: cache.ttlSeconds,
+      scope: cache.scope,
+      fallbackToOp: cache.fallbackToOp === true,
+      stderr: process.stderr,
+    })
+  }
+
+  /**
+   * @returns {boolean} Whether cache must be bypassed for this read
+   */
+  function shouldBypassOpCache() {
+    if (process.env.OP_CACHE_DISABLED === '1') return true
+    if (execFile) return true
+    if (process.env.OP_SERVICE_ACCOUNT_TOKEN && !(cache && cache.allowServiceAccountTokenCache === true)) {
+      return true
+    }
+    return false
+  }
+}
+
+/**
+ * @returns {object} @davidwells/op-cache API
+ */
+function loadOpCache() {
+  try {
+    return require('@davidwells/op-cache')
+  } catch (err) {
+    throw new Error('1Password op-cache provider requested but @davidwells/op-cache is not installed. Install it with: npm install @davidwells/op-cache')
   }
 }
 

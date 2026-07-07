@@ -50,6 +50,7 @@ Options:
 | `configDir` | string | Passed to `op` as `--config` |
 | `opPath` | string | Path to the `op` binary (defaults to `op` on `PATH`) |
 | `skipResolution` | boolean | Record metadata and return deterministic placeholders without calling `op` |
+| `cache` | object | Optional cache provider config. `{ provider: 'op-cache' }` enables `@davidwells/op-cache` for direct `op://` reads only |
 
 ## Alias syntax (recommended)
 
@@ -159,6 +160,36 @@ configorama: requesting 3 items from 1Password (expect an authorization prompt)
 ```
 
 The hint is TTY-only — silent in CI and pipes.
+
+## Optional op-cache
+
+For fresh-process workflows such as agents repeatedly running `configx .env -- <command>`, install `@davidwells/op-cache` and opt in explicitly:
+
+```bash
+npm install @davidwells/op-cache
+```
+
+```js
+const createOnePasswordResolver = require('configorama/plugins/onepassword')
+
+module.exports = {
+  variableSources: [
+    createOnePasswordResolver({
+      cache: {
+        provider: 'op-cache',
+        ttlSeconds: 300,
+        scope: process.env.OP_CACHE_SCOPE || 'user',
+        fallbackToOp: false,
+        allowServiceAccountTokenCache: false
+      }
+    })
+  ]
+}
+```
+
+Only direct secret references are cached in v1: `${op://vault/item/field}`, `${op(op://vault/item/field)}`, and aliases that point to an `op://` ref. Item JSON reads, private links, and field-inference reads still use the normal `op item get --reveal` path.
+
+The plugin fails closed by default when a configured cache provider is broken. Set `fallbackToOp: true` to degrade to direct `op read`. If `OP_SERVICE_ACCOUNT_TOKEN` is set, the cache is bypassed unless `allowServiceAccountTokenCache: true` is configured.
 
 ## Security model
 

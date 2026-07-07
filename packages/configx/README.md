@@ -183,6 +183,8 @@ configx .env -- ./my-app
 
 `${op://vault/item/field}` is the 1Password secret-reference URI — it points directly at a single field. For a key path into a structured note (`${op:alias.KEY}`), use the alias form via a `configx.config.js`. Both need the 1Password resolver registered.
 
+To reduce repeated 1Password prompts across fresh agent commands, opt into `@davidwells/op-cache` in the Configorama 1Password resolver. `configx` remains only the runner; cache semantics live in the resolver/package docs.
+
 ## Behavior
 
 - **Top-level scalar keys only.** `string`, `number`, and `boolean` values become env vars (numbers/booleans stringified). `null`/`undefined` are skipped. Nested objects/arrays are an error — env vars are flat.
