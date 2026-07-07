@@ -50,13 +50,15 @@ function startDaemon(config, options = {}) {
           server.close()
         }
       }, 1000)
+      const shutdown = () => server.close()
       const cleanup = () => {
         clearInterval(sweepTimer)
         clearInterval(idleTimer)
+        process.removeListener('SIGTERM', shutdown)
+        process.removeListener('SIGINT', shutdown)
         cleanupSocket(config.socket_path)
       }
       server.on('close', cleanup)
-      const shutdown = () => server.close()
       process.once('SIGTERM', shutdown)
       process.once('SIGINT', shutdown)
       if (options.foreground && process.env.DEBUG) process.stderr.write(`op-cache: daemon listening on ${config.socket_path}\n`)

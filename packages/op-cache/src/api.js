@@ -49,6 +49,114 @@ async function read(ref, opts = {}) {
   }
 }
 
+// One warning per kind per stream. Production callers pass process.stderr,
+// so this is once-per-process; test streams each warn once.
+const warnedStreams = new WeakMap()
+
+/**
+ * @param {NodeJS.WritableStream|undefined} stderr - Warning stream
+ * @param {string} kind - Warning category
+ * @param {string} message - Warning text
+ */
+function warnOnce(stderr, kind, message) {
+  if (!stderr) return
+  let kinds = warnedStreams.get(stderr)
+  if (!kinds) {
+    kinds = new Set()
+    warnedStreams.set(stderr, kinds)
+  }
+  if (kinds.has(kind)) return
+  kinds.add(kind)
+  stderr.write(message)
+}
+
+/**
+ * @param {Function} producer - Async producer returning the value string
+ * @returns {Promise<string>}
+ */
+async function produce(producer) {
+  const value = await producer()
+  if (typeof value !== 'string') throw new Error('op-cache getOrSet producer must return a string.')
+  return value
+}
+
+/**
+ * @param {Function} validate - Caller validator
+ * @param {string} value - Cached value
+ * @returns {boolean}
+ */
+function validateQuietly(validate, value) {
+  try {
+    return validate(value) !== false
+  } catch (err) {
+    return false
+  }
+}
+
+/**
+ * Get-or-compute: cache lookup where the miss producer is caller logic, not
+ * `op read`. Advanced integration API for resolvers caching computed values.
+ * fallbackToOp here means "on daemon failure, do the work directly" — the
+ * fallback runs the producer; the name matches read for option continuity.
+ * @param {string} cacheRef - Cache reference; any non-empty string
+ * @param {Function} producer - Async producer invoked on miss; must return a string
+ * @param {object} [opts] - Options ({ account, configDir, opPath, ttlSeconds, scope, fallbackToOp, validateCached, stderr, env })
+ * @returns {Promise<string>}
+ */
+async function getOrSet(cacheRef, producer, opts = {}) {
+  if (!cacheRef || typeof cacheRef !== 'string') throw new Error('op-cache getOrSet requires a non-empty cache reference string.')
+  if (typeof producer !== 'function') throw new Error('op-cache getOrSet requires a producer function.')
+  const env = opts.env || process.env
+  const { config } = resolveConfig(optionFlags(opts), { env })
+  const account = effectiveAccount(opts.account, env)
+  if (env.OP_CACHE_DISABLED === '1' || opts.platform === 'win32' || process.platform === 'win32') {
+    return produce(producer)
+  }
+  const scopeInfo = resolveScope(opts.scope || config.default_scope, { env })
+  const key = cacheKey({ scope: scopeInfo.scope, account, configDir: opts.configDir, opPath: config.op_path, reference: cacheRef })
+  const fallbackToOp = opts.fallbackToOp === true
+  let daemonBroken = false
+  let got
+  try {
+    await ensureDaemon(config, { stderr: opts.stderr })
+    got = await request(config, { type: 'get', key, scope: scopeInfo.scope })
+  } catch (err) {
+    if (!fallbackToOp) throw err
+    if (opts.stderr) opts.stderr.write(`op-cache: cache bypassed (${err.message}); resolving directly\n`)
+    daemonBroken = true
+  }
+  if (!daemonBroken && got.type === 'hit') {
+    if (!opts.validateCached || validateQuietly(opts.validateCached, got.value)) {
+      return got.value
+    }
+    warnOnce(opts.stderr, 'validate-reject', 'op-cache: cached entry failed validation; recomputing and overwriting\n')
+  }
+  // Producer errors propagate untouched and the producer never runs twice:
+  // only daemon get/set failures participate in the fallback path above/below.
+  const value = await produce(producer)
+  if (!daemonBroken) {
+    try {
+      const stored = await request(config, {
+        type: 'set',
+        key,
+        value,
+        scope: scopeInfo.scope,
+        ttlSeconds: config.ttl_seconds,
+        ownerPid: scopeInfo.ownerPid,
+        refHash: shortHash(cacheRef),
+        accountHash: shortHash(account),
+      })
+      if (stored.clamped) {
+        warnOnce(opts.stderr, 'ttl-clamp', `op-cache: ttl clamped to ${stored.ttlSeconds}s by daemon max_ttl_seconds\n`)
+      }
+    } catch (err) {
+      if (!fallbackToOp) throw err
+      if (opts.stderr) opts.stderr.write(`op-cache: cache bypassed (${err.message}); value not stored\n`)
+    }
+  }
+  return value
+}
+
 /**
  * @param {object} [opts] - Options
  * @returns {Promise<object>}
@@ -123,4 +231,4 @@ function optionFlags(opts) {
   }
 }
 
-module.exports = { read, status, stats, clear, stop, start, ensureDaemon }
+module.exports = { read, getOrSet, status, stats, clear, stop, start, ensureDaemon }
