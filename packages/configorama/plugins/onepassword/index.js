@@ -4,6 +4,8 @@ const { readSecretRef, getItem } = require('./op-cli')
 const { validateAliasName, normalizeRefValue, isItemId } = require('./normalize')
 const { selectField, trySelectField } = require('./fields')
 const { parseStructuredSecret, getKeyPath } = require('./parser')
+const { buildCacheRef } = require('./cache-ref')
+const { encodeEnvelope, decodeEnvelope, isValidEnvelope } = require('./envelope')
 
 const OP_PREFIX = 'op'
 
@@ -212,6 +214,75 @@ function createOnePasswordResolver(options = {}) {
   }
 
   /**
+   * Resolve a normalized reference to its final value.
+   * Direct secret refs without a key path keep the read path (same daemon
+   * keys as standalone `op-cache read`); every other syntax caches its
+   * final resolved value under a synthetic ref.
+   * @param {object} reference - Normalized reference
+   * @param {string|undefined} keyPath - Requested key path
+   * @param {string} [label] - Human label for the auth hint
+   * @returns {Promise<{value: string, fieldName: string|undefined}>} Final value
+   */
+  async function resolveReference(reference, keyPath, label) {
+    if (reference.kind === 'secretRef' && keyPath === undefined) {
+      const value = await cached(secretRefCache, `${scopeKey}|${reference.ref}`, () => {
+        return readSecretRefWithOptionalCache(reference.ref)
+      }, label)
+      return { value, fieldName: undefined }
+    }
+    return finalValueWithOptionalCache(reference, keyPath, label)
+  }
+
+  /**
+   * Final-value caching through op-cache getOrSet. The cached payload is a
+   * { value, fieldName } envelope so audit metadata survives cache hits;
+   * malformed envelopes are rejected via validateCached and recomputed.
+   * @param {object} reference - Normalized reference
+   * @param {string|undefined} keyPath - Requested key path
+   * @param {string} [label] - Human label for the auth hint
+   * @returns {Promise<{value: string, fieldName: string|undefined}>} Final value
+   */
+  async function finalValueWithOptionalCache(reference, keyPath, label) {
+    if (!opCache || shouldBypassOpCache()) {
+      return computeFinalValue(reference, keyPath, label)
+    }
+    const cacheRef = buildCacheRef(reference, keyPath)
+    const encoded = await opCache.getOrSet(cacheRef, async () => {
+      const resolved = await computeFinalValue(reference, keyPath, label)
+      return encodeEnvelope(resolved.value, resolved.fieldName)
+    }, {
+      account,
+      configDir,
+      opPath,
+      ttlSeconds: cache.ttlSeconds,
+      scope: cache.scope,
+      fallbackToOp: cache.fallbackToOp === true,
+      validateCached: isValidEnvelope,
+      stderr: process.stderr,
+    })
+    return decodeEnvelope(encoded)
+  }
+
+  /**
+   * Compute the final resolver value with no persistent cache involved.
+   * This is the getOrSet producer body; the cold-start latch lives in here
+   * (via cached) so daemon hits never serialize behind it and auth hints
+   * only print when an op call actually happens.
+   * @param {object} reference - Normalized reference
+   * @param {string|undefined} keyPath - Requested key path
+   * @param {string} [label] - Human label for the auth hint
+   * @returns {Promise<{value: string, fieldName: string|undefined}>} Final value
+   */
+  async function computeFinalValue(reference, keyPath, label) {
+    const { value, fieldName, remainingKeyPath } = await selectBackingValue(reference, keyPath, label)
+    if (remainingKeyPath === undefined) {
+      return { value, fieldName }
+    }
+    const parsedValue = parseStructuredSecret(value, { fieldName })
+    return { value: getKeyPath(parsedValue, remainingKeyPath, fieldName), fieldName }
+  }
+
+  /**
    * Fetch and select the backing field value for a normalized reference.
    * For items without a configured field, the first key path segment may
    * select a field directly: ${op(My Login).password} picks the password
@@ -222,10 +293,10 @@ function createOnePasswordResolver(options = {}) {
    * @param {string} [label] - Human label for the auth hint
    * @returns {Promise<{value: string, fieldName: string, remainingKeyPath: string|undefined}>} Selected value
    */
-  async function fetchValue(reference, keyPath, label) {
+  async function selectBackingValue(reference, keyPath, label) {
     if (reference.kind === 'secretRef') {
       const value = await cached(secretRefCache, `${scopeKey}|${reference.ref}`, () => {
-        return readSecretRefWithOptionalCache(reference.ref)
+        return readSecretRef(reference.ref, cliOptions)
       }, label)
       return { value, fieldName: reference.ref, remainingKeyPath: keyPath }
     }
@@ -305,16 +376,11 @@ function createOnePasswordResolver(options = {}) {
       || (configPath ? configPath.split('.').pop() : undefined)
       || reference.field
       || (reference.kind === 'secretRef' ? reference.ref : reference.item)
-    const { value, fieldName, remainingKeyPath } = await fetchValue(reference, keyPath, label)
-    if (entry.field === undefined && reference.kind !== 'secretRef') {
-      entry.field = fieldName
+    const resolved = await resolveReference(reference, keyPath, label)
+    if (entry.field === undefined && reference.kind !== 'secretRef' && resolved.fieldName !== undefined) {
+      entry.field = resolved.fieldName
     }
-
-    if (remainingKeyPath === undefined) {
-      return value
-    }
-    const parsedValue = parseStructuredSecret(value, { fieldName })
-    return getKeyPath(parsedValue, remainingKeyPath, fieldName)
+    return resolved.value
   }
 
   return {
