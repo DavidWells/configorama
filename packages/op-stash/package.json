@@ -1,10 +1,10 @@
 {
-  "name": "@davidwells/op-cache",
+  "name": "@davidwells/op-stash",
   "version": "0.1.0",
   "description": "Per-user in-memory cache daemon for 1Password op:// reads",
   "main": "src/api.js",
   "bin": {
-    "op-cache": "src/cli.js"
+    "op-stash": "src/cli.js"
   },
   "type": "commonjs",
   "scripts": {
@@ -29,11 +29,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/DavidWells/configorama/tree/master/packages/op-cache#readme",
+  "homepage": "https://github.com/DavidWells/configorama/tree/master/packages/op-stash#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DavidWells/configorama.git",
-    "directory": "packages/op-cache"
+    "directory": "packages/op-stash"
   },
   "bugs": {
     "url": "https://github.com/DavidWells/configorama/issues"

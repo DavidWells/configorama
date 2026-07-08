@@ -1,5 +1,5 @@
 /* Encodes cached final values as { value, fieldName } JSON strings.
-   Private plugin convention: op-cache stores these as opaque strings. */
+   Private plugin convention: op-stash stores these as opaque strings. */
 
 /**
  * @param {string} value - Final resolved value
@@ -20,10 +20,10 @@ function decodeEnvelope(encoded) {
   try {
     parsed = JSON.parse(encoded)
   } catch (err) {
-    throw new Error('Malformed op-cache envelope: not valid JSON.')
+    throw new Error('Malformed op-stash envelope: not valid JSON.')
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.value !== 'string') {
-    throw new Error('Malformed op-cache envelope: missing string value.')
+    throw new Error('Malformed op-stash envelope: missing string value.')
   }
   return { value: parsed.value, fieldName: typeof parsed.fieldName === 'string' ? parsed.fieldName : undefined }
 }

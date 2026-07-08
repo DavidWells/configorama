@@ -11,14 +11,14 @@ function resolveScope(requested, settings = {}) {
   const env = settings.env || process.env
   const pid = settings.pid || process.pid
   const ppid = settings.ppid || process.ppid
-  const raw = requested || env.OP_CACHE_SCOPE || 'user'
+  const raw = requested || env.OP_STASH_SCOPE || 'user'
   if (raw === 'user') return { scope: 'user', ownerPid: undefined, kind: 'user' }
   if (raw === 'pid') return { scope: `pid:${pid}`, ownerPid: pid, kind: 'pid' }
   if (raw === 'ppid') return { scope: `ppid:${ppid}`, ownerPid: ppid, kind: 'ppid' }
   if (raw === 'session') {
-    const session = env.OP_CACHE_SESSION || env.OP_CACHE_SCOPE
+    const session = env.OP_STASH_SESSION || env.OP_STASH_SCOPE
     if (!session || session === 'session') {
-      throw new ScopeError('Scope "session" requires OP_CACHE_SESSION or inline --scope session:<name>.')
+      throw new ScopeError('Scope "session" requires OP_STASH_SESSION or inline --scope session:<name>.')
     }
     return { scope: normalizeSession(session), ownerPid: undefined, kind: 'session' }
   }

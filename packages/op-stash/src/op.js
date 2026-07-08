@@ -1,4 +1,4 @@
-/* Executes the 1Password CLI for op-cache misses.
+/* Executes the 1Password CLI for op-stash misses.
    Uses op read --no-newline and sanitized errors. */
 const { spawn } = require('child_process')
 const { OpExecError } = require('./errors')
@@ -8,7 +8,7 @@ const NOT_FOUND_PATTERN = /isn'?t an? (item|vault)|not found|no item|no vault|do
 
 /**
  * @param {string} ref - op:// reference
- * @param {object} config - op-cache config
+ * @param {object} config - op-stash config
  * @param {object} [opts] - { account }
  * @returns {Promise<string>}
  */

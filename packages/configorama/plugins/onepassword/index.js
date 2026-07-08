@@ -47,7 +47,7 @@ const opVariableSyntax = /^op(?::|\()/
  * @param {string} [options.opPath] - Path to the op binary (defaults to "op" on PATH)
  * @param {string} [options.programName] - Host tool name for the auth-prompt hint (defaults to $CONFIGORAMA_PROGRAM_NAME or "configorama")
  * @param {boolean} [options.skipResolution] - Collect metadata and return placeholders without calling op
- * @param {object} [options.cache] - Optional cache provider config ({ provider: 'op-cache', ttlSeconds, scope, fallbackToOp, allowServiceAccountTokenCache })
+ * @param {object} [options.cache] - Optional cache provider config ({ provider: 'op-stash', ttlSeconds, scope, fallbackToOp, allowServiceAccountTokenCache })
  * @param {Function} [options.execFile] - execFile injection for tests (not serializable; unavailable in sync mode)
  * @returns {object} Variable source configuration with resolver and metadata collector
  */
@@ -63,7 +63,7 @@ function createOnePasswordResolver(options = {}) {
     execFile,
   } = options
 
-  const opCache = cache && cache.provider === 'op-cache' ? loadOpCache() : undefined
+  const opStash = cache && cache.provider === 'op-stash' ? loadOpStash() : undefined
 
   const aliasRefs = {}
   for (const alias of Object.keys(refs)) {
@@ -216,7 +216,7 @@ function createOnePasswordResolver(options = {}) {
   /**
    * Resolve a normalized reference to its final value.
    * Direct secret refs without a key path keep the read path (same daemon
-   * keys as standalone `op-cache read`); every other syntax caches its
+   * keys as standalone `op-stash read`); every other syntax caches its
    * final resolved value under a synthetic ref.
    * @param {object} reference - Normalized reference
    * @param {string|undefined} keyPath - Requested key path
@@ -234,7 +234,7 @@ function createOnePasswordResolver(options = {}) {
   }
 
   /**
-   * Final-value caching through op-cache getOrSet. The cached payload is a
+   * Final-value caching through op-stash getOrSet. The cached payload is a
    * { value, fieldName } envelope so audit metadata survives cache hits;
    * malformed envelopes are rejected via validateCached and recomputed.
    * @param {object} reference - Normalized reference
@@ -243,11 +243,11 @@ function createOnePasswordResolver(options = {}) {
    * @returns {Promise<{value: string, fieldName: string|undefined}>} Final value
    */
   async function finalValueWithOptionalCache(reference, keyPath, label) {
-    if (!opCache || shouldBypassOpCache()) {
+    if (!opStash || shouldBypassOpStash()) {
       return computeFinalValue(reference, keyPath, label)
     }
     const cacheRef = buildCacheRef(reference, keyPath)
-    const encoded = await opCache.getOrSet(cacheRef, async () => {
+    const encoded = await opStash.getOrSet(cacheRef, async () => {
       const resolved = await computeFinalValue(reference, keyPath, label)
       return encodeEnvelope(resolved.value, resolved.fieldName)
     }, {
@@ -427,10 +427,10 @@ function createOnePasswordResolver(options = {}) {
    * @returns {Promise<string>} Secret value
    */
   function readSecretRefWithOptionalCache(ref) {
-    if (!opCache || shouldBypassOpCache()) {
+    if (!opStash || shouldBypassOpStash()) {
       return readSecretRef(ref, cliOptions)
     }
-    return opCache.read(ref, {
+    return opStash.read(ref, {
       account,
       configDir,
       opPath,
@@ -444,8 +444,8 @@ function createOnePasswordResolver(options = {}) {
   /**
    * @returns {boolean} Whether cache must be bypassed for this read
    */
-  function shouldBypassOpCache() {
-    if (process.env.OP_CACHE_DISABLED === '1') return true
+  function shouldBypassOpStash() {
+    if (process.env.OP_STASH_DISABLED === '1') return true
     if (execFile) return true
     if (process.env.OP_SERVICE_ACCOUNT_TOKEN && !(cache && cache.allowServiceAccountTokenCache === true)) {
       return true
@@ -455,13 +455,13 @@ function createOnePasswordResolver(options = {}) {
 }
 
 /**
- * @returns {object} @davidwells/op-cache API
+ * @returns {object} @davidwells/op-stash API
  */
-function loadOpCache() {
+function loadOpStash() {
   try {
-    return require('@davidwells/op-cache')
+    return require('@davidwells/op-stash')
   } catch (err) {
-    throw new Error('1Password op-cache provider requested but @davidwells/op-cache is not installed. Install it with: npm install @davidwells/op-cache')
+    throw new Error('1Password op-stash provider requested but @davidwells/op-stash is not installed. Install it with: npm install @davidwells/op-stash')
   }
 }
 

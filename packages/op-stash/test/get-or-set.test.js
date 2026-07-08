@@ -11,14 +11,14 @@ const { tempDir, stopDaemon } = require('./helpers')
 function makeEnv(dir, overrides = {}) {
   const env = {
     ...process.env,
-    OP_CACHE_SOCKET_PATH: path.join(dir, 'cache.sock'),
-    OP_CACHE_TTL_SECONDS: '60',
-    OP_CACHE_MAX_TTL_SECONDS: '60',
-    OP_CACHE_IDLE_EXIT_SECONDS: '30',
+    OP_STASH_SOCKET_PATH: path.join(dir, 'cache.sock'),
+    OP_STASH_TTL_SECONDS: '60',
+    OP_STASH_MAX_TTL_SECONDS: '60',
+    OP_STASH_IDLE_EXIT_SECONDS: '30',
     XDG_CONFIG_HOME: path.join(dir, 'xdg'),
     ...overrides,
   }
-  delete env.OP_CACHE_DISABLED
+  delete env.OP_STASH_DISABLED
   delete env.OP_ACCOUNT
   delete env.OP_SERVICE_ACCOUNT_TOKEN
   return env
@@ -40,7 +40,7 @@ function producerOf(values) {
 }
 
 async function withDaemon(env, opts, fn) {
-  const handle = await start({ env, socketPath: env.OP_CACHE_SOCKET_PATH, ...opts })
+  const handle = await start({ env, socketPath: env.OP_STASH_SOCKET_PATH, ...opts })
   try {
     return await fn(handle)
   } finally {
@@ -53,7 +53,7 @@ test('miss runs producer once and stores; hit does not run producer', async () =
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
     const producer = producerOf('resolved-value')
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:a' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:a' }
     assert.is(await getOrSet('configorama-op://v1/abc', producer, opts), 'resolved-value')
     assert.is(await getOrSet('configorama-op://v1/abc', producer, opts), 'resolved-value')
     assert.is(producer.calls(), 1)
@@ -64,7 +64,7 @@ test('validateCached rejection recomputes and overwrites the entry', async () =>
   const dir = tempDir()
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:v' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:v' }
     await getOrSet('ref-v', producerOf('old-value'), opts)
     const second = producerOf('new-value')
     const stderr = fakeStderr()
@@ -84,7 +84,7 @@ test('validateCached rejection warns at most once per stderr stream', async () =
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
     const stderr = fakeStderr()
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:w', stderr, validateCached: () => false }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:w', stderr, validateCached: () => false }
     await getOrSet('ref-w', producerOf('v1'), opts)
     await getOrSet('ref-w', producerOf('v2'), opts)
     await getOrSet('ref-w', producerOf('v3'), opts)
@@ -97,7 +97,7 @@ test('validateCached throwing behaves as rejection', async () => {
   const dir = tempDir()
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:t' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:t' }
     await getOrSet('ref-t', producerOf('first'), opts)
     const second = producerOf('second')
     const value = await getOrSet('ref-t', second, { ...opts, validateCached: () => { throw new Error('boom') } })
@@ -110,7 +110,7 @@ test('producer rejection is not cached and surfaces the producer error', async (
   const dir = tempDir()
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:e' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:e' }
     let failCalls = 0
     try {
       await getOrSet('ref-e', async () => { failCalls += 1; throw new Error('producer failed sanitized') }, opts)
@@ -129,7 +129,7 @@ test('non-string producer result throws and stores nothing', async () => {
   const dir = tempDir()
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:n' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:n' }
     try {
       await getOrSet('ref-n', async () => 42, opts)
       assert.unreachable('should throw')
@@ -146,7 +146,7 @@ test('daemon failure fails closed by default without running the producer', asyn
   const dir = tempDir()
   const badSocket = path.join(dir, 'not-a-socket')
   fs.writeFileSync(badSocket, 'x')
-  const env = makeEnv(dir, { OP_CACHE_SOCKET_PATH: badSocket })
+  const env = makeEnv(dir, { OP_STASH_SOCKET_PATH: badSocket })
   const producer = producerOf('never')
   try {
     await getOrSet('ref-f', producer, { env, socketPath: badSocket, fallbackToOp: false })
@@ -161,7 +161,7 @@ test('daemon failure with fallbackToOp runs producer and warns', async () => {
   const dir = tempDir()
   const badSocket = path.join(dir, 'not-a-socket')
   fs.writeFileSync(badSocket, 'x')
-  const env = makeEnv(dir, { OP_CACHE_SOCKET_PATH: badSocket })
+  const env = makeEnv(dir, { OP_STASH_SOCKET_PATH: badSocket })
   const stderr = fakeStderr()
   const producer = producerOf('direct-value')
   const value = await getOrSet('ref-f2', producer, { env, socketPath: badSocket, fallbackToOp: true, stderr })
@@ -172,10 +172,10 @@ test('daemon failure with fallbackToOp runs producer and warns', async () => {
 
 test('ttl expiration causes producer to run again', async () => {
   const dir = tempDir()
-  const env = makeEnv(dir, { OP_CACHE_TTL_SECONDS: '1', OP_CACHE_MAX_TTL_SECONDS: '1' })
+  const env = makeEnv(dir, { OP_STASH_TTL_SECONDS: '1', OP_STASH_MAX_TTL_SECONDS: '1' })
   await withDaemon(env, { ttlSeconds: 1, maxTtlSeconds: 1 }, async () => {
     const producer = producerOf('short-lived')
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:ttl' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:ttl' }
     await getOrSet('ref-ttl', producer, opts)
     await new Promise((resolve) => setTimeout(resolve, 1100))
     await getOrSet('ref-ttl', producer, opts)
@@ -188,7 +188,7 @@ test('scopes are isolated', async () => {
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
     const producer = producerOf('scoped')
-    const base = { env, socketPath: env.OP_CACHE_SOCKET_PATH }
+    const base = { env, socketPath: env.OP_STASH_SOCKET_PATH }
     await getOrSet('ref-s', producer, { ...base, scope: 'session:one' })
     await getOrSet('ref-s', producer, { ...base, scope: 'session:two' })
     assert.is(producer.calls(), 2)
@@ -200,7 +200,7 @@ test('account, configDir, and opPath partition the cache key', async () => {
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
     const producer = producerOf('partitioned')
-    const base = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:p' }
+    const base = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:p' }
     await getOrSet('ref-p', producer, base)
     await getOrSet('ref-p', producer, { ...base, account: 'other.1password.com' })
     await getOrSet('ref-p', producer, { ...base, configDir: path.join(dir, 'other-config') })
@@ -212,33 +212,33 @@ test('account, configDir, and opPath partition the cache key', async () => {
   })
 })
 
-test('OP_CACHE_DISABLED=1 runs producer directly and never touches the daemon', async () => {
+test('OP_STASH_DISABLED=1 runs producer directly and never touches the daemon', async () => {
   const dir = tempDir()
-  const env = makeEnv(dir, { OP_CACHE_DISABLED: '1' })
-  env.OP_CACHE_DISABLED = '1'
+  const env = makeEnv(dir, { OP_STASH_DISABLED: '1' })
+  env.OP_STASH_DISABLED = '1'
   const producer = producerOf('disabled-value')
-  const value = await getOrSet('ref-d', producer, { env, socketPath: env.OP_CACHE_SOCKET_PATH })
+  const value = await getOrSet('ref-d', producer, { env, socketPath: env.OP_STASH_SOCKET_PATH })
   assert.is(value, 'disabled-value')
   assert.is(producer.calls(), 1)
-  assert.is(fs.existsSync(env.OP_CACHE_SOCKET_PATH), false)
+  assert.is(fs.existsSync(env.OP_STASH_SOCKET_PATH), false)
 })
 
 test('win32 runs producer directly and never touches a socket', async () => {
   const dir = tempDir()
   const env = makeEnv(dir)
   const producer = producerOf('win32-value')
-  const value = await getOrSet('ref-w32', producer, { env, socketPath: env.OP_CACHE_SOCKET_PATH, platform: 'win32' })
+  const value = await getOrSet('ref-w32', producer, { env, socketPath: env.OP_STASH_SOCKET_PATH, platform: 'win32' })
   assert.is(value, 'win32-value')
   assert.is(producer.calls(), 1)
-  assert.is(fs.existsSync(env.OP_CACHE_SOCKET_PATH), false)
+  assert.is(fs.existsSync(env.OP_STASH_SOCKET_PATH), false)
 })
 
 test('ttl clamp warns at most once per stderr stream', async () => {
   const dir = tempDir()
-  const env = makeEnv(dir, { OP_CACHE_TTL_SECONDS: '60', OP_CACHE_MAX_TTL_SECONDS: '60' })
+  const env = makeEnv(dir, { OP_STASH_TTL_SECONDS: '60', OP_STASH_MAX_TTL_SECONDS: '60' })
   await withDaemon(env, { maxTtlSeconds: 1 }, async () => {
     const stderr = fakeStderr()
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:c', stderr }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:c', stderr }
     await getOrSet('ref-c1', producerOf('a'), opts)
     await getOrSet('ref-c2', producerOf('b'), opts)
     const warnings = stderr.chunks.filter((c) => c.includes('ttl clamped'))
@@ -250,7 +250,7 @@ test('set carries refHash and accountHash diagnostics', async () => {
   const dir = tempDir()
   const env = makeEnv(dir)
   await withDaemon(env, {}, async (handle) => {
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:h', account: 'my.1password.com' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:h', account: 'my.1password.com' }
     await getOrSet('configorama-op://v1/hashme', producerOf('x'), opts)
     const entries = [...handle.cache.map.values()]
     assert.is(entries.length, 1)
@@ -264,7 +264,7 @@ test('non-op:// refs are accepted; empty refs are rejected', async () => {
   const env = makeEnv(dir)
   await withDaemon(env, {}, async () => {
     const producer = producerOf('any-ref')
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:r' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:r' }
     assert.is(await getOrSet('configorama-op://v1/deadbeef', producer, opts), 'any-ref')
     try {
       await getOrSet('', producer, opts)
@@ -280,7 +280,7 @@ test('auto-starts the daemon when none is running', async () => {
   const env = makeEnv(dir)
   try {
     const producer = producerOf('spawned')
-    const opts = { env, socketPath: env.OP_CACHE_SOCKET_PATH, scope: 'session:spawn' }
+    const opts = { env, socketPath: env.OP_STASH_SOCKET_PATH, scope: 'session:spawn' }
     assert.is(await getOrSet('ref-spawn', producer, opts), 'spawned')
     assert.is(await getOrSet('ref-spawn', producer, opts), 'spawned')
     assert.is(producer.calls(), 1)

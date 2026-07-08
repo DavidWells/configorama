@@ -3,7 +3,7 @@ const os = require('os')
 const path = require('path')
 const childProcess = require('child_process')
 
-function tempDir(prefix = 'op-cache-test-') {
+function tempDir(prefix = 'op-stash-test-') {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
 }
 
@@ -36,11 +36,11 @@ if (process.env.FAKE_OP_SLEEP) {
 function cliEnv(dir, fake) {
   return {
     ...process.env,
-    OP_CACHE_SOCKET_PATH: path.join(dir, 'cache.sock'),
-    OP_CACHE_OP_PATH: fake.bin,
-    OP_CACHE_TTL_SECONDS: '2',
-    OP_CACHE_MAX_TTL_SECONDS: '2',
-    OP_CACHE_IDLE_EXIT_SECONDS: '1',
+    OP_STASH_SOCKET_PATH: path.join(dir, 'cache.sock'),
+    OP_STASH_OP_PATH: fake.bin,
+    OP_STASH_TTL_SECONDS: '2',
+    OP_STASH_MAX_TTL_SECONDS: '2',
+    OP_STASH_IDLE_EXIT_SECONDS: '1',
     XDG_CONFIG_HOME: path.join(dir, 'xdg'),
   }
 }

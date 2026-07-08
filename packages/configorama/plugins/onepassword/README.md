@@ -50,7 +50,7 @@ Options:
 | `configDir` | string | Passed to `op` as `--config` |
 | `opPath` | string | Path to the `op` binary (defaults to `op` on `PATH`) |
 | `skipResolution` | boolean | Record metadata and return deterministic placeholders without calling `op` |
-| `cache` | object | Optional cache provider config. `{ provider: 'op-cache' }` enables `@davidwells/op-cache` for every supported `${op...}` syntax |
+| `cache` | object | Optional cache provider config. `{ provider: 'op-stash' }` enables `@davidwells/op-stash` for every supported `${op...}` syntax |
 
 ## Alias syntax (recommended)
 
@@ -161,12 +161,12 @@ configorama: requesting 3 items from 1Password (expect an authorization prompt)
 
 The hint is TTY-only — silent in CI and pipes.
 
-## Optional op-cache
+## Optional op-stash
 
-For fresh-process workflows such as agents repeatedly running `configx .env -- <command>`, install `@davidwells/op-cache` and opt in explicitly:
+For fresh-process workflows such as agents repeatedly running `configx .env -- <command>`, install `@davidwells/op-stash` and opt in explicitly:
 
 ```bash
-npm install @davidwells/op-cache
+npm install @davidwells/op-stash
 ```
 
 ```js
@@ -176,9 +176,9 @@ module.exports = {
   variableSources: [
     createOnePasswordResolver({
       cache: {
-        provider: 'op-cache',
+        provider: 'op-stash',
         ttlSeconds: 300,
-        scope: process.env.OP_CACHE_SCOPE || 'user',
+        scope: process.env.OP_STASH_SCOPE || 'user',
         fallbackToOp: false,
         allowServiceAccountTokenCache: false
       }
@@ -200,7 +200,7 @@ The cache stores **final resolved values only**, never `op item get` JSON. A cac
 
 One granularity consequence: `${op(op://vault/item/notesPlain).KEY}` caches the selected `KEY` value, not the whole `notesPlain` field. Resolving a key path that no earlier run resolved costs one fresh `op` call even when a sibling key is already cached.
 
-Values live in daemon memory only — until TTL expiry, `op-cache clear`, or `op-cache stop`; nothing is written to disk. Short TTLs (minutes, not hours) are recommended for interactive agent workflows. `OP_CACHE_DISABLED=1` bypasses all cache paths.
+Values live in daemon memory only — until TTL expiry, `op-stash clear`, or `op-stash stop`; nothing is written to disk. Short TTLs (minutes, not hours) are recommended for interactive agent workflows. `OP_STASH_DISABLED=1` bypasses all cache paths.
 
 The plugin fails closed by default when a configured cache provider is broken. Set `fallbackToOp: true` to degrade to direct resolution. If `OP_SERVICE_ACCOUNT_TOKEN` is set, the cache is bypassed unless `allowServiceAccountTokenCache: true` is configured.
 

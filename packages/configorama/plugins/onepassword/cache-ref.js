@@ -1,4 +1,4 @@
-/* Builds synthetic cache refs for final-value op-cache entries.
+/* Builds synthetic cache refs for final-value op-stash entries.
    NUL-joined fixed-order dimensions hashed with SHA-256 — never raw links. */
 const crypto = require('crypto')
 
@@ -10,7 +10,7 @@ const CACHE_REF_SCHEMA_VERSION = 'v1'
  * Deterministic cache reference for one final-value resolver operation.
  * Dimensions are requested inputs only — never discovered outputs — so the
  * key is computable before any op call. account/configDir/opPath are NOT
- * included here; they travel via getOrSet opts and op-cache applies them as
+ * included here; they travel via getOrSet opts and op-stash applies them as
  * key dimensions, exactly as it does for read (one owner per dimension).
  * @param {object} reference - Normalized reference ({ kind, item, vault, section, field, ref })
  * @param {string|undefined} keyPath - Requested key path

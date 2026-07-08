@@ -1,4 +1,4 @@
-/* Resolves op-cache configuration from flags, env, JSON config, and defaults.
+/* Resolves op-stash configuration from flags, env, JSON config, and defaults.
    Caches process-level config while allowing per-call option overrides. */
 const fs = require('fs')
 const os = require('os')
@@ -17,9 +17,9 @@ let cachedBase
  * @returns {string} Config file path
  */
 function configPath(env = process.env) {
-  if (env.OP_CACHE_CONFIG) return env.OP_CACHE_CONFIG
+  if (env.OP_STASH_CONFIG) return env.OP_STASH_CONFIG
   const base = env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
-  return path.join(base, 'op-cache', 'config.json')
+  return path.join(base, 'op-stash', 'config.json')
 }
 
 /**
@@ -30,7 +30,7 @@ function defaults(env = process.env) {
   const uid = typeof process.getuid === 'function' ? process.getuid() : 'user'
   const tmp = env.TMPDIR || os.tmpdir() || '/tmp'
   return {
-    socket_path: path.join(tmp, `op-cache-${uid}.sock`),
+    socket_path: path.join(tmp, `op-stash-${uid}.sock`),
     ttl_seconds: 300,
     max_ttl_seconds: 86400,
     max_entries: 1000,
@@ -52,12 +52,12 @@ function readConfigFile(filePath) {
     if (!raw.trim()) return {}
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new ConfigError(`Invalid op-cache config ${filePath}: expected a JSON object.`)
+      throw new ConfigError(`Invalid op-stash config ${filePath}: expected a JSON object.`)
     }
     return parsed
   } catch (err) {
     if (err instanceof ConfigError) throw err
-    throw new ConfigError(`Invalid op-cache config ${filePath}: ${err.message}`)
+    throw new ConfigError(`Invalid op-stash config ${filePath}: ${err.message}`)
   }
 }
 
@@ -67,14 +67,14 @@ function readConfigFile(filePath) {
  */
 function envConfig(env) {
   const out = {}
-  if (env.OP_CACHE_SOCKET_PATH) out.socket_path = env.OP_CACHE_SOCKET_PATH
-  if (env.OP_CACHE_TTL_SECONDS) out.ttl_seconds = parseDurationSeconds(env.OP_CACHE_TTL_SECONDS, 'OP_CACHE_TTL_SECONDS')
-  if (env.OP_CACHE_MAX_TTL_SECONDS) out.max_ttl_seconds = parseDurationSeconds(env.OP_CACHE_MAX_TTL_SECONDS, 'OP_CACHE_MAX_TTL_SECONDS')
-  if (env.OP_CACHE_MAX_ENTRIES) out.max_entries = parsePositiveInt(env.OP_CACHE_MAX_ENTRIES, 'OP_CACHE_MAX_ENTRIES')
-  if (env.OP_CACHE_OP_PATH) out.op_path = env.OP_CACHE_OP_PATH
-  if (env.OP_CACHE_OP_TIMEOUT_SECONDS) out.op_timeout_seconds = parseDurationSeconds(env.OP_CACHE_OP_TIMEOUT_SECONDS, 'OP_CACHE_OP_TIMEOUT_SECONDS')
-  if (env.OP_CACHE_IDLE_EXIT_SECONDS) out.idle_exit_seconds = parseDurationSeconds(env.OP_CACHE_IDLE_EXIT_SECONDS, 'OP_CACHE_IDLE_EXIT_SECONDS')
-  if (env.OP_CACHE_SCOPE) out.default_scope = env.OP_CACHE_SCOPE
+  if (env.OP_STASH_SOCKET_PATH) out.socket_path = env.OP_STASH_SOCKET_PATH
+  if (env.OP_STASH_TTL_SECONDS) out.ttl_seconds = parseDurationSeconds(env.OP_STASH_TTL_SECONDS, 'OP_STASH_TTL_SECONDS')
+  if (env.OP_STASH_MAX_TTL_SECONDS) out.max_ttl_seconds = parseDurationSeconds(env.OP_STASH_MAX_TTL_SECONDS, 'OP_STASH_MAX_TTL_SECONDS')
+  if (env.OP_STASH_MAX_ENTRIES) out.max_entries = parsePositiveInt(env.OP_STASH_MAX_ENTRIES, 'OP_STASH_MAX_ENTRIES')
+  if (env.OP_STASH_OP_PATH) out.op_path = env.OP_STASH_OP_PATH
+  if (env.OP_STASH_OP_TIMEOUT_SECONDS) out.op_timeout_seconds = parseDurationSeconds(env.OP_STASH_OP_TIMEOUT_SECONDS, 'OP_STASH_OP_TIMEOUT_SECONDS')
+  if (env.OP_STASH_IDLE_EXIT_SECONDS) out.idle_exit_seconds = parseDurationSeconds(env.OP_STASH_IDLE_EXIT_SECONDS, 'OP_STASH_IDLE_EXIT_SECONDS')
+  if (env.OP_STASH_SCOPE) out.default_scope = env.OP_STASH_SCOPE
   return out
 }
 

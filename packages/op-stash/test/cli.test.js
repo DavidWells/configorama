@@ -65,10 +65,10 @@ test('ttl clamp warning stays on stderr', () => {
   }
 })
 
-test('OP_CACHE_DISABLED bypasses daemon', () => {
+test('OP_STASH_DISABLED bypasses daemon', () => {
   const dir = tempDir()
   const fake = fakeOp(dir)
-  const env = { ...cliEnv(dir, fake), OP_CACHE_DISABLED: '1' }
+  const env = { ...cliEnv(dir, fake), OP_STASH_DISABLED: '1' }
   const r = runCli(['read', 'op://vault/item/field'], env)
   assert.is(r.status, 0, r.stderr)
   assert.is(fake.calls(), 1)

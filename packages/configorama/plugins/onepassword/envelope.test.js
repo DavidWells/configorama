@@ -1,5 +1,5 @@
 /* Tests for the cached-value envelope: { value, fieldName } as a JSON string.
-   The envelope is a private plugin convention; op-cache stores opaque strings. */
+   The envelope is a private plugin convention; op-stash stores opaque strings. */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const { encodeEnvelope, decodeEnvelope, isValidEnvelope } = require('./envelope')

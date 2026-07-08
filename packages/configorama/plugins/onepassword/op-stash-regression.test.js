@@ -2,12 +2,12 @@
    with zero op invocations in a second process. Fake op only; never real 1Password. */
 
 // Real manual QA (real 1Password is manual-only, never in CI):
-//   op-cache stop
+//   op-stash stop
 //   configx .env -- node <script>   # may prompt
 //   configx .env -- node <script>   # should not prompt within TTL
-//   op-cache stats --json           # shows entries and hits
-//   op-cache stop
-// OP_CACHE_DISABLED=1 restores the old prompt-every-run behavior.
+//   op-stash stats --json           # shows entries and hits
+//   op-stash stop
+// OP_STASH_DISABLED=1 restores the old prompt-every-run behavior.
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const fs = require('fs')
@@ -58,14 +58,14 @@ test('second process resolves every syntax family with zero op invocations', () 
   const fake = fakeOp(dir)
   const env = {
     ...process.env,
-    OP_CACHE_SOCKET_PATH: path.join(dir, 'cache.sock'),
-    OP_CACHE_OP_PATH: fake.bin,
-    OP_CACHE_TTL_SECONDS: '30',
-    OP_CACHE_MAX_TTL_SECONDS: '30',
-    OP_CACHE_IDLE_EXIT_SECONDS: '10',
+    OP_STASH_SOCKET_PATH: path.join(dir, 'cache.sock'),
+    OP_STASH_OP_PATH: fake.bin,
+    OP_STASH_TTL_SECONDS: '30',
+    OP_STASH_MAX_TTL_SECONDS: '30',
+    OP_STASH_IDLE_EXIT_SECONDS: '10',
     XDG_CONFIG_HOME: path.join(dir, 'xdg'),
   }
-  delete env.OP_CACHE_DISABLED
+  delete env.OP_STASH_DISABLED
   delete env.OP_SERVICE_ACCOUNT_TOKEN
   const link = `https://start.1password.com/open/i?a=ACCOUNT&v=vaultid123&i=${LINK_ITEM_ID}&h=my.1password.com`
   const code = `
@@ -73,8 +73,8 @@ const configorama = require('./src')
 const createOnePasswordResolver = require('./plugins/onepassword')
 const source = createOnePasswordResolver({
   refs: { npm: 'note-item' },
-  opPath: process.env.OP_CACHE_OP_PATH,
-  cache: { provider: 'op-cache', ttlSeconds: 30, scope: 'session:regression' }
+  opPath: process.env.OP_STASH_OP_PATH,
+  cache: { provider: 'op-stash', ttlSeconds: 30, scope: 'session:regression' }
 })
 configorama({
   a: '\${op:npm.NPM_TOKEN}',
@@ -105,7 +105,7 @@ configorama({
 
     const stats = childProcess.spawnSync(
       process.execPath,
-      [require.resolve('@davidwells/op-cache/src/cli'), 'stats', '--json'],
+      [require.resolve('@davidwells/op-stash/src/cli'), 'stats', '--json'],
       { env, encoding: 'utf8' }
     )
     assert.is(stats.status, 0, stats.stderr)
@@ -113,7 +113,7 @@ configorama({
     assert.is(parsed.entries, 4)
     assert.ok(parsed.hits >= 4, `expected >=4 hits, saw ${parsed.hits}`)
   } finally {
-    childProcess.spawnSync(process.execPath, [require.resolve('@davidwells/op-cache/src/cli'), 'stop'], { env, encoding: 'utf8' })
+    childProcess.spawnSync(process.execPath, [require.resolve('@davidwells/op-stash/src/cli'), 'stop'], { env, encoding: 'utf8' })
   }
 })
 

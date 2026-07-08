@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* CLI for @davidwells/op-cache.
+/* CLI for @davidwells/op-stash.
    Dispatches cache reads, lifecycle diagnostics, and daemon mode. */
 const fs = require('fs')
 const { read, status, stats, clear, stop, start } = require('./api')
@@ -27,16 +27,16 @@ function parse(argv) {
 }
 
 function usage() {
-  return `op-cache ${pkg.version}
+  return `op-stash ${pkg.version}
 
 Usage:
-  op-cache read <op://ref> [--account <account>] [--ttl <duration>] [--scope <scope>]
-  op-cache status [--json]
-  op-cache stats [--scope <scope>] [--json]
-  op-cache clear [--scope <scope>]
-  op-cache stop
-  op-cache doctor [--json]
-  op-cache config-path
+  op-stash read <op://ref> [--account <account>] [--ttl <duration>] [--scope <scope>]
+  op-stash status [--json]
+  op-stash stats [--scope <scope>] [--json]
+  op-stash clear [--scope <scope>]
+  op-stash stop
+  op-stash doctor [--json]
+  op-stash config-path
 `
 }
 
@@ -69,7 +69,7 @@ async function main(argv = process.argv.slice(2), io = process) {
   if (platform === 'win32' && cmd !== 'read') {
     const unavailable = { running: false, available: false, platform: 'win32' }
     if (args.json) writeOut(io, `${JSON.stringify(unavailable)}\n`)
-    else writeOut(io, 'op-cache: caching unavailable on win32\n')
+    else writeOut(io, 'op-stash: caching unavailable on win32\n')
     return
   }
   if (cmd === 'read') {
@@ -119,7 +119,7 @@ async function main(argv = process.argv.slice(2), io = process) {
   if (cmd === 'config-path') {
     const p = configPath(process.env)
     writeOut(io, `${p}\n`)
-    if (!fs.existsSync(p)) io.stderr.write('op-cache: config file does not exist\n')
+    if (!fs.existsSync(p)) io.stderr.write('op-stash: config file does not exist\n')
     return
   }
   if (cmd === 'doctor') {
@@ -151,7 +151,7 @@ async function doctor(opts) {
 function formatDoctor(result) {
   return [
     `node: ${result.node}`,
-    `op-cache: ${result.packageVersion}`,
+    `op-stash: ${result.packageVersion}`,
     `op: ${result.opPath}`,
     `socket: ${result.socketPath}`,
     `config: ${result.configPath} (${result.configExists ? 'exists' : 'missing'})`,
@@ -167,13 +167,13 @@ function writeOut(io, text) {
 }
 
 function fail(io, message, code) {
-  io.stderr.write(`op-cache: ${message}\n`)
+  io.stderr.write(`op-stash: ${message}\n`)
   process.exitCode = code
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stderr.write(`op-cache: ${err.message}\n`)
+    process.stderr.write(`op-stash: ${err.message}\n`)
     process.exit(1)
   })
 }

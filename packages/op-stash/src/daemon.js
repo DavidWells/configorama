@@ -1,4 +1,4 @@
-/* Unix socket daemon that stores op-cache secrets in memory only.
+/* Unix socket daemon that stores op-stash secrets in memory only.
    Handles NDJSON cache requests and never executes the op CLI. */
 const fs = require('fs')
 const net = require('net')
@@ -61,7 +61,7 @@ function startDaemon(config, options = {}) {
       server.on('close', cleanup)
       process.once('SIGTERM', shutdown)
       process.once('SIGINT', shutdown)
-      if (options.foreground && process.env.DEBUG) process.stderr.write(`op-cache: daemon listening on ${config.socket_path}\n`)
+      if (options.foreground && process.env.DEBUG) process.stderr.write(`op-stash: daemon listening on ${config.socket_path}\n`)
       resolve({ server, cache })
     })
   })
@@ -125,7 +125,7 @@ const MAX_SOCKET_PATH_BYTES = 100
  */
 function prepareSocket(socketPath) {
   if (Buffer.byteLength(socketPath) > MAX_SOCKET_PATH_BYTES) {
-    throw new DaemonUnavailableError(`Socket path exceeds ${MAX_SOCKET_PATH_BYTES} bytes; Unix sockets require short paths. Set OP_CACHE_SOCKET_PATH to a shorter location: ${socketPath}`)
+    throw new DaemonUnavailableError(`Socket path exceeds ${MAX_SOCKET_PATH_BYTES} bytes; Unix sockets require short paths. Set OP_STASH_SOCKET_PATH to a shorter location: ${socketPath}`)
   }
   fs.mkdirSync(path.dirname(socketPath), { recursive: true })
   if (!fs.existsSync(socketPath)) return

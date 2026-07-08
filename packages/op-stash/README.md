@@ -1,14 +1,14 @@
-# @davidwells/op-cache
+# @davidwells/op-stash
 
-`op-cache` is a per-user, in-memory cache daemon for 1Password `op://` secret references. It is designed for fresh-process agent workflows where the same command runs repeatedly and each `op read` would otherwise trigger another 1Password prompt.
+`op-stash` is a per-user, in-memory cache daemon for 1Password `op://` secret references. It is designed for fresh-process agent workflows where the same command runs repeatedly and each `op read` would otherwise trigger another 1Password prompt.
 
 ```bash
-op-cache read op://Private/MyItem/password
-op-cache status --json
-op-cache stats
-op-cache clear
-op-cache doctor --json
-op-cache stop
+op-stash read op://Private/MyItem/password
+op-stash status --json
+op-stash stats
+op-stash clear
+op-stash doctor --json
+op-stash stop
 ```
 
 Secrets are never written to disk. The daemon stores values in memory behind a `0600` Unix socket owned by the current user, applies a default 5 minute TTL, and periodically sweeps expired entries.
@@ -16,12 +16,12 @@ Secrets are never written to disk. The daemon stores values in memory behind a `
 ## Install
 
 ```bash
-npm install -g @davidwells/op-cache
+npm install -g @davidwells/op-stash
 ```
 
 ## Config
 
-Config is optional JSON at `~/.config/op-cache/config.json`:
+Config is optional JSON at `~/.config/op-stash/config.json`:
 
 ```json
 {
@@ -35,23 +35,23 @@ Config is optional JSON at `~/.config/op-cache/config.json`:
 }
 ```
 
-Precedence is CLI flags, `OP_CACHE_*` environment variables, config file, then defaults.
+Precedence is CLI flags, `OP_STASH_*` environment variables, config file, then defaults.
 
 Useful environment variables:
 
 ```bash
-OP_CACHE_SOCKET_PATH=/tmp/op-cache-dev.sock
-OP_CACHE_TTL_SECONDS=300
-OP_CACHE_MAX_TTL_SECONDS=3600
-OP_CACHE_SCOPE="session:claude-thread-abc"
-OP_CACHE_DISABLED=1
+OP_STASH_SOCKET_PATH=/tmp/op-stash-dev.sock
+OP_STASH_TTL_SECONDS=300
+OP_STASH_MAX_TTL_SECONDS=3600
+OP_STASH_SCOPE="session:claude-thread-abc"
+OP_STASH_DISABLED=1
 ```
 
 ## TTL And Scope
 
 ```bash
-op-cache read op://Private/MyItem/password --ttl 5m
-OP_CACHE_SCOPE="session:claude-thread-abc" op-cache read op://Private/MyItem/password
+op-stash read op://Private/MyItem/password --ttl 5m
+OP_STASH_SCOPE="session:claude-thread-abc" op-stash read op://Private/MyItem/password
 ```
 
 Supported TTL formats are `30s`, `5m`, `1h`, and bare seconds like `300`.
@@ -59,7 +59,7 @@ Supported TTL formats are `30s`, `5m`, `1h`, and bare seconds like `300`.
 Scopes partition cache entries:
 
 - `user` shares entries for the same user/account/config/op path.
-- `session` uses `OP_CACHE_SESSION` first, then `OP_CACHE_SCOPE`; bare `session` errors if neither is set.
+- `session` uses `OP_STASH_SESSION` first, then `OP_STASH_SCOPE`; bare `session` errors if neither is set.
 - `session:<name>` uses the inline session name.
 - `pid` and `ppid` include process ownership metadata.
 - Any other string is a custom scope.
@@ -75,16 +75,16 @@ module.exports = {
   variableSources: [
     createOnePasswordResolver({
       cache: {
-        provider: 'op-cache',
+        provider: 'op-stash',
         ttlSeconds: 300,
-        scope: process.env.OP_CACHE_SCOPE || 'user'
+        scope: process.env.OP_STASH_SCOPE || 'user'
       }
     })
   ]
 }
 ```
 
-The resolver caches every supported `${op...}` syntax: direct `op://` reads use `op-cache read` keys, and item/alias/private-link/key-path syntaxes cache their final resolved values through `getOrSet`.
+The resolver caches every supported `${op...}` syntax: direct `op://` reads use `op-stash read` keys, and item/alias/private-link/key-path syntaxes cache their final resolved values through `getOrSet`.
 
 ## getOrSet (Advanced Integration API)
 
@@ -93,7 +93,7 @@ logic rather than `op read`. It is API-only — there is no CLI command, because
 producers are functions.
 
 ```js
-const { getOrSet } = require('@davidwells/op-cache')
+const { getOrSet } = require('@davidwells/op-stash')
 
 const value = await getOrSet('my-tool://v1/<hash>', async () => {
   return computeTheValueSomehow() // must return a string
@@ -112,7 +112,7 @@ Semantics:
 
 - any non-empty reference string is accepted; `account`/`configDir`/`opPath`
   are applied as cache key dimensions exactly as for `read`
-- `OP_CACHE_DISABLED=1` and win32 run the producer directly, never touching
+- `OP_STASH_DISABLED=1` and win32 run the producer directly, never touching
   the daemon
 - on a hit, `validateCached(value)` runs first when provided; returning
   `false` or throwing treats the entry as unusable — the producer recomputes
@@ -126,32 +126,32 @@ Semantics:
 
 ## Daemon Lifecycle
 
-Only `op-cache read` starts the daemon. Diagnostic commands such as `status`, `stats`, `clear`, `stop`, and `doctor` do not spawn a daemon just to report an empty cache.
+Only `op-stash read` starts the daemon. Diagnostic commands such as `status`, `stats`, `clear`, `stop`, and `doctor` do not spawn a daemon just to report an empty cache.
 
 The daemon exits after `idle_exit_seconds` only when the cache is empty. To reload config, run:
 
 ```bash
-op-cache stop
+op-stash stop
 ```
 
 The next read starts a fresh daemon with the current config.
 
-`OP_CACHE_DISABLED=1` bypasses the daemon entirely and executes `op read` directly.
+`OP_STASH_DISABLED=1` bypasses the daemon entirely and executes `op read` directly.
 
 ## Agent Ergonomics
 
 `status`, `stats`, and `doctor` support `--json` for machine parsing:
 
 ```bash
-op-cache status --json
-op-cache stats --json
-op-cache doctor --json
+op-stash status --json
+op-stash stats --json
+op-stash doctor --json
 ```
 
-Secret values only appear on stdout for `op-cache read`. Diagnostics and warnings go to stderr unless the command explicitly emits JSON.
+Secret values only appear on stdout for `op-stash read`. Diagnostics and warnings go to stderr unless the command explicitly emits JSON.
 
 ## Security Model
 
-This is a same-user convenience cache, not a hard isolation boundary. Secret values are held in daemon memory and returned over a user-owned `0600` Unix socket. Values are never logged or persisted. TTL defaults to 5 minutes, `max_ttl_seconds` clamps unexpectedly long requests, and periodic sweeping bounds how long expired values remain in memory. Use `op-cache clear`, `op-cache stop`, or `OP_CACHE_DISABLED=1` when you want to bypass the cache.
+This is a same-user convenience cache, not a hard isolation boundary. Secret values are held in daemon memory and returned over a user-owned `0600` Unix socket. Values are never logged or persisted. TTL defaults to 5 minutes, `max_ttl_seconds` clamps unexpectedly long requests, and periodic sweeping bounds how long expired values remain in memory. Use `op-stash clear`, `op-stash stop`, or `OP_STASH_DISABLED=1` when you want to bypass the cache.
 
-The Rust prototype in `_misc/op-cache` remains as a reference. Remove old `op-cache` binaries from `PATH` if you install this package; separate implementations can use separate sockets and appear as two daemons.
+The Rust prototype in `_misc/op-stash` remains as a reference. Remove old `op-stash` binaries from `PATH` if you install this package; separate implementations can use separate sockets and appear as two daemons.

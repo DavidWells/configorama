@@ -43,12 +43,12 @@ test('session scope requires explicit session identity', () => {
     resolveScope('session', { env: {} })
     assert.unreachable('should reject')
   } catch (err) {
-    assert.match(err.message, /OP_CACHE_SESSION/)
+    assert.match(err.message, /OP_STASH_SESSION/)
   }
-  assert.is(resolveScope('session', { env: { OP_CACHE_SCOPE: 'general', OP_CACHE_SESSION: 'specific' } }).scope, 'session:specific')
+  assert.is(resolveScope('session', { env: { OP_STASH_SCOPE: 'general', OP_STASH_SESSION: 'specific' } }).scope, 'session:specific')
 })
 
-test('cache key changes on each dimension and account precedence matches op-cache rust behavior', () => {
+test('cache key changes on each dimension and account precedence matches op-stash rust behavior', () => {
   const base = { scope: 'user', account: '', configDir: '', opPath: 'op', reference: 'op://vault/item/field' }
   const key = cacheKey(base)
   assert.is(cacheKey(base), key)
@@ -104,10 +104,10 @@ test('protocol round-trips and validates shapes', () => {
 
 test('config precedence is flags, env, file, defaults', () => {
   resetConfigCache()
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'op-cache-config-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'op-stash-config-'))
   const file = path.join(dir, 'config.json')
   fs.writeFileSync(file, JSON.stringify({ ttl_seconds: 10, max_entries: 10, op_path: 'file-op' }))
-  const env = { OP_CACHE_TTL_SECONDS: '20', OP_CACHE_OP_PATH: 'env-op', TMPDIR: dir }
+  const env = { OP_STASH_TTL_SECONDS: '20', OP_STASH_OP_PATH: 'env-op', TMPDIR: dir }
   const result = resolveConfig({ configPath: file, ttlSeconds: '30s' }, { env, useCache: false })
   assert.is(result.config.ttl_seconds, 30)
   assert.is(result.config.op_path, 'env-op')
@@ -117,16 +117,16 @@ test('config precedence is flags, env, file, defaults', () => {
 
 test('config handles absent file and invalid JSON', () => {
   resetConfigCache()
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'op-cache-config-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'op-stash-config-'))
   const missing = path.join(dir, 'missing.json')
-  assert.ok(resolveConfig({ configPath: missing }, { env: { TMPDIR: dir }, useCache: false }).config.socket_path.includes('op-cache-'))
+  assert.ok(resolveConfig({ configPath: missing }, { env: { TMPDIR: dir }, useCache: false }).config.socket_path.includes('op-stash-'))
   const bad = path.join(dir, 'bad.json')
   fs.writeFileSync(bad, '{')
   try {
     resolveConfig({ configPath: bad }, { env: { TMPDIR: dir }, useCache: false })
     assert.unreachable('should reject')
   } catch (err) {
-    assert.match(err.message, /Invalid op-cache config/)
+    assert.match(err.message, /Invalid op-stash config/)
     assert.match(err.message, /bad\.json/)
   }
 })
@@ -147,7 +147,7 @@ test('daemon rejects over-long socket paths with a clear error', async () => {
     await startDaemon({ socket_path: longPath, max_entries: 10, idle_exit_seconds: 30 })
     assert.unreachable('should throw')
   } catch (err) {
-    assert.match(err.message, /exceeds.*bytes.*OP_CACHE_SOCKET_PATH/s)
+    assert.match(err.message, /exceeds.*bytes.*OP_STASH_SOCKET_PATH/s)
   }
 })
 

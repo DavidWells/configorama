@@ -1,4 +1,4 @@
-/* Programmatic API for op-cache callers.
+/* Programmatic API for op-stash callers.
    Configorama's 1Password resolver consumes these module-level functions. */
 const { resolveConfig } = require('./config')
 const { resolveScope } = require('./scope')
@@ -17,7 +17,7 @@ async function read(ref, opts = {}) {
   const env = opts.env || process.env
   const { config } = resolveConfig(optionFlags(opts), { env })
   const account = effectiveAccount(opts.account, env)
-  if (env.OP_CACHE_DISABLED === '1' || opts.platform === 'win32' || process.platform === 'win32') {
+  if (env.OP_STASH_DISABLED === '1' || opts.platform === 'win32' || process.platform === 'win32') {
     return readOp(ref, config, { account, configDir: opts.configDir })
   }
   const scopeInfo = resolveScope(opts.scope || config.default_scope, { env })
@@ -39,12 +39,12 @@ async function read(ref, opts = {}) {
       accountHash: shortHash(account),
     })
     if (stored.clamped && opts.stderr) {
-      opts.stderr.write(`op-cache: ttl clamped to ${stored.ttlSeconds}s by daemon max_ttl_seconds\n`)
+      opts.stderr.write(`op-stash: ttl clamped to ${stored.ttlSeconds}s by daemon max_ttl_seconds\n`)
     }
     return value
   } catch (err) {
     if (!fallbackToOp) throw err
-    if (opts.stderr) opts.stderr.write(`op-cache: cache bypassed (${err.message}); reading directly\n`)
+    if (opts.stderr) opts.stderr.write(`op-stash: cache bypassed (${err.message}); reading directly\n`)
     return readOp(ref, config, { account, configDir: opts.configDir })
   }
 }
@@ -76,7 +76,7 @@ function warnOnce(stderr, kind, message) {
  */
 async function produce(producer) {
   const value = await producer()
-  if (typeof value !== 'string') throw new Error('op-cache getOrSet producer must return a string.')
+  if (typeof value !== 'string') throw new Error('op-stash getOrSet producer must return a string.')
   return value
 }
 
@@ -104,12 +104,12 @@ function validateQuietly(validate, value) {
  * @returns {Promise<string>}
  */
 async function getOrSet(cacheRef, producer, opts = {}) {
-  if (!cacheRef || typeof cacheRef !== 'string') throw new Error('op-cache getOrSet requires a non-empty cache reference string.')
-  if (typeof producer !== 'function') throw new Error('op-cache getOrSet requires a producer function.')
+  if (!cacheRef || typeof cacheRef !== 'string') throw new Error('op-stash getOrSet requires a non-empty cache reference string.')
+  if (typeof producer !== 'function') throw new Error('op-stash getOrSet requires a producer function.')
   const env = opts.env || process.env
   const { config } = resolveConfig(optionFlags(opts), { env })
   const account = effectiveAccount(opts.account, env)
-  if (env.OP_CACHE_DISABLED === '1' || opts.platform === 'win32' || process.platform === 'win32') {
+  if (env.OP_STASH_DISABLED === '1' || opts.platform === 'win32' || process.platform === 'win32') {
     return produce(producer)
   }
   const scopeInfo = resolveScope(opts.scope || config.default_scope, { env })
@@ -122,14 +122,14 @@ async function getOrSet(cacheRef, producer, opts = {}) {
     got = await request(config, { type: 'get', key, scope: scopeInfo.scope })
   } catch (err) {
     if (!fallbackToOp) throw err
-    if (opts.stderr) opts.stderr.write(`op-cache: cache bypassed (${err.message}); resolving directly\n`)
+    if (opts.stderr) opts.stderr.write(`op-stash: cache bypassed (${err.message}); resolving directly\n`)
     daemonBroken = true
   }
   if (!daemonBroken && got.type === 'hit') {
     if (!opts.validateCached || validateQuietly(opts.validateCached, got.value)) {
       return got.value
     }
-    warnOnce(opts.stderr, 'validate-reject', 'op-cache: cached entry failed validation; recomputing and overwriting\n')
+    warnOnce(opts.stderr, 'validate-reject', 'op-stash: cached entry failed validation; recomputing and overwriting\n')
   }
   // Producer errors propagate untouched and the producer never runs twice:
   // only daemon get/set failures participate in the fallback path above/below.
@@ -147,11 +147,11 @@ async function getOrSet(cacheRef, producer, opts = {}) {
         accountHash: shortHash(account),
       })
       if (stored.clamped) {
-        warnOnce(opts.stderr, 'ttl-clamp', `op-cache: ttl clamped to ${stored.ttlSeconds}s by daemon max_ttl_seconds\n`)
+        warnOnce(opts.stderr, 'ttl-clamp', `op-stash: ttl clamped to ${stored.ttlSeconds}s by daemon max_ttl_seconds\n`)
       }
     } catch (err) {
       if (!fallbackToOp) throw err
-      if (opts.stderr) opts.stderr.write(`op-cache: cache bypassed (${err.message}); value not stored\n`)
+      if (opts.stderr) opts.stderr.write(`op-stash: cache bypassed (${err.message}); value not stored\n`)
     }
   }
   return value

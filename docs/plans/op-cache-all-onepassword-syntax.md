@@ -1,6 +1,6 @@
 # Cache All Configorama 1Password Syntax Flavors
 
-Status: reviewed spec. Design review 2026-07-07 settled: cached payloads are plugin-side JSON envelopes ({ value, fieldName }) so audit metadata stays identical between miss and hit runs; cache keys are NUL-joined fixed-order parts (no JSON hashing); `getOrSet` mirrors `read` for `OP_CACHE_DISABLED`/win32.
+Status: reviewed spec. Design review 2026-07-07 settled: cached payloads are plugin-side JSON envelopes ({ value, fieldName }) so audit metadata stays identical between miss and hit runs; cache keys are NUL-joined fixed-order parts (no JSON hashing); `getOrSet` mirrors `read` for `OP_CACHE_DISABLED`/win32. Shipped as @davidwells/op-stash (renamed from op-cache before first publish).
 
 ## Goal
 

@@ -81,9 +81,9 @@ importers:
       '@cdktf/hcl2json':
         specifier: ^0.21.0
         version: 0.21.0
-      '@davidwells/op-cache':
+      '@davidwells/op-stash':
         specifier: workspace:^
-        version: link:../op-cache
+        version: link:../op-stash
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.2
@@ -116,7 +116,7 @@ importers:
         specifier: ^0.5.6
         version: 0.5.6
 
-  packages/op-cache:
+  packages/op-stash:
     devDependencies:
       uvu:
         specifier: ^0.5.6

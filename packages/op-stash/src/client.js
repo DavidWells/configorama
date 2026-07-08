@@ -38,9 +38,9 @@ function request(config, message) {
     })
     socket.on('timeout', () => {
       socket.destroy()
-      reject(new DaemonUnavailableError('Timed out waiting for op-cache daemon.'))
+      reject(new DaemonUnavailableError('Timed out waiting for op-stash daemon.'))
     })
-    socket.on('error', (err) => reject(new DaemonUnavailableError(`Could not connect to op-cache daemon: ${err.message}`)))
+    socket.on('error', (err) => reject(new DaemonUnavailableError(`Could not connect to op-stash daemon: ${err.message}`)))
     socket.on('close', () => {
       if (!buffer) return
       try {
@@ -64,7 +64,7 @@ async function ensureDaemon(config, options = {}) {
     warnVersionMismatch(pong, options.stderr)
     return pong
   } catch (err) {
-    if (/Unsafe op-cache socket/.test(err.message)) throw err
+    if (/Unsafe op-stash socket/.test(err.message)) throw err
     spawnDaemon(config)
     const start = Date.now()
     while (Date.now() - start < 5000) {
@@ -77,7 +77,7 @@ async function ensureDaemon(config, options = {}) {
         // keep polling
       }
     }
-    throw new DaemonUnavailableError('op-cache daemon failed to start within 5s.')
+    throw new DaemonUnavailableError('op-stash daemon failed to start within 5s.')
   }
 }
 
@@ -88,7 +88,7 @@ function spawnDaemon(config) {
   const child = spawn(process.execPath, [require.resolve('./cli'), 'daemon'], {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, OP_CACHE_SOCKET_PATH: config.socket_path },
+    env: { ...process.env, OP_STASH_SOCKET_PATH: config.socket_path },
   })
   child.unref()
 }
@@ -101,14 +101,14 @@ function assertSafeSocket(socketPath) {
   try {
     stat = fs.statSync(socketPath)
   } catch (err) {
-    throw new DaemonUnavailableError('op-cache daemon is not running.')
+    throw new DaemonUnavailableError('op-stash daemon is not running.')
   }
-  if (!stat.isSocket()) throw new DaemonUnavailableError(`Unsafe op-cache socket path is not a socket: ${socketPath}`)
+  if (!stat.isSocket()) throw new DaemonUnavailableError(`Unsafe op-stash socket path is not a socket: ${socketPath}`)
   if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) {
-    throw new DaemonUnavailableError(`Unsafe op-cache socket owner for ${socketPath}.`)
+    throw new DaemonUnavailableError(`Unsafe op-stash socket owner for ${socketPath}.`)
   }
   const mode = stat.mode & 0o777
-  if (mode !== 0o600) throw new DaemonUnavailableError(`Unsafe op-cache socket permissions ${mode.toString(8)} for ${socketPath}; expected 600.`)
+  if (mode !== 0o600) throw new DaemonUnavailableError(`Unsafe op-stash socket permissions ${mode.toString(8)} for ${socketPath}; expected 600.`)
 }
 
 /**
@@ -117,7 +117,7 @@ function assertSafeSocket(socketPath) {
  */
 function warnVersionMismatch(pong, stderr) {
   if (pong && pong.version && pong.version !== pkg.version && stderr) {
-    stderr.write(`op-cache: daemon version ${pong.version} differs from client version ${pkg.version}; run op-cache stop to reload\n`)
+    stderr.write(`op-stash: daemon version ${pong.version} differs from client version ${pkg.version}; run op-stash stop to reload\n`)
   }
 }
 
