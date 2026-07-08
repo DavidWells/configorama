@@ -14,6 +14,26 @@ on:
         required: true
         type: string
         default: 'david'
+      create_branch:
+        description: 'Create new branch (changes are pushed to a claude/dispatch-* branch and opened as a PR instead of landing on the default branch)'
+        required: false
+        type: boolean
+        default: true
+      notify_email:
+        description: 'Email address to send a result receipt to (via event bus → reply mailer)'
+        required: false
+        type: string
+        default: ''
+      in_reply_to:
+        description: 'Message-ID of the originating email, for reply threading'
+        required: false
+        type: string
+        default: ''
+      notify_subject:
+        description: 'Subject of the originating email, for reply threading'
+        required: false
+        type: string
+        default: ''
   # PR related events
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -47,7 +67,8 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository ||
           contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.pull_request.author_association)
         ) &&
-        contains(github.event.pull_request.body, '@claude')
+        contains(github.event.pull_request.body, '@claude') &&
+        !contains(github.event.pull_request.body, 'claude-dispatch-artifact')
       ) ||
       (
         github.event_name == 'issue_comment' &&
@@ -56,7 +77,8 @@ jobs:
           github.event.sender.login == 'github-actions[bot]' ||
           contains(fromJSON('["COLLABORATOR", "MEMBER", "OWNER"]'), github.event.comment.author_association)
         ) &&
-        contains(github.event.comment.body, '@claude')
+        contains(github.event.comment.body, '@claude') &&
+        !contains(github.event.comment.body, 'claude-dispatch-artifact')
       ) ||
       (
         github.event_name == 'issues' &&
@@ -67,7 +89,8 @@ jobs:
         (
           contains(github.event.issue.body, '@claude') ||
           contains(github.event.issue.title, '@claude')
-        )
+        ) &&
+        !contains(github.event.issue.body, 'claude-dispatch-artifact')
       ) ||
       (
         github.event_name == 'pull_request_review_comment' &&
@@ -481,7 +504,10 @@ jobs:
           echo "=================================="
           
           # Check for model keywords (case-insensitive)
-          if echo "$TRIGGER_TEXT" | grep -qi '\bopus\b'; then
+          if echo "$TRIGGER_TEXT" | grep -qi '\bfable\b'; then
+            echo "📖 Fable model requested"
+            echo "model=claude-fable-5" >> $GITHUB_OUTPUT
+          elif echo "$TRIGGER_TEXT" | grep -qi '\bopus\b'; then
             echo "🧠 Opus model requested"
             echo "model=opus" >> $GITHUB_OUTPUT
           elif echo "$TRIGGER_TEXT" | grep -qi '\bhaiku\b'; then
@@ -561,6 +587,17 @@ jobs:
       
       #     timeout_minutes: "60"
 
+      # Dispatch runs with "Create new branch" checked work on a branch so
+      # changes never land directly on the default branch
+      - name: Create Dispatch Branch
+        id: dispatch-branch
+        if: github.event_name == 'workflow_dispatch' && inputs.create_branch
+        run: |
+          BRANCH_NAME="claude/dispatch-${{ github.run_id }}"
+          git checkout -b "$BRANCH_NAME"
+          echo "🌿 Working on branch: $BRANCH_NAME"
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@main
@@ -569,6 +606,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN || github.token }}
+          # git-ops dispatches via GitHub App installation token, which acts as this bot
+          allowed_bots: 'custom-git-ops'
           # GITHUB ACTIONS (Maximum Freedom):
           settings: |
             {
@@ -641,6 +680,118 @@ jobs:
           CAN_MANAGE_SECURITY: "true"
           CAN_MANAGE_PACKAGES: "true"
           CAN_MANAGE_ACTIONS: "true"
+
+      # Dispatch-branch runs: commit anything Claude left uncommitted, push the
+      # branch, and open a PR when there are changes vs the default branch
+      - name: Push Dispatch Branch and Open PR
+        id: dispatch-pr
+        if: steps.claude.outcome == 'success' && steps.dispatch-branch.outputs.branch-name
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN || github.token }}
+          TRIGGER_TEXT: ${{ needs.setup.outputs.trigger-text }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          BRANCH_NAME="${{ steps.dispatch-branch.outputs.branch-name }}"
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "📝 Committing uncommitted changes left by Claude"
+            git config user.name "claude[bot]"
+            git config user.email "claude[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Claude changes from workflow dispatch"
+          fi
+
+          if git diff --quiet "origin/${DEFAULT_BRANCH}...HEAD"; then
+            echo "✅ No changes vs ${DEFAULT_BRANCH}, skipping branch push and PR"
+            exit 0
+          fi
+
+          git push origin "$BRANCH_NAME"
+
+          # Claude's final message from the execution log becomes the PR summary
+          CLAUDE_SUMMARY=""
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
+            CLAUDE_SUMMARY=$(jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // empty' "$EXECUTION_FILE" 2>/dev/null | head -c 4000 || true)
+          fi
+
+          # "@claude" in a PR body would re-trigger this workflow — refer to
+          # the bot without the @ and stamp the artifact marker
+          BODY_FILE=$(mktemp)
+          {
+            if [ -n "$CLAUDE_SUMMARY" ]; then
+              printf '%s\n\n' "$CLAUDE_SUMMARY" | sed 's/@claude/Claude/g'
+            fi
+            echo "<details><summary>Original instruction</summary>"
+            echo ""
+            echo '```text'
+            printf '%s\n' "$TRIGGER_TEXT" | sed -e 's/@claude/Claude/g' -e 's/```/~~~/g'
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "🤖 Created by Claude from a \`workflow_dispatch\` run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "<!-- claude-dispatch-artifact -->"
+          } > "$BODY_FILE"
+
+          PR_TITLE=$(git log -1 --pretty=%s)
+          PR_URL=$(gh pr create \
+            --base "$DEFAULT_BRANCH" \
+            --head "$BRANCH_NAME" \
+            --title "$PR_TITLE" \
+            --body-file "$BODY_FILE")
+          echo "🔀 Opened PR: $PR_URL"
+          echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT
+
+      # Dispatch runs that carry notify_* inputs publish their outcome to the
+      # event bus so the reply mailer can email the sender a threaded receipt.
+      # Fire-and-forget: a bus outage must never fail the workflow.
+      - name: Publish Dispatch Result to Event Bus
+        id: dispatch-publish
+        if: always() && steps.dispatch-branch.outputs.branch-name && inputs.notify_email != ''
+        env:
+          EVENT_BUS_URL: ${{ secrets.EVENT_BUS_URL }}
+          EVENT_BUS_API_KEY: ${{ secrets.EVENT_BUS_API_KEY }}
+          NOTIFY_EMAIL: ${{ inputs.notify_email }}
+          IN_REPLY_TO: ${{ inputs.in_reply_to }}
+          NOTIFY_SUBJECT: ${{ inputs.notify_subject }}
+          BRANCH_NAME: ${{ steps.dispatch-branch.outputs.branch-name }}
+          PR_URL: ${{ steps.dispatch-pr.outputs.pr-url }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$EVENT_BUS_URL" ]; then
+            echo "No EVENT_BUS_URL secret configured, skipping publish"
+            exit 0
+          fi
+
+          if [ "$CLAUDE_OUTCOME" = "success" ]; then
+            TYPE="claude.job.completed"
+            STATUS="completed"
+          else
+            TYPE="claude.job.failed"
+            STATUS="failed"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg type "$TYPE" \
+            --arg status "$STATUS" \
+            --arg repo "${{ github.repository }}" \
+            --arg branch "$BRANCH_NAME" \
+            --arg runUrl "$RUN_URL" \
+            --arg prUrl "$PR_URL" \
+            --arg outcome "$CLAUDE_OUTCOME" \
+            --arg email "$NOTIFY_EMAIL" \
+            --arg inReplyTo "$IN_REPLY_TO" \
+            --arg subject "$NOTIFY_SUBJECT" \
+            '{type: $type, detail: {status: $status, repository: $repo, event: "workflow_dispatch", branch: $branch, results: {runUrl: $runUrl, prUrl: $prUrl, prCreated: ($prUrl != ""), claudeOutcome: $outcome}, notify: {email: $email, inReplyTo: $inReplyTo, subject: $subject}}}')
+
+          echo "🔔 Publishing $TYPE to event bus"
+          curl -sf -X POST "$EVENT_BUS_URL/ingest" \
+            -H "Authorization: Bearer $EVENT_BUS_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" || echo "⚠️ Event bus publish failed (non-fatal)"
 
       - name: Run Advanced Repository Management
         id: advanced-management
@@ -1124,8 +1275,8 @@ jobs:
 
               // Ping our webhook - PR creation successful
               try {
-                const webhookUrl = '${{ secrets.CLAUDE_CODE_NOTIFICATIONS_URL }}';
-                const webhookToken = '${{ secrets.CLAUDE_CODE_NOTIFICATIONS_KEY }}';
+                const busUrl = '${{ secrets.EVENT_BUS_URL }}';
+                const busApiKey = '${{ secrets.EVENT_BUS_API_KEY }}';
                 
                 const jobId = `claude-${context.repo.owner}-${context.repo.repo}-${issueNumber}-${Date.now()}`;
                 const actionUrl = `https://github.com/${owner}/${repo}/issues/${issueNumber}`;
@@ -1151,17 +1302,17 @@ jobs:
                   }
                 };
                 
-                console.log('🔔 Sending webhook notification (PR created)...');
-                console.log('Webhook URL:', webhookUrl);
+                console.log('🔔 Publishing claude.job event to event bus (PR created)...');
+                console.log('Event bus URL:', busUrl);
                 console.log('Job ID:', jobId);
                 
-                const response = await fetch(`${webhookUrl}/job-complete`, {
+                const response = await fetch(`${busUrl}/ingest`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${webhookToken}`
+                    'Authorization': `Bearer ${busApiKey}`
                   },
-                  body: JSON.stringify(webhookData)
+                  body: JSON.stringify({ type: `claude.job.${webhookData.status}`, detail: webhookData })
                 });
                 
                 if (response.ok) {
@@ -1187,8 +1338,8 @@ jobs:
 
               // Ping our webhook - PR creation failed
               try {
-                const webhookUrl = '${{ secrets.CLAUDE_CODE_NOTIFICATIONS_URL }}';
-                const webhookToken = '${{ secrets.CLAUDE_CODE_NOTIFICATIONS_KEY }}';
+                const busUrl = '${{ secrets.EVENT_BUS_URL }}';
+                const busApiKey = '${{ secrets.EVENT_BUS_API_KEY }}';
                 
                 const jobId = `claude-${context.repo.owner}-${context.repo.repo}-${issueNumber}-${Date.now()}`;
                 const actionUrl = `https://github.com/${owner}/${repo}/issues/${issueNumber}`;
@@ -1216,16 +1367,16 @@ jobs:
                 };
                 
                 console.log('🔔 Sending webhook notification (PR creation failed)...');
-                console.log('Webhook URL:', webhookUrl);
+                console.log('Event bus URL:', busUrl);
                 console.log('Job ID:', jobId);
                 
-                const response = await fetch(`${webhookUrl}/job-complete`, {
+                const response = await fetch(`${busUrl}/ingest`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${webhookToken}`
+                    'Authorization': `Bearer ${busApiKey}`
                   },
-                  body: JSON.stringify(webhookData)
+                  body: JSON.stringify({ type: `claude.job.${webhookData.status}`, detail: webhookData })
                 });
                 
                 if (response.ok) {
