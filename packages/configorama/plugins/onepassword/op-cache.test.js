@@ -20,12 +20,12 @@ const INI_NOTE = 'NPM_TOKEN=npm-secret\n\n[database]\npassword=db-pass\n'
 function fakeOp(dir) {
   const bin = path.join(dir, 'fake-op.js')
   const count = path.join(dir, 'count.txt')
-  fs.writeFileSync(count, '0')
+  fs.writeFileSync(count, '')
   fs.writeFileSync(bin, `#!/usr/bin/env node
 const fs = require('fs')
-const count = ${JSON.stringify(count)}
-const n = Number(fs.readFileSync(count, 'utf8') || '0') + 1
-fs.writeFileSync(count, String(n))
+// O_APPEND is atomic under concurrent op processes; a read-modify-write
+// counter loses increments when resolution fans out in parallel.
+fs.appendFileSync(${JSON.stringify(count)}, '.')
 const args = process.argv.slice(2)
 if (process.env.FAKE_OP_FAIL) {
   process.stderr.write(process.env.FAKE_OP_FAIL)
@@ -58,7 +58,7 @@ process.stderr.write('unknown fake op command')
 process.exit(1)
 `)
   fs.chmodSync(bin, 0o755)
-  return { bin, calls: () => Number(fs.readFileSync(count, 'utf8') || '0') }
+  return { bin, calls: () => fs.readFileSync(count, 'utf8').length }
 }
 
 // op-cache memoizes env-derived config per process; in-process daemon tests
