@@ -1,6 +1,6 @@
 {
   "name": "@davidwells/op-stash",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Per-user in-memory cache daemon for 1Password op:// reads",
   "main": "src/api.js",
   "bin": {

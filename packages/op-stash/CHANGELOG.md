@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.1.2](https://github.com/DavidWells/configorama/compare/@davidwells/op-stash@0.1.1...@davidwells/op-stash@0.1.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **op-stash:** cold-start spawn race stranded clients and leaked daemons ([49c3570](https://github.com/DavidWells/configorama/commit/49c3570377bea478cd8b0b6526ae0ea070dd8076))
+
+
+
+
+
 ## 0.1.1 (2026-07-08)
 
 **Note:** Version bump only for package @davidwells/op-stash
