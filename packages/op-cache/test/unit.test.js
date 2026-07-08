@@ -140,4 +140,15 @@ test('op stderr translation reports missing fields as not found', () => {
   assert.match(err.message, /op:\/\/vault\/item\/password/)
 })
 
+test('daemon rejects over-long socket paths with a clear error', async () => {
+  const { startDaemon } = require('../src/daemon')
+  const longPath = '/tmp/' + 'x'.repeat(120) + '.sock'
+  try {
+    await startDaemon({ socket_path: longPath, max_entries: 10, idle_exit_seconds: 30 })
+    assert.unreachable('should throw')
+  } catch (err) {
+    assert.match(err.message, /exceeds.*bytes.*OP_CACHE_SOCKET_PATH/s)
+  }
+})
+
 test.run()

@@ -116,10 +116,17 @@ function handleLine(line, socket, cache, config, server) {
   }
 }
 
+// sun_path caps Unix socket paths (~104 bytes on macOS, ~108 on Linux);
+// over-long paths bind truncated and fail with misleading ENOENT errors.
+const MAX_SOCKET_PATH_BYTES = 100
+
 /**
  * @param {string} socketPath - Socket path
  */
 function prepareSocket(socketPath) {
+  if (Buffer.byteLength(socketPath) > MAX_SOCKET_PATH_BYTES) {
+    throw new DaemonUnavailableError(`Socket path exceeds ${MAX_SOCKET_PATH_BYTES} bytes; Unix sockets require short paths. Set OP_CACHE_SOCKET_PATH to a shorter location: ${socketPath}`)
+  }
   fs.mkdirSync(path.dirname(socketPath), { recursive: true })
   if (!fs.existsSync(socketPath)) return
   try {
