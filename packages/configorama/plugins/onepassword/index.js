@@ -63,7 +63,12 @@ function createOnePasswordResolver(options = {}) {
     execFile,
   } = options
 
-  const opStash = cache && cache.provider === 'op-stash' ? loadOpStash() : undefined
+  // An unrecognized provider fails loudly: a typo silently disabling a
+  // requested secrets cache would look identical to working caching.
+  if (cache && cache.provider !== 'op-stash') {
+    throw new Error(`Unknown 1Password cache provider "${cache.provider}". Supported: 'op-stash'.`)
+  }
+  const opStash = cache ? loadOpStash() : undefined
 
   const aliasRefs = {}
   for (const alias of Object.keys(refs)) {

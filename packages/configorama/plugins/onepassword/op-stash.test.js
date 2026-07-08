@@ -528,4 +528,12 @@ process.stdout.write(config.password)
   }
 })
 
+test('unknown cache provider fails loudly instead of silently skipping the cache', () => {
+  assert.throws(
+    () => createOnePasswordResolver({ cache: { provider: 'op-cache' } }),
+    /Unknown 1Password cache provider "op-cache"/
+  )
+})
+
 test.run()
+
