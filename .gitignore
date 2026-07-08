@@ -4,6 +4,7 @@
 /dist
 /tmp
 /types
+/packages/configorama/types
 node_modules
 
 site/out
