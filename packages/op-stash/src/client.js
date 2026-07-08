@@ -54,11 +54,30 @@ function request(config, message) {
   })
 }
 
+// One in-flight ensure per socket path: parallel resolution of N variables
+// must not spawn N daemons that race each other for the socket.
+const ensuring = new Map()
+
 /**
  * @param {object} config - Config
  * @param {object} [options] - { stderr }
  */
-async function ensureDaemon(config, options = {}) {
+function ensureDaemon(config, options = {}) {
+  const key = config.socket_path
+  if (!ensuring.has(key)) {
+    const inflight = ensureDaemonInner(config, options).finally(() => {
+      ensuring.delete(key)
+    })
+    ensuring.set(key, inflight)
+  }
+  return ensuring.get(key)
+}
+
+/**
+ * @param {object} config - Config
+ * @param {object} [options] - { stderr }
+ */
+async function ensureDaemonInner(config, options = {}) {
   try {
     const pong = await ping(config)
     warnVersionMismatch(pong, options.stderr)

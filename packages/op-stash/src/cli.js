@@ -58,12 +58,14 @@ async function main(argv = process.argv.slice(2), io = process) {
     fallbackToOp: true,
   }
 
-  if (cmd === 'daemon') {
-    await start({})
-    return new Promise(() => {})
-  }
-  if (cmd === 'daemon-foreground') {
-    await start({ foreground: true })
+  if (cmd === 'daemon' || cmd === 'daemon-foreground') {
+    try {
+      await start({ foreground: cmd === 'daemon-foreground' })
+    } catch (err) {
+      // Losing a spawn race is a success: some daemon is serving the socket
+      if (/already running/.test(err.message)) return
+      throw err
+    }
     return new Promise(() => {})
   }
   if (platform === 'win32' && cmd !== 'read') {

@@ -13,9 +13,9 @@ const pkg = require('../package.json')
  * @param {object} [options] - { foreground }
  * @returns {Promise<object>} Server handle
  */
-function startDaemon(config, options = {}) {
+async function startDaemon(config, options = {}) {
+  await prepareSocket(config.socket_path)
   return new Promise((resolve, reject) => {
-    prepareSocket(config.socket_path)
     const cache = new SecretCache({ maxEntries: config.max_entries })
     let lastConnectionAt = Date.now()
     const server = net.createServer((socket) => {
@@ -121,21 +121,53 @@ function handleLine(line, socket, cache, config, server) {
 const MAX_SOCKET_PATH_BYTES = 100
 
 /**
+ * Prepare the socket path for binding. A live daemon on the path is never
+ * stolen from - unlinking a serving socket strands its clients mid-request
+ * and leaks the displaced daemon. Only dead socket files are removed.
  * @param {string} socketPath - Socket path
  */
-function prepareSocket(socketPath) {
+async function prepareSocket(socketPath) {
   if (Buffer.byteLength(socketPath) > MAX_SOCKET_PATH_BYTES) {
     throw new DaemonUnavailableError(`Socket path exceeds ${MAX_SOCKET_PATH_BYTES} bytes; Unix sockets require short paths. Set OP_STASH_SOCKET_PATH to a shorter location: ${socketPath}`)
   }
   fs.mkdirSync(path.dirname(socketPath), { recursive: true })
   if (!fs.existsSync(socketPath)) return
+  let stat
   try {
-    const stat = fs.statSync(socketPath)
-    if (stat.isSocket()) fs.unlinkSync(socketPath)
-    else throw new DaemonUnavailableError(`Refusing to remove non-socket path: ${socketPath}`)
+    stat = fs.statSync(socketPath)
+  } catch (err) {
+    if (err.code === 'ENOENT') return
+    throw err
+  }
+  if (!stat.isSocket()) {
+    throw new DaemonUnavailableError(`Refusing to remove non-socket path: ${socketPath}`)
+  }
+  if (await socketAnswers(socketPath)) {
+    throw new DaemonUnavailableError(`op-stash daemon already running on ${socketPath}.`)
+  }
+  try {
+    fs.unlinkSync(socketPath)
   } catch (err) {
     if (err.code !== 'ENOENT') throw err
   }
+}
+
+/**
+ * @param {string} socketPath - Socket path
+ * @returns {Promise<boolean>} True when something accepts connections
+ */
+function socketAnswers(socketPath) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection(socketPath)
+    const done = (answered) => {
+      socket.destroy()
+      resolve(answered)
+    }
+    socket.setTimeout(500)
+    socket.on('connect', () => done(true))
+    socket.on('timeout', () => done(false))
+    socket.on('error', () => done(false))
+  })
 }
 
 function pidPath(socketPath) {

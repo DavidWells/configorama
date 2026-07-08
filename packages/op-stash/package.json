@@ -8,7 +8,7 @@
   },
   "type": "commonjs",
   "scripts": {
-    "test": "node test/unit.test.js && node test/cli.test.js && node test/integration.test.js && node test/get-or-set.test.js"
+    "test": "node test/unit.test.js && node test/cli.test.js && node test/integration.test.js && node test/get-or-set.test.js && node test/daemon-race.test.js"
   },
   "files": [
     "src",
