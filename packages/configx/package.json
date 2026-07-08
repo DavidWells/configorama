@@ -1,6 +1,6 @@
 {
   "name": "@davidwells/configx",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Resolve a configorama config and exec a command with it as environment",
   "bin": {
     "configx": "./cli.js"

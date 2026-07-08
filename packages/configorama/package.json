@@ -1,6 +1,6 @@
 {
   "name": "configorama",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Variable support for configuration files",
   "main": "src/index.js",
   "types": "index.d.ts",
@@ -89,8 +89,8 @@
     "lodash": "^4.18.1"
   },
   "peerDependencies": {
-    "@davidwells/op-stash": ">=0.1.0",
     "@cdktf/hcl2json": ">=0.20.0",
+    "@davidwells/op-stash": ">=0.1.0",
     "ts-node": ">=10.0.0",
     "tsx": ">=4.0.0"
   },

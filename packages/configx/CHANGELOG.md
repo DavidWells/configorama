@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/DavidWells/configorama/compare/@davidwells/configx@0.2.3...@davidwells/configx@0.3.0) (2026-07-08)
+
+
+### Features
+
+* **op-cache:** all-syntax final-value caching for 1Password reads ([#76](https://github.com/DavidWells/configorama/issues/76)) ([8caf477](https://github.com/DavidWells/configorama/commit/8caf47789d43e03fed2db928b3b67574c4e24c6e))
+
+
+
+
+
 ## [0.2.2](https://github.com/DavidWells/configorama/compare/@davidwells/configx@0.2.1...@davidwells/configx@0.2.2) (2026-07-05)
 
 
