@@ -84,7 +84,45 @@ module.exports = {
 }
 ```
 
-The resolver caches only direct `op://` reads in v1. Item JSON reads still use `op item get --reveal`.
+The resolver caches every supported `${op...}` syntax: direct `op://` reads use `op-cache read` keys, and item/alias/private-link/key-path syntaxes cache their final resolved values through `getOrSet`.
+
+## getOrSet (Advanced Integration API)
+
+`getOrSet` is get-or-compute for integrations whose miss producer is their own
+logic rather than `op read`. It is API-only — there is no CLI command, because
+producers are functions.
+
+```js
+const { getOrSet } = require('@davidwells/op-cache')
+
+const value = await getOrSet('my-tool://v1/<hash>', async () => {
+  return computeTheValueSomehow() // must return a string
+}, {
+  account,
+  configDir,
+  opPath,
+  ttlSeconds: 300,
+  scope: 'user',
+  fallbackToOp: false,
+  validateCached: (cached) => looksValid(cached)
+})
+```
+
+Semantics:
+
+- any non-empty reference string is accepted; `account`/`configDir`/`opPath`
+  are applied as cache key dimensions exactly as for `read`
+- `OP_CACHE_DISABLED=1` and win32 run the producer directly, never touching
+  the daemon
+- on a hit, `validateCached(value)` runs first when provided; returning
+  `false` or throwing treats the entry as unusable — the producer recomputes
+  and overwrites it, with a one-line stderr note at most once per process
+- the producer must return a string; anything else throws and stores nothing
+- producer failures surface unchanged and are never cached
+- `fallbackToOp: false` (default) fails closed on daemon failure before the
+  producer runs; `true` means "on daemon failure, do the work directly" —
+  the fallback runs the producer, with the same stderr warning style as `read`
+- TTL clamping by the daemon warns at most once per process
 
 ## Daemon Lifecycle
 
