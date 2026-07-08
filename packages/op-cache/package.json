@@ -1,0 +1,47 @@
+{
+  "name": "@davidwells/op-cache",
+  "version": "0.1.0",
+  "description": "Per-user in-memory cache daemon for 1Password op:// reads",
+  "main": "src/api.js",
+  "bin": {
+    "op-cache": "src/cli.js"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test/unit.test.js && node test/cli.test.js && node test/integration.test.js && node test/get-or-set.test.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "keywords": [
+    "1password",
+    "op",
+    "secrets",
+    "cache",
+    "configorama"
+  ],
+  "author": "David Wells",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/DavidWells/configorama/tree/master/packages/op-cache#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DavidWells/configorama.git",
+    "directory": "packages/op-cache"
+  },
+  "bugs": {
+    "url": "https://github.com/DavidWells/configorama/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "uvu": "^0.5.6"
+  }
+}
