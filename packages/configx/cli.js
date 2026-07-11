@@ -34,7 +34,7 @@ Usage: configx <file> [options] -- <command and args...>
 Options:
   --export            Print 'export KEY=value' to stdout instead of running a command
                       (use: eval "$(configx .env --export)")
-  --config <path>     Settings file that registers resolvers (default: ./configx.config.js)
+  --config <path>     Optional settings file for aliases/custom resolvers
   --no-preflight      Skip the pre-flight validation pass
   --stage, --param    Passed through to configorama for \${opt:...} resolution
   -h, --help          Show this help
@@ -93,7 +93,7 @@ async function main() {
   }
 
   const cwd = process.cwd()
-  const settingsFile = loadSettingsFile(argv.config, cwd)
+  const settingsFile = loadSettingsFile(argv.config, cwd, file)
 
   // configorama options for ${opt:...} come from the CLI flags (minus
   // positionals, the -- command, and configx's own --config/--export).

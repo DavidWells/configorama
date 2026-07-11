@@ -2,7 +2,7 @@
 
 Resolve a [configorama](https://github.com/DavidWells/configorama) config file and run a command with the resolved values as environment variables.
 
-`configx` is a thin execution wrapper. All resolution — `${opt:...}`, `${env:...}`, `.env` files, custom resolvers like the 1Password plugin — is done by configorama. `configx` maps the resolved top-level keys into the child process environment and execs your command.
+`configx` is a thin execution wrapper. All resolution — `${opt:...}`, `${env:...}`, `.env` files, 1Password refs, and custom resolvers — is done by configorama. `configx` maps the resolved top-level keys into the child process environment and execs your command.
 
 ```bash
 configx <file> [configorama options] -- <command and args...>
@@ -21,12 +21,26 @@ configx deploy.yml --stage prod -- node deploy.js
 # child sees API_URL=https://api.example.com and STAGE=prod
 ```
 
-## Using resolvers (1Password, etc.)
+## 1Password Refs
 
-Resolvers are registered in an optional `configx.config.js` in the working directory (or via `--config <path>`). The file exports a configorama settings object:
+1Password references work with zero project config:
+
+```bash
+# .env
+NPM_TOKEN=${op://production/npm-automation/credential}
+```
+
+```bash
+configx .env -- npm publish
+# NPM_TOKEN is fetched from 1Password at run time and passed to npm
+```
+
+If `@davidwells/op-stash` is available to configx, the default 1Password resolver uses it with a short cache to reduce repeated 1Password prompts across fresh commands. Set `OP_STASH_DISABLED=1` or `CONFIGX_OP_STASH_DISABLED=1` to bypass that cache.
+
+Use an optional `configx.config.cjs` or `configx.config.js` only when you need aliases or custom resolver settings:
 
 ```js
-// configx.config.js
+// configx.config.cjs
 const createOnePasswordResolver = require('configorama/plugins/onepassword')
 
 module.exports = {
@@ -47,6 +61,8 @@ NPM_TOKEN: ${op:npm.NPM_TOKEN}
 configx secrets.yml -- npm publish
 # NPM_TOKEN is fetched from 1Password at run time and passed to npm publish
 ```
+
+Project-defined variable sources are appended after configx defaults, so custom `op:` settings override the zero-config resolver.
 
 ## Loading into the current shell
 
@@ -181,9 +197,9 @@ configx .env -- ./my-app
 # DB_PASSWORD is fetched from 1Password; API_URL passes through
 ```
 
-`${op://vault/item/field}` is the 1Password secret-reference URI — it points directly at a single field. For a key path into a structured note (`${op:alias.KEY}`), use the alias form via a `configx.config.js`. Both need the 1Password resolver registered.
+`${op://vault/item/field}` is the 1Password secret-reference URI — it points directly at a single field. For a key path into a structured note (`${op:alias.KEY}`), use the alias form via a `configx.config.cjs`.
 
-To reduce repeated 1Password prompts across fresh agent commands, opt into `@davidwells/op-stash` in the Configorama 1Password resolver. `configx` remains only the runner; cache semantics live in the resolver/package docs.
+To reduce repeated 1Password prompts across fresh agent commands, install `@davidwells/op-stash`; configx will use it automatically when available.
 
 ## Behavior
 

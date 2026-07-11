@@ -478,7 +478,7 @@ async function runSetupConfig(rawArgs) {
     throw new ConfigxError('setup_file_not_found', `config file not found: ${parsed.file}`)
   }
 
-  const settingsFile = loadSettingsFile(parsed.argv.config, process.cwd())
+  const settingsFile = loadSettingsFile(parsed.argv.config, process.cwd(), parsed.file)
   const configorama = loadConfigorama()
 
   // If stdin ends mid-prompt the pending prompt promise never settles, the

@@ -6,6 +6,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { spawnSync } = require('child_process')
+const { loadDefaultSettings } = require('./src/loaders')
 
 const cli = path.join(__dirname, 'cli.js')
 const fixtures = path.join(__dirname, 'test')
@@ -28,6 +29,13 @@ const printEnv = (name) => ['node', '-e', `process.stdout.write(String(process.e
 
 function tempPath(name) {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'configx-test-')), name)
+}
+
+function fakeOpBin(output = 'zero-config-secret') {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configx-op-'))
+  const bin = path.join(dir, 'op')
+  fs.writeFileSync(bin, `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(output)})\n`, { mode: 0o755 })
+  return dir
 }
 
 test('resolves scalars, opt, and env into the child environment', () => {
@@ -104,6 +112,38 @@ test('custom variable source from a config file resolves', () => {
   ])
   assert.is(r.status, 0)
   assert.is(r.stdout, 'resolved-hello')
+})
+
+test('1Password op:// refs resolve without a configx.config file', () => {
+  const opDir = fakeOpBin()
+  const r = runConfigx(
+    [path.join(fixtures, 'default-op.env'), '--', ...printEnv('TOKEN')],
+    { PATH: `${opDir}${path.delimiter}${process.env.PATH}`, OP_STASH_DISABLED: '1' }
+  )
+  assert.is(r.status, 0)
+  assert.is(r.stdout, 'zero-config-secret')
+})
+
+test('default 1Password source uses op-stash when available', () => {
+  const priorDisabled = process.env.OP_STASH_DISABLED
+  const priorConfigxDisabled = process.env.CONFIGX_OP_STASH_DISABLED
+  delete process.env.OP_STASH_DISABLED
+  delete process.env.CONFIGX_OP_STASH_DISABLED
+
+  const settings = loadDefaultSettings(path.join(fixtures, 'default-op.env'), process.cwd())
+  const source = settings.variableSources && settings.variableSources[0]
+  assert.ok(source, 'default op source should be installed for op refs')
+  assert.is(source.syncOptions.cache.provider, 'op-stash')
+  assert.is(source.syncOptions.cache.fallbackToOp, true)
+
+  process.env.OP_STASH_DISABLED = '1'
+  const disabled = loadDefaultSettings(path.join(fixtures, 'default-op.env'), process.cwd())
+  assert.is(disabled.variableSources[0].syncOptions.cache, undefined)
+
+  if (priorDisabled === undefined) delete process.env.OP_STASH_DISABLED
+  else process.env.OP_STASH_DISABLED = priorDisabled
+  if (priorConfigxDisabled === undefined) delete process.env.CONFIGX_OP_STASH_DISABLED
+  else process.env.CONFIGX_OP_STASH_DISABLED = priorConfigxDisabled
 })
 
 test('flag args after -- go to the child, not configorama', () => {
