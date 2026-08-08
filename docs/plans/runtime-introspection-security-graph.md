@@ -1,3 +1,12 @@
+---
+id: 01KW83S4N8VNAQ930RK8TW2JSM
+status: draft
+createdAt: 2026-06-28T14:57:13-07:00
+updatedAt: 2026-06-28T14:57:13-07:00
+origin: manual
+type: plan
+---
+
 # Runtime Introspection, Security, and Graph Plan
 
 Status: revised core plan. Conformance/perf and docs-site work are split into

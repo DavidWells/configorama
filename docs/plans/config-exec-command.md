@@ -1,3 +1,12 @@
+---
+id: 01KWRFM4NRJ83ZEWCP44CJEWG9
+status: draft
+createdAt: 2026-07-04T23:32:03-07:00
+updatedAt: 2026-07-05T12:08:58-07:00
+origin: manual
+type: plan
+---
+
 # Configorama `exec` Command Plan
 
 ## Status

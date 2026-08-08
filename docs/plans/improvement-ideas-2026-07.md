@@ -1,3 +1,12 @@
+---
+id: 01KWN0S3SG4355HT7RAZGKBPAE
+status: draft
+createdAt: 2026-07-03T15:14:54-07:00
+updatedAt: 2026-07-03T15:14:54-07:00
+origin: manual
+type: plan
+---
+
 # Improvement Ideas — July 2026
 
 30 candidate improvements for configorama, generated after grounding in the full bead history (142 beads), `docs/plans/`, `.iterate-plan.md`, PERF.md, and the current source. Each idea includes what it is and why it earns its place. Statuses reflect verification against what is actually on disk, not what closed beads claim.

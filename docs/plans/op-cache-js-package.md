@@ -1,3 +1,12 @@
+---
+id: 01KX035W30M00TFNQ7FZWQZRMM
+status: draft
+createdAt: 2026-07-07T22:28:28-07:00
+updatedAt: 2026-07-07T22:37:50-07:00
+origin: manual
+type: plan
+---
+
 # @davidwells/op-cache JavaScript Package Plan
 
 Status: spec. Design decisions settled in interview review on 2026-07-05. Ready to implement once Phase 0 baseline is confirmed. Shipped as @davidwells/op-stash (package/bin/env prefix renamed from op-cache before first publish to avoid PATH collision with the Rust prototype binary).

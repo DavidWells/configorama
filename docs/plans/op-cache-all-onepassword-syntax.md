@@ -1,3 +1,12 @@
+---
+id: 01KX035W30DPPZFPCCAMARXZAC
+status: draft
+createdAt: 2026-07-07T22:28:28-07:00
+updatedAt: 2026-07-07T22:37:50-07:00
+origin: manual
+type: plan
+---
+
 # Cache All Configorama 1Password Syntax Flavors
 
 Status: reviewed spec. Design review 2026-07-07 settled: cached payloads are plugin-side JSON envelopes ({ value, fieldName }) so audit metadata stays identical between miss and hit runs; cache keys are NUL-joined fixed-order parts (no JSON hashing); `getOrSet` mirrors `read` for `OP_CACHE_DISABLED`/win32. Shipped as @davidwells/op-stash (renamed from op-cache before first publish).

@@ -1,3 +1,12 @@
+---
+id: 01KW83S4N85XSER2NBQNKY586M
+status: draft
+createdAt: 2026-06-28T14:57:13-07:00
+updatedAt: 2026-06-28T14:57:13-07:00
+origin: manual
+type: plan
+---
+
 # Docs IA Consolidation and Test-Backed Example Expansion
 
 ## Goal

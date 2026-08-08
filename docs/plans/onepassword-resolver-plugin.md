@@ -1,3 +1,12 @@
+---
+id: 01KWQZCMN0PTMNAKATA9R8RHP2
+status: draft
+createdAt: 2026-07-04T18:48:20-07:00
+updatedAt: 2026-07-04T18:48:20-07:00
+origin: manual
+type: plan
+---
+
 # 1Password resolver plugin implementation plan
 
 ## Status

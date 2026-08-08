@@ -1,3 +1,12 @@
+---
+id: 01KW7EQZMR0KJCRKP8M6CCK81P
+status: draft
+createdAt: 2026-06-28T08:49:35-07:00
+updatedAt: 2026-06-28T08:49:35-07:00
+origin: manual
+type: plan
+---
+
 # Config Wizard Enhancements — Plan
 
 Status: decisions locked (2026-06-27); ready to build. Revised after external review.

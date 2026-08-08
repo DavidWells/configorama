@@ -1,3 +1,12 @@
+---
+id: 01KW7EQZMR8MQK08XPVXJ77Y9X
+status: draft
+createdAt: 2026-06-28T08:49:35-07:00
+updatedAt: 2026-06-28T08:49:35-07:00
+origin: manual
+type: plan
+---
+
 # Comment Annotations for Config Requirements - Plan
 
 Status: draft plan (2026-06-27). This is a follow-up to the config wizard and

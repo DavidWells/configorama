@@ -1,3 +1,12 @@
+---
+id: 01KW83S4N8D7PRGPBP4ZQGFEY8
+status: draft
+createdAt: 2026-06-28T14:57:13-07:00
+updatedAt: 2026-06-28T14:57:13-07:00
+origin: manual
+type: plan
+---
+
 # Conformance and Performance Guardrails Plan
 
 Status: split from the runtime introspection plan. This plan is independently

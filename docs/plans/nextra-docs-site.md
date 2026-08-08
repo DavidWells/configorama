@@ -1,3 +1,12 @@
+---
+id: 01KW83S4N8VNE87NFFME9GAPSP
+status: draft
+createdAt: 2026-06-28T14:57:13-07:00
+updatedAt: 2026-06-28T14:57:13-07:00
+origin: manual
+type: plan
+---
+
 # Nextra Documentation Site Plan
 
 Status: split from the runtime introspection plan. Use the local

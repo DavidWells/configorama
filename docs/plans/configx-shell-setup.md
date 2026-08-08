@@ -1,3 +1,12 @@
+---
+id: 01KWSTY38GS9Q05FQQZSR2PQ5Z
+status: draft
+createdAt: 2026-07-05T12:08:58-07:00
+updatedAt: 2026-07-05T12:08:58-07:00
+origin: manual
+type: plan
+---
+
 # Configx Shell Setup Plan
 
 ## Status

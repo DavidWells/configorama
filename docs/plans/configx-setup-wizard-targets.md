@@ -1,3 +1,12 @@
+---
+id: 01KWSTY38GXM2HHMRQWP4KAJJ2
+status: draft
+createdAt: 2026-07-05T12:08:58-07:00
+updatedAt: 2026-07-05T13:03:52-07:00
+origin: manual
+type: plan
+---
+
 # Configx Setup Wizard Targets Plan
 
 ## Status
