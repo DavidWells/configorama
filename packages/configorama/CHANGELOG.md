@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.2](https://github.com/DavidWells/configorama/compare/configorama@1.3.1...configorama@1.3.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* a pipe inside parens is not a filter delimiter ([5cde1a3](https://github.com/DavidWells/configorama/commit/5cde1a363b0f7b7433878c55ce6eaa1e5b0cccde))
+* apply arg-bearing filters exactly once ([a0eb152](https://github.com/DavidWells/configorama/commit/a0eb15241044309e576fe1090db0618fea4a4232))
+* bind a filter to its own variable when adjacent to other vars/text ([c40ac31](https://github.com/DavidWells/configorama/commit/c40ac31ea2f4d840058fde76ec47d6fcfb82d301))
+
+
+
+
+
 ## [1.3.1](https://github.com/DavidWells/configorama/compare/configorama@1.3.0...configorama@1.3.1) (2026-07-08)
 
 **Note:** Version bump only for package configorama

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/DavidWells/configorama/compare/@davidwells/configx@0.3.1...@davidwells/configx@0.4.0) (2026-08-31)
+
+
+### Features
+
+* **configx:** auto-enable 1Password refs ([0fb25c1](https://github.com/DavidWells/configorama/commit/0fb25c1d4904f6d7b6789fdb9b94eaaa2e9cd513))
+
+
+
+
+
 ## [0.3.1](https://github.com/DavidWells/configorama/compare/@davidwells/configx@0.3.0...@davidwells/configx@0.3.1) (2026-07-08)
 
 **Note:** Version bump only for package @davidwells/configx
