@@ -2633,6 +2633,9 @@ Missing Value ${missingValue} - ${matchedString}
           return acc.concat({
             filter: this.filters[filterName],
             filterName: filterName,
+            // Full filter string (e.g. `append('X')`) — the key the populateVariable dedupe compares
+            // against. Caching only filterName let an arg-bearing filter escape dedupe and run twice.
+            filterString: currentFilter,
             args: filterArgs
           })
         }, [])
@@ -2665,10 +2668,10 @@ Missing Value ${missingValue} - ${matchedString}
             return theValue
           }
           if (c.args) {
-            this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterName)
+            this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
             return c.filter(theValue, ...c.args, 'from getValueFromSrc with args')
           }
-          this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterName)
+          this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
           return c.filter(theValue, 'from getValueFromSrc')
         }, val)
         // console.log('> RESOLVER RETURN newValue', newValue)
