@@ -118,17 +118,16 @@ test('eval edge case - bitwise AND', async () => {
   assert.is(config.result, 1)
 })
 
-test('eval edge case - bitwise OR conflicts with filter syntax', async () => {
-  // LIMITATION: | is used for filter syntax, so bitwise OR doesn't work in eval
+test('eval edge case - bitwise OR', async () => {
   const config = await configorama({
     result: '${eval(5 | 3)}'
   }, {
     configDir: dirname
   })
 
-  // The | is interpreted as filter pipe, not bitwise OR
-  // Result will be the unprocessed string or filter error
-  assert.is(typeof config.result, 'string')
+  // 5 = 101, 3 = 011, OR = 111 = 7
+  // A pipe inside eval's parens is part of the expression, not a filter delimiter
+  assert.is(config.result, 7)
 })
 
 test('eval edge case - bitwise XOR', async () => {
