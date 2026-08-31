@@ -2386,12 +2386,15 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('variableString', variableString)
       promiseKey = deeperValue.match(/\s\|/) ? deeperValue : undefined
 
-      // TODO clean this up
+      // Filters belong to the CURRENT variable (variableString), NOT the whole property value
+      // (propertyString/string). When a filtered var sits next to other vars or literal text —
+      // `${a | toUpperCase}-${b}-suffix` — the whole value carries extra `}`/`${`/text that
+      // splitOnPipe(string) would fold into the filter name. Split the individual variable instead.
       const t = splitOnPipe(variableString)
       // console.log('variableString', variableString)
       // console.log('valueObject', valueObject)
       // console.log('t', t)
-      const _filter = splitOnPipe(string)
+      const _filter = t
         .filter((value, index, arr) => {
           return index > 0
         })
