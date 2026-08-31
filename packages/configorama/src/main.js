@@ -72,6 +72,29 @@ function resolveStaticFilterArg(arg, config) {
   return encodeFilterArg(dotProp.get(config, match[1]))
 }
 
+/**
+ * Parse a single filter expression into its name and resolved static arguments.
+ *   `toUpperCase` -> { name: 'toUpperCase', args: null }
+ *   `trunc(4)`    -> { name: 'trunc', args: [4] }
+ * Function-style filters have their args comma-split, with `${...}` refs resolved from config.
+ * @param {string} filterExpression - a single filter, e.g. `toUpperCase` or `trunc(4)`
+ * @param {Object} config - config used to resolve `${...}` references inside the args
+ * @returns {{ name: string, args: Array|null }} args is null when the filter takes none
+ */
+function parseFilter(filterExpression, config) {
+  const funcMatch = filterExpression.match(/^(\w+)\((.*)\)$/)
+  if (!funcMatch) {
+    return { name: filterExpression, args: null }
+  }
+  const rawArgs = funcMatch[2]
+  if (!rawArgs) {
+    return { name: funcMatch[1], args: null }
+  }
+  const splitter = splitCsv(rawArgs, ', ')
+  const args = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, config)))
+  return { name: funcMatch[1], args }
+}
+
 /* Utils - root */
 const {
   isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
@@ -2164,23 +2187,10 @@ Missing Value ${missingValue} - ${matchedString}
         })
       }
       property = foundFilters.reduce((acc, filter) => {
-        // Check if filter has function-style arguments
-        const funcMatch = filter.match(/^(\w+)\((.*)\)$/)
-        let filterName = filter
-        let filterArgs = []
-
-        if (funcMatch) {
-          filterName = funcMatch[1]
-          const rawArgs = funcMatch[2]
-          if (rawArgs) {
-            const splitter = splitCsv(rawArgs, ', ')
-            filterArgs = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, this.config)))
-          }
-        }
-
-        const newVal = filterArgs.length > 0
-          ? this.filters[filterName](acc, ...filterArgs, 'from populateVariable')
-          : this.filters[filterName](acc, 'from populateVariable')
+        const { name, args } = parseFilter(filter, this.config)
+        const newVal = args && args.length > 0
+          ? this.filters[name](acc, ...args, 'from populateVariable')
+          : this.filters[name](acc, 'from populateVariable')
         // console.log('PROPERTY', newVal)
         return newVal
       }, property)
@@ -2612,31 +2622,17 @@ Missing Value ${missingValue} - ${matchedString}
         }
 
         const newUse = newHasFilter.reduce((acc, currentFilter, i) => {
-          // Check if filter has function-style arguments: filterName(arg1, arg2)
-          const funcMatch = currentFilter.match(/^(\w+)\((.*)\)$/)
-          let filterName = currentFilter
-          let filterArgs = null
-
-          if (funcMatch) {
-            filterName = funcMatch[1]
-            const rawArgs = funcMatch[2]
-            // Parse arguments using the same logic as functions
-            if (rawArgs) {
-              const splitter = splitCsv(rawArgs, ', ')
-              filterArgs = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, this.config)))
-            }
-          }
-
-          if (!this.filters[filterName]) {
-            throw new Error(`Filter "${filterName}" not found`)
+          const { name, args } = parseFilter(currentFilter, this.config)
+          if (!this.filters[name]) {
+            throw new Error(`Filter "${name}" not found`)
           }
           return acc.concat({
-            filter: this.filters[filterName],
-            filterName: filterName,
+            filter: this.filters[name],
+            filterName: name,
             // Full filter string (e.g. `append('X')`) — the key the populateVariable dedupe compares
             // against. Caching only filterName let an arg-bearing filter escape dedupe and run twice.
             filterString: currentFilter,
-            args: filterArgs
+            args: args
           })
         }, [])
         // console.log('pathValue', pathValue)
