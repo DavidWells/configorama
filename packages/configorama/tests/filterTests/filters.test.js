@@ -83,7 +83,11 @@ test('deep equality', () => {
     chainedFiltersTwo: 'dev',
     chainedFiltersThree: 'Hello-world',
     chainedNumberToString: '42',
-    chainedWithHelp: 'TESTVALUE'
+    chainedWithHelp: 'TESTVALUE',
+    composeSource: 'value-TheGooseIsLoose',
+    filterOnComposeAdjacent: 'VALUE-THEGOOSEISLOOSE-value',
+    indirectSource: 'what-is-up',
+    filterThroughIndirection: 'WHAT-IS-UP-tail'
   })
 })
 
@@ -159,6 +163,14 @@ test('chainedNumberToString - Number then toString', () => {
 test('chainedWithHelp - filter before help() is applied', () => {
   // testValue -> TESTVALUE (toUpperCase) -> TESTVALUE (help is identity)
   assert.is(config.chainedWithHelp, 'TESTVALUE')
+})
+
+test('filterOnComposeAdjacent - filter on a compose applies when the var is only part of the value', () => {
+  assert.is(config.filterOnComposeAdjacent, 'VALUE-THEGOOSEISLOOSE-value')
+})
+
+test('filterThroughIndirection - filter through a var->var indirection, adjacent to literal text', () => {
+  assert.is(config.filterThroughIndirection, 'WHAT-IS-UP-tail')
 })
 
 test.run()

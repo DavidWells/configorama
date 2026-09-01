@@ -84,3 +84,17 @@ chainedFiltersTwo: ${opt:stage | toUpperCase | toKebabCase}
 chainedFiltersThree: ${'helloWorld' | toKebabCase | toUpperCase | capitalize}
 chainedNumberToString: ${env:TEST_NUM, '42' | Number | toString}
 chainedWithHelp: ${env:CHAIN_TEST, 'testValue' | toUpperCase | help('Test chained with help')}
+
+########################
+# Filter on a variable that is only PART of a larger value (adjacent to other vars/text)
+# Regression: the filter must apply to the fully-resolved value, even when that variable resolves to
+# another variable (indirection) or a multi-part compose.
+########################
+
+# a variable whose value is itself a two-part compose
+composeSource: ${self:normalKey}-${self:keyThree}
+# filter on that compose while adjacent to another variable -> filter applies to the resolved compose
+filterOnComposeAdjacent: ${self:composeSource | toUpperCase}-${self:normalKey}
+# filter through a plain indirection (var -> var) while adjacent to literal text
+indirectSource: ${self:keyTwo}
+filterThroughIndirection: ${self:indirectSource | toUpperCase}-tail
