@@ -2912,11 +2912,19 @@ Missing Value ${missingValue} - ${matchedString}
     console.log('deepRef', (deepRef) ? deepRef : '- no deepRef')
     console.log('getValueFromDeep variable', variable)
     /** */
-    // Preserve path and originalSource information from pathValue
+    // Resolve the deep value with the right source for filter scoping. Normally the outer
+    // originalSource is preserved so a trailing filter on a simple indirection (${self:ref | filter},
+    // whose value is itself a variable) still applies. But when the outer (minus its trailing filter)
+    // holds more than one variable — a NESTED variable, e.g. ${map.${selector} | filter} — this deep
+    // ref is a selector inside a larger lookup; the filter applies to the lookup's result, not the
+    // selector. In that case resolve against the deep's own source so the outer filter can't fold on.
+    const outerSource = pathValue && typeof pathValue.originalSource === 'string' ? pathValue.originalSource : undefined
+    const deepRefIsSelector = typeof outerSource === 'string' &&
+      outerSource.replace(this.filterMatch, '').split(this.varPrefix).length > 2
     const valueObject = {
       value: variable,
       path: pathValue ? pathValue.path : undefined,
-      originalSource: pathValue ? pathValue.originalSource : undefined,
+      originalSource: deepRefIsSelector ? variable : outerSource,
       resolutionHistory: pathValue ? pathValue.resolutionHistory : []
     }
     let ret = this.populateValue(valueObject, undefined, 'getValueFromDeep')
