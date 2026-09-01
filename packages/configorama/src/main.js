@@ -2645,20 +2645,22 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('newUse', newUse)
 
         if (typeof val === 'string' && val.match(/deep:/)) {
-          // TODO refactor the deep filter logic here. match | filter | filter..
-          const propWithoutSuffix = propertyString.replace(this.varSuffixPattern, '')
-          const allFilters = splitOnPipe(propWithoutSuffix)
-            .reduce((acc, currentFilter, i) => {
-              if (i === 0) {
-                return acc
-              }
-              acc += `| ${trim(currentFilter)}`
-              return acc
-            }, '')
-          // add filters to deep references if filter is used
-          const deepValueWithFilters = newHasFilter[1] ? val.replace(this.varSuffixPattern, ` ${allFilters}${this.varSuffix}`) : val
+          // The variable resolved to a nested variable/compose, captured as a ${deep:N} placeholder.
+          // If the filtered variable IS the whole value (`${a | f}`), leave the placeholder alone — the
+          // filters apply to the fully-resolved value downstream. If it is only PART of a composite
+          // (`${a | f}-${b}-x`), the value can't be filtered as a whole, so carry THIS variable's filters
+          // onto the placeholder (`${deep:N | f}`) to run once the ref resolves. Built from newHasFilter
+          // (this variable's own filters), NOT from propertyString — which folds in the adjacent vars/text
+          // and mangled the carry-over. (Previously gated on `newHasFilter[1]`, which dropped a single
+          // filter through a composite entirely.)
+          const rawMatches = propertyString.match(this.variableSyntax) || []
+          const isLoneVariable = rawMatches.length === 1 && rawMatches[0] === propertyString.trim()
+          if (isLoneVariable) {
+            return Promise.resolve(val)
+          }
+          const filterSuffix = newHasFilter.map((currentFilter) => `| ${trim(currentFilter)}`).join(' ')
+          const deepValueWithFilters = val.replace(this.varSuffixPattern, ` ${filterSuffix}${this.varSuffix}`)
           // console.log('deepValueWithFilters', deepValueWithFilters)
-          // console.log('RESOLVER RETURN newValue 4', deepValueWithFilters)
           return Promise.resolve(deepValueWithFilters)
         }
         /* Loop over filters used and produce new value */
