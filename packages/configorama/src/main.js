@@ -114,7 +114,7 @@ function filterCacheKey(filterExpression, config) {
   // `append('X')` and `append('Y')` stay distinct.
   const normalized = args.map((a) => {
     if (a && a.__resolvedFilterArg) return '\x00VAR\x00'
-    if (typeof a === 'string' && /^\$\{.*\}$/.test(a.trim())) return '\x00VAR\x00'
+    if (typeof a === 'string' && /\$\{.*\}/.test(a)) return '\x00VAR\x00'
     return a
   })
   return `${name}(${JSON.stringify(normalized)})`
