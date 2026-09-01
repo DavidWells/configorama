@@ -2644,16 +2644,23 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('propertyString', propertyString)
         // console.log('newUse', newUse)
 
-        // If the filtered variable settled to a value that STILL holds unresolved variables around literal
-        // text (a compose reached e.g. through a fallback `${env:X, self:composeVar}`), the deep resolver
-        // hands back that half-resolved compose. Applying the filter here would run it on placeholder text.
+        // If the filtered variable settled to a value that STILL holds unresolved variables (a compose or a
+        // fallback expression reached e.g. through `${env:X, self:composeVar}`), the deep resolver hands back
+        // that half-resolved value. Applying the filter here would run it on placeholder text.
         // Fully resolve that value first (recursively, with NO path so it can't re-enter this path and cycle),
-        // THEN apply the filters. A re-entrancy guard prevents pathological recursion. Only for a genuine
-        // compose (literal text among the variables); a lone nested variable / ${deep:N} placeholder is
-        // handled by the carry-over below.
+        // THEN apply the filters. A re-entrancy guard prevents pathological recursion. A lone nested variable
+        // / ${deep:N} placeholder is excluded — that is handled by the carry-over below.
         const settledValue = (val && typeof val === 'object' && val.__internal_only_flag && typeof val.value === 'string') ? val.value : null
-        const settledIsCompose = settledValue !== null && !settledValue.match(/deep:/) &&
-          this.variableSyntaxTest.test(settledValue) && settledValue.replace(this.variableSyntax, '').trim() !== ''
+        // A lone ${deep:N} placeholder is handled by the carry-over below; everything else that still holds
+        // unresolved variables must be fully resolved before filtering. That covers a compose with literal
+        // text (${a}-${b}) AND a fallback expression still carrying a ${deep:N} (${env:MISSING, deep:2}),
+        // reached through a fallback-to-compose — where the settled value is a single ${...} with no outer
+        // literal, so the "literal around vars" test alone would miss it and the filter would run on the
+        // raw placeholder text (leaking DEEP:N).
+        const isLoneDeepPlaceholder = settledValue !== null && /^\$\{\s*deep:\d+\s*\}$/.test(settledValue.trim())
+        const settledIsCompose = settledValue !== null && !isLoneDeepPlaceholder &&
+          this.variableSyntaxTest.test(settledValue) &&
+          (settledValue.replace(this.variableSyntax, '').trim() !== '' || !!settledValue.match(/deep:/))
         if (settledIsCompose) {
           this._filterDeferKeys = this._filterDeferKeys || new Set()
           const deferKey = `${valueObject.path ? valueObject.path.join('.') : ''}::${settledValue}::${newHasFilter.join('|')}`

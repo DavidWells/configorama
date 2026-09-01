@@ -9,6 +9,7 @@ const configorama = require('../../src')
 
 const up = (v) => String(v).toUpperCase()
 const low = (v) => String(v).toLowerCase()
+const append = (v, s) => String(v) + String(s)
 
 test('filter on a compose value applies when adjacent to another variable', async () => {
   const out = await configorama({ a: 'hi', b: 'yo', c: '${self:a}-${self:b}', r: '${self:c | up}-${self:a}-x' }, { options: {}, filters: { up } })
@@ -45,11 +46,36 @@ test('filter through a fallback-to-compose, variable then trailing literal (user
   assert.is(out.r, 'VALUE-GOOSE-wiu-tail')
 })
 
-// KNOWN LIMITATION (pre-existing on master): a filter through a fallback-to-compose followed by ONLY literal
-// text (no trailing variable) leaks the ${deep:N} placeholder — `${self:fc | up}-lit` -> "DEEP:2-lit-lit".
-// The var-then-literal form above works; this literal-only-tail form needs a render-layer fix. Tracked.
-test.skip('filter through a fallback-to-compose with only a trailing literal (KNOWN BUG: leaks deep placeholder)', async () => {
+// A filter through a fallback-to-compose followed by ONLY literal text (no trailing variable). The fallback
+// settles to `${env:MISSING, deep:N}` — an expression still holding a ${deep:N} — which must be fully
+// resolved before the filter runs, else the filter uppercases the raw placeholder (was "DEEP:2-lit-lit").
+test('filter through a fallback-to-compose with only a trailing literal', async () => {
   const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: '${self:fc | up}-lit' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-lit')
+})
+
+test('a non-idempotent filter through a fallback-to-compose, trailing literal only', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: "${self:fc | append('!')}-lit" }, { options: {}, filters: { append } })
+  assert.is(out.r, 'value-Goose!-lit')
+})
+
+test('chained filters through a fallback-to-compose, trailing literal only', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: "${self:fc | up | append('X')}-lit" }, { options: {}, filters: { up, append } })
+  assert.is(out.r, 'VALUE-GOOSEX-lit')
+})
+
+test('filter through a fallback-to-compose with literals on both sides', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: '${self:fc | up}-post' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-post')
+})
+
+test('two filtered fallback-to-composes adjacent to each other', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', dd: '${self:b}-${self:a}', gd: '${env:MISSING, self:dd}', r: '${self:fc | up}-${self:gd | up}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-GOOSE-VALUE')
+})
+
+test('filter through a fallback-to-fallback-to-compose, trailing literal only', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', fc2: '${env:MISSING, self:fc}', r: '${self:fc2 | up}-lit' }, { options: {}, filters: { up } })
   assert.is(out.r, 'VALUE-GOOSE-lit')
 })
 
