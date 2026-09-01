@@ -65,6 +65,18 @@ function isNestedCallArgument(property, matchedString, callNames) {
   return callNames.has(name) || callNames.has(name.toLowerCase())
 }
 
+// True when matchedString sits INSIDE an outer variable expression — the text before it has more variable
+// openers than closers, e.g. `${self:flag}` inside `${env:X, ${self:flag}}`. Used to keep a substituted
+// value's type (a boolean fallback) intact instead of stringifying it into the outer expression.
+function isInsideOuterVariable(property, matchedString, varPrefix, varSuffix) {
+  const idx = property.indexOf(matchedString)
+  if (idx <= 0) return false
+  const before = property.slice(0, idx)
+  const opens = before.split(varPrefix).length - 1
+  const closes = before.split(varSuffix).length - 1
+  return opens > closes
+}
+
 // Narrower check for object/number args: encode only for FILTER arg lists (enclosing `(` follows a `|`).
 // Object/array values passed to a FUNCTION (e.g. merge(${obj})) must stay raw, not base64-encoded.
 function isNestedFilterArgument(property, matchedString) {
@@ -2066,10 +2078,17 @@ class Configorama {
       // TODO run functions here
       // console.log('other new prop', property)
 
-    // partial replacement, boolean inside eval/if expressions
-    } else if (typeof valueToPopulate === 'boolean' && evalIfPattern.test(property)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean in eval/if')
-      property = replaceAll(matchedString, String(valueToPopulate), property)
+    // partial replacement, boolean (eval/if keeps the bare true/false; a compose gets the stringified value)
+    } else if (typeof valueToPopulate === 'boolean' && (evalIfPattern.test(property) || !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
+      // A boolean composed into literal text or a filter arg is stringified (flag=${b} -> "flag=true"), and
+      // eval/if get the bare true/false. But when the match sits INSIDE an outer ${...} that is NOT eval/if
+      // (a fallback like ${env:X, ${self:flag}}), leave it to the fallback handler below so the boolean's
+      // TYPE is preserved once that fallback is selected.
+      if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean')
+      const replacementValue = isNestedFilterArgument(property, matchedString)
+        ? encodeFilterArg(valueToPopulate)
+        : String(valueToPopulate)
+      property = replaceAll(matchedString, replacementValue, property)
 
     // partial replacement, null inside eval/if expressions
     } else if (valueToPopulate === null && evalIfPattern.test(property)) {
