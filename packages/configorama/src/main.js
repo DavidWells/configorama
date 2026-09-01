@@ -2389,9 +2389,12 @@ Missing Value ${missingValue} - ${matchedString}
       console.log('-----')
     }
 
-    const filters = propertyString.match(/\s\|/)
+    // A filter delimiter is a single `|` that is NOT part of `||` (logical OR) and NOT inside parens
+    // (eval expressions, filter args). splitOnPipe encodes exactly that, so it detects filters whether or
+    // not the pipe has surrounding whitespace (`${a|up}`, `${a| up}` and `${a | up}` all count) while
+    // leaving eval's `||`/bitwise `|` alone.
+    const filters = splitOnPipe(propertyString).length > 1
     let promiseKey
-    // TODO match () or pipes |
     if (filters) {
       const string = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc filter ${this.callCount}`)
       // console.log('string', string)
@@ -2399,7 +2402,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('deeperValue', deeperValue)
       // console.log('filters', filters)
       // console.log('variableString', variableString)
-      promiseKey = deeperValue.match(/\s\|/) ? deeperValue : undefined
+      promiseKey = splitOnPipe(deeperValue).length > 1 ? deeperValue : undefined
 
       // Filters belong to the CURRENT variable (variableString), NOT the whole property value
       // (propertyString/string). When a filtered var sits next to other vars or literal text —
