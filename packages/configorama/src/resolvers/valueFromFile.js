@@ -321,9 +321,14 @@ ${JSON.stringify(options.context, null, 2)}`,
       // Default export function with property access - include first property in path
       returnValueFunction = jsFile
       includeFirstProperty = true
-    } else if (moduleName) {
-      // Named export - look it up directly
+    } else if (moduleName && jsFile && typeof jsFile[moduleName] === 'function') {
+      // Named function export - look it up directly
       returnValueFunction = jsFile[moduleName]
+    } else if (moduleName) {
+      // Object/value export with property access - keep the whole export and resolve the
+      // property via getDeeperValue (so dotted paths like :nested.deep work).
+      returnValueFunction = jsFile
+      includeFirstProperty = true
     }
 
     return processExecutableFile({
@@ -350,10 +355,14 @@ ${JSON.stringify(options.context, null, 2)}`,
       // For default export functions with :property syntax, keep the function and use deep properties
       // For named exports (non-function module), look up the named export
       let includeFirstProperty = false
-      if (moduleName && typeof returnValueFunction !== 'function') {
-        returnValueFunction = tsFile[moduleName]
-      } else if (moduleName && typeof returnValueFunction === 'function') {
+      if (moduleName && typeof returnValueFunction === 'function') {
         // Default export function with property access - include first property in path
+        includeFirstProperty = true
+      } else if (moduleName && returnValueFunction && typeof returnValueFunction[moduleName] === 'function') {
+        // Named function export - look it up directly
+        returnValueFunction = returnValueFunction[moduleName]
+      } else if (moduleName) {
+        // Object/value export with property access - keep the export, resolve the prop via getDeeperValue
         includeFirstProperty = true
       }
 
@@ -384,10 +393,14 @@ ${JSON.stringify(options.context, null, 2)}`,
       // For default export functions with :property syntax, keep the function and use deep properties
       // For named exports (non-function module), look up the named export
       let includeFirstProperty = false
-      if (moduleName && typeof returnValueFunction !== 'function') {
-        returnValueFunction = esmFile[moduleName]
-      } else if (moduleName && typeof returnValueFunction === 'function') {
+      if (moduleName && typeof returnValueFunction === 'function') {
         // Default export function with property access - include first property in path
+        includeFirstProperty = true
+      } else if (moduleName && returnValueFunction && typeof returnValueFunction[moduleName] === 'function') {
+        // Named function export - look it up directly
+        returnValueFunction = returnValueFunction[moduleName]
+      } else if (moduleName) {
+        // Object/value export with property access - keep the export, resolve the prop via getDeeperValue
         includeFirstProperty = true
       }
 
@@ -558,13 +571,17 @@ async function processExecutableFile({
   getDeeperValue,
   includeFirstProperty = false
 }) {
-  if (typeof returnValueFunction !== 'function') {
+  // A module may export a function (call it) OR a plain object/value (use it directly) — the latter
+  // matches how the same file behaves when loaded as the top-level config.
+  if (returnValueFunction === undefined || returnValueFunction === null) {
     const errorMessage = `Invalid variable syntax when referencing file "${relativePath}".
-Check if your ${fileType} is exporting a function that returns a value.`
+Check if your ${fileType} is exporting a function that returns a value, or a value/object.`
     return Promise.reject(new Error(errorMessage))
   }
 
-  const valueToPopulate = returnValueFunction.call(fileModule, ...argsToPass, valueForFunction)
+  const valueToPopulate = typeof returnValueFunction === 'function'
+    ? returnValueFunction.call(fileModule, ...argsToPass, valueForFunction)
+    : returnValueFunction
 
   return Promise.resolve(valueToPopulate).then((valueToPopulateResolved) => {
     const deepProperties = extractDeepProperties(variableString, matchedFileString, includeFirstProperty)
