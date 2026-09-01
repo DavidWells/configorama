@@ -1587,10 +1587,7 @@ class Configorama {
       }
       historyEntry.result = finalResult
 
-      // A resolved value that is a ${deep:N} placeholder — with or without trailing `| filter`s — is deferred
-      // to the next pass. Recognising the filtered form is what lets a carried filter (`${deep:N | f}`) ride
-      // through the deferral instead of being re-processed into an infinite loop.
-      const isDeepResult = typeof finalResult === 'string' && finalResult.match(/^\$\{deep:\d+(\s*\|[^}]*)?\}$/)
+      const isDeepResult = typeof finalResult === 'string' && finalResult.match(/^\$\{deep:\d+\}$/)
 
       if (isDeepResult) {
         historyEntry.resultAfterDeep = 'TBD'
@@ -2647,22 +2644,6 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('propertyString', propertyString)
         // console.log('newUse', newUse)
 
-        // The variable resolved to a value that STILL contains unresolved variables but is no longer a bare
-        // ${deep:N} placeholder — e.g. a compose `${a}-${b}` reached through a fallback. Applying the filter
-        // now would run it on the half-resolved text. Register that compose as a NEW ${deep:N} placeholder and
-        // carry this variable's filters onto it, so the compose resolves FULLY on the next pass and the filters
-        // then run on the final value (same mechanism as the plain-compose carry-over below, and — unlike a
-        // recursive re-resolve here — it can't cycle). Only for a value with literal text around the variable(s)
-        // (a genuine compose); a lone nested variable is handled by the ${deep:N} carry-over below.
-        const settledValue = (val && typeof val === 'object' && val.__internal_only_flag) ? val.value : null
-        const settledIsCompose = typeof settledValue === 'string' && !settledValue.match(/deep:/) &&
-          this.variableSyntaxTest.test(settledValue) && settledValue.replace(this.variableSyntax, '').trim() !== ''
-        if (settledIsCompose) {
-          let deepIndex = this.deep.findIndex((item) => item === settledValue)
-          if (deepIndex < 0) deepIndex = this.deep.push(settledValue) - 1
-          const filterSuffix = newHasFilter.map((currentFilter) => `| ${trim(currentFilter)}`).join(' ')
-          return Promise.resolve(`${this.varPrefix}deep:${deepIndex} ${filterSuffix}${this.varSuffix}`)
-        }
         if (typeof val === 'string' && val.match(/deep:/)) {
           // The variable resolved to a nested variable/compose, captured as a ${deep:N} placeholder.
           // If the filtered variable IS the whole value (`${a | f}`), leave the placeholder alone — the
