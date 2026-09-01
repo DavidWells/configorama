@@ -1858,8 +1858,13 @@ class Configorama {
 
       }
 
-      /* Handle ${self:custom.ref, ''} with deep values */
-      if (v.match(deepRefSyntax) && this.variableSyntaxTest.test(originalSrc) && !v.match(/deep\:(\d*)\..*}$/)) {
+      /* Handle ${self:custom.ref, ''} with deep values.
+         Only re-expand the deep placeholder to its raw source when valueToPopulate is itself still
+         unresolved (a variable/deep ref that needs another pass). Once it is a concrete value the
+         deep ref has fully resolved — reverting to the raw source here would drop an applied filter. */
+      const valueStillUnresolved = typeof valueToPopulate === 'string' &&
+        (this.variableSyntaxTest.test(valueToPopulate) || !!valueToPopulate.match(deepRefSyntax))
+      if (v.match(deepRefSyntax) && this.variableSyntaxTest.test(originalSrc) && !v.match(/deep\:(\d*)\..*}$/) && valueStillUnresolved) {
         // console.log('deep ref syntax')
         // console.log('deep var', this.deep)
         // console.log('originalSrc', originalSrc)
