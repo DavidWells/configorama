@@ -30,4 +30,27 @@ test('single filter through a plain indirection applies when adjacent', async ()
   assert.is(out.r, 'HI-yo-x')
 })
 
+test('single filter through a plain indirection alone resolves (no re-resolution loop)', async () => {
+  const out = await configorama({ a: 'hi', ref: '${self:a}', r: '${self:ref | up}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'HI')
+})
+
+test('filter through a fallback that resolves to a compose, adjacent to a variable', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', kt: 'wiu', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: '${self:fc | up}-${self:kt}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-wiu')
+})
+
+test('filter through a fallback-to-compose, variable then trailing literal (user-service role shape)', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', kt: 'wiu', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: '${self:fc | up}-${self:kt}-tail' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-wiu-tail')
+})
+
+// KNOWN LIMITATION (pre-existing on master): a filter through a fallback-to-compose followed by ONLY literal
+// text (no trailing variable) leaks the ${deep:N} placeholder — `${self:fc | up}-lit` -> "DEEP:2-lit-lit".
+// The var-then-literal form above works; this literal-only-tail form needs a render-layer fix. Tracked.
+test.skip('filter through a fallback-to-compose with only a trailing literal (KNOWN BUG: leaks deep placeholder)', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: '${self:fc | up}-lit' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'VALUE-GOOSE-lit')
+})
+
 test.run()

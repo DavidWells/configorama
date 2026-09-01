@@ -2644,6 +2644,36 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('propertyString', propertyString)
         // console.log('newUse', newUse)
 
+        // If the filtered variable settled to a value that STILL holds unresolved variables around literal
+        // text (a compose reached e.g. through a fallback `${env:X, self:composeVar}`), the deep resolver
+        // hands back that half-resolved compose. Applying the filter here would run it on placeholder text.
+        // Fully resolve that value first (recursively, with NO path so it can't re-enter this path and cycle),
+        // THEN apply the filters. A re-entrancy guard prevents pathological recursion. Only for a genuine
+        // compose (literal text among the variables); a lone nested variable / ${deep:N} placeholder is
+        // handled by the carry-over below.
+        const settledValue = (val && typeof val === 'object' && val.__internal_only_flag && typeof val.value === 'string') ? val.value : null
+        const settledIsCompose = settledValue !== null && !settledValue.match(/deep:/) &&
+          this.variableSyntaxTest.test(settledValue) && settledValue.replace(this.variableSyntax, '').trim() !== ''
+        if (settledIsCompose) {
+          this._filterDeferKeys = this._filterDeferKeys || new Set()
+          const deferKey = `${valueObject.path ? valueObject.path.join('.') : ''}::${settledValue}::${newHasFilter.join('|')}`
+          if (!this._filterDeferKeys.has(deferKey)) {
+            this._filterDeferKeys.add(deferKey)
+            return this.populateValue({ value: settledValue }, true, 'getValueFromSrc filter-defer').then(
+              (resolvedObj) => {
+                this._filterDeferKeys.delete(deferKey)
+                const resolved = (resolvedObj && typeof resolvedObj === 'object' && resolvedObj.__internal_only_flag) ? resolvedObj.value : resolvedObj
+                const filtered = newUse.reduce((acc, c) => {
+                  const tv = (acc && typeof acc === 'object' && acc.__internal_only_flag) ? acc.value : acc
+                  if (typeof c.filter !== 'function') return tv
+                  return c.args ? c.filter(tv, ...c.args, 'from filter-defer') : c.filter(tv, 'from filter-defer')
+                }, resolved)
+                return { value: filtered, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true }
+              },
+              (err) => { this._filterDeferKeys.delete(deferKey); return Promise.reject(err) },
+            )
+          }
+        }
         if (typeof val === 'string' && val.match(/deep:/)) {
           // The variable resolved to a nested variable/compose, captured as a ${deep:N} placeholder.
           // If the filtered variable IS the whole value (`${a | f}`), leave the placeholder alone — the
