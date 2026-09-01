@@ -9,15 +9,13 @@
  * @returns {string} The trimmed string
  */
 function trimSurroundingQuotes(str = '', includeBackticks = true) {
-  let result = str
-    .replace(/^(")([^"\n]*?)(\1)$/, "$2")
-    .replace(/^(')([^'\n]*?)(\1)$/, "$2")
-
-  if (includeBackticks) {
-    result = result.replace(/^(`)([^`\n]*?)(\1)$/, "$2")
-  }
-
-  return result
+  // Allow an escaped quote (\" \' \`) inside the quoted body so `'it\'s'` strips correctly, then unescape
+  // only that surrounding-quote char — other escapes (\\, \n, Windows paths, ...) are left untouched.
+  let m
+  if ((m = str.match(/^"((?:\\.|[^"\n])*)"$/))) return m[1].split('\\"').join('"')
+  if ((m = str.match(/^'((?:\\.|[^'\n])*)'$/))) return m[1].split("\\'").join("'")
+  if (includeBackticks && (m = str.match(/^`((?:\\.|[^`\n])*)`$/))) return m[1].split('\\`').join('`')
+  return str
 }
 
 /**
