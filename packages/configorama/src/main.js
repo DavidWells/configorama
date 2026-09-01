@@ -40,10 +40,33 @@ function walkAndUpdate(root, callback) {
   visit(root, [], null, null)
 }
 
-// True when matchedString sits inside a filter's argument list, e.g. the `${n}` in `${a | trunc(${n})}`.
-// Uses actual parenthesis depth at the match position (not global first-pipe / last-paren indices, which
-// misfire when the value holds more than one filter — the second variable's own text is not an argument
-// of the first filter). The enclosing `(` must follow a `|` to be a filter arg list rather than an eval.
+// True when matchedString sits inside the argument list of a registered filter/function call, e.g. the
+// `${n}` in `${a | trunc(${n})}` or `${sep}` in `${split(${s}, ${sep})}`. Such a value is base64-encoded on
+// substitution so its own commas/quotes can't be mis-split when the call's args are parsed. Uses actual
+// parenthesis depth at the match position (not global pipe/paren indices, which misfire with multiple calls)
+// and requires the enclosing `(` to directly follow a name in callNames — so eval/if/cron/file/text (which
+// are resolvers, not in this.functions/this.filters) handle their own args and are left alone.
+function isNestedCallArgument(property, matchedString, callNames) {
+  if (typeof property !== 'string' || typeof matchedString !== 'string') return false
+  if (property.trim() === matchedString.trim()) return false
+  if (!callNames) return false
+  const matchIdx = property.indexOf(matchedString)
+  if (matchIdx === -1) return false
+  const openParens = []
+  for (let i = 0; i < matchIdx; i++) {
+    if (property[i] === '(') openParens.push(i)
+    else if (property[i] === ')') openParens.pop()
+  }
+  if (openParens.length === 0) return false // not inside any open paren
+  const enclosingOpen = openParens[openParens.length - 1]
+  const nameMatch = property.slice(0, enclosingOpen).match(/(\w+)\s*$/)
+  if (!nameMatch) return false
+  const name = nameMatch[1]
+  return callNames.has(name) || callNames.has(name.toLowerCase())
+}
+
+// Narrower check for object/number args: encode only for FILTER arg lists (enclosing `(` follows a `|`).
+// Object/array values passed to a FUNCTION (e.g. merge(${obj})) must stay raw, not base64-encoded.
 function isNestedFilterArgument(property, matchedString) {
   if (typeof property !== 'string' || typeof matchedString !== 'string') return false
   if (property.trim() === matchedString.trim()) return false
@@ -54,7 +77,7 @@ function isNestedFilterArgument(property, matchedString) {
     if (property[i] === '(') openParens.push(i)
     else if (property[i] === ')') openParens.pop()
   }
-  if (openParens.length === 0) return false // not inside any open paren
+  if (openParens.length === 0) return false
   const enclosingOpen = openParens[openParens.length - 1]
   return property.lastIndexOf('|', enclosingOpen) !== -1
 }
@@ -163,7 +186,7 @@ const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
-const { encodeFilterArg } = require('./utils/filters/filterArgs')
+const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
 const chalk = require('./utils/ui/chalk')
@@ -807,6 +830,12 @@ class Configorama {
     if (options.functions) {
       this.functions = Object.assign({}, this.functions, options.functions)
     }
+
+    // Names whose (...) argument list holds values to encode on substitution (filters + functions), so a
+    // value's own commas/quotes survive arg parsing. Excludes resolvers (eval/if/cron/file/text) implicitly.
+    this._callArgNames = new Set(
+      [...Object.keys(this.filters), ...Object.keys(this.functions)].map((n) => n.toLowerCase())
+    )
 
     this.deep = []
     this.leaves = []
@@ -1965,7 +1994,17 @@ class Configorama {
           valueToPopulate = `"${valueToPopulate}"`
         }
       }
-      if (isNestedFilterArgument(property, currentMatchedString)) {
+      // Encode a fully-resolved string arg to a filter/function call so its own commas/quotes survive arg
+      // parsing. Skip values that are still a DEFERRED representation — a variable/deep placeholder
+      // (${deep:N}, an object arg mid-resolution) or a `> function` marker (a nested function not yet run).
+      // Encoding those would wrap the eventual value in a ResolvedFilterArg / preserve the `> function`
+      // prefix and leak it into the outer call's result.
+      if (
+        isNestedCallArgument(property, currentMatchedString, this._callArgNames) &&
+        !this.variableSyntaxTest.test(valueToPopulate) &&
+        !valueToPopulate.match(deepRefSyntax) &&
+        !valueToPopulate.match(functionPrefixPattern)
+      ) {
         valueToPopulate = encodeFilterArg(valueToPopulate)
       }
       property = replaceAll(currentMatchedString, valueToPopulate, property)
@@ -3194,11 +3233,10 @@ Missing Value ${missingValue} - ${matchedString}
       // TODO use JSON5
       argsToPass = [JSON.parse(rawArgs)]
     } else {
-      // Split on `, ` (comma-space), NOT bare `,`: function args are substituted as raw resolved values,
-      // so a value containing commas (e.g. ${sep} resolving to `,` in split(${s}, ${sep})) would be
-      // mis-split by a bare comma. The source separates args with `, `. (No-space function args like
-      // merge('a','b') are a known limitation — fixing them needs the args encoded like filter args.)
-      const splitter = splitCsv(rawArgs, ', ')
+      // Split on any comma (not just `, `) so `merge('a','b')` works like `merge('a', 'b')`. Variable args
+      // are base64-encoded on substitution (isNestedCallArgument), so a value containing commas — e.g.
+      // ${sep} resolving to `,` in split(${s}, ${sep}) — is protected and only true separator commas split.
+      const splitter = splitCsv(rawArgs, ',', { protectVariables: true })
       // console.log('splitter', splitter)
       // Recursively evaluate any nested function calls in arguments
       const evaluatedArgs = splitter.map((arg) => {
@@ -3207,7 +3245,9 @@ Missing Value ${missingValue} - ${matchedString}
         }
         return arg
       })
-      argsToPass = formatFunctionArgs(evaluatedArgs)
+      // Unwrap encoded args to their raw value — functions like merge() do Object.assign on their args and
+      // would otherwise spread a ResolvedFilterArg wrapper's ({value, __resolvedFilterArg}) into the result.
+      argsToPass = formatFunctionArgs(evaluatedArgs).map(unwrapFilterArg)
     }
     // console.log('argsToPass runFunction', argsToPass)
     // TODO check for camelCase version. | toUpperCase messes with function name
