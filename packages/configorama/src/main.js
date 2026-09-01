@@ -1112,13 +1112,18 @@ class Configorama {
                 /* Process inline functions like merge() */
                 if (rawValue.match(functionPrefixPattern)) {
                   // console.log('RAW FUNCTION', rawFunction)
-                  const funcString = rawValue.replace(/> function /g, '')
-                  // console.log('funcString', funcString)
-                  const func = cleanVariable(funcString, varSyntax, true, `init ${this.callCount}`)
+                  const withoutPrefix = rawValue.replace(/> function /g, '')
+                  // Separate the function call from any trailing filters (paren-aware, so pipes inside the
+                  // args are left alone). Run the BARE call — otherwise runFunction keeps the ` | filter`
+                  // text and it leaks into the result — then apply the filters to that result below.
+                  const pipeParts = splitOnPipe(withoutPrefix)
+                  const rawValueNoFilters = pipeParts[0].trim()
+                  const filterNames = pipeParts.slice(1)
+                    .map(f => f.trim().replace(/\}$/, '').split('(')[0].trim())
+                    .filter(Boolean)
+                  // console.log('funcString', rawValueNoFilters)
+                  const func = cleanVariable(rawValueNoFilters, varSyntax, true, `init ${this.callCount}`)
                   const funcVal = transform(func)
-
-                  // Strip filters like " | toUpperCase" before checking for property/index access
-                  const rawValueNoFilters = rawValue.replace(/\s*\|.*$/, '')
 
                   // Helper to get property from value (works on objects, arrays, and primitives)
                   const getProp = (val, path) => {
@@ -1132,15 +1137,6 @@ class Configorama {
                     }
                     return dotProp.get(val, path)
                   }
-
-                  // Extract filters from rawValue if present (may end with } from ${...})
-                  // Handles multiple filters like "| trim | toUpperCase"
-                  const pipeIdx = rawValue.indexOf('|')
-                  const filterNames = pipeIdx > -1
-                    ? splitOnPipe(rawValue.slice(pipeIdx).replace(/\}$/, ''))
-                        .map(f => f.trim().split('(')[0])
-                        .filter(Boolean)
-                    : []
 
                   let finalValue = funcVal
 
@@ -2195,7 +2191,14 @@ Missing Value ${missingValue} - ${matchedString}
           rewrite the variable to run the function after inputs resolved
         */
         const rep = property.replace(functionPrefixPattern, '')
-        property = `> function ${rep}`
+        // The function runs in the final pass, which applies any filters to its RESULT. Rebuild the string
+        // as the bare call plus this value's filters (from foundFilters) so the final pass can find and
+        // apply them — a filter stripped during resolution (e.g. md5's) would otherwise be lost.
+        const repFn = splitOnPipe(rep)[0].trim()
+        const filterSuffix = (foundFilters && foundFilters.length)
+          ? ' ' + foundFilters.map((f) => `| ${f}`).join(' ')
+          : ''
+        property = `> function ${repFn}${filterSuffix}`
       }
       // if (prop.match(/\s\|/)) {
       //   console.log('HAS FILTER')
@@ -2220,6 +2223,12 @@ Missing Value ${missingValue} - ${matchedString}
       !this.variableSyntaxTest.test(property)
     ) {
       runFilters = true
+    }
+    // A function call defers to the final pass, which runs the function and applies the filters to its
+    // RESULT. Applying them here would run the filter on the `> function name(args)` expression text
+    // (e.g. uppercasing md5('hello') into MD5('HELLO')), corrupting the call and dropping the filter.
+    if (typeof property === 'string' && property.match(functionPrefixPattern)) {
+      runFilters = false
     }
     /* Apply filters if found */
     //console.log('> property', property)
@@ -3185,7 +3194,10 @@ Missing Value ${missingValue} - ${matchedString}
       // TODO use JSON5
       argsToPass = [JSON.parse(rawArgs)]
     } else {
-      // TODO fix how commas + spaces are ned
+      // Split on `, ` (comma-space), NOT bare `,`: function args are substituted as raw resolved values,
+      // so a value containing commas (e.g. ${sep} resolving to `,` in split(${s}, ${sep})) would be
+      // mis-split by a bare comma. The source separates args with `, `. (No-space function args like
+      // merge('a','b') are a known limitation — fixing them needs the args encoded like filter args.)
       const splitter = splitCsv(rawArgs, ', ')
       // console.log('splitter', splitter)
       // Recursively evaluate any nested function calls in arguments
