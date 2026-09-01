@@ -95,6 +95,31 @@ function parseFilter(filterExpression, config) {
   return { name: funcMatch[1], args }
 }
 
+/**
+ * Canonical filter-cache key: filter name plus its RESOLVED arguments. Both filter-application sites
+ * (getValueFromSource and populateVariable) must agree on whether a filter already ran, but they see the
+ * filter string in different forms — a variable arg is raw `${b}` at one site and an encoded marker at the
+ * other. Keying on the resolved args makes those forms compare equal (so `${a | append(${b})}` runs once)
+ * while still distinguishing genuinely different args (`append('X')` vs `append('Y')`).
+ * @param {string} filterExpression
+ * @param {Object} config
+ * @returns {string}
+ */
+function filterCacheKey(filterExpression, config) {
+  const { name, args } = parseFilter(filterExpression, config)
+  if (!args || !args.length) return name
+  // A variable-derived arg looks different at the two sites — a decoded marker (ResolvedFilterArg) at one,
+  // an unresolved `${...}` (e.g. `${opt:x}`, which resolveStaticFilterArg can't reach) at the other. Collapse
+  // both to a single token so the same filter is recognized as already-run; literal args keep their value so
+  // `append('X')` and `append('Y')` stay distinct.
+  const normalized = args.map((a) => {
+    if (a && a.__resolvedFilterArg) return '\x00VAR\x00'
+    if (typeof a === 'string' && /^\$\{.*\}$/.test(a.trim())) return '\x00VAR\x00'
+    return a
+  })
+  return `${name}(${JSON.stringify(normalized)})`
+}
+
 /* Utils - root */
 const {
   isArray, isString, isNumber, isObject, isDate, isRegExp, isFunction,
@@ -2188,7 +2213,7 @@ Missing Value ${missingValue} - ${matchedString}
       // If filter cache exists we need to remove filter that have already been run
       if (this.filterCache[valueObject.path]) {
         foundFilters = foundFilters.filter((filter) => {
-          return !this.filterCache[valueObject.path].includes(filter)
+          return !this.filterCache[valueObject.path].includes(filterCacheKey(filter, this.config))
         })
       }
       property = foundFilters.reduce((acc, filter) => {
@@ -2199,7 +2224,7 @@ Missing Value ${missingValue} - ${matchedString}
         // console.log('PROPERTY', newVal)
         return newVal
       }, property)
-      this.filterCache[valueObject.path] = (this.filterCache[valueObject.path] || []).concat(foundFilters)
+      this.filterCache[valueObject.path] = (this.filterCache[valueObject.path] || []).concat(foundFilters.map((f) => filterCacheKey(f, this.config)))
       // console.log('NEW PROPERTY', property)
       // console.log('typeof property', typeof property)
     }
@@ -2679,7 +2704,7 @@ Missing Value ${missingValue} - ${matchedString}
                   // Record in filterCache (like the regular reduce) so populateVariable's dedup won't
                   // re-apply this filter to the whole assembled value — e.g. lit-${self:cc | up} where the
                   // filter would otherwise run again on "lit-VALUE-GOOSE".
-                  this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
+                  this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
                   return c.args ? c.filter(tv, ...c.args) : c.filter(tv)
                 }, resolved)
                 return { value: filtered, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true }
@@ -2715,10 +2740,10 @@ Missing Value ${missingValue} - ${matchedString}
             return theValue
           }
           if (c.args) {
-            this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
+            this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
             return c.filter(theValue, ...c.args)
           }
-          this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
+          this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
           return c.filter(theValue)
         }, val)
         // console.log('> RESOLVER RETURN newValue', newValue)
