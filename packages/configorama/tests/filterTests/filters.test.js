@@ -71,6 +71,7 @@ test('deep equality', () => {
       dev: 'api-dev.my-site.com'
     },
     resolvedDomainName: 'api-dev.my-site.com',
+    resolvedDomainNameUpper: 'API-DEV.MY-SITE.COM',
     fallbackTest: 'foo',
     fallbackTestTwo: 'foo',
     fooInCaps: 'FOO',
@@ -119,6 +120,10 @@ test('deepVarTestTwo toCamelCase', () => {
 
 test('resolvedDomainName', () => {
   assert.is(config.resolvedDomainName, 'api-dev.my-site.com')
+})
+
+test('resolvedDomainNameUpper - filter applies to the dynamic-key lookup result, not the selector', () => {
+  assert.is(config.resolvedDomainNameUpper, 'API-DEV.MY-SITE.COM')
 })
 
 test('fooInCaps', () => {

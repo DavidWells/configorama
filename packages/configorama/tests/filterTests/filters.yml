@@ -59,8 +59,11 @@ domains:
   staging: api-staging.${domainName}
   dev:     api-dev.${domainName}
 
-# TODO: variables get replaced only once. This means opt:stage if filtered toUpper can't resolve here
+# Dynamic-key lookup: ${originalStage} selects which domain to read
 resolvedDomainName: ${domains.${originalStage}}
+
+# A filter on a dynamic-key lookup applies to the LOOKUP RESULT, not the ${originalStage} selector
+resolvedDomainNameUpper: ${domains.${originalStage} | toUpperCase}
 
 
 fallbackTest: ${self:not.a.value, "foo"}
