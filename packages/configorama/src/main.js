@@ -2419,8 +2419,10 @@ Missing Value ${missingValue} - ${matchedString}
     // A filter delimiter is a single `|` that is NOT part of `||` (logical OR) and NOT inside parens
     // (eval expressions, filter args). splitOnPipe encodes exactly that, so it detects filters whether or
     // not the pipe has surrounding whitespace (`${a|up}`, `${a| up}` and `${a | up}` all count) while
-    // leaving eval's `||`/bitwise `|` alone.
-    const filters = splitOnPipe(propertyString).length > 1
+    // leaving eval's `||`/bitwise `|` alone. Detect on the CURRENT variable, not the whole property value:
+    // a filtered variable NESTED inside eval parens (`${eval(${self:a | Number} + 1)}`) has its own pipe
+    // that a paren-aware scan of the whole value would wrongly treat as inside-parens and miss.
+    const filters = splitOnPipe(variableString).length > 1
     let promiseKey
     if (filters) {
       const string = cleanVariable(propertyString, this.variableSyntax, true, `getValueFromSrc filter ${this.callCount}`)
