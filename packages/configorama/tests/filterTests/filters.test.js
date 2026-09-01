@@ -47,6 +47,7 @@ test('deep equality', () => {
     keyTwo: 'what-is-up',
     keyThree: 'TheGooseIsLoose',
     toUpperCaseString: 'VALUE',
+    toUpperCaseVar: 'WHAT-IS-UP',
     toKebabCaseString: 'value-here',
     originalStage: 'dev',
     stageToUpper: 'DEV',
@@ -88,6 +89,10 @@ test('deep equality', () => {
 
 test('toUpperCaseString normal value', () => {
   assert.is(config.toUpperCaseString, 'VALUE')
+})
+
+test('toUpperCaseVar - filter on a self-ref is applied, not leaked as a deep placeholder', () => {
+  assert.is(config.toUpperCaseVar, 'WHAT-IS-UP')
 })
 
 test('toKebabCaseString', () => {

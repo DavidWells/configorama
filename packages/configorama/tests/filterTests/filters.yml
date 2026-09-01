@@ -16,7 +16,8 @@ originalStage: ${opt:stage}
 
 stageToUpper: ${opt:stage | toUpperCase }
 
-# TODO toUpperCaseVar: 'deep0', is wrong... works now but doesnt process filter
+# A filter on a self-ref is applied to the resolved value (historically leaked the ${deep:N} placeholder)
+toUpperCaseVar: ${self:keyTwo | toUpperCase}
 deepVarTest: ${self:keyTwo | capitalize}
 
 deepVarTestTwo: ${keyTwo | toCamelCase}
