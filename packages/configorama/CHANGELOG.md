@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.3](https://github.com/DavidWells/configorama/compare/configorama@1.3.2...configorama@1.3.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* apply filters to dynamic-key lookups, not the nested selector ([98517fc](https://github.com/DavidWells/configorama/commit/98517fc9f2069fa7a3b8c6ef7bfefc3a7235c0d7))
+* apply filters when a variable resolves through indirection/fallback ([9939117](https://github.com/DavidWells/configorama/commit/9939117360e5c34737d09ce259bcaeadcddfc20e))
+
+
+
+
+
 ## [1.3.2](https://github.com/DavidWells/configorama/compare/configorama@1.3.1...configorama@1.3.2) (2026-08-31)
 
 
