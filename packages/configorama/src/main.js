@@ -40,14 +40,23 @@ function walkAndUpdate(root, callback) {
   visit(root, [], null, null)
 }
 
+// True when matchedString sits inside a filter's argument list, e.g. the `${n}` in `${a | trunc(${n})}`.
+// Uses actual parenthesis depth at the match position (not global first-pipe / last-paren indices, which
+// misfire when the value holds more than one filter — the second variable's own text is not an argument
+// of the first filter). The enclosing `(` must follow a `|` to be a filter arg list rather than an eval.
 function isNestedFilterArgument(property, matchedString) {
   if (typeof property !== 'string' || typeof matchedString !== 'string') return false
   if (property.trim() === matchedString.trim()) return false
   const matchIdx = property.indexOf(matchedString)
-  const pipeIdx = property.indexOf('|')
-  const openParenIdx = property.lastIndexOf('(', matchIdx)
-  const closeParenIdx = property.indexOf(')', matchIdx)
-  return pipeIdx !== -1 && matchIdx > pipeIdx && openParenIdx > pipeIdx && closeParenIdx > matchIdx
+  if (matchIdx === -1) return false
+  const openParens = []
+  for (let i = 0; i < matchIdx; i++) {
+    if (property[i] === '(') openParens.push(i)
+    else if (property[i] === ')') openParens.pop()
+  }
+  if (openParens.length === 0) return false // not inside any open paren
+  const enclosingOpen = openParens[openParens.length - 1]
+  return property.lastIndexOf('|', enclosingOpen) !== -1
 }
 
 function resolveConfigFilePath(filePath) {

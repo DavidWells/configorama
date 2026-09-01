@@ -34,7 +34,9 @@ function encodeFilterArg(value) {
 }
 
 function isEncodedFilterArg(value) {
-  return typeof value === 'string' && value.startsWith(`${MARKER}:`)
+  // A marker can sit anywhere in the arg, not just the start — a variable glued after literal text
+  // (`pre${b}`) puts the marker mid-string. decodeFilterArg scans and decodes every marker it finds.
+  return typeof value === 'string' && value.includes(`${MARKER}:`)
 }
 
 // One encoded marker: `<MARKER>:<base64url>~`. base64url is [A-Za-z0-9-_], so the class and the `~`
