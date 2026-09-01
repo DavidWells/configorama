@@ -37,23 +37,45 @@ function isEncodedFilterArg(value) {
   return typeof value === 'string' && value.startsWith(`${MARKER}:`)
 }
 
-function decodeFilterArg(value) {
-  if (!isEncodedFilterArg(value)) return value
-  const rest = value.slice(MARKER.length + 1)
-  // Separate the base64url payload from any literal text glued after the terminator (`${b}--` -> value + "--").
-  const termIdx = rest.indexOf(TERMINATOR)
-  const payload = termIdx === -1 ? rest : rest.slice(0, termIdx)
-  const suffix = termIdx === -1 ? '' : rest.slice(termIdx + 1)
-  let decoded
+// One encoded marker: `<MARKER>:<base64url>~`. base64url is [A-Za-z0-9-_], so the class and the `~`
+// terminator can't be confused for payload. Global so a single arg holding several markers (a compose
+// used as one arg, e.g. `${b}-${d}`) is fully decoded.
+const MARKER_PATTERN = new RegExp(`${MARKER}:([A-Za-z0-9\\-_]*)${TERMINATOR}`, 'g')
+
+function decodePayload(payload) {
+  const raw = decodeBase64Url(payload)
   try {
-    decoded = JSON.parse(decodeBase64Url(payload))
+    return JSON.parse(raw)
   } catch (err) {
     // Corrupted/legacy payload — fall back to the decoded string rather than throwing a raw JSON error.
-    decoded = decodeBase64Url(payload)
+    return raw
   }
-  // A glued literal suffix forces a string result (the value is being concatenated with text anyway).
-  if (suffix) return new ResolvedFilterArg(String(decoded) + suffix)
-  return new ResolvedFilterArg(decoded)
+}
+
+function decodeFilterArg(value) {
+  if (!isEncodedFilterArg(value)) return value
+  let lastIndex = 0
+  let markerCount = 0
+  let literalSeen = false
+  let single
+  let out = ''
+  let match
+  MARKER_PATTERN.lastIndex = 0
+  while ((match = MARKER_PATTERN.exec(value)) !== null) {
+    if (match.index > lastIndex) literalSeen = true // literal text before this marker
+    out += value.slice(lastIndex, match.index)
+    single = decodePayload(match[1])
+    out += String(single)
+    markerCount += 1
+    lastIndex = MARKER_PATTERN.lastIndex
+  }
+  if (lastIndex < value.length) {
+    literalSeen = true
+    out += value.slice(lastIndex)
+  }
+  // Exactly one marker and no surrounding literal: preserve the decoded value's type (number, etc.).
+  if (markerCount === 1 && !literalSeen) return new ResolvedFilterArg(single)
+  return new ResolvedFilterArg(out)
 }
 
 function isResolvedFilterArg(value) {
