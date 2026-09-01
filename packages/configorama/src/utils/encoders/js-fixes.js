@@ -55,6 +55,28 @@ function hasEncodedJson(value) {
   return value.includes(JSON_ENCODED_PREFIX)
 }
 
+/**
+ * Encode a single-level JSON object literal used as a filter/function argument (`name(... {..} ...)`) so
+ * its `{ }` don't break variable matching (whose char class excludes braces); decoded when the argument is
+ * parsed (decodeJsonInVariable). Only brace-delimited variable syntaxes (`${`, `#{`) conflict; the
+ * lookbehind skips a `{` that is the start of a nested variable (e.g. the `{` in `${x}` / `#{x}`), whose
+ * brace is not JSON. `[^{}()]` keeps the match to one object within one call.
+ * @param {string} str
+ * @param {string} [varPrefix] - the variable opening, e.g. `${` or `#{`
+ * @returns {string}
+ */
+function encodeJsonArgObjects(str, varPrefix = '${') {
+  if (!str || typeof str !== 'string' || str.indexOf('{') === -1) return str
+  if (!varPrefix.endsWith('{')) return str // non-brace syntaxes (e.g. `$[`) don't conflict with JSON braces
+  const preBrace = varPrefix.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const guard = preBrace ? `(?<!${preBrace})` : ''
+  const pattern = new RegExp(`(\\w+\\([^{}()]*)(${guard}\\{[^{}]*\\})([^{}()]*\\))`, 'g')
+  return str.replace(pattern, (match, open, obj, close) => {
+    const b64 = Buffer.from(obj).toString('base64')
+    return `${open}${JSON_ENCODED_PREFIX}${b64}__${close}`
+  })
+}
+
 module.exports = {
   OPEN_PAREN_PLACEHOLDER_PATTERN,
   hasParenthesesPlaceholder,
@@ -63,4 +85,5 @@ module.exports = {
   encodeJsonForVariable,
   decodeJsonInVariable,
   hasEncodedJson,
+  encodeJsonArgObjects,
 }

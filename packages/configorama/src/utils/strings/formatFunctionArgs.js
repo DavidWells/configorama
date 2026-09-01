@@ -1,13 +1,18 @@
 const { trim } = require('../lodash')
 const { trimSurroundingQuotes } = require('./quoteUtils')
 const { decodeFilterArg, isEncodedFilterArg } = require('../filters/filterArgs')
+const { decodeJsonInVariable, hasEncodedJson } = require('../encoders/js-fixes')
 
 function formatArg(arg) {
   const trimmed = trim(arg)
   if (isEncodedFilterArg(trimmed)) {
     return decodeFilterArg(trimmed)
   }
-  const cleanArg = trimSurroundingQuotes(trimmed, false)
+  // A JSON object literal argument was base64-encoded at pre-process time (its { } would break variable
+  // matching); restore it before parsing.
+  const cleanArg = hasEncodedJson(trimmed)
+    ? trimSurroundingQuotes(decodeJsonInVariable(trimmed), false)
+    : trimSurroundingQuotes(trimmed, false)
   // An arg that looks like a JSON object/array is parsed as one, so filters can take structured args.
   // If it only looks like JSON but isn't valid (e.g. `[, ]`, or a bare literal that happens to hold
   // brackets), fall back to the plain string rather than leaking a raw JSON.parse error to the user.

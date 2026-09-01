@@ -6,6 +6,7 @@
 const { splitByComma } = require('../strings/splitByComma')
 const { getQuoteRanges } = require('../strings/quoteAware')
 const { extractVariableWrapper } = require('../variables/variableUtils')
+const { encodeJsonArgObjects } = require('../encoders/js-fixes')
 
 /**
  * Preprocess config to fix malformed fallback references
@@ -372,9 +373,11 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
 
       const withHelpEscaped = hasHelp ? escapeHelpVariables(obj) : obj
       const withBareRefsConverted = hasEvalOrIf ? convertBareRefsInIf(withHelpEscaped) : withHelpEscaped
+      // Encode JSON object literals used as filter/function args so their { } don't break variable matching.
+      const withJsonArgsEncoded = obj.indexOf('{') !== -1 ? encodeJsonArgObjects(withBareRefsConverted, varPrefix) : withBareRefsConverted
       // Skip fallback fixing for object configs (they handle bare refs differently)
-      if (skipFallbackFix || !hasComma) return withBareRefsConverted
-      return fixFallbacksInString(withBareRefsConverted)
+      if (skipFallbackFix || !hasComma) return withJsonArgsEncoded
+      return fixFallbacksInString(withJsonArgsEncoded)
     }
 
     if (Array.isArray(obj)) {
