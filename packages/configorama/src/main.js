@@ -90,7 +90,9 @@ function parseFilter(filterExpression, config) {
   if (!rawArgs) {
     return { name: funcMatch[1], args: null }
   }
-  const splitter = splitCsv(rawArgs, ', ')
+  // Split on any comma (not just `, `) so no-space args work — `oneOf("a","b")` as well as
+  // `oneOf("a", "b")`. protectVariables keeps commas inside quotes, parens/brackets, and `${...}` intact.
+  const splitter = splitCsv(rawArgs, ',', { protectVariables: true })
   const args = formatFunctionArgs(splitter.map(arg => resolveStaticFilterArg(arg, config)))
   return { name: funcMatch[1], args }
 }
