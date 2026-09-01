@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.4](https://github.com/DavidWells/configorama/compare/configorama@1.3.3...configorama@1.3.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* carry a variable's filters onto its deep-ref when it's part of a composite ([ca2b881](https://github.com/DavidWells/configorama/commit/ca2b881a07bdda234e15016866bfccc6b5479c0d))
+* don't re-filter content before a filtered compose ([60b16d9](https://github.com/DavidWells/configorama/commit/60b16d9ed8416bc4f66063abb87a5f16ad859277))
+* filter through a fallback-to-compose applies to the fully-resolved value ([2359dbb](https://github.com/DavidWells/configorama/commit/2359dbbede6adfea666297d6a10001ca9e3d34ce))
+* resolve a fallback-carried deep ref before filtering (literal-only tail) ([d22a3e8](https://github.com/DavidWells/configorama/commit/d22a3e86c34d31bf1121eb98997b2fb5bf2e7a04))
+
+
+
+
+
 ## [1.3.3](https://github.com/DavidWells/configorama/compare/configorama@1.3.2...configorama@1.3.3) (2026-09-01)
 
 
