@@ -30,4 +30,20 @@ test('single filter through a plain indirection applies when adjacent', async ()
   assert.is(out.r, 'HI-yo-x')
 })
 
+test('filter through a fallback that resolves to a compose applies when adjacent', async () => {
+  const trunc = (v, n) => String(v).slice(0, Number(n))
+  const out = await configorama({
+    svc: 'longservicename', stg: 'sandbox',
+    csn: '${self:svc}-${self:stg}',        // compose
+    psn: '${env:NOPE, self:csn}',          // fallback -> compose
+    r: '${self:psn | trunc(6)}-${self:stg}-tail',
+  }, { options: {}, filters: { trunc } })
+  assert.is(out.r, 'longse-sandbox-tail')
+})
+
+test('a single filter through a plain indirection alone resolves (no re-resolution loop)', async () => {
+  const out = await configorama({ a: 'hi', r: '${self:a}', x: '${self:r | up}' }, { options: {}, filters: { up } })
+  assert.is(out.x, 'HI')
+})
+
 test.run()
