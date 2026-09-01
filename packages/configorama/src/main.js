@@ -2194,8 +2194,8 @@ Missing Value ${missingValue} - ${matchedString}
       property = foundFilters.reduce((acc, filter) => {
         const { name, args } = parseFilter(filter, this.config)
         const newVal = args && args.length > 0
-          ? this.filters[name](acc, ...args, 'from populateVariable')
-          : this.filters[name](acc, 'from populateVariable')
+          ? this.filters[name](acc, ...args)
+          : this.filters[name](acc)
         // console.log('PROPERTY', newVal)
         return newVal
       }, property)
@@ -2677,7 +2677,7 @@ Missing Value ${missingValue} - ${matchedString}
                   // re-apply this filter to the whole assembled value — e.g. lit-${self:cc | up} where the
                   // filter would otherwise run again on "lit-VALUE-GOOSE".
                   this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
-                  return c.args ? c.filter(tv, ...c.args, 'from filter-defer') : c.filter(tv, 'from filter-defer')
+                  return c.args ? c.filter(tv, ...c.args) : c.filter(tv)
                 }, resolved)
                 return { value: filtered, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true }
               },
@@ -2713,10 +2713,10 @@ Missing Value ${missingValue} - ${matchedString}
           }
           if (c.args) {
             this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
-            return c.filter(theValue, ...c.args, 'from getValueFromSrc with args')
+            return c.filter(theValue, ...c.args)
           }
           this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
-          return c.filter(theValue, 'from getValueFromSrc')
+          return c.filter(theValue)
         }, val)
         // console.log('> RESOLVER RETURN newValue', newValue)
         // console.log('> RESOLVER RETURN newValue 5', newValue)
