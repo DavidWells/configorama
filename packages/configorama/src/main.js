@@ -2673,6 +2673,10 @@ Missing Value ${missingValue} - ${matchedString}
                 const filtered = newUse.reduce((acc, c) => {
                   const tv = (acc && typeof acc === 'object' && acc.__internal_only_flag) ? acc.value : acc
                   if (typeof c.filter !== 'function') return tv
+                  // Record in filterCache (like the regular reduce) so populateVariable's dedup won't
+                  // re-apply this filter to the whole assembled value — e.g. lit-${self:cc | up} where the
+                  // filter would otherwise run again on "lit-VALUE-GOOSE".
+                  this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(c.filterString)
                   return c.args ? c.filter(tv, ...c.args, 'from filter-defer') : c.filter(tv, 'from filter-defer')
                 }, resolved)
                 return { value: filtered, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true }

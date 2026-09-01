@@ -79,4 +79,35 @@ test('filter through a fallback-to-fallback-to-compose, trailing literal only', 
   assert.is(out.r, 'VALUE-GOOSE-lit')
 })
 
+// Content BEFORE a filtered compose: the filter must apply to the compose only, not the whole assembled
+// value. The filtered var resolves to a compose whose filter is applied in getValueFromSource; without
+// recording that in filterCache, populateVariable re-applied it to "lit-VALUE-GOOSE" -> "LIT-VALUE-GOOSE".
+test('a leading literal before a filtered compose is not itself filtered', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', r: 'lit-${self:cc | up}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'lit-VALUE-GOOSE')
+})
+
+test('a leading literal before a filtered fallback-to-compose is not itself filtered', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', fc: '${env:MISSING, self:cc}', r: 'lit-${self:fc | up}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'lit-VALUE-GOOSE')
+})
+
+test('a leading variable before a filtered compose is not itself filtered', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', x: 'hi', cc: '${self:a}-${self:b}', r: '${self:x}-${self:cc | up}' }, { options: {}, filters: { up } })
+  assert.is(out.r, 'hi-VALUE-GOOSE')
+})
+
+test('a leading literal before a non-idempotent filtered compose applies the filter once', async () => {
+  const out = await configorama({ a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', r: "lit-${self:cc | append('!')}" }, { options: {}, filters: { append } })
+  assert.is(out.r, 'lit-value-Goose!')
+})
+
+test('two filtered composes with different filters and surrounding literals', async () => {
+  const out = await configorama(
+    { a: 'value', b: 'Goose', cc: '${self:a}-${self:b}', dd: '${self:b}-${self:a}', r: 'p-${self:cc | up}-m-${self:dd | low}-s' },
+    { options: {}, filters: { up, low } },
+  )
+  assert.is(out.r, 'p-VALUE-GOOSE-m-goose-value-s')
+})
+
 test.run()
