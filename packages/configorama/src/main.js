@@ -2199,7 +2199,10 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('foundFilters', foundFilters)
 
     let runFilters = false
-    if (typeof valueToPopulate === 'number' && foundFilters.length) {
+    if (typeof valueToPopulate === 'number' && foundFilters.length && !this.variableSyntaxTest.test(property)) {
+      // The !variableSyntaxTest guard (mirroring the string branch) stops a number being substituted as a
+      // nested filter ARGUMENT (`${self:a | trunc(${n})}`, n a number) from running the filter on the still
+      // unresolved property `${self:a | trunc(...)}` before `self:a` resolves.
       runFilters = true
     } else if (
       typeof valueToPopulate === 'string' &&
