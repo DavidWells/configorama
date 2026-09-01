@@ -2737,7 +2737,9 @@ Missing Value ${missingValue} - ${matchedString}
         /* Loop over filters used and produce new value */
         const newValue = newUse.reduce((a, c) => {
           // Fix for async value resolution. That code file refs returns object with .value
-          const theValue = typeof a === 'object' && a.__internal_only_flag ? a.value : a
+          // (a && ...) guards a null accumulator — a prior filter may have returned null (typeof null
+          // is 'object'), which would otherwise crash reading .__internal_only_flag.
+          const theValue = a && typeof a === 'object' && a.__internal_only_flag ? a.value : a
           if (typeof c.filter !== 'function') {
             return theValue
           }
