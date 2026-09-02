@@ -23,5 +23,45 @@ mondayMorning: ${cron(on monday at 9:00)}
 fridayEvening: ${cron(on friday at 17:00)}
 sundayNoon: ${cron(on sunday at 12:00)}
 
+# Bare times (no "at")
+at9am: ${cron(9am)}
+at3pm: ${cron(3pm)}
+at930colon: ${cron(9:30)}
+
+# Day + time (no "on")
+mondayAt9: ${cron(monday at 9)}
+fridaysAt5pm: ${cron(every friday at 5pm)}
+weekendPair: ${cron(saturday and sunday at 8)}
+
+# Named times in compound schedules
+everyDayAtNoon: ${cron(every day at noon)}
+dailyAtMidnight: ${cron(daily at midnight)}
+weekendsAtNoon: ${cron(weekends at noon)}
+
+# Day plurals with on/each
+onSundays: ${cron(on sundays)}
+eachMonday: ${cron(each monday)}
+monToFri: ${cron(mon-fri)}
+
+# Abbreviated units
+every15m: ${cron(15m)}
+every2h: ${cron(2h)}
+every30min: ${cron(every 30 min)}
+
+# "every other X"
+everyOtherDay: ${cron(every other day)}
+everyOtherHour: ${cron(every other hour)}
+
+# Month/date phrases (no time -> midnight)
+onThe1st: ${cron(on the 1st)}
+fifteenthOfMonth: ${cron(15th of the month)}
+endOfMonth: ${cron(end of the month)}
+
+# Frequency words
+onceADay: ${cron(once a day)}
+twiceADay: ${cron(twice a day)}
+everyHalfHour: ${cron(every half hour)}
+everyQuarterHour: ${cron(every quarter hour)}
+
 # Pre-existing cron expressions
 customCron: ${cron(15 2 * * *)}

@@ -45,6 +45,78 @@ test('cron() weekday patterns', async () => {
   assert.equal(config.sundayNoon, '0 12 * * 0')
 })
 
+test('cron() bare times without "at"', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.at9am, '0 9 * * *')
+  assert.equal(config.at3pm, '0 15 * * *')
+  assert.equal(config.at930colon, '30 9 * * *')
+})
+
+test('cron() day + time without "on"', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.mondayAt9, '0 9 * * 1')
+  assert.equal(config.fridaysAt5pm, '0 17 * * 5')
+  assert.equal(config.weekendPair, '0 8 * * 6,0')
+})
+
+test('cron() named times in compound schedules', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.everyDayAtNoon, '0 12 * * *')
+  assert.equal(config.dailyAtMidnight, '0 0 * * *')
+  assert.equal(config.weekendsAtNoon, '0 12 * * 0,6')
+})
+
+test('cron() day plurals with on/each and ranges', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.onSundays, '0 0 * * 0')
+  assert.equal(config.eachMonday, '0 0 * * 1')
+  assert.equal(config.monToFri, '0 0 * * 1-5')
+})
+
+test('cron() abbreviated units', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.every15m, '*/15 * * * *')
+  assert.equal(config.every2h, '0 */2 * * *')
+  assert.equal(config.every30min, '*/30 * * * *')
+})
+
+test('cron() "every other X" means every 2', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.everyOtherDay, '0 0 */2 * *')
+  assert.equal(config.everyOtherHour, '0 */2 * * *')
+})
+
+test('cron() month/date phrases default to midnight', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.onThe1st, '0 0 1 * *')
+  assert.equal(config.fifteenthOfMonth, '0 0 15 * *')
+  assert.equal(config.endOfMonth, '0 0 L * *')
+})
+
+test('cron() frequency words', async () => {
+  const configFilePath = path.join(__dirname, 'cronValue.yml')
+  const config = await configorama(configFilePath)
+
+  assert.equal(config.onceADay, '0 0 * * *')
+  assert.equal(config.twiceADay, '0 0,12 * * *')
+  assert.equal(config.everyHalfHour, '*/30 * * * *')
+  assert.equal(config.everyQuarterHour, '*/15 * * * *')
+})
+
 test('cron() pre-existing cron expressions pass through', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')
   const config = await configorama(configFilePath)
