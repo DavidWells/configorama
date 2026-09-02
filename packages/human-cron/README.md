@@ -18,6 +18,8 @@ const { parseCron, isValidCron } = require('@davidwells/human-cron')
 // Human-readable phrases
 parseCron('every minute')        // => '* * * * *'
 parseCron('every 5 minutes')     // => '*/5 * * * *'
+parseCron('every five minutes')  // => '*/5 * * * *'   (spelled-out numbers work too)
+parseCron('every twenty-five minutes') // => '*/25 * * * *'
 parseCron('weekdays')            // => '0 0 * * 1-5'
 parseCron('at 9:30 pm')          // => '30 21 * * *'
 parseCron('on monday at 9:00')   // => '0 9 * * 1'
@@ -48,7 +50,7 @@ The phrase → cron map used by `parseCron`, exported for reference.
 
 ## Supported phrases
 
-- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`
+- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`).
 - **Business:** `weekdays`, `weekends`, `business hours`, `after hours`
 - **Times of day:** `midnight`, `noon`, `morning`, `evening`, `at H:MM[am|pm]`
 - **Days:** `monday`…`sunday`, `on <day[,day…]> at H:MM`

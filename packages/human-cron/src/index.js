@@ -79,6 +79,30 @@ function isValidCron(expression) {
   return parts.every((part) => CRON_FIELD.test(part))
 }
 
+// Spelled-out cardinal numbers (0-59) so "every five minutes" works like "every 5 minutes".
+const NUMBER_WORDS = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+}
+const TENS = 'twenty|thirty|forty|fifty'
+const UNITS = 'one|two|three|four|five|six|seven|eight|nine'
+const ONES_TO_NINETEEN = Object.keys(NUMBER_WORDS).filter((w) => NUMBER_WORDS[w] < 20 || NUMBER_WORDS[w] % 10 === 0).join('|')
+const COMPOUND_RE = new RegExp(`\\b(${TENS})[\\s-](${UNITS})\\b`, 'gi')
+const SINGLE_RE = new RegExp(`\\b(${ONES_TO_NINETEEN})\\b`, 'gi')
+
+/**
+ * Replace spelled-out cardinal numbers with digits (e.g. "twenty five" / "twenty-five" -> "25", "five" -> "5")
+ * so the digit-based pattern parsers below handle them. Ordinals (first/second) are intentionally left alone.
+ * @param {string} str
+ * @returns {string}
+ */
+function wordsToDigits(str) {
+  return str
+    .replace(COMPOUND_RE, (m, tens, units) => String(NUMBER_WORDS[tens.toLowerCase()] + NUMBER_WORDS[units.toLowerCase()]))
+    .replace(SINGLE_RE, (m, word) => String(NUMBER_WORDS[word.toLowerCase()]))
+}
+
 function parseTimeMatch(match, hourIndex, minuteIndex, amPmIndex) {
   let hour = parseInt(match[hourIndex])
   const minute = parseInt(match[minuteIndex])
@@ -104,7 +128,8 @@ function parseCron(input) {
     throw new Error('Cron input must be a non-empty string')
   }
 
-  const normalizedInput = input.toLowerCase().trim()
+  // Lowercase, then turn spelled-out numbers into digits so the digit-based parsers handle them.
+  const normalizedInput = wordsToDigits(input.toLowerCase().trim())
 
   // Check direct mapping first
   if (CRON_PATTERNS[normalizedInput]) {

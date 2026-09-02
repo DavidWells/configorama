@@ -93,6 +93,23 @@ test('parseCron: raw cron expressions pass through', () => {
   assert.equal(parseCron('0 0 12 * * ? 2025'), '0 0 12 * * ? 2025') // 7-field Quartz
 })
 
+test('parseCron: spelled-out numbers', () => {
+  assert.equal(parseCron('every five minutes'), '*/5 * * * *')
+  assert.equal(parseCron('five minutes'), '*/5 * * * *')
+  assert.equal(parseCron('every two hours'), '0 */2 * * *')
+  assert.equal(parseCron('every one minute'), '*/1 * * * *')
+  assert.equal(parseCron('every fifteen minutes'), '*/15 * * * *')
+  assert.equal(parseCron('every thirty minutes'), '*/30 * * * *')
+  assert.equal(parseCron('twenty minutes'), '*/20 * * * *')
+  assert.equal(parseCron('every twenty five minutes'), '*/25 * * * *')
+  assert.equal(parseCron('every twenty-five minutes'), '*/25 * * * *')
+  assert.equal(parseCron('three days'), '0 0 */3 * *')
+})
+
+test('parseCron: spelled-out numbers are case-insensitive', () => {
+  assert.equal(parseCron('Every Five Minutes'), '*/5 * * * *')
+})
+
 test('parseCron: error handling', () => {
   assert.throws(() => parseCron(''), /must be a non-empty string/)
   assert.throws(() => parseCron(null), /must be a non-empty string/)
