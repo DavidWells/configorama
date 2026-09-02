@@ -222,26 +222,44 @@ function parseCron(input) {
   // (e.g., "every 5 minutes", "1 minute", "5 minutes", "1 hour")
   const intervalMatch = normalizedInput.match(/^(?:every )?(a|an|\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
   if (intervalMatch) {
-    const interval = /^\d+$/.test(intervalMatch[1]) ? parseInt(intervalMatch[1]) : 1 // "a"/"an" mean 1
-    const unit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
+    const originalInterval = /^\d+$/.test(intervalMatch[1]) ? parseInt(intervalMatch[1]) : 1 // "a"/"an" mean 1
+    const originalUnit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
+    let interval = originalInterval
+    let unit = originalUnit
 
-    // Validate the interval against the field's range (a step of 0, or larger than the field, is invalid).
+    if (interval < 1) {
+      throw new Error(`Invalid interval "${originalInterval}"; must be 1 or more`)
+    }
+
+    // A step can't exceed its cron field's range, so roll a whole-multiple interval up to the next unit:
+    // "every 60 minutes" -> hourly, "every 24 hours" -> daily, "every 1440 minutes" -> daily.
+    if (unit === 'minute' && interval % 60 === 0) {
+      interval /= 60
+      unit = 'hour'
+    }
+    if (unit === 'hour' && interval % 24 === 0) {
+      interval /= 24
+      unit = 'day'
+    }
+
+    // If it still overflows the field after rolling up, no single cron expression can represent it
+    // (e.g. "every 90 minutes" = 1.5h, "every 25 hours" drifts across days).
     const INTERVAL_MAX = { minute: 59, hour: 23, day: 31, week: 52, month: 12 }
-    if (interval < 1 || interval > INTERVAL_MAX[unit]) {
-      throw new Error(`Invalid interval "${interval}" for ${unit}; use 1-${INTERVAL_MAX[unit]}`)
+    if (interval > INTERVAL_MAX[unit]) {
+      throw new Error(`"every ${originalInterval} ${originalUnit}s" can't be expressed as a single cron expression`)
     }
 
     switch (unit) {
       case 'minute':
-        return `*/${interval} * * * *`
+        return interval === 1 ? '* * * * *' : `*/${interval} * * * *`
       case 'hour':
-        return `0 */${interval} * * *`
+        return interval === 1 ? '0 * * * *' : `0 */${interval} * * *`
       case 'day':
-        return `0 0 */${interval} * *`
+        return interval === 1 ? '0 0 * * *' : `0 0 */${interval} * *`
       case 'week':
         return `0 0 * * 0/${interval}`
       case 'month':
-        return `0 0 1 */${interval} *`
+        return interval === 1 ? '0 0 1 * *' : `0 0 1 */${interval} *`
       default:
         throw new Error(`Unsupported interval unit: ${unit}`)
     }

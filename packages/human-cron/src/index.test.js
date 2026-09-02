@@ -24,13 +24,13 @@ test('parseCron: interval patterns', () => {
   assert.equal(parseCron('every 3 days'), '0 0 */3 * *')
   assert.equal(parseCron('every 2 weeks'), '0 0 * * 0/2')
   assert.equal(parseCron('every 6 months'), '0 0 1 */6 *')
-  assert.equal(parseCron('every 1 minute'), '*/1 * * * *')
-  assert.equal(parseCron('every 1 hour'), '0 */1 * * *')
+  assert.equal(parseCron('every 1 minute'), '* * * * *')  // interval of 1 collapses to the plain field
+  assert.equal(parseCron('every 1 hour'), '0 * * * *')
 })
 
 test('parseCron: simple interval patterns', () => {
-  assert.equal(parseCron('1 minute'), '*/1 * * * *')
-  assert.equal(parseCron('1 hour'), '0 */1 * * *')
+  assert.equal(parseCron('1 minute'), '* * * * *')
+  assert.equal(parseCron('1 hour'), '0 * * * *')
   assert.equal(parseCron('5 minutes'), '*/5 * * * *')
   assert.equal(parseCron('2 hours'), '0 */2 * * *')
   assert.equal(parseCron('6 months'), '0 0 1 */6 *')
@@ -131,7 +131,7 @@ test('parseCron: spelled-out numbers', () => {
   assert.equal(parseCron('every five minutes'), '*/5 * * * *')
   assert.equal(parseCron('five minutes'), '*/5 * * * *')
   assert.equal(parseCron('every two hours'), '0 */2 * * *')
-  assert.equal(parseCron('every one minute'), '*/1 * * * *')
+  assert.equal(parseCron('every one minute'), '* * * * *')
   assert.equal(parseCron('every fifteen minutes'), '*/15 * * * *')
   assert.equal(parseCron('every thirty minutes'), '*/30 * * * *')
   assert.equal(parseCron('twenty minutes'), '*/20 * * * *')
@@ -145,9 +145,9 @@ test('parseCron: spelled-out numbers are case-insensitive', () => {
 })
 
 test('parseCron: article "a"/"an" means 1', () => {
-  assert.equal(parseCron('a minute'), '*/1 * * * *')
-  assert.equal(parseCron('an hour'), '0 */1 * * *')
-  assert.equal(parseCron('every a minute'), '*/1 * * * *')
+  assert.equal(parseCron('a minute'), '* * * * *')
+  assert.equal(parseCron('an hour'), '0 * * * *')
+  assert.equal(parseCron('every a minute'), '* * * * *')
 })
 
 test('parseCron: everyday / each day / every weekday synonyms', () => {
@@ -215,12 +215,19 @@ test('parseCron: rejects out-of-range times', () => {
   assert.throws(() => parseCron('at 9:60'), /minute/i) // minute > 59
 })
 
-test('parseCron: rejects invalid intervals', () => {
+test('parseCron: rolls whole-multiple intervals up to the next unit', () => {
+  assert.equal(parseCron('every 60 minutes'), '0 * * * *')      // = every hour
+  assert.equal(parseCron('every 120 minutes'), '0 */2 * * *')   // = every 2 hours
+  assert.equal(parseCron('every 24 hours'), '0 0 * * *')        // = every day
+  assert.equal(parseCron('every 48 hours'), '0 0 */2 * *')      // = every 2 days
+  assert.equal(parseCron('every 1440 minutes'), '0 0 * * *')    // 60*24 = every day
+})
+
+test('parseCron: rejects intervals that no single cron can express', () => {
   assert.throws(() => parseCron('every 0 minutes'), /interval/i)
-  assert.throws(() => parseCron('every 60 minutes'), /interval/i)
-  assert.throws(() => parseCron('every 90 minutes'), /interval/i)
-  assert.throws(() => parseCron('every 24 hours'), /interval/i)
-  assert.throws(() => parseCron('every 13 months'), /interval/i)
+  assert.throws(() => parseCron('every 90 minutes'), /cron expression/i)  // 1.5h, not a clean step
+  assert.throws(() => parseCron('every 25 hours'), /cron expression/i)    // drifts across days
+  assert.throws(() => parseCron('every 13 months'), /cron expression/i)
 })
 
 test('parseCron: whitespace is normalized', () => {

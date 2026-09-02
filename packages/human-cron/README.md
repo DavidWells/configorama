@@ -52,7 +52,7 @@ The phrase → cron map used by `parseCron`, exported for reference.
 
 ## Supported phrases
 
-- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`, or `a minute`/`an hour`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`).
+- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`, or `a minute`/`an hour`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`). Whole-multiple intervals roll up to the next unit (`every 60 minutes` → hourly, `every 24 hours` → daily); intervals no single cron can express throw (`every 90 minutes`, `every 25 hours`).
 - **Business:** `weekdays`, `weekends`, `business hours`, `after hours`
 - **Times of day:** `midnight`, `noon`, `morning`, `evening`, `at H[:MM][am|pm]` (minutes optional: `at 9`, `at 9pm`, `at 9:30 pm`), `at <midnight|noon|morning|evening>`
 - **Base schedule + time:** `every day at 9am`, `daily at 9`, `every weekday at 9:30`, `weekdays at 9am`, `weekends at 10`, `hourly at 30` (minute of every hour)
