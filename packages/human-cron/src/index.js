@@ -16,9 +16,13 @@ const CRON_PATTERNS = {
   weekly: '0 0 * * 0',
   daily: '0 0 * * *',
   hourly: '0 * * * *',
+  everyday: '0 0 * * *',
+  'each day': '0 0 * * *',
 
   // Common business schedules
   weekdays: '0 0 * * 1-5',
+  weekday: '0 0 * * 1-5',
+  'every weekday': '0 0 * * 1-5',
   weekends: '0 0 * * 0,6',
   'business hours': '0 9-17 * * 1-5',
   'after hours': '0 18-8 * * *',
@@ -103,6 +107,27 @@ function wordsToDigits(str) {
     .replace(SINGLE_RE, (m, word) => String(NUMBER_WORDS[word.toLowerCase()]))
 }
 
+// Day-of-week names/abbreviations -> cron number (0 = Sunday). Plurals ("mondays") are handled in dayToNum.
+const DAY_NUM = {
+  sunday: 0, sun: 0,
+  monday: 1, mon: 1,
+  tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3,
+  thursday: 4, thu: 4, thur: 4, thurs: 4,
+  friday: 5, fri: 5,
+  saturday: 6, sat: 6,
+}
+// One day token (full name or abbreviation, optional trailing plural s), used to build list/range matchers.
+// Longest alternatives first so "monday" wins over "mon".
+const DAY_TOKEN = '(?:monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thurs|thur|thu|friday|fri|saturday|sat|sunday|sun)s?'
+
+function dayToNum(token) {
+  const t = token.toLowerCase()
+  if (DAY_NUM[t] !== undefined) return DAY_NUM[t]
+  const singular = t.replace(/s$/, '')
+  return DAY_NUM[singular]
+}
+
 function parseTimeMatch(match, hourIndex, minuteIndex, amPmIndex) {
   let hour = parseInt(match[hourIndex])
   // Minutes are optional (e.g. "at 9pm" has no minutes) — default to 0.
@@ -143,9 +168,16 @@ function parseCron(input) {
   }
 
   // Collapse internal whitespace ("every  5  minutes"), then lowercase and turn spelled-out numbers into
-  // digits. Also tighten spaces around a time colon ("at 9 : 30" -> "at 9:30") for the digit parsers.
+  // digits. Tighten spaces around a time colon ("at 9 : 30" -> "at 9:30"), drop "the" ("on the 1st" ->
+  // "on 1st"), and join list/range separators: " and " -> "," and " to " -> "-".
   const cleaned = input.trim().replace(/\s+/g, ' ')
-  const normalizedInput = wordsToDigits(cleaned.toLowerCase()).replace(/\s*:\s*/g, ':')
+  const normalizedInput = wordsToDigits(cleaned.toLowerCase())
+    .replace(/\s*:\s*/g, ':')
+    .replace(/\bthe\b/g, '')
+    .replace(/\s+and\s+/g, ',')
+    .replace(/\s+to\s+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
 
   // Check direct mapping first
   if (CRON_PATTERNS[normalizedInput]) {
@@ -166,11 +198,31 @@ function parseCron(input) {
     return `${minute} ${hour} * * *`
   }
 
+  // "hourly at MM" / "every hour at MM" -> minute MM of every hour
+  const hourlyAtMatch = normalizedInput.match(/^(?:hourly|every hour) at (\d{1,2})$/i)
+  if (hourlyAtMatch) {
+    const m = parseInt(hourlyAtMatch[1])
+    if (m < 0 || m > 59) throw new Error(`Invalid minute "${m}"; use 0-59`)
+    return `${m} * * * *`
+  }
+
+  // A day-based schedule with a time: "every day at 9am", "daily at 9", "every weekday at 9:30",
+  // "weekdays at 9am", "weekends at 10".
+  const baseAtMatch = normalizedInput.match(/^(daily|every day|every weekday|weekdays?|weekends?) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+  if (baseAtMatch) {
+    const base = baseAtMatch[1].toLowerCase()
+    const { minute, hour } = parseTimeMatch(baseAtMatch, 2, 3, 4)
+    let dayOfWeek = '*'
+    if (base.includes('weekday')) dayOfWeek = '1-5'
+    else if (base.includes('weekend')) dayOfWeek = '0,6'
+    return `${minute} ${hour} * * ${dayOfWeek}`
+  }
+
   // Parse "every X minutes/hours/days" and bare "X minute(s)/hour(s)/day(s)" patterns
   // (e.g., "every 5 minutes", "1 minute", "5 minutes", "1 hour")
-  const intervalMatch = normalizedInput.match(/^(?:every )?(\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
+  const intervalMatch = normalizedInput.match(/^(?:every )?(a|an|\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
   if (intervalMatch) {
-    const interval = parseInt(intervalMatch[1])
+    const interval = /^\d+$/.test(intervalMatch[1]) ? parseInt(intervalMatch[1]) : 1 // "a"/"an" mean 1
     const unit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
 
     // Validate the interval against the field's range (a step of 0, or larger than the field, is invalid).
@@ -195,10 +247,11 @@ function parseCron(input) {
     }
   }
 
-  // Parse "on Xst/nd/rd/th of month at time" patterns (e.g., "on 1st of month at 00:00", "on 1st of month at 9pm")
-  const ordinalDateMatch = normalizedInput.match(/^on (\d+)(?:st|nd|rd|th) of month at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+  // Parse "on Xst/nd/rd/th[,Yst…] of month at time" (e.g. "on 1st of month at 00:00",
+  // "on 1st,15th of month at 9" — "and" was already normalized to a comma above).
+  const ordinalDateMatch = normalizedInput.match(/^on (\d+(?:st|nd|rd|th)(?:,\d+(?:st|nd|rd|th))*) of month at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
   if (ordinalDateMatch) {
-    const dayOfMonth = parseInt(ordinalDateMatch[1])
+    const dayOfMonth = ordinalDateMatch[1].split(',').map((d) => parseInt(d)).join(',')
     const { minute, hour } = parseTimeMatch(ordinalDateMatch, 2, 3, 4)
     return `${minute} ${hour} ${dayOfMonth} * *`
   }
@@ -225,6 +278,25 @@ function parseCron(input) {
     const dayRange = weekdaysTimeMatch[1].toLowerCase() === 'weekdays' ? '1-5' : '0,6'
     const { minute, hour } = parseTimeMatch(weekdaysTimeMatch, 2, 3, 4)
     return `${minute} ${hour} * * ${dayRange}`
+  }
+
+  // Standalone day(s) with no time -> run at midnight. Handles abbreviations/plurals ("mon", "tuesdays"),
+  // an optional leading "every" ("every monday"), a range ("mon-fri", "monday-friday"), or a comma list
+  // ("monday,friday" — "and" was normalized to a comma above).
+  const dayRangeMatch = normalizedInput.match(new RegExp(`^(?:every )?(${DAY_TOKEN})-(${DAY_TOKEN})$`, 'i'))
+  if (dayRangeMatch) {
+    const from = dayToNum(dayRangeMatch[1])
+    const to = dayToNum(dayRangeMatch[2])
+    if (from !== undefined && to !== undefined) {
+      return `0 0 * * ${from}-${to}`
+    }
+  }
+  const dayListMatch = normalizedInput.match(new RegExp(`^(?:every )?${DAY_TOKEN}(?:,${DAY_TOKEN})*$`, 'i'))
+  if (dayListMatch) {
+    const nums = normalizedInput.replace(/^every /, '').split(',').map(dayToNum)
+    if (nums.every((n) => n !== undefined)) {
+      return `0 0 * * ${nums.join(',')}`
+    }
   }
 
   // Already a valid cron expression — pass it through unchanged. Use the ORIGINAL input (not lowercased)

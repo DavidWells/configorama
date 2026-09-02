@@ -144,6 +144,49 @@ test('parseCron: spelled-out numbers are case-insensitive', () => {
   assert.equal(parseCron('Every Five Minutes'), '*/5 * * * *')
 })
 
+test('parseCron: article "a"/"an" means 1', () => {
+  assert.equal(parseCron('a minute'), '*/1 * * * *')
+  assert.equal(parseCron('an hour'), '0 */1 * * *')
+  assert.equal(parseCron('every a minute'), '*/1 * * * *')
+})
+
+test('parseCron: everyday / each day / every weekday synonyms', () => {
+  assert.equal(parseCron('everyday'), '0 0 * * *')
+  assert.equal(parseCron('each day'), '0 0 * * *')
+  assert.equal(parseCron('every weekday'), '0 0 * * 1-5')
+  assert.equal(parseCron('weekday'), '0 0 * * 1-5')
+})
+
+test('parseCron: base schedule + "at" time', () => {
+  assert.equal(parseCron('every day at 9am'), '0 9 * * *')
+  assert.equal(parseCron('daily at 9'), '0 9 * * *')
+  assert.equal(parseCron('every weekday at 9:30'), '30 9 * * 1-5')
+  assert.equal(parseCron('weekdays at 9am'), '0 9 * * 1-5')
+  assert.equal(parseCron('weekends at 10'), '0 10 * * 0,6')
+  assert.equal(parseCron('hourly at 30'), '30 * * * *')
+})
+
+test('parseCron: day abbreviations, plurals, and "every <day>"', () => {
+  assert.equal(parseCron('mon'), '0 0 * * 1')
+  assert.equal(parseCron('fri'), '0 0 * * 5')
+  assert.equal(parseCron('tuesdays'), '0 0 * * 2')
+  assert.equal(parseCron('every monday'), '0 0 * * 1')
+})
+
+test('parseCron: day ranges', () => {
+  assert.equal(parseCron('mon-fri'), '0 0 * * 1-5')
+  assert.equal(parseCron('monday to friday'), '0 0 * * 1-5')
+})
+
+test('parseCron: "and" joins day/date lists', () => {
+  assert.equal(parseCron('on monday and friday at 9'), '0 9 * * 1,5')
+})
+
+test('parseCron: ordinal "the" and multiple ordinals', () => {
+  assert.equal(parseCron('on the 1st of month at 9'), '0 9 1 * *')
+  assert.equal(parseCron('on 1st and 15th of month at 9'), '0 9 1,15 * *')
+})
+
 test('parseCron: error handling', () => {
   assert.throws(() => parseCron(''), /must be a non-empty string/)
   assert.throws(() => parseCron(null), /must be a non-empty string/)
