@@ -104,6 +104,24 @@ test('parseCron: bare-hour times (optional minutes / am-pm)', () => {
   assert.equal(parseCron('at 9:30 pm'), '30 21 * * *') // minutes still work
 })
 
+test('parseCron: compound "on <day> at <bare hour>"', () => {
+  assert.equal(parseCron('on monday at 9pm'), '0 21 * * 1')
+  assert.equal(parseCron('on friday at 9'), '0 9 * * 5')
+  assert.equal(parseCron('on monday,friday at 9 am'), '0 9 * * 1,5')
+  assert.equal(parseCron('on tuesday at nine pm'), '0 21 * * 2')
+  assert.equal(parseCron('on monday at 9:30 pm'), '30 21 * * 1') // minutes still work
+})
+
+test('parseCron: compound "on Nth of month at <bare hour>"', () => {
+  assert.equal(parseCron('on 1st of month at 9pm'), '0 21 1 * *')
+  assert.equal(parseCron('on 15th of month at 6'), '0 6 15 * *')
+})
+
+test('parseCron: compound "on weekdays/weekends at <bare hour>"', () => {
+  assert.equal(parseCron('on weekdays at 9am'), '0 9 * * 1-5')
+  assert.equal(parseCron('on weekends at 10'), '0 10 * * 0,6')
+})
+
 test('parseCron: named times of day with "at"', () => {
   assert.equal(parseCron('at noon'), '0 12 * * *')
   assert.equal(parseCron('at midnight'), '0 0 * * *')

@@ -174,16 +174,16 @@ function parseCron(input) {
     }
   }
 
-  // Parse "on Xst/nd/rd/th of month at time" patterns (e.g., "on 1st of month at 00:00")
-  const ordinalDateMatch = normalizedInput.match(/^on (\d+)(?:st|nd|rd|th) of month at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  // Parse "on Xst/nd/rd/th of month at time" patterns (e.g., "on 1st of month at 00:00", "on 1st of month at 9pm")
+  const ordinalDateMatch = normalizedInput.match(/^on (\d+)(?:st|nd|rd|th) of month at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
   if (ordinalDateMatch) {
     const dayOfMonth = parseInt(ordinalDateMatch[1])
-    const { minute, hour } = parseTimeMatch(ordinalDateMatch, 2, 3, 5)
+    const { minute, hour } = parseTimeMatch(ordinalDateMatch, 2, 3, 4)
     return `${minute} ${hour} ${dayOfMonth} * *`
   }
 
-  // Parse "on weekday at time" patterns (e.g., "on monday at 9:00")
-  const weekdayTimeMatch = normalizedInput.match(/^on ((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))*?) at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  // Parse "on weekday at time" patterns (e.g., "on monday at 9:00", "on monday at 9pm")
+  const weekdayTimeMatch = normalizedInput.match(/^on ((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))*?) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
   if (weekdayTimeMatch) {
     const dayMap = {
       sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
@@ -194,15 +194,15 @@ function parseCron(input) {
     const days = weekdayTimeMatch[1].split(',').map((day) => day.trim())
     const dayOfWeek = days.map((day) => dayMap[day.toLowerCase()]).join(',')
 
-    const { minute, hour } = parseTimeMatch(weekdayTimeMatch, 2, 3, 5)
+    const { minute, hour } = parseTimeMatch(weekdayTimeMatch, 2, 3, 4)
     return `${minute} ${hour} * * ${dayOfWeek}`
   }
 
-  // Parse "on weekdays/weekends at time" patterns (e.g., "on weekdays at 9:00")
-  const weekdaysTimeMatch = normalizedInput.match(/^on (weekdays|weekends) at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  // Parse "on weekdays/weekends at time" patterns (e.g., "on weekdays at 9:00", "on weekends at 10")
+  const weekdaysTimeMatch = normalizedInput.match(/^on (weekdays|weekends) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
   if (weekdaysTimeMatch) {
     const dayRange = weekdaysTimeMatch[1].toLowerCase() === 'weekdays' ? '1-5' : '0,6'
-    const { minute, hour } = parseTimeMatch(weekdaysTimeMatch, 2, 3, 5)
+    const { minute, hour } = parseTimeMatch(weekdaysTimeMatch, 2, 3, 4)
     return `${minute} ${hour} * * ${dayRange}`
   }
 
