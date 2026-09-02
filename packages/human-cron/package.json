@@ -1,0 +1,36 @@
+{
+  "name": "@davidwells/human-cron",
+  "version": "0.1.0",
+  "description": "Convert human-readable schedule phrases (\"every 5 minutes\", \"weekdays\", \"at 9:30\") into cron expressions, with raw-cron passthrough and validation",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node src/index.test.js",
+    "release:patch": "pnpm version patch && pnpm publish",
+    "release:minor": "pnpm version minor && pnpm publish",
+    "release:major": "pnpm version major && pnpm publish"
+  },
+  "files": [
+    "src",
+    "!src/*.test.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "cron",
+    "crontab",
+    "schedule",
+    "human-readable",
+    "cron-parser",
+    "cron-expression"
+  ],
+  "author": "David Wells",
+  "license": "MIT",
+  "devDependencies": {
+    "uvu": "^0.5.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DavidWells/configorama.git",
+    "directory": "packages/human-cron"
+  }
+}

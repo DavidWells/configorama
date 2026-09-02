@@ -20,6 +20,9 @@ importers:
       '@davidwells/box-logger':
         specifier: ^2.0.3
         version: 2.0.8
+      '@davidwells/human-cron':
+        specifier: workspace:^
+        version: link:../human-cron
       '@iarna/toml':
         specifier: ^2.2.5
         version: 2.2.5
@@ -111,6 +114,12 @@ importers:
       minimist:
         specifier: ^1.2.8
         version: 1.2.8
+    devDependencies:
+      uvu:
+        specifier: ^0.5.6
+        version: 0.5.6
+
+  packages/human-cron:
     devDependencies:
       uvu:
         specifier: ^0.5.6
