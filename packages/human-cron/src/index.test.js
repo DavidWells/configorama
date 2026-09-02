@@ -256,4 +256,70 @@ test('CRON_PATTERNS is exported', () => {
   assert.type(CRON_PATTERNS, 'object')
 })
 
+test('parseCron: bare time without "at"', () => {
+  assert.equal(parseCron('9am'), '0 9 * * *')
+  assert.equal(parseCron('3pm'), '0 15 * * *')
+  assert.equal(parseCron('9:30am'), '30 9 * * *')
+  assert.equal(parseCron('9:30 pm'), '30 21 * * *')
+  assert.equal(parseCron('9:30'), '30 9 * * *')   // 24h explicit colon
+  assert.equal(parseCron('14:00'), '0 14 * * *')
+})
+
+test('parseCron: day + time without "on"', () => {
+  assert.equal(parseCron('monday at 9'), '0 9 * * 1')
+  assert.equal(parseCron('mondays at 9am'), '0 9 * * 1')
+  assert.equal(parseCron('every friday at 5pm'), '0 17 * * 5')
+  assert.equal(parseCron('fridays at 5'), '0 5 * * 5')
+  assert.equal(parseCron('saturday and sunday at 8'), '0 8 * * 6,0')
+  assert.equal(parseCron('mon-fri at 9'), '0 9 * * 1-5')
+})
+
+test('parseCron: named times in compound schedules', () => {
+  assert.equal(parseCron('every day at noon'), '0 12 * * *')
+  assert.equal(parseCron('daily at midnight'), '0 0 * * *')
+  assert.equal(parseCron('weekends at noon'), '0 12 * * 0,6')
+  assert.equal(parseCron('every sunday at 3pm'), '0 15 * * 0')
+  assert.equal(parseCron('monday at midnight'), '0 0 * * 1')
+})
+
+test('parseCron: plain day plurals with "on"/"each"', () => {
+  assert.equal(parseCron('on sundays'), '0 0 * * 0')
+  assert.equal(parseCron('each monday'), '0 0 * * 1')
+})
+
+test('parseCron: abbreviated units', () => {
+  assert.equal(parseCron('15m'), '*/15 * * * *')
+  assert.equal(parseCron('2h'), '0 */2 * * *')
+  assert.equal(parseCron('every 15 min'), '*/15 * * * *')
+  assert.equal(parseCron('every 2 hrs'), '0 */2 * * *')
+  assert.equal(parseCron('30 mins'), '*/30 * * * *')
+  assert.equal(parseCron('5 d'), '0 0 */5 * *')
+})
+
+test('parseCron: "every other X" means every 2', () => {
+  assert.equal(parseCron('every other day'), '0 0 */2 * *')
+  assert.equal(parseCron('every other hour'), '0 */2 * * *')
+  assert.equal(parseCron('every other week'), '0 0 * * 0/2')
+  assert.equal(parseCron('every other minute'), '*/2 * * * *')
+})
+
+test('parseCron: month/date phrases (no time -> midnight)', () => {
+  assert.equal(parseCron('on the 1st'), '0 0 1 * *')
+  assert.equal(parseCron('15th of the month'), '0 0 15 * *')
+  assert.equal(parseCron('1st of every month'), '0 0 1 * *')
+  assert.equal(parseCron('first of the month'), '0 0 1 * *')
+  assert.equal(parseCron('beginning of the month'), '0 0 1 * *')
+  assert.equal(parseCron('end of the month'), '0 0 L * *')
+  assert.equal(parseCron('on the 1st and 15th'), '0 0 1,15 * *')
+})
+
+test('parseCron: frequency words', () => {
+  assert.equal(parseCron('once a day'), '0 0 * * *')
+  assert.equal(parseCron('once an hour'), '0 * * * *')
+  assert.equal(parseCron('once a week'), '0 0 * * 0')
+  assert.equal(parseCron('twice a day'), '0 0,12 * * *')
+  assert.equal(parseCron('every half hour'), '*/30 * * * *')
+  assert.equal(parseCron('every quarter hour'), '*/15 * * * *')
+})
+
 test.run()

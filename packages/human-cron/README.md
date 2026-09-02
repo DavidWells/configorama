@@ -52,12 +52,13 @@ The phrase → cron map used by `parseCron`, exported for reference.
 
 ## Supported phrases
 
-- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`, or `a minute`/`an hour`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`). Whole-multiple intervals roll up to the next unit (`every 60 minutes` → hourly, `every 24 hours` → daily); intervals no single cron can express throw (`every 90 minutes`, `every 25 hours`).
+- **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`, `a minute`/`an hour`, unit abbreviations `15m`/`2h`/`every 15 min`), `every other <unit>` (= every 2), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`). Whole-multiple intervals roll up to the next unit (`every 60 minutes` → hourly, `every 24 hours` → daily); intervals no single cron can express throw (`every 90 minutes`, `every 25 hours`).
+- **Frequency words:** `once a day|week|hour`, `twice a day` (→ midnight and noon), `every half hour` (`*/30`), `every quarter hour` (`*/15`)
 - **Business:** `weekdays`, `weekends`, `business hours`, `after hours`
-- **Times of day:** `midnight`, `noon`, `morning`, `evening`, `at H[:MM][am|pm]` (minutes optional: `at 9`, `at 9pm`, `at 9:30 pm`), `at <midnight|noon|morning|evening>`
-- **Base schedule + time:** `every day at 9am`, `daily at 9`, `every weekday at 9:30`, `weekdays at 9am`, `weekends at 10`, `hourly at 30` (minute of every hour)
-- **Days:** `monday`…`sunday`, abbreviations and plurals (`mon`, `tuesdays`), `every <day>`, ranges (`mon-fri`, `monday to friday`), lists (`monday and friday`), `on <day[,day…]> at H:MM`
-- **Month:** `first|last day of month`, `middle of month`, `on Nth[,Mth…] of month at H:MM` (`on the 1st and 15th of month at 9`)
+- **Times of day:** `midnight`, `noon`, `morning`, `evening`, `H[:MM][am|pm]` with or without a leading `at` (`9am`, `3pm`, `9:30`, `at 9`, `at 9:30 pm`), `at <midnight|noon|morning|evening>`
+- **Schedule + time:** any day/base phrase followed by `at <time>` — `every day at noon`, `daily at midnight`, `weekdays at 9:30`, `weekends at 10`, `monday at 9`, `fridays at 5pm`, `every sunday at 3pm`, `on monday and friday at 9`, `hourly at 30` (minute of every hour)
+- **Days:** `monday`…`sunday`, abbreviations and plurals (`mon`, `tuesdays`, `on sundays`), `every`/`each <day>`, ranges (`mon-fri`, `monday to friday`), lists (`monday and friday`)
+- **Month:** `first|last day of month`, `first|last of month`, `beginning|start|end of month`, `middle of month`, `on the Nth[,Mth…]` (→ midnight), `on Nth[,Mth…] of month at H:MM`
 - **Special:** `reboot`/`startup` (`@reboot`), `never`
 
 ## License

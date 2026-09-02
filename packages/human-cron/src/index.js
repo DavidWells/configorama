@@ -55,7 +55,26 @@ const CRON_PATTERNS = {
   // Monthly patterns
   'first day of month': '0 0 1 * *',
   'last day of month': '0 0 L * *',
+  'first of month': '0 0 1 * *',
+  'last of month': '0 0 L * *',
+  'beginning of month': '0 0 1 * *',
+  'start of month': '0 0 1 * *',
+  'end of month': '0 0 L * *',
   'middle of month': '0 0 15 * *',
+
+  // Frequency words ("twice a day" -> midnight and noon is a chosen convention)
+  'once a minute': '* * * * *',
+  'once an hour': '0 * * * *',
+  'once a day': '0 0 * * *',
+  'once a week': '0 0 * * 0',
+  'once a month': '0 0 1 * *',
+  'once a year': '0 0 1 1 *',
+  'twice a day': '0 0,12 * * *',
+  'twice an hour': '*/30 * * * *',
+  'every half hour': '*/30 * * * *',
+  'half hourly': '*/30 * * * *',
+  'every quarter hour': '*/15 * * * *',
+  'quarter hourly': '*/15 * * * *',
 
   // Special patterns
   never: '0 0 30 2 *', // Feb 30th (never occurs)
@@ -156,6 +175,66 @@ function parseTimeMatch(match, hourIndex, minuteIndex, amPmIndex) {
   return { minute, hour }
 }
 
+// Named times of day -> {minute, hour}. Mirrors the standalone entries in CRON_PATTERNS.
+const NAMED_TIMES = {
+  midnight: { minute: 0, hour: 0 },
+  noon: { minute: 0, hour: 12 },
+  morning: { minute: 0, hour: 9 },
+  evening: { minute: 0, hour: 18 },
+}
+
+/**
+ * Parse a time phrase into {minute, hour}: a named time ("noon"/"midnight"/...) or "H[:MM][am|pm]".
+ * @param {string} str
+ * @returns {{minute: number, hour: number}|null} null if it isn't a recognizable time (throws on out-of-range)
+ */
+function parseTimePhrase(str) {
+  const s = str.trim()
+  if (NAMED_TIMES[s]) return NAMED_TIMES[s]
+  const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+  if (!m) return null
+  return parseTimeMatch(m, 1, 2, 3)
+}
+
+/**
+ * Parse a day-of-week phrase into a cron day-of-week field: a single day/abbreviation/plural, a comma list
+ * ("monday,friday"), a range ("mon-fri"), or weekday/weekend words. An optional leading "every" is stripped.
+ * @param {string} str
+ * @returns {string|null} the dow field (e.g. "1", "1,5", "1-5"), or null if unrecognized
+ */
+function parseDayPhrase(str) {
+  const s = str.trim().replace(/^every /, '')
+  if (/^weekdays?$/.test(s)) return '1-5'
+  if (/^weekends?$/.test(s)) return '0,6'
+
+  const range = s.match(new RegExp(`^(${DAY_TOKEN})-(${DAY_TOKEN})$`, 'i'))
+  if (range) {
+    const from = dayToNum(range[1])
+    const to = dayToNum(range[2])
+    if (from !== undefined && to !== undefined) return `${from}-${to}`
+  }
+
+  if (new RegExp(`^${DAY_TOKEN}(?:,${DAY_TOKEN})*$`, 'i').test(s)) {
+    const nums = s.split(',').map(dayToNum)
+    if (nums.every((n) => n !== undefined)) return nums.join(',')
+  }
+
+  return null
+}
+
+// Unit aliases (incl. abbreviations) -> canonical interval unit. "m" is minutes; month has no short alias
+// to avoid clashing with "m".
+const UNIT_ALIAS = {
+  minutes: 'minute', minute: 'minute', mins: 'minute', min: 'minute', m: 'minute',
+  hours: 'hour', hour: 'hour', hrs: 'hour', hr: 'hour', h: 'hour',
+  days: 'day', day: 'day', d: 'day',
+  weeks: 'week', week: 'week', wks: 'week', wk: 'week',
+  months: 'month', month: 'month',
+}
+// Longest token first so "minutes" wins over "min"/"m".
+const UNIT_TOKENS = Object.keys(UNIT_ALIAS).sort((a, b) => b.length - a.length).join('|')
+const INTERVAL_RE = new RegExp(`^(?:every )?(a|an|\\d+)\\s*(${UNIT_TOKENS})$`, 'i')
+
 /**
  * Convert a human-readable schedule phrase to a cron expression, or pass through a raw cron unchanged.
  * @param {string} input - e.g. "every 5 minutes", "weekdays", "at 9:30", or a raw cron like "0 12 * * ? *"
@@ -173,6 +252,7 @@ function parseCron(input) {
   const cleaned = input.trim().replace(/\s+/g, ' ')
   const normalizedInput = wordsToDigits(cleaned.toLowerCase())
     .replace(/\s*:\s*/g, ':')
+    .replace(/\bevery other\b/g, 'every 2')
     .replace(/\bthe\b/g, '')
     .replace(/\s+and\s+/g, ',')
     .replace(/\s+to\s+/g, '-')
@@ -184,17 +264,19 @@ function parseCron(input) {
     return CRON_PATTERNS[normalizedInput]
   }
 
-  // Parse "at <named time>" (e.g., "at noon", "at midnight", "at morning")
-  const atNamedMatch = normalizedInput.match(/^at (midnight|noon|morning|evening)$/i)
-  if (atNamedMatch) {
-    return CRON_PATTERNS[atNamedMatch[1].toLowerCase()]
+  // Parse "at <time>" -> that time every day (named time or "H[:MM][am|pm]"): "at noon", "at 9:30", "at 9pm".
+  const atMatch = normalizedInput.match(/^at (.+)$/i)
+  if (atMatch) {
+    const time = parseTimePhrase(atMatch[1])
+    if (time) return `${time.minute} ${time.hour} * * *`
   }
 
-  // Parse "at H[:MM][am|pm]" patterns (e.g., "at 9:30", "at 14:00", "at 9pm", "at 9 pm", "at 9").
-  // Minutes are optional (default 0); am/pm may be attached ("9pm") or spaced ("9 pm").
-  const atTimeMatch = normalizedInput.match(/^at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (atTimeMatch) {
-    const { minute, hour } = parseTimeMatch(atTimeMatch, 1, 2, 3)
+  // Bare time with no "at" -> that time every day. Requires am/pm ("9am", "3 pm") or an explicit "HH:MM"
+  // ("9:30", "14:00") so a lone number isn't grabbed as a time.
+  const bareTimeMatch = normalizedInput.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i)
+    || normalizedInput.match(/^(\d{1,2}):(\d{2})$/)
+  if (bareTimeMatch) {
+    const { minute, hour } = parseTimeMatch(bareTimeMatch, 1, 2, 3)
     return `${minute} ${hour} * * *`
   }
 
@@ -206,24 +288,12 @@ function parseCron(input) {
     return `${m} * * * *`
   }
 
-  // A day-based schedule with a time: "every day at 9am", "daily at 9", "every weekday at 9:30",
-  // "weekdays at 9am", "weekends at 10".
-  const baseAtMatch = normalizedInput.match(/^(daily|every day|every weekday|weekdays?|weekends?) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (baseAtMatch) {
-    const base = baseAtMatch[1].toLowerCase()
-    const { minute, hour } = parseTimeMatch(baseAtMatch, 2, 3, 4)
-    let dayOfWeek = '*'
-    if (base.includes('weekday')) dayOfWeek = '1-5'
-    else if (base.includes('weekend')) dayOfWeek = '0,6'
-    return `${minute} ${hour} * * ${dayOfWeek}`
-  }
-
-  // Parse "every X minutes/hours/days" and bare "X minute(s)/hour(s)/day(s)" patterns
-  // (e.g., "every 5 minutes", "1 minute", "5 minutes", "1 hour")
-  const intervalMatch = normalizedInput.match(/^(?:every )?(a|an|\d+) (minute|minutes|hour|hours|day|days|week|weeks|month|months)s?$/i)
+  // Parse "every X minutes/hours/days" and bare "X minute(s)/hour(s)/day(s)" patterns, incl. unit
+  // abbreviations (e.g. "every 5 minutes", "5 minutes", "1 hour", "15m", "every 2 hrs").
+  const intervalMatch = normalizedInput.match(INTERVAL_RE)
   if (intervalMatch) {
     const originalInterval = /^\d+$/.test(intervalMatch[1]) ? parseInt(intervalMatch[1]) : 1 // "a"/"an" mean 1
-    const originalUnit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
+    const originalUnit = UNIT_ALIAS[intervalMatch[2].toLowerCase()]
     let interval = originalInterval
     let unit = originalUnit
 
@@ -265,56 +335,43 @@ function parseCron(input) {
     }
   }
 
-  // Parse "on Xst/nd/rd/th[,Yst…] of month at time" (e.g. "on 1st of month at 00:00",
-  // "on 1st,15th of month at 9" — "and" was already normalized to a comma above).
-  const ordinalDateMatch = normalizedInput.match(/^on (\d+(?:st|nd|rd|th)(?:,\d+(?:st|nd|rd|th))*) of month at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (ordinalDateMatch) {
-    const dayOfMonth = ordinalDateMatch[1].split(',').map((d) => parseInt(d)).join(',')
-    const { minute, hour } = parseTimeMatch(ordinalDateMatch, 2, 3, 4)
-    return `${minute} ${hour} ${dayOfMonth} * *`
-  }
-
-  // Parse "on weekday at time" patterns (e.g., "on monday at 9:00", "on monday at 9pm")
-  const weekdayTimeMatch = normalizedInput.match(/^on ((?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:,(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))*?) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (weekdayTimeMatch) {
-    const dayMap = {
-      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-      thursday: 4, friday: 5, saturday: 6,
-    }
-
-    // Extract all days from the match
-    const days = weekdayTimeMatch[1].split(',').map((day) => day.trim())
-    const dayOfWeek = days.map((day) => dayMap[day.toLowerCase()]).join(',')
-
-    const { minute, hour } = parseTimeMatch(weekdayTimeMatch, 2, 3, 4)
-    return `${minute} ${hour} * * ${dayOfWeek}`
-  }
-
-  // Parse "on weekdays/weekends at time" patterns (e.g., "on weekdays at 9:00", "on weekends at 10")
-  const weekdaysTimeMatch = normalizedInput.match(/^on (weekdays|weekends) at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
-  if (weekdaysTimeMatch) {
-    const dayRange = weekdaysTimeMatch[1].toLowerCase() === 'weekdays' ? '1-5' : '0,6'
-    const { minute, hour } = parseTimeMatch(weekdaysTimeMatch, 2, 3, 4)
-    return `${minute} ${hour} * * ${dayRange}`
-  }
-
-  // Standalone day(s) with no time -> run at midnight. Handles abbreviations/plurals ("mon", "tuesdays"),
-  // an optional leading "every" ("every monday"), a range ("mon-fri", "monday-friday"), or a comma list
-  // ("monday,friday" — "and" was normalized to a comma above).
-  const dayRangeMatch = normalizedInput.match(new RegExp(`^(?:every )?(${DAY_TOKEN})-(${DAY_TOKEN})$`, 'i'))
-  if (dayRangeMatch) {
-    const from = dayToNum(dayRangeMatch[1])
-    const to = dayToNum(dayRangeMatch[2])
-    if (from !== undefined && to !== undefined) {
-      return `0 0 * * ${from}-${to}`
+  // A day-based schedule with a time: "monday at 9", "fridays at 5pm", "every day at noon",
+  // "weekdays at 9:30", "on monday and friday at 9", "every sunday at 3pm". An optional leading
+  // "on "/"each " is ignored; the day part is a base word, weekday/weekend, or a day name/list/range.
+  const atSplit = normalizedInput.match(/^(?:on |each )?(.+?) at (.+)$/i)
+  if (atSplit) {
+    const dayPart = atSplit[1].trim()
+    const dayOfWeek = /^(daily|every day|everyday|each day)$/.test(dayPart) ? '*' : parseDayPhrase(dayPart)
+    if (dayOfWeek !== null) {
+      const time = parseTimePhrase(atSplit[2])
+      if (time) return `${time.minute} ${time.hour} * * ${dayOfWeek}`
     }
   }
-  const dayListMatch = normalizedInput.match(new RegExp(`^(?:every )?${DAY_TOKEN}(?:,${DAY_TOKEN})*$`, 'i'))
-  if (dayListMatch) {
-    const nums = normalizedInput.replace(/^every /, '').split(',').map(dayToNum)
-    if (nums.every((n) => n !== undefined)) {
-      return `0 0 * * ${nums.join(',')}`
+
+  // Parse "[on] Xst/nd/rd/th[,Yth…] [of [every] month] at time" -> that day-of-month at that time
+  // (e.g. "on 1st of month at 9pm", "on 1st,15th of month at 9" — "and" was normalized to a comma above).
+  const ordinalTimeMatch = normalizedInput.match(/^(?:on )?(\d+(?:st|nd|rd|th)(?:,\d+(?:st|nd|rd|th))*) of (?:every )?month at (.+)$/i)
+  if (ordinalTimeMatch) {
+    const time = parseTimePhrase(ordinalTimeMatch[2])
+    if (time) {
+      const dayOfMonth = ordinalTimeMatch[1].split(',').map((d) => parseInt(d)).join(',')
+      return `${time.minute} ${time.hour} ${dayOfMonth} * *`
     }
+  }
+
+  // Day-of-month phrase with no time -> midnight: "on the 1st", "15th of the month", "1st of every month",
+  // "on the 1st and 15th" (the/and/of already normalized above).
+  const ordinalMatch = normalizedInput.match(/^(?:on )?(\d+(?:st|nd|rd|th)(?:,\d+(?:st|nd|rd|th))*)(?: of (?:every )?month)?$/i)
+  if (ordinalMatch) {
+    const dayOfMonth = ordinalMatch[1].split(',').map((d) => parseInt(d)).join(',')
+    return `0 0 ${dayOfMonth} * *`
+  }
+
+  // Standalone day(s) with no time -> run at midnight. Handles abbreviations/plurals ("mon", "on sundays"),
+  // an optional leading "on "/"each "/"every " ("each monday"), a range ("mon-fri"), or a comma list.
+  const dayOnly = parseDayPhrase(normalizedInput.replace(/^(on|each|every) /, ''))
+  if (dayOnly !== null) {
+    return `0 0 * * ${dayOnly}`
   }
 
   // Already a valid cron expression — pass it through unchanged. Use the ORIGINAL input (not lowercased)
