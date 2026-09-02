@@ -1,5 +1,5 @@
 const { trimSurroundingQuotes } = require('../utils/strings/quoteUtils')
-const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\` ]+?)?\)/g)
+const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\`?# ]+?)?\)/g)
 
 /**
  * Convert human-readable strings to cron expressions
@@ -141,12 +141,22 @@ function parseCronExpression(input) {
     return `${minute} ${hour} * * ${dayRange}`
   }
 
-  // Check if it's already a valid cron expression (5 or 6 parts)
-  const parts = normalizedInput.split(/\s+/)
-  if (parts.length === 5 || parts.length === 6) {
-    // Basic validation for cron format
-    if (parts.every(part => /^[@*\d,\-\/]+$/.test(part) || part.startsWith('@'))) {
-      return normalizedInput
+  // Already a valid cron expression — pass it through. Use the ORIGINAL input (not lowercased) so the
+  // casing of L/W and day/month names is preserved. Supports 5 (standard), 6 (AWS/Quartz seconds or year),
+  // and 7 (Quartz) fields, an @macro (@reboot/@daily/...), the `?` unspecified-day placeholder, and the
+  // L/W/# Quartz specials, plus 3-letter day/month names (MON-FRI, JAN,JUL).
+  const original = input.trim()
+  if (/^@\w+$/.test(original)) {
+    return original
+  }
+  const parts = original.split(/\s+/)
+  if (parts.length >= 5 && parts.length <= 7) {
+    // A field is `*`, `?`, a numeric/step/range/list (with L/W/# Quartz specials), or a list/range of
+    // day/month names. `xyz` is NOT a valid name, so a garbage field falls through to the error below.
+    const NAME = 'sun|mon|tue|wed|thu|fri|sat|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec'
+    const cronField = new RegExp(`^(\\*|\\?|[\\d*?,\\-\\/lw#]+|(?:${NAME})(?:[-,](?:${NAME}))*)$`, 'i')
+    if (parts.every((part) => cronField.test(part))) {
+      return original
     }
   }
 
