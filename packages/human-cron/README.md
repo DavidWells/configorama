@@ -22,6 +22,8 @@ parseCron('every five minutes')  // => '*/5 * * * *'   (spelled-out numbers work
 parseCron('every twenty-five minutes') // => '*/25 * * * *'
 parseCron('weekdays')            // => '0 0 * * 1-5'
 parseCron('at 9:30 pm')          // => '30 21 * * *'
+parseCron('at 9pm')              // => '0 21 * * *'   (bare hour, minutes default to 0)
+parseCron('at noon')             // => '0 12 * * *'
 parseCron('on monday at 9:00')   // => '0 9 * * 1'
 parseCron('on 15th of month at 9:30 am') // => '30 9 15 * *'
 
@@ -52,7 +54,7 @@ The phrase → cron map used by `parseCron`, exported for reference.
 
 - **Intervals:** `every minute|hour|day|week|month|year`, `every N minutes|hours|days|weeks|months` (and bare `5 minutes`), `hourly`/`daily`/`weekly`/`monthly`/`yearly`. `N` may be a digit or spelled out (`five`, `twenty-five`).
 - **Business:** `weekdays`, `weekends`, `business hours`, `after hours`
-- **Times of day:** `midnight`, `noon`, `morning`, `evening`, `at H:MM[am|pm]`
+- **Times of day:** `midnight`, `noon`, `morning`, `evening`, `at H[:MM][am|pm]` (minutes optional: `at 9`, `at 9pm`, `at 9:30 pm`), `at <midnight|noon|morning|evening>`
 - **Days:** `monday`…`sunday`, `on <day[,day…]> at H:MM`
 - **Month:** `first|last day of month`, `middle of month`, `on Nth of month at H:MM`
 - **Special:** `reboot`/`startup` (`@reboot`), `never`

@@ -105,7 +105,8 @@ function wordsToDigits(str) {
 
 function parseTimeMatch(match, hourIndex, minuteIndex, amPmIndex) {
   let hour = parseInt(match[hourIndex])
-  const minute = parseInt(match[minuteIndex])
+  // Minutes are optional (e.g. "at 9pm" has no minutes) — default to 0.
+  const minute = match[minuteIndex] !== undefined ? parseInt(match[minuteIndex]) : 0
   const amPm = match[amPmIndex]
 
   if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
@@ -136,10 +137,17 @@ function parseCron(input) {
     return CRON_PATTERNS[normalizedInput]
   }
 
-  // Parse "at X:XX" patterns (e.g., "at 9:30", "at 14:00")
-  const atTimeMatch = normalizedInput.match(/^at (\d{1,2}):(\d{2})(\s*(am|pm))?$/i)
+  // Parse "at <named time>" (e.g., "at noon", "at midnight", "at morning")
+  const atNamedMatch = normalizedInput.match(/^at (midnight|noon|morning|evening)$/i)
+  if (atNamedMatch) {
+    return CRON_PATTERNS[atNamedMatch[1].toLowerCase()]
+  }
+
+  // Parse "at H[:MM][am|pm]" patterns (e.g., "at 9:30", "at 14:00", "at 9pm", "at 9 pm", "at 9").
+  // Minutes are optional (default 0); am/pm may be attached ("9pm") or spaced ("9 pm").
+  const atTimeMatch = normalizedInput.match(/^at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
   if (atTimeMatch) {
-    const { minute, hour } = parseTimeMatch(atTimeMatch, 1, 2, 4)
+    const { minute, hour } = parseTimeMatch(atTimeMatch, 1, 2, 3)
     return `${minute} ${hour} * * *`
   }
 

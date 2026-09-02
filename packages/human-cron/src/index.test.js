@@ -93,6 +93,22 @@ test('parseCron: raw cron expressions pass through', () => {
   assert.equal(parseCron('0 0 12 * * ? 2025'), '0 0 12 * * ? 2025') // 7-field Quartz
 })
 
+test('parseCron: bare-hour times (optional minutes / am-pm)', () => {
+  assert.equal(parseCron('at 9'), '0 9 * * *')
+  assert.equal(parseCron('at 9pm'), '0 21 * * *')
+  assert.equal(parseCron('at 9 pm'), '0 21 * * *')
+  assert.equal(parseCron('at 9am'), '0 9 * * *')
+  assert.equal(parseCron('at 12am'), '0 0 * * *')
+  assert.equal(parseCron('at 12pm'), '0 12 * * *')
+  assert.equal(parseCron('at nine pm'), '0 21 * * *') // spelled-out + bare hour
+  assert.equal(parseCron('at 9:30 pm'), '30 21 * * *') // minutes still work
+})
+
+test('parseCron: named times of day with "at"', () => {
+  assert.equal(parseCron('at noon'), '0 12 * * *')
+  assert.equal(parseCron('at midnight'), '0 0 * * *')
+})
+
 test('parseCron: spelled-out numbers', () => {
   assert.equal(parseCron('every five minutes'), '*/5 * * * *')
   assert.equal(parseCron('five minutes'), '*/5 * * * *')
