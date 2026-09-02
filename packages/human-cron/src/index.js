@@ -109,10 +109,23 @@ function parseTimeMatch(match, hourIndex, minuteIndex, amPmIndex) {
   const minute = match[minuteIndex] !== undefined ? parseInt(match[minuteIndex]) : 0
   const amPm = match[amPmIndex]
 
-  if (amPm && amPm.toLowerCase() === 'pm' && hour !== 12) {
-    hour += 12
-  } else if (amPm && amPm.toLowerCase() === 'am' && hour === 12) {
-    hour = 0
+  if (amPm) {
+    // 12-hour clock: valid hours are 1-12
+    if (hour < 1 || hour > 12) {
+      throw new Error(`Invalid hour "${hour}" for a 12-hour (am/pm) time; use 1-12`)
+    }
+    if (amPm.toLowerCase() === 'pm' && hour !== 12) {
+      hour += 12
+    } else if (amPm.toLowerCase() === 'am' && hour === 12) {
+      hour = 0
+    }
+  } else if (hour < 0 || hour > 23) {
+    // 24-hour clock: valid hours are 0-23
+    throw new Error(`Invalid hour "${hour}"; use 0-23`)
+  }
+
+  if (minute < 0 || minute > 59) {
+    throw new Error(`Invalid minute "${minute}"; use 0-59`)
   }
 
   return { minute, hour }
@@ -129,8 +142,10 @@ function parseCron(input) {
     throw new Error('Cron input must be a non-empty string')
   }
 
-  // Lowercase, then turn spelled-out numbers into digits so the digit-based parsers handle them.
-  const normalizedInput = wordsToDigits(input.toLowerCase().trim())
+  // Collapse internal whitespace ("every  5  minutes"), then lowercase and turn spelled-out numbers into
+  // digits. Also tighten spaces around a time colon ("at 9 : 30" -> "at 9:30") for the digit parsers.
+  const cleaned = input.trim().replace(/\s+/g, ' ')
+  const normalizedInput = wordsToDigits(cleaned.toLowerCase()).replace(/\s*:\s*/g, ':')
 
   // Check direct mapping first
   if (CRON_PATTERNS[normalizedInput]) {
@@ -157,6 +172,12 @@ function parseCron(input) {
   if (intervalMatch) {
     const interval = parseInt(intervalMatch[1])
     const unit = intervalMatch[2].toLowerCase().replace(/s$/, '') // Remove trailing 's' if present
+
+    // Validate the interval against the field's range (a step of 0, or larger than the field, is invalid).
+    const INTERVAL_MAX = { minute: 59, hour: 23, day: 31, week: 52, month: 12 }
+    if (interval < 1 || interval > INTERVAL_MAX[unit]) {
+      throw new Error(`Invalid interval "${interval}" for ${unit}; use 1-${INTERVAL_MAX[unit]}`)
+    }
 
     switch (unit) {
       case 'minute':
@@ -208,7 +229,7 @@ function parseCron(input) {
 
   // Already a valid cron expression — pass it through unchanged. Use the ORIGINAL input (not lowercased)
   // so the casing of L/W and day/month names is preserved.
-  const original = input.trim()
+  const original = cleaned
   if (isValidCron(original)) {
     return original
   }

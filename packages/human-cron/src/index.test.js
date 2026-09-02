@@ -153,6 +153,40 @@ test('parseCron: error handling', () => {
   assert.throws(() => parseCron('0 12 xyz * ? *'), /Unrecognized cron pattern/) // invalid field
 })
 
+test('parseCron: valid time boundaries', () => {
+  assert.equal(parseCron('at 0'), '0 0 * * *')
+  assert.equal(parseCron('at 12'), '0 12 * * *')
+  assert.equal(parseCron('at 23'), '0 23 * * *')
+  assert.equal(parseCron('at 00:00'), '0 0 * * *')
+  assert.equal(parseCron('at 23:59'), '59 23 * * *')
+  assert.equal(parseCron('at 12am'), '0 0 * * *')
+  assert.equal(parseCron('at 12pm'), '0 12 * * *')
+  assert.equal(parseCron('on 22nd of month at 9'), '0 9 22 * *')
+})
+
+test('parseCron: rejects out-of-range times', () => {
+  assert.throws(() => parseCron('at 25'), /hour/i) // hour > 23
+  assert.throws(() => parseCron('at 24:00'), /hour/i)
+  assert.throws(() => parseCron('at 13pm'), /hour/i) // 13 on a 12-hour clock
+  assert.throws(() => parseCron('at 0pm'), /hour/i)
+  assert.throws(() => parseCron('at 9:60'), /minute/i) // minute > 59
+})
+
+test('parseCron: rejects invalid intervals', () => {
+  assert.throws(() => parseCron('every 0 minutes'), /interval/i)
+  assert.throws(() => parseCron('every 60 minutes'), /interval/i)
+  assert.throws(() => parseCron('every 90 minutes'), /interval/i)
+  assert.throws(() => parseCron('every 24 hours'), /interval/i)
+  assert.throws(() => parseCron('every 13 months'), /interval/i)
+})
+
+test('parseCron: whitespace is normalized', () => {
+  assert.equal(parseCron('  every minute  '), '* * * * *')
+  assert.equal(parseCron('every  5  minutes'), '*/5 * * * *')
+  assert.equal(parseCron('at 9 : 30'), '30 9 * * *')
+  assert.equal(parseCron('EVERY 5 MINUTES'), '*/5 * * * *')
+})
+
 test('isValidCron', () => {
   assert.ok(isValidCron('* * * * *'))
   assert.ok(isValidCron('0 12 * * ? *'))
