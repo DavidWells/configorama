@@ -1,0 +1,2 @@
+branchName: ${git:branch, "main"}
+shortSha: ${git:sha1, "unknown"}

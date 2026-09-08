@@ -1,0 +1,10 @@
+{
+  "settings": {
+    "database": {
+      "host": "db.local",
+      "port": 5432
+    }
+  },
+  "databaseHost": "db.local",
+  "databasePortFromFile": 5432
+}

@@ -12,6 +12,15 @@ description: Read repository metadata with git variables.
 branchName: ${git:branch, "main"}
 shortSha: ${git:sha1, "unknown"}
 ```
+
+Resolves to:
+
+```json
+{
+  "branchName": "main",
+  "shortSha": "1a2b3c4"
+}
+```
 {/* /docs */}
 
 Use fallbacks when a config may resolve outside a git checkout. Common keys include branch, commit, sha1, message, remote, tag, describe, repo, owner, and timestamp.

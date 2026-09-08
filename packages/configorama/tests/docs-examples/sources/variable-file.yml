@@ -1,0 +1,3 @@
+settings: ${file(./settings.yml)}
+databaseHost: ${file(./settings.yml):database.host}
+databasePortFromFile: ${file(./settings.yml).database.port}

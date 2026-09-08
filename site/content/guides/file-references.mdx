@@ -27,6 +27,26 @@ databasePort: ${file(./settings.yml).database.port}
 stageConfig: ${file(./config.${opt:stage}.json)}
 fallbackValue: ${file(./missing.yml):name, "local"}
 ```
+
+Resolves to:
+
+```json
+{
+  "stage": "prod",
+  "settings": {
+    "database": {
+      "host": "db.local",
+      "port": 5432
+    }
+  },
+  "databaseHost": "db.local",
+  "databasePort": 5432,
+  "stageConfig": {
+    "url": "https://api.example.com"
+  },
+  "fallbackValue": "local"
+}
+```
 {/* /docs */}
 
 Aliases can keep long paths readable when a project has a stable config layout:

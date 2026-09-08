@@ -13,6 +13,21 @@ settings: ${file(./settings.yml)}
 databaseHost: ${file(./settings.yml):database.host}
 databasePortFromFile: ${file(./settings.yml).database.port}
 ```
+
+Resolves to:
+
+```json
+{
+  "settings": {
+    "database": {
+      "host": "db.local",
+      "port": 5432
+    }
+  },
+  "databaseHost": "db.local",
+  "databasePortFromFile": 5432
+}
+```
 {/* /docs */}
 
 ## Field access

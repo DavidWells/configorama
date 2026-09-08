@@ -36,6 +36,15 @@ For example, given this simple yaml config file:
 service: billing
 stage: ${opt:stage, "dev"}
 ```
+
+Resolves to:
+
+```json
+{
+  "service": "billing",
+  "stage": "prod"
+}
+```
 {/* /docs */}
 
 Running it through the CLI:

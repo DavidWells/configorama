@@ -11,10 +11,17 @@ const CONTENT_DIR = path.join(__dirname, '..', '..', '..', '..', 'site', 'conten
 
 for (const entry of registry) {
   test(`docs example "${entry.id}" resolves to its golden output`, async () => {
+    const resolved = await resolveExample(entry)
+    if (entry.dynamic) {
+      // Non-deterministic (e.g. git): just assert it resolves to the shown shape.
+      for (const key of Object.keys(entry.displayOutput || {})) {
+        assert.ok(key in resolved, `${entry.id} missing key "${key}"`)
+      }
+      return
+    }
     const goldenPath = path.join(SOURCES_DIR, `${entry.id}.output.json`)
     assert.ok(fs.existsSync(goldenPath), `missing golden ${entry.id}.output.json — run npm run docs:examples`)
     const golden = JSON.parse(fs.readFileSync(goldenPath, 'utf8'))
-    const resolved = await resolveExample(entry)
     assert.equal(resolved, golden, `${entry.id} resolved output drifted from its golden — run npm run docs:examples`)
   })
 

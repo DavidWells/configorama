@@ -1,0 +1,2 @@
+domain: ${param:domain, "example.test"}
+databasePort: ${param:databasePort, 5432 | Number}

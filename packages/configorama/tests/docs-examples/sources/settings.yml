@@ -1,0 +1,3 @@
+database:
+  host: db.local
+  port: 5432

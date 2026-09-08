@@ -1,0 +1,2 @@
+service: billing
+stage: ${opt:stage, "dev"}

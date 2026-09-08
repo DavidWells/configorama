@@ -43,16 +43,19 @@ async function main() {
   for (const entry of registry) {
     const { showcase } = loadSource(entry.id)
     const full = await resolveExample(entry)
-    // golden: full resolution (covers edge cases too)
-    const goldenPath = path.join(SOURCES_DIR, `${entry.id}.output.json`)
-    const goldenText = JSON.stringify(full, null, 2) + '\n'
-    if (write) fs.writeFileSync(goldenPath, goldenText)
+    // golden: full resolution (covers edge cases too). Dynamic examples (e.g. git)
+    // resolve non-deterministically, so they use a fixed displayOutput instead.
+    if (!entry.dynamic) {
+      const goldenPath = path.join(SOURCES_DIR, `${entry.id}.output.json`)
+      if (write) fs.writeFileSync(goldenPath, JSON.stringify(full, null, 2) + '\n')
+    }
 
     // docs output: only the showcase's top-level keys, so edge cases stay hidden
     const keys = showcaseKeys(showcase)
     /** @type {Record<string, unknown>} */
     const shown = {}
-    for (const k of keys) shown[k] = full[k]
+    const source = entry.dynamic ? (entry.displayOutput || {}) : full
+    for (const k of keys) shown[k] = source[k]
 
     const body = [
       '```yaml',
