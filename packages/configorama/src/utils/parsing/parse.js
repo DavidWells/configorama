@@ -16,10 +16,14 @@ const cloudFormationSchema = require('./cloudformationSchema')
 const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
 
 /**
+ * @typedef {Error & { mark?: { line?: number, column?: number }, original?: Error }} YamlError
+ */
+
+/**
  * Turn a cryptic js-yaml flow-collection error into an actionable configorama
  * message when the cause is a variable embedded in an unquoted flow entry
  * (e.g. `key: [arn/${env:X}]`). Returns the original error otherwise.
- * @param {Error} yamlErr - The YAMLException thrown by the parser
+ * @param {YamlError} yamlErr - The YAMLException thrown by the parser
  * @param {string} contents - The original YAML source
  * @param {string} filePath - Path to the config file
  * @returns {Error} An enhanced error, or the original
@@ -48,6 +52,7 @@ function enhanceYamlError(yamlErr, contents, filePath) {
     '',
     `(YAML parser: ${String(yamlErr.message || '').split('\n')[0]})`
   ].join('\n')
+  /** @type {YamlError} */
   const enhanced = new Error(message)
   enhanced.original = yamlErr
   return enhanced

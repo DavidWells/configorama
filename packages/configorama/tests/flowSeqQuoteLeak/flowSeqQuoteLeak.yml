@@ -13,3 +13,10 @@ flow_obj_dq: {a: "arn:userpool/${env:POOL}"}
 flow_arr_in_obj: {a: ['arn:userpool/${env:POOL}']}
 flow_seq_bare: [${env:POOL}]
 flow_seq_fallback_sq: ['${opt:missing, ${env:POOL}}']
+lit_bracket_dq: "[${env:POOL}]"
+lit_bracket_sq: '[${env:POOL}]'
+nested_flow: [['arn:userpool/${env:POOL}']]
+multiline_flow: [
+  "a/${env:POOL}",
+  "b/${env:POOL}"
+]

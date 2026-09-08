@@ -43,4 +43,11 @@ test('embedded in flow array nested in object', () => assert.is(config.flow_arr_
 test('bare var in flow sequence still resolves', () => assert.is(config.flow_seq_bare[0], POOL))
 test('nested-var fallback in quoted flow element', () => assert.is(config.flow_seq_fallback_sq[0], POOL))
 
+// Brackets that are literal content of a quoted scalar are NOT a flow array;
+// the variable must resolve inside the string without quote injection.
+test('literal brackets in double-quoted scalar', () => assert.is(config.lit_bracket_dq, `[${POOL}]`))
+test('literal brackets in single-quoted scalar', () => assert.is(config.lit_bracket_sq, `[${POOL}]`))
+test('nested flow array', () => assert.is(config.nested_flow[0][0], `arn:userpool/${POOL}`))
+test('multiline flow array', () => assert.is(config.multiline_flow[1], `b/${POOL}`))
+
 test.run()

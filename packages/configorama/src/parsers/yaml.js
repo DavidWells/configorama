@@ -145,27 +145,31 @@ function preProcess(ymlStr = '') {
   // Fix nested variables in array brackets
   // in  -> y: !Not [!Equals [!Join ['', ${param:xyz}]]]
   // out -> y: !Not [!Equals [!Join ['', "${param:xyz}"]]]
-  const arrayBracketMatches = ymlStr && ymlStr.match(
-    // /\[(?:[^\[\]]+|)*\]/gm
-    INNER_ARRAY
-  )
-  if (arrayBracketMatches) {
-    // console.log('arrayBracketMatches', arrayBracketMatches)
-    arrayBracketMatches.forEach((txt) => {
-      // console.log('txt', txt)
-      const hasNestedVars = txt && findOutermostVariables(txt)
-      /*
-      console.log(varRegex)
-      console.log('findOutermostVariables(txt)', findOutermostVariables(txt))
-      console.log('hasNested', hasNested)
-      /** */
-      if (hasNestedVars && hasNestedVars.length) {
-        const fixedText = wrapBareVariables(txt)
-        if (fixedText !== txt) {
-          ymlStr = ymlStr.replace(txt, fixedText)
-        }
+  if (ymlStr && ymlStr.indexOf('[') > -1) {
+    // Collect edits by index so we can skip brackets that are literal content of a
+    // quoted scalar (key: "[${x}]"), where a real flow array's `[` is never inside
+    // quotes. Apply right-to-left so earlier indices stay valid.
+    /** @type {Array<[number, number, string]>} */
+    const edits = []
+    for (const m of ymlStr.matchAll(INNER_ARRAY)) {
+      const txt = m[0]
+      const idx = m.index
+      if (typeof idx !== 'number') continue
+      const lineStart = ymlStr.lastIndexOf('\n', idx - 1) + 1
+      const nl = ymlStr.indexOf('\n', idx)
+      const lineText = ymlStr.slice(lineStart, nl === -1 ? undefined : nl)
+      if (isInsideQuotes(lineText, idx - lineStart)) continue
+      const hasNestedVars = findOutermostVariables(txt)
+      if (!hasNestedVars || !hasNestedVars.length) continue
+      const fixedText = wrapBareVariables(txt)
+      if (fixedText !== txt) {
+        edits.push([idx, idx + txt.length, fixedText])
       }
-    })
+    }
+    for (let i = edits.length - 1; i >= 0; i--) {
+      const [start, end, rep] = edits[i]
+      ymlStr = ymlStr.slice(0, start) + rep + ymlStr.slice(end)
+    }
   }
 
   /* If have yaml object and vars not wrapped in quotes, wrap them */
