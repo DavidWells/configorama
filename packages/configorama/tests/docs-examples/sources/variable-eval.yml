@@ -1,0 +1,7 @@
+evalStage: ${opt:stage, "dev"}
+replicas: ${opt:replicas, 2 | Number}
+isScaled: ${eval(${self:replicas} > 1)}
+minReplicas: 2
+desiredReplicas: '${eval(${replicas} < ${minReplicas} ? ${minReplicas} : ${replicas})}'
+workerMemoryMb: ${eval(${replicas} * 256)}
+canDeploy: ${eval(${evalStage} == "prod" && ${replicas} >= 3)}

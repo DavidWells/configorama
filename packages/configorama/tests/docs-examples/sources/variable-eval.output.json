@@ -1,0 +1,9 @@
+{
+  "evalStage": "prod",
+  "replicas": 3,
+  "isScaled": true,
+  "minReplicas": 2,
+  "desiredReplicas": 3,
+  "workerMemoryMb": 768,
+  "canDeploy": true
+}

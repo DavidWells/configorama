@@ -17,6 +17,20 @@ desiredReplicas: '${eval(${replicas} < ${minReplicas} ? ${minReplicas} : ${repli
 workerMemoryMb: ${eval(${replicas} * 256)}
 canDeploy: ${eval(${evalStage} == "prod" && ${replicas} >= 3)}
 ```
+
+Resolves to:
+
+```json
+{
+  "evalStage": "prod",
+  "replicas": 3,
+  "isScaled": true,
+  "minReplicas": 2,
+  "desiredReplicas": 3,
+  "workerMemoryMb": 768,
+  "canDeploy": true
+}
+```
 {/* /docs */}
 
 Use eval for small boolean, arithmetic, or comparison expressions. Avoid using it as a substitute for a full programming language; executable config belongs in trusted JS/TS modules.

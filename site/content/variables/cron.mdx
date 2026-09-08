@@ -22,6 +22,19 @@ monthlyBilling: ${cron(on 1st of month at 00:00)}
 existingCron: ${cron(15 10 * * 1-5)}
 # ^ stays 15 10 * * 1-5
 ```
+
+Resolves to:
+
+```json
+{
+  "everyFiveMinutes": "*/5 * * * *",
+  "weekdayMorning": "0 9 * * 1",
+  "dailyMidnight": "0 0 * * *",
+  "businessHours": "0 9-17 * * 1-5",
+  "monthlyBilling": "0 0 1 * *",
+  "existingCron": "15 10 * * 1-5"
+}
+```
 {/* /docs */}
 
 Use cron variables when deployment config wants readable schedules but the target platform expects cron syntax. Supported phrases include common intervals, weekdays, named times such as `midnight`, and explicit times.

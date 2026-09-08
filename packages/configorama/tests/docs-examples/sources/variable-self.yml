@@ -1,0 +1,8 @@
+selfExample:
+  service: billing
+  stage: ${opt:stage, "dev"}
+  apiHost: ${env:DOCS_API_HOST, "localhost"}
+  apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+  baseUrl: https://${selfExample.apiHost}:${selfExample.apiPort}
+  serviceUrl: ${selfExample.baseUrl}/${selfExample.stage}/${selfExample.service}
+  explicitServiceUrl: ${self:selfExample.baseUrl}/${self:selfExample.stage}/${self:selfExample.service}

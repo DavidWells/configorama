@@ -1,0 +1,6 @@
+apiHost: ${env:DOCS_API_HOST, "localhost"}
+apiPort: ${env:DOCS_API_PORT, 3000 | Number}
+
+## edge cases (tested, not shown in docs)
+nestedFallback: ${env:DOCS_MISSING, ${env:DOCS_ALSO_MISSING, "fallback"}}
+emptyStringFallback: ${env:DOCS_MISSING, ""}

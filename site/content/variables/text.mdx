@@ -11,6 +11,14 @@ description: Read raw local file contents with text variables.
 ```yaml
 template: ${text(./message.txt)}
 ```
+
+Resolves to:
+
+```json
+{
+  "template": "Hello from a raw text file.\n"
+}
+```
 {/* /docs */}
 
 Use `text` for templates, scripts, inline policy bodies, or other file contents that should stay a string. Root restrictions still apply in safe mode because this is a local file read.

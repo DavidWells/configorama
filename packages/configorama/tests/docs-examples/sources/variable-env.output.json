@@ -1,0 +1,6 @@
+{
+  "apiHost": "localhost",
+  "apiPort": 3000,
+  "nestedFallback": "fallback",
+  "emptyStringFallback": ""
+}

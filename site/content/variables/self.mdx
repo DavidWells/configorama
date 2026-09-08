@@ -47,6 +47,22 @@ selfExample:
   serviceUrl: ${selfExample.baseUrl}/${selfExample.stage}/${selfExample.service}
   explicitServiceUrl: ${self:selfExample.baseUrl}/${self:selfExample.stage}/${self:selfExample.service}
 ```
+
+Resolves to:
+
+```json
+{
+  "selfExample": {
+    "service": "billing",
+    "stage": "prod",
+    "apiHost": "localhost",
+    "apiPort": 3000,
+    "baseUrl": "https://localhost:3000",
+    "serviceUrl": "https://localhost:3000/prod/billing",
+    "explicitServiceUrl": "https://localhost:3000/prod/billing"
+  }
+}
+```
 {/* /docs */}
 
 Bare self references are config-derived values, not external inputs. They can point at values that themselves contain variables, so resolution may take multiple generations.

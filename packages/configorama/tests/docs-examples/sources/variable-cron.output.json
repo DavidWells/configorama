@@ -1,0 +1,8 @@
+{
+  "everyFiveMinutes": "*/5 * * * *",
+  "weekdayMorning": "0 9 * * 1",
+  "dailyMidnight": "0 0 * * *",
+  "businessHours": "0 9-17 * * 1-5",
+  "monthlyBilling": "0 0 1 * *",
+  "existingCron": "15 10 * * 1-5"
+}

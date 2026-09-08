@@ -1,0 +1,4 @@
+provider:
+  stage: ${opt:stage, "dev"}
+environmentName: '${if(provider.stage === "prod") ? "production" : "development"}'
+workerCount: '${if(provider.stage === "prod") ? 4 : 1}'

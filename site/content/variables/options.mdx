@@ -12,6 +12,15 @@ description: Read CLI flags and API options with opt or option variables.
 stage: ${opt:stage, "dev"}
 region: ${option:region, "us-east-1"}
 ```
+
+Resolves to:
+
+```json
+{
+  "stage": "prod",
+  "region": "us-east-1"
+}
+```
 {/* /docs */}
 
 Use options for invocation-specific values such as `stage`, `region`, `profile`, or output mode. Options are user inputs, so they are reported by requirements and analyze output when required.

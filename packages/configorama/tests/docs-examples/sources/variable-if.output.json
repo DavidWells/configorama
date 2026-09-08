@@ -1,0 +1,7 @@
+{
+  "provider": {
+    "stage": "prod"
+  },
+  "environmentName": "production",
+  "workerCount": 4
+}
