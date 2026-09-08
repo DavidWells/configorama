@@ -198,6 +198,7 @@ const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
+const { didYouMean } = require('./utils/strings/didYouMean')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -865,6 +866,45 @@ class Configorama {
     if (setting === false || setting === undefined) return false
     if (Array.isArray(setting) && setting.includes(type)) return true
     return false
+  }
+
+  /**
+   * Suggest a likely-intended key for an unresolvable variable reference, e.g.
+   * `${env:DATABSE}` -> `did you mean "env:DATABASE"?`. Compares the referenced key
+   * against the keys that actually exist for that source (env vars, options, or
+   * top-level config keys). Best-effort: returns '' if nothing is close.
+   * @param {string} variableString - e.g. 'env:DATABSE', 'opt:stgae', 'self:databse'
+   * @returns {string} A "did you mean" hint, or '' when there is no close match
+   */
+  suggestVariableFix(variableString) {
+    try {
+      const sep = variableString.indexOf(':')
+      if (sep === -1) return ''
+      const type = variableString.slice(0, sep).trim()
+      const key = variableString.slice(sep + 1).trim()
+      if (!key) return ''
+      /** @type {string[]} */
+      let candidates = []
+      if (type === 'env') {
+        candidates = Object.keys(process.env)
+      } else if (type === 'opt') {
+        candidates = Object.keys(this.options || {})
+      } else if (type === 'self') {
+        candidates = Object.keys(this.config || {})
+      } else {
+        return ''
+      }
+      // For dotted self paths, match on the first segment (the top-level key).
+      const lookup = type === 'self' ? key.split('.')[0] : key
+      const match = didYouMean(lookup, candidates, { threshold: 2 })
+      if (!match || match === lookup) return ''
+      const suggestion = type === 'self' && key.includes('.')
+        ? `${type}:${key.replace(lookup, match)}`
+        : `${type}:${match}`
+      return `\nDid you mean "${suggestion}"?\n`
+    } catch (err) {
+      return ''
+    }
   }
 
   /**
@@ -2703,7 +2743,8 @@ Missing Value ${missingValue} - ${matchedString}
             const configFilePathMsg = (this.configFilePath) ? `\nIn file ${this.configFilePath}${lineInfo} ` : ''
             const fromLine = (propertyString !== valueObject.originalSource) ? `\n  From   "${valueObject.originalSource}"\n` : ''
 
-            throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}
+            const suggestion = this.suggestVariableFix(variableString)
+            throw new Error(`Unable to resolve config variable "${propertyString}".\n${configFilePathMsg}at location ${valueObject.path ? `"${arrayToJsonPath(valueObject.path)}"` : 'n/a'}${fromLine}${suggestion}
 \nFix this reference, your inputs and/or provide a valid fallback value.
 \nExample of setting a fallback value: \${${variableString}, "fallbackValue"\}\n`)
           }
