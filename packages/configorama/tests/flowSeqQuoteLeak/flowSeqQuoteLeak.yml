@@ -1,0 +1,10 @@
+base: us-east-1_zMCQjZIHO
+dq_scalar: "${env:POOL}"
+sq_scalar: '${env:POOL}'
+plain_scalar: ${env:POOL}
+block_embed: 'pre/${env:POOL}/post'
+block_seq:
+  - 'pre/${env:POOL}'
+flow_seq_env: ['arn:userpool/${env:POOL}']
+flow_seq_self: ['arn:userpool/${self:base}']
+flow_seq_opt: ['stage/${opt:stage}']

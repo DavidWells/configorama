@@ -2,6 +2,7 @@ const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
 const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/strings/bracketMatcher')
+const { isInsideQuotes } = require('../utils/strings/quoteAware')
 
 /**
  * Loader for custom CF syntax
@@ -123,19 +124,33 @@ function preProcess(ymlStr = '') {
       console.log('hasNested', hasNested)
       /** */
       if (hasNestedVars && hasNestedVars.length) {
-        let fixedText = txt
-        hasNestedVars.forEach((nested) => {
+        // Only wrap BARE variables (outside any quoted scalar). A variable already
+        // inside a quoted element like ['arn/${env:X}'] is already a safe string, so
+        // wrapping it would inject literal quotes into the resolved value.
+        const wraps = []
+        // findOutermostVariables returns one entry per occurrence, so dedupe before
+        // scanning to avoid collecting the same span multiple times.
+        const uniqueVars = [...new Set(hasNestedVars)]
+        uniqueVars.forEach((nested) => {
           // console.log('nested', nested)
-          if (txt.indexOf(`"${nested}"`) > -1) {
-            return
+          let from = 0
+          let idx
+          while ((idx = txt.indexOf(nested, from)) > -1) {
+            if (!isInsideQuotes(txt, idx)) {
+              wraps.push([idx, idx + nested.length])
+            }
+            from = idx + nested.length
           }
-          if (txt.indexOf(`'${nested}'`) > -1) {
-            return
-          }
-          /* Replace ALL occurrences of variable wrapped in quotes */
-          fixedText = fixedText.replaceAll(nested, `"${nested}"`)
         })
-        ymlStr = ymlStr.replace(txt, fixedText)
+        if (wraps.length) {
+          /* Wrap right-to-left so earlier indices stay valid */
+          wraps.sort((a, b) => b[0] - a[0])
+          let fixedText = txt
+          for (const [start, end] of wraps) {
+            fixedText = `${fixedText.slice(0, start)}"${fixedText.slice(start, end)}"${fixedText.slice(end)}`
+          }
+          ymlStr = ymlStr.replace(txt, fixedText)
+        }
       }
     })
   }
