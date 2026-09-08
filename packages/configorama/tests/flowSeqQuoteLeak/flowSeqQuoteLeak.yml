@@ -8,3 +8,8 @@ block_seq:
 flow_seq_env: ['arn:userpool/${env:POOL}']
 flow_seq_self: ['arn:userpool/${self:base}']
 flow_seq_opt: ['stage/${opt:stage}']
+flow_obj_sq: {a: 'arn:userpool/${env:POOL}'}
+flow_obj_dq: {a: "arn:userpool/${env:POOL}"}
+flow_arr_in_obj: {a: ['arn:userpool/${env:POOL}']}
+flow_seq_bare: [${env:POOL}]
+flow_seq_fallback_sq: ['${opt:missing, ${env:POOL}}']

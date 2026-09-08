@@ -34,4 +34,13 @@ test('env ref in flow sequence', () => assert.is(config.flow_seq_env[0], `arn:us
 test('self ref in flow sequence', () => assert.is(config.flow_seq_self[0], `arn:userpool/${POOL}`))
 test('opt ref in flow sequence', () => assert.is(config.flow_seq_opt[0], 'stage/dev'))
 
+// Same bug in flow OBJECTS and arrays nested in objects (single- and double-quoted).
+test('embedded in single-quoted flow object', () => assert.is(config.flow_obj_sq.a, `arn:userpool/${POOL}`))
+test('embedded in double-quoted flow object', () => assert.is(config.flow_obj_dq.a, `arn:userpool/${POOL}`))
+test('embedded in flow array nested in object', () => assert.is(config.flow_arr_in_obj.a[0], `arn:userpool/${POOL}`))
+
+// A bare variable IS still quote-protected so YAML parses it as a string.
+test('bare var in flow sequence still resolves', () => assert.is(config.flow_seq_bare[0], POOL))
+test('nested-var fallback in quoted flow element', () => assert.is(config.flow_seq_fallback_sq[0], POOL))
+
 test.run()

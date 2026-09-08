@@ -97,6 +97,42 @@ const KEY_OBJECT = /^[ \t]*[^":\s]*:\s+\{/gm
 const INNER_ARRAY = /\[(?:[^\[\]])*\]/g
 
 /**
+ * Wrap BARE ${...} variables (those not already inside a quoted scalar) in double
+ * quotes so the YAML parser treats them as strings instead of choking on `${`.
+ * A variable already inside a quoted element like ['arn/${env:X}'] is already a safe
+ * string, so wrapping it would inject literal quotes into the resolved value. A
+ * variable whose own text contains a double quote (e.g. a ${opt:x, "def"} fallback)
+ * is skipped, since double-wrapping it would produce invalid nested quotes; a
+ * variable containing only single quotes is safe to wrap in double quotes.
+ * @param {string} txt - A flow array/object substring containing variables
+ * @returns {string} The substring with bare variables wrapped
+ */
+function wrapBareVariables(txt) {
+  // findOutermostVariables returns one entry per occurrence, so dedupe first.
+  const uniqueVars = [...new Set(findOutermostVariables(txt))]
+  const wraps = []
+  uniqueVars.forEach((nested) => {
+    if (nested.indexOf('"') > -1) return
+    let from = 0
+    let idx
+    while ((idx = txt.indexOf(nested, from)) > -1) {
+      if (!isInsideQuotes(txt, idx)) {
+        wraps.push([idx, idx + nested.length])
+      }
+      from = idx + nested.length
+    }
+  })
+  if (!wraps.length) return txt
+  /* Wrap right-to-left so earlier indices stay valid */
+  wraps.sort((a, b) => b[0] - a[0])
+  let fixedText = txt
+  for (const [start, end] of wraps) {
+    fixedText = `${fixedText.slice(0, start)}"${fixedText.slice(start, end)}"${fixedText.slice(end)}`
+  }
+  return fixedText
+}
+
+/**
  * Pre-process YAML string to handle nested variables and CloudFormation syntax
  * @param {string} [ymlStr=''] - YAML string to pre-process
  * @returns {string} Pre-processed YAML string
@@ -124,31 +160,8 @@ function preProcess(ymlStr = '') {
       console.log('hasNested', hasNested)
       /** */
       if (hasNestedVars && hasNestedVars.length) {
-        // Only wrap BARE variables (outside any quoted scalar). A variable already
-        // inside a quoted element like ['arn/${env:X}'] is already a safe string, so
-        // wrapping it would inject literal quotes into the resolved value.
-        const wraps = []
-        // findOutermostVariables returns one entry per occurrence, so dedupe before
-        // scanning to avoid collecting the same span multiple times.
-        const uniqueVars = [...new Set(hasNestedVars)]
-        uniqueVars.forEach((nested) => {
-          // console.log('nested', nested)
-          let from = 0
-          let idx
-          while ((idx = txt.indexOf(nested, from)) > -1) {
-            if (!isInsideQuotes(txt, idx)) {
-              wraps.push([idx, idx + nested.length])
-            }
-            from = idx + nested.length
-          }
-        })
-        if (wraps.length) {
-          /* Wrap right-to-left so earlier indices stay valid */
-          wraps.sort((a, b) => b[0] - a[0])
-          let fixedText = txt
-          for (const [start, end] of wraps) {
-            fixedText = `${fixedText.slice(0, start)}"${fixedText.slice(start, end)}"${fixedText.slice(end)}`
-          }
+        const fixedText = wrapBareVariables(txt)
+        if (fixedText !== txt) {
           ymlStr = ymlStr.replace(txt, fixedText)
         }
       }
@@ -166,30 +179,10 @@ function preProcess(ymlStr = '') {
         // console.log('obj text', txt)
         const hasNestedVars = txt && findOutermostVariables(txt)
         if (hasNestedVars && hasNestedVars.length) {
-          let fixedText = txt
-          hasNestedVars.forEach((nested) => {
-            const isObject = txt.match(/^\{/) && txt.match(/}$/)
-            // console.log('nested', nested)
-
-            if (nested.match(/^\${/) && (nested.match(/"/) || nested.match(/'/)) && !isObject) {
-              return
-            }
-
-            // Fallback comma ${opt:stage, dev}
-            if (nested.match(/^\${/) && nested.match(/,/) && !txt.match(/\n/) ) {
-              return
-            }
-
-            if (txt.indexOf(`"${nested}"`) > -1) {
-              return
-            }
-            if (txt.indexOf(`'${nested}'`) > -1) {
-              return
-            }
-            /* Replace ALL occurrences of variable wrapped in quotes */
-            fixedText = fixedText.replaceAll(nested, `"${nested}"`)
-          })
-          ymlStr = ymlStr.replace(txt, fixedText)
+          const fixedText = wrapBareVariables(txt)
+          if (fixedText !== txt) {
+            ymlStr = ymlStr.replace(txt, fixedText)
+          }
         }
       })
     }
