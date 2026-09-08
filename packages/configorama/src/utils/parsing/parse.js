@@ -15,6 +15,44 @@ const cloudFormationSchema = require('./cloudformationSchema')
 
 const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
 
+/**
+ * Turn a cryptic js-yaml flow-collection error into an actionable configorama
+ * message when the cause is a variable embedded in an unquoted flow entry
+ * (e.g. `key: [arn/${env:X}]`). Returns the original error otherwise.
+ * @param {Error} yamlErr - The YAMLException thrown by the parser
+ * @param {string} contents - The original YAML source
+ * @param {string} filePath - Path to the config file
+ * @returns {Error} An enhanced error, or the original
+ */
+function enhanceYamlError(yamlErr, contents, filePath) {
+  const isFlowError = /missed comma between flow collection entries|flow collection/i.test(yamlErr.message || '')
+  const lineNum = yamlErr.mark && typeof yamlErr.mark.line === 'number' ? yamlErr.mark.line : -1
+  if (!isFlowError || lineNum < 0) return yamlErr
+
+  const lineText = String(contents).split(/\r?\n/)[lineNum]
+  // Only rewrite when the offending line has a flow collection AND a variable that
+  // is not already wrapped in quotes ('${...} or "${...}).
+  const hasFlow = lineText && (lineText.indexOf('[') > -1 || lineText.indexOf('{') > -1)
+  const hasUnquotedVar = lineText && /(^|[^'"])\$\{/.test(lineText)
+  if (!hasFlow || !hasUnquotedVar) return yamlErr
+
+  const loc = `${filePath}:${lineNum + 1}`
+  const message = [
+    'configorama: could not parse YAML — a variable is embedded in an unquoted flow collection entry.',
+    '',
+    `  ${loc}`,
+    `    ${lineText.trim()}`,
+    '',
+    'Wrap the whole entry in quotes so it parses as a string:',
+    "    key: ['arn:userpool/${env:POOL}']   # not   key: [arn:userpool/${env:POOL}]",
+    '',
+    `(YAML parser: ${String(yamlErr.message || '').split('\n')[0]})`
+  ].join('\n')
+  const enhanced = new Error(message)
+  enhanced.original = yamlErr
+  return enhanced
+}
+
 const KNOWN_EXTENSIONS = new Set([
   '.yml', '.yaml', '.json', '.json5', '.jsonc',
   '.toml', '.tml', '.ini',
@@ -65,7 +103,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
           schema: cloudFormationSchema.schema,
         })
         if (result.error) {
-          throw result.error
+          throw enhanceYamlError(result.error, contents, filePath)
         }
         configObject = result.data
       } else {
