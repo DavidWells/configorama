@@ -169,6 +169,30 @@ function maskBlockScalars(ymlStr) {
   return lines.join('\n')
 }
 
+/*
+ * Text before a `[` or `{` on its line when that bracket starts a value: indentation
+ * only, `key: `, a `- ` or `? ` item, `"key":` (JSON style), or `[` `{` `,` of an
+ * enclosing flow collection, optionally followed by tags/anchors (!Join, &a).
+ */
+const FLOW_START_PREFIX = /(?:^|[[{,]|["']:|:[ \t]|(?:^|[ \t])[-?][ \t])[ \t]*(?:[!&][^\s[\]{},]*[ \t]+)*$/
+
+/**
+ * Whether the `[` or `{` at idx opens a YAML flow collection. A bracket inside a
+ * quoted scalar ("{${x}}") or mid plain scalar (echo a[${x}]) is literal text, and
+ * wrapping vars inside it would inject quotes into the value or break parsing.
+ * @param {string} ymlStr - YAML text
+ * @param {number} idx - Index of the `[` or `{`
+ * @returns {boolean} True if the bracket starts a flow collection
+ */
+function opensFlowCollection(ymlStr, idx) {
+  const lineStart = ymlStr.lastIndexOf('\n', idx - 1) + 1
+  const nl = ymlStr.indexOf('\n', idx)
+  const lineText = ymlStr.slice(lineStart, nl === -1 ? undefined : nl)
+  const col = idx - lineStart
+  if (isInsideQuotes(lineText, col)) return false
+  return FLOW_START_PREFIX.test(lineText.slice(0, col))
+}
+
 /**
  * Pre-process YAML string to handle nested variables and CloudFormation syntax
  * @param {string} [ymlStr=''] - YAML string to pre-process
@@ -184,8 +208,9 @@ function preProcess(ymlStr = '') {
   // out -> y: !Not [!Equals [!Join ['', "${param:xyz}"]]]
   if (ymlStr && ymlStr.indexOf('[') > -1) {
     // Collect edits by index so we can skip brackets that are literal content of a
-    // quoted scalar (key: "[${x}]"), where a real flow array's `[` is never inside
-    // quotes. Apply right-to-left so earlier indices stay valid.
+    // quoted scalar (key: "[${x}]") or plain scalar (key: echo a[${x}]), where a real
+    // flow array's `[` is never inside quotes and always starts a value. Apply
+    // right-to-left so earlier indices stay valid.
     /** @type {Array<[number, number, string]>} */
     const edits = []
     // Scan with block scalar content blanked; a match that differs from the real
@@ -196,10 +221,7 @@ function preProcess(ymlStr = '') {
       if (typeof idx !== 'number') continue
       const txt = ymlStr.slice(idx, idx + m[0].length)
       if (txt !== m[0]) continue
-      const lineStart = ymlStr.lastIndexOf('\n', idx - 1) + 1
-      const nl = ymlStr.indexOf('\n', idx)
-      const lineText = ymlStr.slice(lineStart, nl === -1 ? undefined : nl)
-      if (isInsideQuotes(lineText, idx - lineStart)) continue
+      if (!opensFlowCollection(ymlStr, idx)) continue
       const hasNestedVars = findOutermostVariables(txt)
       if (!hasNestedVars || !hasNestedVars.length) continue
       const fixedText = wrapBareVariables(txt)
@@ -216,9 +238,10 @@ function preProcess(ymlStr = '') {
   /* If have yaml object and vars not wrapped in quotes, wrap them */
   const objScanStr = maskBlockScalars(ymlStr)
   if (objScanStr.match(KEY_OBJECT)) {
-    // Brace pairs outside block scalar content, as [start, end) ranges into ymlStr
+    // Flow mappings outside block scalar content, as [start, end) ranges into ymlStr
     const ranges = findOutermostBraceRanges(objScanStr)
       .filter(([start, end]) => objScanStr.slice(start, end) === ymlStr.slice(start, end))
+      .filter(([start]) => opensFlowCollection(ymlStr, start))
     const values = ranges.map(([start, end]) => ymlStr.slice(start, end))
     // console.log('values', values)
     /** @type {Array<[number, number, string]>} */

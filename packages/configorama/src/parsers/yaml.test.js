@@ -310,4 +310,71 @@ script: !Sub |
   assert.is(preProcess(input), input)
 })
 
-test.run() 
+// ==========================================
+// Brackets/braces that are literal text (inside a quoted or plain scalar) are not
+// flow collections: preProcess must not wrap vars inside them
+// ==========================================
+
+test('preProcess - braces inside a double-quoted scalar are left alone', () => {
+  const input = `obj: { a: 1 }
+v: "{\${self:stage}}"
+`
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - braces inside a single-quoted scalar are left alone', () => {
+  const input = `obj: { a: 1 }
+v: 'x {\${self:stage}} y'
+`
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - braces and brackets mid plain scalar are left alone', () => {
+  const input = `obj: { a: 1 }
+braces: pre {\${self:stage}} post
+brackets: pre [\${self:stage}] post
+attached: echo a[\${self:stage}]
+url: http://x[\${self:stage}]
+dashed: pre-[\${self:stage}]
+`
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - CloudFormation dynamic reference mid plain scalar is not quoted', () => {
+  const input = `obj: { a: 1 }
+v: pre {{resolve:ssm:/my/param}} post
+`
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - flow collections in value positions still get bare vars wrapped', () => {
+  const input = `obj: {a: \${self:stage}}
+tagged: !Join [ '', [ \${self:stage} ] ]
+seq:
+  - {a: \${self:stage}}
+  - [\${self:stage}]
+inArr: [ {a: \${self:stage}}, [\${self:stage}] ]
+multi: [
+  \${self:stage},
+  {a: \${self:stage}}
+]
+anchored: &x [\${self:stage}]
+json: {"a":[\${self:stage}]}
+`
+  const expected = `obj: {a: "\${self:stage}"}
+tagged: !Join [ '', [ "\${self:stage}" ] ]
+seq:
+  - {a: "\${self:stage}"}
+  - ["\${self:stage}"]
+inArr: [ {a: "\${self:stage}"}, ["\${self:stage}"] ]
+multi: [
+  "\${self:stage}",
+  {a: "\${self:stage}"}
+]
+anchored: &x ["\${self:stage}"]
+json: {"a":["\${self:stage}"]}
+`
+  assert.is(preProcess(input), expected)
+})
+
+test.run()

@@ -1,0 +1,8 @@
+stage: dev
+obj: { a: ${self:stage} }
+quotedBrace: "{${self:stage}}"
+singleQuotedBrace: 'x {${self:stage}} y'
+plainBrace: pre {${self:stage}} post
+plainBracket: pre [${self:stage}] post
+attachedBracket: echo a[${self:stage}]
+flowAfter: [ ${self:stage}, b ]
