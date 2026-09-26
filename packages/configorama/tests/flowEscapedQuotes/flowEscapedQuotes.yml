@@ -1,0 +1,6 @@
+stage: dev
+flow: [ "\"A/${self:stage}\"", b ]
+flowBackslash: [ "a\\", ${self:stage} ]
+flowSingle: [ 'it''s ${self:stage}' ]
+flowSingleThenBare: [ 'it''s', ${self:stage} ]
+flowObj: { a: "\"A/${self:stage}\"", b: ${self:stage} }

@@ -1,6 +1,21 @@
 /* Quote-aware string processing utilities */
 
 /**
+ * Length of an escape sequence starting at idx inside a quoted string, or 0.
+ * Inside double quotes a backslash escapes the next char (\" and \\).
+ * Inside single quotes '' is an escaped quote (YAML). Backslash is literal there.
+ * @param {string} str - String being scanned
+ * @param {number} idx - Current index (inside a quoted string)
+ * @param {string} quoteChar - The quote char that opened the string
+ * @returns {number} Number of chars the escape sequence spans (0 if none)
+ */
+function escapeLength(str, idx, quoteChar) {
+  if (quoteChar === '"' && str[idx] === '\\' && idx + 1 < str.length) return 2
+  if (quoteChar === "'" && str[idx] === "'" && str[idx + 1] === "'") return 2
+  return 0
+}
+
+/**
  * Find index of a character/pattern outside of quoted strings
  * @param {string} str - String to search
  * @param {string|function} matcher - Char to find, or function(str, idx) => matchLength|0
@@ -13,8 +28,11 @@ function findOutsideQuotes(str, matcher, startIdx = 0) {
 
   for (let i = startIdx; i < str.length; i++) {
     const ch = str[i]
+    const esc = inQuote ? escapeLength(str, i, quoteChar) : 0
 
-    if (!inQuote && (ch === '"' || ch === "'")) {
+    if (esc) {
+      i += esc - 1
+    } else if (!inQuote && (ch === '"' || ch === "'")) {
       inQuote = true
       quoteChar = ch
     } else if (inQuote && ch === quoteChar) {
@@ -50,8 +68,12 @@ function replaceOutsideQuotes(str, pattern, replacement) {
 
   while (i < str.length) {
     const ch = str[i]
+    const esc = inQuote ? escapeLength(str, i, quoteChar) : 0
 
-    if (!inQuote && (ch === '"' || ch === "'")) {
+    if (esc) {
+      result += str.substring(i, i + esc)
+      i += esc
+    } else if (!inQuote && (ch === '"' || ch === "'")) {
       inQuote = true
       quoteChar = ch
       result += ch
@@ -95,7 +117,10 @@ function isInsideQuotes(str, idx) {
 
   for (let i = 0; i < str.length && i <= idx; i++) {
     const ch = str[i]
-    if (!inQuote && (ch === '"' || ch === "'")) {
+    const esc = inQuote ? escapeLength(str, i, quoteChar) : 0
+    if (esc) {
+      i += esc - 1
+    } else if (!inQuote && (ch === '"' || ch === "'")) {
       inQuote = true
       quoteChar = ch
     } else if (inQuote && ch === quoteChar) {
@@ -120,7 +145,10 @@ function getQuoteRanges(str) {
 
   for (let i = 0; i < str.length; i++) {
     const ch = str[i]
-    if (!inQuote && (ch === '"' || ch === "'")) {
+    const esc = inQuote ? escapeLength(str, i, quoteChar) : 0
+    if (esc) {
+      i += esc - 1
+    } else if (!inQuote && (ch === '"' || ch === "'")) {
       inQuote = true
       quoteChar = ch
       quoteStart = i
