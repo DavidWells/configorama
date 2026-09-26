@@ -16,6 +16,7 @@ function comparable(config) {
     service: config.service,
     stage: config.stage,
     database: config.database,
+    enabled: config.enabled,
   }
 }
 
@@ -75,32 +76,6 @@ test('cross-format equivalent configs resolve consistently where formats overlap
   }
 
   assertGolden('cross-format-equivalence', outputs)
-})
-
-test('cross-format differences are documented instead of hidden', async () => {
-  const envBackup = process.env.CONF_DB_HOST
-  process.env.CONF_DB_HOST = 'db.internal'
-
-  try {
-    const yaml = await configorama(path.join(fixtureDir, 'equivalent.yml'), {
-      options: { stage: 'prod', port: 6543, enabled: 'false' }
-    })
-    const hcl = await configorama(path.join(fixtureDir, 'equivalent.hcl'), {
-      options: { stage: 'prod', port: 6543, enabled: 'false' }
-    })
-
-    assertGolden('cross-format-differences', {
-      hclBooleanFilter: {
-        yamlEnabled: yaml.enabled,
-        hclEnabled: hcl.enabled,
-        status: 'documented',
-        reason: 'HCL $[] variable parsing currently resolves the option value but does not apply the Boolean filter in this fixture.',
-      }
-    })
-  } finally {
-    if (envBackup === undefined) delete process.env.CONF_DB_HOST
-    else process.env.CONF_DB_HOST = envBackup
-  }
 })
 
 test.run()

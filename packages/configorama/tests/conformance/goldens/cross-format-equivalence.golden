@@ -4,6 +4,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -12,6 +13,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -20,6 +22,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -28,6 +31,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -36,6 +40,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -44,6 +49,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -52,6 +58,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   },
@@ -60,6 +67,7 @@
       "host": "db.internal",
       "port": 6543
     },
+    "enabled": false,
     "service": "demo",
     "stage": "prod"
   }

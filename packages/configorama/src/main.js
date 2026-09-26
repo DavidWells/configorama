@@ -2402,15 +2402,7 @@ Missing Value ${missingValue} - ${matchedString}
           return !this.filterCache[valueObject.path].includes(filterCacheKey(filter, this.config))
         })
       }
-      property = foundFilters.reduce((acc, filter) => {
-        const { name, args } = parseFilter(filter, this.config)
-        const newVal = args && args.length > 0
-          ? this.filters[name](acc, ...args)
-          : this.filters[name](acc)
-        // console.log('PROPERTY', newVal)
-        return newVal
-      }, property)
-      this.filterCache[valueObject.path] = (this.filterCache[valueObject.path] || []).concat(foundFilters.map((f) => filterCacheKey(f, this.config)))
+      property = this.applyFilters(property, foundFilters, valueObject.path)
       // console.log('NEW PROPERTY', property)
       // console.log('typeof property', typeof property)
     }
@@ -2428,6 +2420,27 @@ Missing Value ${missingValue} - ${matchedString}
       caller: 'end',
       count: this.callCount,
     }
+  }
+  /**
+   * Run filters on a value and record them in the path's filter cache so the same
+   * filters are not run again on the populated value
+   * @param {any} value - The value to filter
+   * @param {string[]} filters - Filter expressions, e.g. ['toUpperCase', "split(',')"]
+   * @param {string[]} [pathValue] - Config path the value belongs to
+   * @returns {any} The filtered value
+   */
+  applyFilters(value, filters, pathValue) {
+    const filtered = filters.reduce((acc, filter) => {
+      const { name, args } = parseFilter(filter, this.config)
+      const newVal = args && args.length > 0
+        ? this.filters[name](acc, ...args)
+        : this.filters[name](acc)
+      // console.log('PROPERTY', newVal)
+      return newVal
+    }, value)
+    const cacheKey = String(pathValue)
+    this.filterCache[cacheKey] = (this.filterCache[cacheKey] || []).concat(filters.map((f) => filterCacheKey(f, this.config)))
+    return filtered
   }
   // ###############
   // ## VARIABLES ##
@@ -2451,6 +2464,14 @@ Missing Value ${missingValue} - ${matchedString}
     // process.exit(1)
     /** */
 
+    // Filters written after the last fallback (${a, 'b' | f}) apply to whichever value wins,
+    // so resolve the last item without them and apply them to the winner below
+    const lastIndex = variableStrings.length - 1
+    const [lastValue, ...trailingFilters] = splitOnPipe(variableStrings[lastIndex])
+    if (trailingFilters.length) {
+      variableStrings = variableStrings.slice(0, lastIndex).concat(lastValue.trim())
+    }
+
     if (variableStrings.length === 2) {
       const firstValue = variableStrings[0]
       const secondValue = variableStrings[1]
@@ -2459,9 +2480,7 @@ Missing Value ${missingValue} - ${matchedString}
         && isString(secondValue) && !secondValue.match(this.variablesKnownTypes) && !this.variableSyntaxTest.test(secondValue)
       ) {
         if (!isSurroundedByQuotes(secondValue) && !/^-?\d+(\.\d+)?$/.test(secondValue) && !startsWithQuotedPipe(secondValue)) {
-          // Quote only the value: filters (3000 | Number) apply to whichever fallback wins
-          // and run once on the populated result, not on this item
-          variableStrings = [firstValue, ensureQuote(splitOnPipe(secondValue)[0].trim())]
+          variableStrings = [firstValue, ensureQuote(secondValue)]
         }
         // console.log('new overwrite variableStrings', variableStrings)
       }
@@ -2504,10 +2523,13 @@ Missing Value ${missingValue} - ${matchedString}
 
       if (deepProperties > 0) {
         // Reconstruct a minimal variable string with deep refs, not the full outer string
-        const reconstructed = this.varPrefix + deepVariableParts.join(', ') + this.varSuffix
+        const filterSuffix = trailingFilters.map((f) => ` | ${f.trim()}`).join('')
+        const reconstructed = this.varPrefix + deepVariableParts.join(', ') + filterSuffix + this.varSuffix
         return Promise.resolve(reconstructed)
       }
-      return Promise.resolve(extractedValues.find(isValidValue)) // resolve first valid value, else undefined
+      const winner = extractedValues.find(isValidValue) // first valid value, else undefined
+      if (winner === undefined || !trailingFilters.length) return Promise.resolve(winner)
+      return Promise.resolve(this.applyFilters(winner, trailingFilters.map((f) => f.trim()), valueObject.path))
     })
   }
 
