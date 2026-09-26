@@ -1,15 +1,15 @@
 module.exports = (config, x, y, z) => {
-  console.log('async fn called withconfig', config)
-  console.log(`x`, x)
-  console.log(`y`, y)
-  console.log(`z`, z)
+  if (process.env.TEST_VERBOSE) console.log('async fn called withconfig', config)
+  if (process.env.TEST_VERBOSE) console.log(`x`, x)
+  if (process.env.TEST_VERBOSE) console.log(`y`, y)
+  if (process.env.TEST_VERBOSE) console.log(`z`, z)
   // simulate remote config fetch
   return fetchSecretsFromRemoteStore(x, y, z)
 }
 
 function fetchSecretsFromRemoteStore(x, y, z) {
   return delay(0).then(() => {
-    console.log('delay 10')
+    if (process.env.TEST_VERBOSE) console.log('delay 10')
     return Promise.resolve('asyncval')
   })
 }

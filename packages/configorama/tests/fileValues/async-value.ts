@@ -10,7 +10,7 @@ function delayWithValue(ms: number): Promise<string> {
 }
 
 async function fetchSecretsFromRemoteStore(config?: ConfigArgs): Promise<string> {
-  console.log('TypeScript async function called with:', config)
+  if (process.env.TEST_VERBOSE) console.log('TypeScript async function called with:', config)
   return delayWithValue(100)
 }
 

@@ -2,6 +2,8 @@ const path = require('path')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
+// console.log output below prints only with TEST_VERBOSE=1
+const console = require('../utils').quietConsole
 
 test('cron() basic patterns', async () => {
   const configFilePath = path.join(__dirname, 'cronValue.yml')

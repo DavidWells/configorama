@@ -1,1 +1,1 @@
-console.log('js-dev-one')
+if (process.env.TEST_VERBOSE) console.log('js-dev-one')

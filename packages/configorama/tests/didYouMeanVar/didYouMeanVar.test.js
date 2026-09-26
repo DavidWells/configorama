@@ -3,6 +3,8 @@
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
+// console.log output below prints only with TEST_VERBOSE=1
+const console = require('../utils').quietConsole
 
 async function errorFor(config, opts) {
   try { await configorama(config, { configDir: __dirname, ...opts }); return '' }

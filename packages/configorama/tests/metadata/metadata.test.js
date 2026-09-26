@@ -4,6 +4,8 @@ const assert = require('uvu/assert')
 const path = require('path')
 const { deepLog } = require('../utils')
 const configorama = require('../../src')
+// console.log output below prints only with TEST_VERBOSE=1
+const console = require('../utils').quietConsole
 
 test('Nested file references', async () => {
   const configFile = path.join(__dirname, 'test-config-two.yml')

@@ -5,7 +5,7 @@ module.exports = (config) => {
 
 function fetchSecretsFromRemoteStore() {
   return delay(0).then(() => {
-    console.log('fetchSecretsFromRemoteStore delay 10')
+    if (process.env.TEST_VERBOSE) console.log('fetchSecretsFromRemoteStore delay 10')
     return Promise.resolve({
       test: true,
       nested: {

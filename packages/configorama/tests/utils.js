@@ -3,6 +3,29 @@ const os = require('os')
 const path = require('path')
 const util = require('util')
 
+// Test detail output is opt-in: with TEST_VERBOSE=1 test files print what they log
+const TEST_VERBOSE = !!process.env.TEST_VERBOSE
+
+/**
+ * Print only when TEST_VERBOSE is set
+ * @param {(...args: any[]) => void} write - console method to print with
+ * @returns {(...args: any[]) => void} Gated method
+ */
+function whenVerbose(write) {
+  return (...args) => { if (TEST_VERBOSE) write(...args) }
+}
+
+/**
+ * console for test files: log/info/dir/table print only with TEST_VERBOSE=1, so a normal
+ * run shows just results; warn/error always print
+ */
+const quietConsole = Object.assign(Object.create(console), {
+  log: whenVerbose(console.log.bind(console)),
+  info: whenVerbose(console.info.bind(console)),
+  dir: whenVerbose(console.dir.bind(console)),
+  table: whenVerbose(console.table.bind(console)),
+})
+
 // Track accessed config keys across test files
 let accessedKeys = new Set()
 
@@ -24,7 +47,7 @@ function checkUnusedConfigValues(config = {}) {
   const unusedKeys = new Set([...allKeys].filter(x => !accessedKeys.has(x)))
 
   if (unusedKeys.size > 0) {
-    console.log('\n\x1b[31mNotice: Untested config values:\x1b[0m\n', [...unusedKeys])
+    quietConsole.log('\n\x1b[31mNotice: Untested config values:\x1b[0m\n', [...unusedKeys])
   }
   // Reset accessed keys for next test run
   accessedKeys = new Set()
@@ -77,8 +100,8 @@ function checkUnusedDeepConfigValues(config = {}) {
   const unusedPaths = [...allPaths].filter(p => !deepAccessedPaths.has(p))
 
   if (unusedPaths.length > 0) {
-    console.log('\n\x1b[31mNotice: Untested config paths:\x1b[0m')
-    unusedPaths.forEach(p => console.log(`  - ${p}`))
+    quietConsole.log('\n\x1b[31mNotice: Untested config paths:\x1b[0m')
+    unusedPaths.forEach(p => quietConsole.log(`  - ${p}`))
   }
   // Reset for next test run
   deepAccessedPaths = new Set()
@@ -91,14 +114,14 @@ const logger = DEBUG ? deepLog : () => {}
 function logValue(value, isFirst, isLast) {
   const prefix = `${isFirst ? '> ' : ''}`
   if (typeof value === 'object') {
-    console.log(`${util.inspect(value, false, null, true)}\n`)
+    quietConsole.log(`${util.inspect(value, false, null, true)}\n`)
     return
   }
   if (isFirst) {
-    console.log(`\n\x1b[33m${prefix}${value}\x1b[0m`)
+    quietConsole.log(`\n\x1b[33m${prefix}${value}\x1b[0m`)
     return
   }
-  console.log((typeof value === 'string' && value.includes('\n')) ? `\`${value}\`` : value)
+  quietConsole.log((typeof value === 'string' && value.includes('\n')) ? `\`${value}\`` : value)
   // isLast && console.log(`\x1b[37m\x1b[1m${'─'.repeat(94)}\x1b[0m\n`)
 }
 
@@ -142,6 +165,7 @@ async function resolveYamlText(yml, settings = {}) {
 }
 
 module.exports = {
+  quietConsole,
   resolveYamlText,
   createTrackingProxy,
   checkUnusedConfigValues,

@@ -6,6 +6,8 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const { parseFile } = require('../../src/utils/parsing/parse')
+// console.log output below prints only with TEST_VERBOSE=1
+const console = require('../utils').quietConsole
 
 test('parse .tf file using parseFile', () => {
   const filePath = path.join(__dirname, 'simple.tf')

@@ -8,7 +8,7 @@ function delay(ms: number): Promise<void> {
 }
 
 export default async function fetchAsyncConfig(args: any): Promise<ConfigObject> {
-  console.log('TS args', args)
+  if (process.env.TEST_VERBOSE) console.log('TS args', args)
   await delay(10)
   return {
     asyncValue: 'async-typescript-value',

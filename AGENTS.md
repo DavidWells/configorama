@@ -19,6 +19,8 @@ at the repo root — it belongs in a package.
 
 - `pnpm test` at the root runs **every** package's tests (`pnpm -r test`).
 - Per package: `cd packages/<pkg> && npm test`, or run a single file with `node`.
+- Test files' own logging (config dumps etc.) is off by default; set `TEST_VERBOSE=1` to see it.
+  In a test file, `const console = require('../utils').quietConsole` gives the gated console.
 - CI (`.github/workflows/test.yml`) runs `pnpm -r --if-present typecheck` and
   `pnpm -r test` on every PR — keep both green.
 

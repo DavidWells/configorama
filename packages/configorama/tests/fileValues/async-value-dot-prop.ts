@@ -14,6 +14,6 @@ function delayWithValue(ms: number): Promise<{ my: { value: string } }> {
 }
 
 export default async function variableResolver(config?: ConfigArgs): Promise<{ my: { value: string } }> {
-  console.log('TypeScript async function called with:', config)
+  if (process.env.TEST_VERBOSE) console.log('TypeScript async function called with:', config)
   return delayWithValue(100)
 }

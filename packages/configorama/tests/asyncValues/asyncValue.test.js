@@ -3,6 +3,8 @@ const { test } = require('uvu')
 const assert = require('uvu/assert')
 const path = require('path')
 const configorama = require('../../src')
+// console.log output below prints only with TEST_VERBOSE=1
+const console = require('../utils').quietConsole
 
 let config
 
