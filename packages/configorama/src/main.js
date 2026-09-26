@@ -2459,7 +2459,9 @@ Missing Value ${missingValue} - ${matchedString}
         && isString(secondValue) && !secondValue.match(this.variablesKnownTypes) && !this.variableSyntaxTest.test(secondValue)
       ) {
         if (!isSurroundedByQuotes(secondValue) && !/^-?\d+(\.\d+)?$/.test(secondValue) && !startsWithQuotedPipe(secondValue)) {
-          variableStrings = [firstValue, ensureQuote(secondValue)]
+          // Quote only the value: filters (3000 | Number) apply to whichever fallback wins
+          // and run once on the populated result, not on this item
+          variableStrings = [firstValue, ensureQuote(splitOnPipe(secondValue)[0].trim())]
         }
         // console.log('new overwrite variableStrings', variableStrings)
       }

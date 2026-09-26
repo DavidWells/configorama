@@ -75,10 +75,22 @@ test('splitOnPipe - splits the filter delimiter but keeps a pipe in the quoted a
   assert.equal(result, ['a ', " append('|bar')"])
 })
 
-test('splitOnPipe - an outer-quoted whole expression still splits on its pipe', () => {
-  // The quotes wrap the entire value, not an arg list — the pipe is a real delimiter
-  const result = splitOnPipe('"5432 | Number"')
-  assert.equal(result, ['"5432 ', ' Number"'])
+test('splitOnPipe - a quoted item is literal text, pipe included', () => {
+  assert.equal(splitOnPipe('"5432 | Number"'), ['"5432 | Number"'])
+  assert.equal(splitOnPipe("'a|b' | toUpperCase"), ["'a|b' ", ' toUpperCase'])
+})
+
+test('splitOnPipe - pipe inside a quoted fallback item is not a delimiter', () => {
+  assert.equal(splitOnPipe("opt:nope, 'a|b'"), ["opt:nope, 'a|b'"])
+  assert.equal(splitOnPipe('opt:nope,"a|b"'), ['opt:nope,"a|b"'])
+})
+
+test('splitOnPipe - filter after a quoted fallback item still splits', () => {
+  assert.equal(splitOnPipe("opt:nope, 'a|b' | toUpperCase"), ["opt:nope, 'a|b' ", ' toUpperCase'])
+})
+
+test('splitOnPipe - quote mid-item does not protect pipes', () => {
+  assert.equal(splitOnPipe("opt:nope, it's | toUpperCase"), ["opt:nope, it's ", ' toUpperCase'])
 })
 
 test('splitOnPipe - a literal close-paren in a quoted arg does not end the arg list early', () => {

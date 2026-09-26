@@ -4,8 +4,9 @@
  * Splits a string on single pipe (|) characters used as filter delimiters, while preserving:
  *   - double pipes (||), which are a logical-OR operator, not a filter delimiter
  *   - any pipe inside a parenthesised filter-argument list, e.g. append('|bar') or replace('a|b','c')
- * Quotes are only significant inside parens (to keep a literal ')' from closing the arg list early);
- * an outer quote that wraps the whole expression (e.g. "5432 | Number") does NOT protect its pipes.
+ * Quotes are significant inside parens (to keep a literal ')' from closing the arg list early) and
+ * around a quoted item, i.e. a quote opening the string or right after a comma ('a|b', opt:x, 'a|b'),
+ * whose pipes are literal text. A quote mid-item (it's | f) protects nothing.
  * A bare single pipe at paren-depth 0 (including bitwise |) still splits.
  * @param {string} str - String to split
  * @returns {string[]} - Array of parts split on filter-delimiter pipes
@@ -29,8 +30,8 @@ function splitOnPipe(str) {
       continue
     }
 
-    // Only treat quotes as arg strings when inside a filter-argument list
-    if (depth > 0 && (ch === "'" || ch === '"')) {
+    // Treat quotes as literal strings inside a filter-argument list or a quoted fallback item
+    if ((ch === "'" || ch === '"') && (depth > 0 || /(^|,)[ \t]*$/.test(current))) {
       quote = ch
       current += ch
       continue
