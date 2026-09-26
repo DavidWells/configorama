@@ -11,7 +11,7 @@ site/out
 
 .specstory
 .oldnax
-
+.nx
 # Stray generated .d.ts files (should only be in /types)
 /parsers
 /resolvers
