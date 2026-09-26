@@ -351,20 +351,7 @@ ${JSON.stringify(options.context, null, 2)}`,
 
     try {
       const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
-      let returnValueFunction = tsFile.config || tsFile.default || tsFile
-      // For default export functions with :property syntax, keep the function and use deep properties
-      // For named exports (non-function module), look up the named export
-      let includeFirstProperty = false
-      if (moduleName && typeof returnValueFunction === 'function') {
-        // Default export function with property access - include first property in path
-        includeFirstProperty = true
-      } else if (moduleName && returnValueFunction && typeof returnValueFunction[moduleName] === 'function') {
-        // Named function export - look it up directly
-        returnValueFunction = returnValueFunction[moduleName]
-      } else if (moduleName) {
-        // Object/value export with property access - keep the export, resolve the prop via getDeeperValue
-        includeFirstProperty = true
-      }
+      const { returnValueFunction, includeFirstProperty } = selectModuleExport(tsFile, moduleName)
 
       return processExecutableFile({
         fileModule: tsFile,
@@ -389,20 +376,7 @@ ${JSON.stringify(options.context, null, 2)}`,
 
     try {
       const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
-      let returnValueFunction = esmFile.config || esmFile.default || esmFile
-      // For default export functions with :property syntax, keep the function and use deep properties
-      // For named exports (non-function module), look up the named export
-      let includeFirstProperty = false
-      if (moduleName && typeof returnValueFunction === 'function') {
-        // Default export function with property access - include first property in path
-        includeFirstProperty = true
-      } else if (moduleName && returnValueFunction && typeof returnValueFunction[moduleName] === 'function') {
-        // Named function export - look it up directly
-        returnValueFunction = returnValueFunction[moduleName]
-      } else if (moduleName) {
-        // Object/value export with property access - keep the export, resolve the prop via getDeeperValue
-        includeFirstProperty = true
-      }
+      const { returnValueFunction, includeFirstProperty } = selectModuleExport(esmFile, moduleName)
 
       return processExecutableFile({
         fileModule: esmFile,
@@ -542,6 +516,35 @@ function extractDeepProperties(variableString, matchedFileString, includeFirstPr
     deepProperties.splice(0, 1)
   }
   return deepProperties.map((prop) => trim(prop)).filter(Boolean)
+}
+
+/**
+ * Choose what a TS/ESM module file ref evaluates. A ref naming an export (:config,
+ * :getConfig) uses that named export: a function is called, a value has the rest of the
+ * path read from it. Otherwise the module's main export (config, then default) is used,
+ * with :name read as a property of its value.
+ * @param {any} fileModule - The loaded module (namespace or interop default)
+ * @param {string|null} moduleName - First path segment after the file, if any
+ * @returns {{ returnValueFunction: any, includeFirstProperty: boolean }}
+ */
+function selectModuleExport(fileModule, moduleName) {
+  const isNamedExport = !!moduleName && fileModule !== null &&
+    (typeof fileModule === 'object' || typeof fileModule === 'function') &&
+    Object.prototype.hasOwnProperty.call(fileModule, moduleName)
+  if (isNamedExport) {
+    // Named function export - call it; named value export - read the path from the module
+    return typeof fileModule[moduleName] === 'function'
+      ? { returnValueFunction: fileModule[moduleName], includeFirstProperty: false }
+      : { returnValueFunction: fileModule, includeFirstProperty: true }
+  }
+  const returnValueFunction = fileModule.config || fileModule.default || fileModule
+  // For default export functions with :property syntax, keep the function and use deep properties
+  if (moduleName && returnValueFunction && typeof returnValueFunction[moduleName] === 'function') {
+    // Named function on the main export - look it up directly
+    return { returnValueFunction: returnValueFunction[moduleName], includeFirstProperty: false }
+  }
+  // Object/value (or function) export with property access - resolve the prop via getDeeperValue
+  return { returnValueFunction, includeFirstProperty: !!moduleName }
 }
 
 /**

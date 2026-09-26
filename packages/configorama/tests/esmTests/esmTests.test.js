@@ -71,7 +71,7 @@ test('ESM async config file resolves correctly', async () => {
   assert.ok(config.timestamp) // Should have a timestamp
 })
 
-test.skip('ESM file references in YAML config work correctly', async () => {
+test('ESM file references in YAML config work correctly', async () => {
   const configFile = path.join(__dirname, 'esm-test-config.yml')
   const config = await configorama(configFile, {
     options: args
@@ -105,7 +105,7 @@ test.skip('ESM file references in YAML config work correctly', async () => {
   // Test composed configuration
   // assert.is(config.combined.fromESM.my, 'config')
   assert.is(config.combined.stage, 'dev')
-  assert.is(config.combined.env, 42) // Default value since env not set in this context
+  assert.is(config.combined.env, '100') // process.env.envNumber is set at the top of this file
 })
 
 test('ESM file with mixed exports (default + named) preserves .config', async () => {

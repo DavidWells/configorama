@@ -95,4 +95,15 @@ test('TS file with mixed exports (default + named) preserves .config', async () 
   assert.is(config.port, 5432)
 })
 
+test('TS named exports in YAML file refs resolve', async () => {
+  const configFile = path.join(__dirname, 'ts-named-exports.yml')
+  const config = await configorama(configFile, {
+    options: args
+  })
+  assert.equal(config.namedConfig, { my: 'named-config', flag: 'dev' })
+  assert.equal(config.namedFunction, { my: 'named-function-config' })
+  assert.equal(config.namedOther, { x: 1 })
+  assert.is(config.namedDeep, 'named-config')
+})
+
 test.run()

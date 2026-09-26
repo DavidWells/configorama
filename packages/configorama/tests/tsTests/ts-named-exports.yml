@@ -1,0 +1,4 @@
+namedConfig: ${file(./ts-named-exports.ts):config}
+namedFunction: ${file(./ts-named-exports.ts):getConfig}
+namedOther: ${file(./ts-named-exports.ts):other}
+namedDeep: ${file(./ts-named-exports.ts):config.my}
