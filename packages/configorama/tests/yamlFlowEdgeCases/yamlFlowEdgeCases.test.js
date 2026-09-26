@@ -157,4 +157,26 @@ b: { k: {{resolve:ssm:/q}}, v: \${self:stage} }
   assert.equal(config.b, { k: '{{resolve:ssm:/q}}', v: 'dev' })
 })
 
+test('a comment that opens a bracket inside a multi-line flow collection', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [
+  x, # see [docs
+  \${self:stage}
+]
+b: { k: 1, # }
+  v: \${self:stage} }
+`)
+  assert.equal(config.a, ['x', 'dev'])
+  assert.equal(config.b, { k: 1, v: 'dev' })
+})
+
+test('a quoted scalar containing ": [" or ": {" is not a flow collection', async () => {
+  const config = await resolveYaml(`stage: dev
+v: "a: [\${self:stage}]"
+w: "k: {\${self:stage}}"
+`)
+  assert.is(config.v, 'a: [dev]')
+  assert.is(config.w, 'k: {dev}')
+})
+
 test.run()

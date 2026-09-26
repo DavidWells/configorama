@@ -80,4 +80,18 @@ test('debug tracing (--debug, DEBUG_IF, DEBUG_EVAL) does not write to stdout', (
   })
 })
 
+test('invalid variableSources writes diagnostics to stderr only', async () => {
+  let error
+  const lines = await captureStdout(async () => {
+    try {
+      await configorama({ a: 1 }, { variableSources: [{}] })
+    } catch (err) {
+      error = err
+    }
+  })
+  assert.instance(error, Error)
+  assert.match(error.message, /Variable source must have a type/)
+  assert.equal(lines, [])
+})
+
 test.run()

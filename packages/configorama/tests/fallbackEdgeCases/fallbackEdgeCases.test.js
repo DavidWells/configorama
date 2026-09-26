@@ -131,4 +131,14 @@ test('deeply nested fallbacks in text', async () => {
   assert.is(await resolveValue('z-${opt:a, ${self:nope, ${stage}}}-z'), 'z-dev-z')
 })
 
+test('an object in a variable source slot still throws', async () => {
+  try {
+    await resolveValue('${env:${self:obj}}')
+    assert.unreachable('should throw')
+  } catch (err) {
+    assert.instance(err, Error)
+    assert.match(err.message, /Invalid variable syntax/)
+  }
+})
+
 test.run()

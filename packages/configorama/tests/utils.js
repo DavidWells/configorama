@@ -111,7 +111,9 @@ let yamlTextDir
 
 /**
  * Resolve YAML text from its own temp file with the async and sync APIs, asserting
- * both agree. A file per call keeps cases isolated from each other.
+ * both agree (or both throw). A file per call keeps cases isolated from each other.
+ * Sync results travel as JSON, so settings with functions (custom variableSources) and
+ * keys resolving to undefined can't use this helper.
  * @param {string} yml - YAML file contents
  * @param {object} [settings] - configorama settings (options defaults to {})
  * @returns {Promise<Record<string, any>>} The resolved config
@@ -126,7 +128,14 @@ async function resolveYamlText(yml, settings = {}) {
   const file = path.join(yamlTextDir, `case-${fs.readdirSync(yamlTextDir).length}.yml`)
   fs.writeFileSync(file, yml)
   const opts = Object.assign({ configDir: yamlTextDir, options: {} }, settings)
-  const config = await configorama(file, opts)
+  let config
+  try {
+    config = await configorama(file, opts)
+  } catch (err) {
+    // The sync API must fail on the same input with the same message
+    assert.throws(() => configorama.sync(file, opts), (syncErr) => syncErr.message.includes(err.message.split('\n')[0]))
+    throw err
+  }
   const syncConfig = configorama.sync(file, opts)
   assert.equal(syncConfig, config, 'sync and async results differ')
   return config
