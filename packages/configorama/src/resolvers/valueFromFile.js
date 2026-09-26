@@ -2,6 +2,7 @@
  * Resolves values from file references (file() and text() syntax)
  */
 const fs = require('fs')
+const path = require('path')
 const { trim } = require('../utils/lodash')
 const { splitCsv } = require('../utils/strings/splitCsv')
 const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
@@ -19,6 +20,7 @@ const JSON5 = require('../parsers/json5')
 const HCL = require('../parsers/hcl')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
+const { rebaseFileRefs } = require('../utils/paths/rebaseFileRefs')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -400,8 +402,8 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   // Process everything except JS, TS, and ESM
   if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
-    /* Read initial file */
-    valueToPopulate = variableFileContents
+    /* Read initial file. Refs written in it are relative to it when their target is there */
+    valueToPopulate = rebaseFileRefs(variableFileContents, path.dirname(fullFilePath), ctx.configPath)
 
     // File reference has :subKey lookup. Must dig deeper
     if (matchedFileString !== variableString) {
