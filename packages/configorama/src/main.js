@@ -216,7 +216,7 @@ const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-value
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
-const { encodeStrayVariableChars, decodeLiteralBraces } = require('./utils/encoders/literal-braces')
+const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -1052,7 +1052,7 @@ class Configorama {
     if (VERBOSE) {
       logHeader('Config Input before processing')
       console.log()
-      deepLog(this.originalConfig)
+      deepLog(decodeLiteralBracesDeep(this.originalConfig))
       console.log()
     }
 
@@ -1060,10 +1060,13 @@ class Configorama {
     const variablesKnownTypes = this.variablesKnownTypes
 
     if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
-      const metadata = this.collectVariableMetadata()
+      // Metadata is collected from encoded text (quoted { } $); decode once for display and callers
+      const encodedMetadata = this.collectVariableMetadata()
+      const metadata = decodeLiteralBracesDeep(encodedMetadata)
+      const shownOriginalConfig = decodeLiteralBracesDeep(this.originalConfig)
 
-      const enrich = await enrichMetadata(
-        metadata,
+      const enrich = decodeLiteralBracesDeep(await enrichMetadata(
+        encodedMetadata,
         this.resolutionTracking,
         this.variableSyntax,
         this.fileRefsFound,
@@ -1073,7 +1076,7 @@ class Configorama {
         undefined, // resolvedConfig not available yet
         this.settings.options,
         this.variableTypes
-      )
+      ))
 
       if (showFoundVariables) {
         deepLog('metadata', metadata)
@@ -1088,7 +1091,7 @@ class Configorama {
       if (this.settings.returnPreResolvedVariableDetails) {
         return Object.assign({}, {
           resolved: false,
-          originalConfig: this.originalConfig 
+          originalConfig: shownOriginalConfig
         }, enrich)
       }
 
@@ -1119,7 +1122,7 @@ class Configorama {
         logHeader('Setup Mode')
         // deepLog('enrich', enrich)
         const setupResult = await runSetup(this.configFilePath || this.config, this.settings, {
-          analysis: Object.assign({ originalConfig: this.originalConfig }, enrich),
+          analysis: Object.assign({ originalConfig: shownOriginalConfig }, enrich),
         })
         this.setupRequirements = setupResult.requirements
 
@@ -1150,7 +1153,7 @@ class Configorama {
     
       /* Exit early if list or info flag is set */
       if (showFoundVariables) {
-        return Promise.resolve(this.config)
+        return Promise.resolve(decodeLiteralBracesDeep(this.config))
       }
     }
 
@@ -1351,8 +1354,12 @@ class Configorama {
       variableTypes: this.variableTypes,
       filterMatch: this.filterMatch,
       configFilePath: this.configFilePath,
-      // Use rawOriginalConfig for metadata display (truly original, no escaping)
-      displayConfig: this.rawOriginalConfig || this.originalConfig,
+      // Use rawOriginalConfig for metadata display (truly original, no escaping). Its quoted
+      // { } $ are encoded like the resolved config's so variables are matched whole; callers
+      // decode the collected metadata once.
+      displayConfig: this.rawOriginalConfig
+        ? encodeQuotedLiteralsDeep(this.rawOriginalConfig, this.varPrefix, this.varSuffix)
+        : this.originalConfig,
       originalConfig: this.originalConfig,
       varSuffix: this.varSuffix,
       varSuffixWithSpacePattern: this.varSuffixWithSpacePattern,

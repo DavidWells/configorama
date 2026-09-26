@@ -3,7 +3,7 @@
 /* eslint-disable no-template-curly-in-string */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { encodeQuotedLiterals, encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, hasLiteralBraces } = require('./literal-braces')
+const { encodeQuotedLiterals, encodeQuotedLiteralsDeep, encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, hasLiteralBraces } = require('./literal-braces')
 
 test('encodeQuotedLiterals - braces and $ in a quoted fallback are encoded', () => {
   const encoded = encodeQuotedLiterals("${opt:x, 'a}b'}")
@@ -77,6 +77,19 @@ test('encodeQuotedLiterals - backslash-escaped quote inside either quote style',
     assert.not.match(encoded.slice(2, -1).replace(/\\/g, ''), /[{}]/, input)
     assert.is(decodeLiteralBraces(encoded), input)
   }
+})
+
+test('encodeQuotedLiteralsDeep - encodes every string in a tree and round-trips', () => {
+  const input = { a: "${opt:x, 'a}b'}", list: ["${opt:y, '{'}", 2], nested: { plain: '{z}' } }
+  const encoded = encodeQuotedLiteralsDeep(input)
+  assert.is(encoded.nested.plain, '{z}')
+  assert.not.match(encoded.a.slice(2, -1), /[{}]/)
+  assert.equal(decodeLiteralBracesDeep(encoded), input)
+})
+
+test('decodeLiteralBracesDeep - decodes object keys too (metadata is keyed by variable text)', () => {
+  const key = encodeQuotedLiterals("${opt:x, 'a}b'}")
+  assert.equal(Object.keys(decodeLiteralBracesDeep({ [key]: 1 })), ["${opt:x, 'a}b'}"])
 })
 
 test.run()

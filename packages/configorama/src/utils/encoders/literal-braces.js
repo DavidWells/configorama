@@ -215,8 +215,9 @@ function decodeLiteralBraces(value) {
 }
 
 /**
- * Decode placeholders in every string of a plain object/array tree (metadata, the
- * preprocessed original config); other values pass through
+ * Decode placeholders in every string and object key of a plain object/array tree
+ * (metadata is keyed by variable text; the preprocessed original config); other values
+ * pass through
  * @param {any} value - Value to decode
  * @returns {any} Decoded copy
  */
@@ -226,7 +227,26 @@ function decodeLiteralBracesDeep(value) {
   if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of Object.keys(value)) result[key] = decodeLiteralBracesDeep(value[key])
+    for (const key of Object.keys(value)) result[decodeLiteralBraces(key)] = decodeLiteralBracesDeep(value[key])
+    return result
+  }
+  return value
+}
+
+/**
+ * encodeQuotedLiterals for every string of a plain object/array tree (a raw config)
+ * @param {any} value - Value to encode
+ * @param {string} [prefix='${'] - Variable prefix
+ * @param {string} [suffix='}'] - Variable suffix
+ * @returns {any} Encoded copy
+ */
+function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
+  if (typeof value === 'string') return encodeQuotedLiterals(value, prefix, suffix)
+  if (Array.isArray(value)) return value.map((item) => encodeQuotedLiteralsDeep(item, prefix, suffix))
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    /** @type {Record<string, any>} */
+    const result = {}
+    for (const key of Object.keys(value)) result[key] = encodeQuotedLiteralsDeep(value[key], prefix, suffix)
     return result
   }
   return value
@@ -234,6 +254,7 @@ function decodeLiteralBracesDeep(value) {
 
 module.exports = {
   decodeLiteralBracesDeep,
+  encodeQuotedLiteralsDeep,
   encodeQuotedLiterals,
   encodeStrayVariableChars,
   decodeLiteralBraces,

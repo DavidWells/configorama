@@ -6,6 +6,7 @@ const os = require('os')
 const path = require('path')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { spawnSync } = require('child_process')
 const configorama = require('../../src')
 const { resolveYamlText } = require('../utils')
 
@@ -61,6 +62,34 @@ test('quoted fallback with braces nested two and three deep', async () => {
 test('a variable inside a quoted fallback still resolves next to braces', async () => {
   assert.is(await resolveValue(`"\${opt:nope, '{\${stage}}'}"`), '{dev}')
   assert.is(await resolveValue(`"\${opt:nope, '\${stage}-{x}'}"`), 'dev-{x}')
+})
+
+test('quoted fallback with braces inside a three-item fallback list', async () => {
+  assert.is(await resolveValue(`"\${opt:a, \${opt:b, '{x}'}, 'z'}"`), '{x}')
+  assert.is(await resolveValue(`"pre \${opt:a, \${opt:b, '{x}'}, 'z'} post"`), 'pre {x} post')
+  assert.is(await resolveValue(`"\${opt:nope, \${UnknownRef}, '{x}'}"`, { allowUnknownVars: true }), '{x}')
+})
+
+test('escaped quote inside a single-quoted fallback with braces', async () => {
+  assert.is(await resolveValue(`"\${opt:nope, 'don\\\\'t {x}'}"`), "don't {x}")
+})
+
+test('a value that looks like a missing variable fails like one written directly', async () => {
+  process.env.QUOTED_BRACES_TPL = '${notavar}'
+  try {
+    for (const value of ['${opt:nope, ${env:QUOTED_BRACES_TPL}}', '${opt:nope, ${notavar}}']) {
+      try {
+        await resolveValue(value)
+        assert.unreachable(`should throw for ${value}`)
+      } catch (err) {
+        assert.instance(err, Error)
+        assert.match(err.message, /notavar/)
+        assert.not.match(err.message, /__CFG_/)
+      }
+    }
+  } finally {
+    delete process.env.QUOTED_BRACES_TPL
+  }
 })
 
 test('a provided value still wins over a quoted fallback with braces', async () => {
@@ -158,6 +187,63 @@ quoted: "\${opt:nope, '__CFG_C125__ }'}"
   assert.is(config.plain, '__CFG_C123__')
   assert.is(config.composed, 'dev __CFG_C123__')
   assert.is(config.quoted, '__CFG_C125__ }')
+})
+
+test('metadata variables record the whole variable and its brace default', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-quoted-braces-vars-'))
+  try {
+    const file = path.join(dir, 'config.yml')
+    fs.writeFileSync(file, `v: "\${opt:nope, 'a}b'}"\n`)
+    const result = await configorama(file, { options: {}, returnMetadata: true })
+    const entries = result.metadata.variables["${opt:nope, 'a}b'}"]
+    assert.ok(entries, `variables keys: ${Object.keys(result.metadata.variables)}`)
+    assert.is(entries[0].defaultValue, 'a}b')
+    assert.equal(entries[0].resolveOrder, ['opt:nope', 'a}b (default)'])
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('sync metadata and originalConfig show the original text', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-quoted-braces-sync-'))
+  try {
+    const file = path.join(dir, 'config.yml')
+    fs.writeFileSync(file, `v: "\${opt:nope, 'a}b'}"\n`)
+    const result = configorama.sync(file, { options: {}, returnMetadata: true })
+    assert.is(result.config.v, 'a}b')
+    assert.not.match(JSON.stringify(result.metadata), /__CFG_/)
+    assert.is(result.originalConfig.v, "${opt:nope, 'a}b'}")
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('async originalConfig shows the original text', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-quoted-braces-orig-'))
+  try {
+    const file = path.join(dir, 'config.yml')
+    fs.writeFileSync(file, `v: "\${opt:nope, 'a}b'}"\n`)
+    const result = await configorama(file, { options: {}, returnMetadata: true })
+    assert.is(result.originalConfig.v, "${opt:nope, 'a}b'}")
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('CLI --info and --verbose output shows no placeholders', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-quoted-braces-cli-'))
+  try {
+    const file = path.join(dir, 'config.yml')
+    fs.writeFileSync(file, `a: "\${opt:nope, 'a}b'}"\n`)
+    for (const flag of ['--info', '--verbose']) {
+      const result = spawnSync(process.execPath, [path.join(__dirname, '../../cli.js'), file, flag], { encoding: 'utf8' })
+      assert.is(result.status, 0, result.stderr)
+      assert.not.match(result.stdout + result.stderr, /__CFG_/, `${flag} output leaked placeholders`)
+      assert.match(result.stdout, /a}b/)
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('no placeholder text leaks into any resolved value', async () => {
