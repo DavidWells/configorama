@@ -18,6 +18,7 @@ const INI = require('../parsers/ini')
 const JSON5 = require('../parsers/json5')
 const HCL = require('../parsers/hcl')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
+const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -166,7 +167,8 @@ async function getValueFromFile(ctx, variableString, options) {
   }
   // console.log('argsToPass', argsToPass)
 
-  const fileDetails = resolveFilePathFromMatch(matchedFileString, syntax, ctx.configPath)
+  // The path's { } $ were encoded while inside the variable expression; decode to open the real file
+  const fileDetails = resolveFilePathFromMatch(decodeLiteralBraces(matchedFileString), syntax, ctx.configPath)
   // console.log('fileDetails', fileDetails)
 
   let { fullFilePath, resolvedPath, relativePath } = fileDetails

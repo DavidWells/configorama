@@ -92,4 +92,18 @@ test('decodeLiteralBracesDeep - decodes object keys too (metadata is keyed by va
   assert.equal(Object.keys(decodeLiteralBracesDeep({ [key]: 1 })), ["${opt:x, 'a}b'}"])
 })
 
+test('encodeQuotedLiterals - file() and text() paths are literal text', () => {
+  for (const input of ['${file(./br/{x}.json):k}', '${file(./br/a$b.json)}', '${text(./{x}.txt)}']) {
+    const encoded = encodeQuotedLiterals(input)
+    assert.not.match(encoded.slice(2, -1), /[{}$]/, input)
+    assert.is(decodeLiteralBraces(encoded), input)
+  }
+})
+
+test('encodeQuotedLiterals - a variable inside a file() path stays live', () => {
+  const encoded = encodeQuotedLiterals('${file(./br/{${self:stage}}.json):k}')
+  assert.ok(encoded.includes('${self:stage}'))
+  assert.is(decodeLiteralBraces(encoded), '${file(./br/{${self:stage}}.json):k}')
+})
+
 test.run()

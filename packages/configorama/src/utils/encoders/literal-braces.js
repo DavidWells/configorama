@@ -79,6 +79,49 @@ function scanQuoted(str, start, syntax) {
 }
 
 /**
+ * Scan a file()/text() path argument from just after its `(` to the matching `)`. A path
+ * is literal text: syntax chars in it are marked for encoding, while variables inside it
+ * (./config.${stage}.json) and quoted paths are scanned as usual.
+ * @param {string} str - Text being scanned
+ * @param {number} start - Index just after the opening paren
+ * @param {Syntax} syntax - Variable syntax
+ * @returns {Scan|null} Index after the closing paren and indexes to encode, or null if unclosed
+ */
+function scanPathArgument(str, start, syntax) {
+  /** @type {number[]} */
+  const encode = []
+  let depth = 1
+  let i = start
+  while (i < str.length) {
+    const ch = str[i]
+    if (str.startsWith(syntax.prefix, i)) {
+      const nested = scanVariable(str, i, syntax)
+      if (!nested) return null
+      encode.push(...nested.encode)
+      i = nested.end
+      continue
+    }
+    if ((ch === "'" || ch === '"') && i === start) {
+      const quoted = scanQuoted(str, i, syntax)
+      if (!quoted) return null
+      encode.push(...quoted.encode)
+      i = quoted.end
+      continue
+    }
+    if (ch === '(') {
+      depth++
+    } else if (ch === ')') {
+      depth--
+      if (depth === 0) return { end: i + 1, encode }
+    } else if (syntax.special.has(ch) || startsPlaceholder(str, i)) {
+      encode.push(i)
+    }
+    i++
+  }
+  return null
+}
+
+/**
  * Scan a variable expression opening at start, marking syntax chars inside its quoted
  * literals for encoding
  * @param {string} str - Text being scanned
@@ -105,6 +148,17 @@ function scanVariable(str, start, syntax, stopQuote = null) {
     }
     if (str.startsWith(syntax.suffix, i)) return { end: i + syntax.suffix.length, encode }
     if (ch === stopQuote) return null
+    // A file()/text() path is literal text up to its closing paren
+    const pathCall = !WORD_CHAR.test(prev) && (str.startsWith('file(', i) || str.startsWith('text(', i))
+    if (pathCall) {
+      const pathArg = scanPathArgument(str, i + 5, syntax)
+      if (pathArg) {
+        encode.push(...pathArg.encode)
+        i = pathArg.end
+        prev = ')'
+        continue
+      }
+    }
     // A quote opens a literal where an item starts, not mid-word (it's)
     if ((ch === "'" || ch === '"') && !WORD_CHAR.test(prev)) {
       const quoted = scanQuoted(str, i, syntax)
@@ -136,9 +190,10 @@ function applyEncoding(str, indexes) {
 }
 
 /**
- * Encode syntax chars inside quoted literals of every variable expression in str:
- * ${opt:x, 'a}b'} keeps its quoted } from ending the expression. Well-formed variables
- * inside a literal (${opt:x, '${self:y}-z'}) stay live.
+ * Encode syntax chars inside quoted literals and file()/text() paths of every variable
+ * expression in str: ${opt:x, 'a}b'} keeps its quoted } from ending the expression, and
+ * ${file(./{x}.json)} its path braces. Well-formed variables inside a literal or path
+ * (${opt:x, '${self:y}-z'}) stay live.
  * @param {string} str - Config string value
  * @param {string} [prefix='${'] - Variable prefix
  * @param {string} [suffix='}'] - Variable suffix
@@ -146,7 +201,9 @@ function applyEncoding(str, indexes) {
  */
 function encodeQuotedLiterals(str, prefix = '${', suffix = '}') {
   if (typeof str !== 'string' || str.indexOf(prefix) === -1) return str
-  if (str.indexOf("'") === -1 && str.indexOf('"') === -1) return str
+  const hasLiteral = str.indexOf("'") !== -1 || str.indexOf('"') !== -1 ||
+    str.indexOf('file(') !== -1 || str.indexOf('text(') !== -1
+  if (!hasLiteral) return str
   const syntax = { prefix, suffix, special: syntaxChars(prefix, suffix) }
   /** @type {number[]} */
   const encode = []
