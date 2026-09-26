@@ -1,0 +1,8 @@
+stage: dev
+afterVar: "${stage} ${opt:b, ${self:nope}, 'z'}"
+numberAfterVar: "${stage}-${opt:b, ${self:nope}, 7}"
+textAround: "pre-${opt:b, ${self:nope}, 'z'}-post"
+chained: "${stage}/${opt:b, ${self:nope}, ${self:nope2}, 'z'}"
+twoInText: "${opt:a, ${self:nope}, 'x'}/${opt:b, ${self:nope}, 'y'}"
+whole: "${opt:b, ${self:nope}, 'z'}"
+wholeNumber: ${opt:b, ${self:nope}, 7}

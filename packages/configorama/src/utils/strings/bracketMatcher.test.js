@@ -155,6 +155,27 @@ test('findEnclosingVariable - returns null when variable is absent or suffix is 
   assert.is(findEnclosingVariable('{{a}}', '{{a}}', '{{', '}}'), null)
 })
 
+test('findEnclosingVariable - index picks the occurrence: nested copy first', () => {
+  const text = "${opt:nope, ${Missing}, 'fb'} and ${Missing}"
+  assert.is(findEnclosingVariable(text, '${Missing}', '${', '}', text.indexOf('${Missing}')), "${opt:nope, ${Missing}, 'fb'}")
+  assert.is(findEnclosingVariable(text, '${Missing}', '${', '}', text.lastIndexOf('${Missing}')), '${Missing}')
+})
+
+test('findEnclosingVariable - index picks the occurrence: standalone copy first', () => {
+  const text = "${Missing} and ${opt:nope, ${Missing}, 'fb'}"
+  assert.is(findEnclosingVariable(text, '${Missing}', '${', '}', 0), '${Missing}')
+  assert.is(findEnclosingVariable(text, '${Missing}', '${', '}', text.lastIndexOf('${Missing}')), "${opt:nope, ${Missing}, 'fb'}")
+})
+
+test('findEnclosingVariable - index picks between two different enclosing vars', () => {
+  const text = "${opt:a, ${M}, 'x'} ${opt:b, ${M}, 'y'}"
+  assert.is(findEnclosingVariable(text, '${M}', '${', '}', text.lastIndexOf('${M}')), "${opt:b, ${M}, 'y'}")
+})
+
+test('findEnclosingVariable - index not at the variable returns null', () => {
+  assert.is(findEnclosingVariable('a ${x} b', '${x}', '${', '}', 0), null)
+})
+
 test('findOutermostBraceRanges - returns [start, end) of each outermost pair', () => {
   const text = 'a {b {c}} d {e}'
   const ranges = findOutermostBraceRanges(text)

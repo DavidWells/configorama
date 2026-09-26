@@ -99,13 +99,28 @@ function findOutermostVariables(text) {
  * @param {string} variable - The variable to locate (including prefix/suffix)
  * @param {string} prefix - Variable syntax prefix (e.g. '${')
  * @param {string} suffix - Variable syntax suffix (e.g. '}'); must be one character
+ * @param {number} [index] - Index of the occurrence in text. The same variable can sit
+ *   in different enclosing variables (${a, ${x}, 'fb'} ${x}); without an index the
+ *   first occurrence is used.
  * @returns {string|null} The enclosing outermost variable, or null if not determinable
  */
-function findEnclosingVariable(text, variable, prefix, suffix) {
+function findEnclosingVariable(text, variable, prefix, suffix, index) {
   if (!prefix || !suffix || suffix.length !== 1) return null
   const outermost = findOutermostBraces(text, prefix.slice(-1), suffix, prefix.slice(0, -1))
-  const enclosing = outermost.find((match) => match.indexOf(variable) > -1)
-  return enclosing || null
+  if (typeof index !== 'number') {
+    const enclosing = outermost.find((match) => match.indexOf(variable) > -1)
+    return enclosing || null
+  }
+  if (text.slice(index, index + variable.length) !== variable) return null
+  // Outermost matches are ordered and non-overlapping, so each starts at the first
+  // occurrence of its text after the previous match ends.
+  let cursor = 0
+  for (const match of outermost) {
+    const start = text.indexOf(match, cursor)
+    cursor = start + match.length
+    if (start <= index && index + variable.length <= cursor) return match
+  }
+  return null
 }
 
 module.exports = {

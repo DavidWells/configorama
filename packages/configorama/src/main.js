@@ -94,6 +94,22 @@ function isNestedFilterArgument(property, matchedString) {
   return property.lastIndexOf('|', enclosingOpen) !== -1
 }
 
+/**
+ * Whether two resolved match results hold the same value (unwrapping resolver metadata)
+ * @param {any} a - A resolved match result
+ * @param {any} b - A resolved match result
+ * @returns {boolean} True if both carry the same value
+ */
+function isSameResult(a, b) {
+  /** @param {any} r */
+  const unwrap = (r) => (r && typeof r === 'object' && (r.__internal_only_flag || r.__internal_metadata)) ? r.value : r
+  const x = unwrap(a)
+  const y = unwrap(b)
+  if (x === y) return true
+  if (x && y && typeof x === 'object' && typeof y === 'object') return JSON.stringify(x) === JSON.stringify(y)
+  return false
+}
+
 function resolveConfigFilePath(filePath) {
   const absolutePath = path.resolve(filePath)
   try {
@@ -1594,6 +1610,8 @@ class Configorama {
    * @property {String} match The original property value that matched the variable syntax
    * @property {String} variable The cleaned variable string that specifies the origin for the
    * property value
+   * @property {Number} index Where the match starts in the property value. The same text can
+   * occur more than once, each in its own context (e.g. inside a fallback list or not)
    */
   /**
    * Get matches against the configured variable syntax
@@ -1604,11 +1622,17 @@ class Configorama {
     if (typeof property !== 'string') return property
     const matches = property.match(this.variableSyntax)
     if (!matches || !matches.length) return property
+    // Matches are ordered and non-overlapping, so each starts at the first occurrence
+    // of its text after the previous match ends.
+    let cursor = 0
     return map(matches, (match) => {
       // console.log('match', match)
+      const index = property.indexOf(match, cursor)
+      cursor = index + match.length
       return {
         match: match,
         variable: cleanVariable(match, this.variableSyntax, true, `getMatches ${this.callCount}`),
+        index: index,
       }
     })
   }
@@ -1621,7 +1645,7 @@ class Configorama {
   populateMatches(matches, valueObject, root) {
     // console.log('populateMatches matches', matches)
     return map(matches, (match) => {
-      return this.splitAndGet(match.variable, valueObject, root, match.match)
+      return this.splitAndGet(match.variable, valueObject, root, match.match, match.index)
     })
   }
   /**
@@ -1782,7 +1806,12 @@ class Configorama {
       if (results[i] && typeof results[i] === 'object' && (results[i].__internal_only_flag || results[i].__internal_metadata)) {
         valueToPop = results[i].value
       }
-      result = this.populateVariable(valueObject, matches[i].match, valueToPop)
+      // Copies of the same variable text can resolve differently (one inside a fallback
+      // list, one not). Then replace only this copy; later passes resolve the others.
+      const hasDifferingCopy = matches.some((m, j) => {
+        return j !== i && m.match === matches[i].match && !isSameResult(results[j], results[i])
+      })
+      result = this.populateVariable(valueObject, matches[i].match, valueToPop, matches[i].index, hasDifferingCopy)
       /*
       console.log('> valueToPop', valueToPop)
       console.log('> valueObject', valueObject)
@@ -1869,9 +1898,10 @@ class Configorama {
    * final value for the entirety of the string
    * @param variable The variable string to split and get a final value for
    * @param property The original property string the given variable was extracted from
+   * @param {number} [matchIndex] Where originalVar starts in the property value
    * @returns {Promise} A promise resolving to the final value of the given variable
    */
-  splitAndGet(variable, valueObject, root, originalVar) {
+  splitAndGet(variable, valueObject, root, originalVar, matchIndex) {
     if (DEBUG) {
       console.log('>>>>>>>> Split and Get', variable)
       console.log('valueObject', valueObject)
@@ -1894,10 +1924,10 @@ class Configorama {
       console.log('-----')
     }
     if (parts.length <= 1) {
-      return this.getValueFromSource(parts[0], valueObject, 'splitAndGet', originalVar)
+      return this.getValueFromSource(parts[0], valueObject, 'splitAndGet', originalVar, matchIndex)
     }
     // More than 2 parts, so we need to overwrite
-    return this.overwrite(parts, valueObject, originalVar)
+    return this.overwrite(parts, valueObject, originalVar, matchIndex)
   }
   /**
    * Populate a given property, given the matched string to replace and the value to replace the
@@ -1909,10 +1939,26 @@ class Configorama {
    * @param {Array} [valueObject.resolutionHistory] History of resolution steps.
    * @param matchedString The string in the given property that was matched and is to be replaced.
    * @param valueToPopulate The value to replace the given matched string in the property with.
+   * @param {number} [matchIndex] Where matchedString starts in the property
+   * @param {boolean} [onlyThisCopy] Replace only the copy at matchIndex instead of every copy
    * @returns {{value: any, path?: string[], originalSource?: string, resolutionHistory?: Array, __internal_only_flag?: boolean, caller?: string, count?: number}} The populated property object
    */
-  populateVariable(valueObject, matchedString, valueToPopulate) {
+  populateVariable(valueObject, matchedString, valueToPopulate, matchIndex, onlyThisCopy) {
     let property = valueObject.value
+    /**
+     * Replace every copy of the matched text, or only the copy at matchIndex
+     * @param {string} replaceThis - Text to replace
+     * @param {string} withThis - Replacement text
+     * @param {string} inThis - Text to replace within
+     * @returns {string} Text with the replacement made
+     */
+    const replaceMatch = (replaceThis, withThis, inThis) => {
+      const isAtIndex = onlyThisCopy && typeof matchIndex === 'number' &&
+        replaceThis === matchedString &&
+        inThis.slice(matchIndex, matchIndex + replaceThis.length) === replaceThis
+      if (!isAtIndex) return replaceAll(replaceThis, withThis, inThis)
+      return inThis.slice(0, matchIndex) + withThis + inThis.slice(matchIndex + replaceThis.length)
+    }
     // console.log('init property', property)
 
     if (DEBUG) {
@@ -2060,7 +2106,7 @@ class Configorama {
       ) {
         valueToPopulate = encodeFilterArg(valueToPopulate)
       }
-      property = replaceAll(currentMatchedString, valueToPopulate, property)
+      property = replaceMatch(currentMatchedString, valueToPopulate, property)
       // console.log('property replaceAll', property)
 
       // if (property.match(/^> function /g)) {
@@ -2073,7 +2119,7 @@ class Configorama {
       const replacementValue = isNestedFilterArgument(property, matchedString)
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
-      property = replaceAll(matchedString, replacementValue, property)
+      property = replaceMatch(matchedString, replacementValue, property)
       // TODO This was temp fix for array value mismatch from filters. This fixes filterInner: ${commas | split(${self:inner}, 2) }
       // } else if (isArray(valueToPopulate) && valueToPopulate.length === 1) {
       //  property = replaceAll(matchedString, String(valueToPopulate[0]), property)
@@ -2084,7 +2130,7 @@ class Configorama {
       const isEvalOrIf = evalIfPattern.test(property)
       if (isEvalOrIf) {
         const encoded = encodeValueForEval(valueToPopulate)
-        property = replaceAll(matchedString, encoded, property)
+        property = replaceMatch(matchedString, encoded, property)
       } else {
         const objStr = JSON.stringify(valueToPopulate)
         /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
@@ -2097,11 +2143,11 @@ class Configorama {
         // Only encode for file() or text() references where JSON braces break regex matching
         const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
         if (isNestedFilterArgument(property, matchedString)) {
-          property = replaceAll(matchedString, encodeFilterArg(valueToPopulate), property)
+          property = replaceMatch(matchedString, encodeFilterArg(valueToPopulate), property)
         } else if (isNestedInVariable && isFileOrTextRef) {
           // Encode object as base64 to avoid breaking variable syntax with nested braces
           const encodedObj = encodeJsonForVariable(valueToPopulate)
-          property = replaceAll(matchedString, encodedObj, property)
+          property = replaceMatch(matchedString, encodedObj, property)
         } else if (isNestedInVariable) {
           const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
           if (isVar) {
@@ -2109,10 +2155,10 @@ class Configorama {
               `Invalid variable syntax "${property}" resolves to "${replaceAll(matchedString, objStr, property)}"`,
             )
           }
-          property = replaceAll(matchedString, objStr, property)
+          property = replaceMatch(matchedString, objStr, property)
         } else {
           // console.log('OBJECT MATCH', `"${objStr}"`)
-          property = replaceAll(matchedString, objStr, property)
+          property = replaceMatch(matchedString, objStr, property)
         }
       }
       // console.log('property', property)
@@ -2129,12 +2175,12 @@ class Configorama {
       const replacementValue = isNestedFilterArgument(property, matchedString)
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
-      property = replaceAll(matchedString, replacementValue, property)
+      property = replaceMatch(matchedString, replacementValue, property)
 
     // partial replacement, null inside eval/if expressions
     } else if (valueToPopulate === null && evalIfPattern.test(property)) {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE isNull in eval/if')
-      property = replaceAll(matchedString, '__NULL__', property)
+      property = replaceMatch(matchedString, '__NULL__', property)
 
     } else {
       if (DEBUG_TYPE) console.log('DEBUG_TYPE else')
@@ -2146,8 +2192,26 @@ class Configorama {
         missingValue = this.deep[i]
       }
 
+      // The fallback list belongs to the variable enclosing this match, not to other
+      // variables or literal text around it (${a} ${opt:x, ${self:nope}, 'z'}).
+      const enclosingVar = (typeof property === 'string' && typeof matchIndex === 'number')
+        ? findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+        : null
+      const isPartOfProperty = !!enclosingVar && enclosingVar !== property
+      /**
+       * Put the enclosing variable's next fallback in place of that variable, keeping
+       * the text around it
+       * @param {any} fallback - The fallback value or variable string
+       * @returns {any} The property with the fallback in place
+       */
+      const withFallback = (fallback) => {
+        if (!isPartOfProperty) return fallback
+        const start = property.lastIndexOf(enclosingVar, matchIndex)
+        return property.slice(0, start) + String(fallback) + property.slice(start + enclosingVar.length)
+      }
+
       const cleanVar = cleanVariable(
-        property,
+        isPartOfProperty ? enclosingVar : property,
         this.variableSyntax,
         true,
         `populateVariable fallback ${this.callCount}`
@@ -2163,7 +2227,7 @@ class Configorama {
         }
 
         return {
-          value: fallbackStr,
+          value: withFallback(fallbackStr),
           path: valueObject.path,
           originalSource: valueObject.originalSource,
           resolutionHistory: valueObject.resolutionHistory || [],
@@ -2186,7 +2250,7 @@ class Configorama {
           /** @type {string|number} */
           const staticValue = isNumeric ? Number(strValue) : strValue
           return {
-            value: staticValue,
+            value: withFallback(staticValue),
             path: valueObject.path,
             originalSource: valueObject.originalSource,
             resolutionHistory: valueObject.resolutionHistory || [],
@@ -2196,7 +2260,7 @@ class Configorama {
         const remainingContent = splitVars.slice(1).join(', ').replace(this.varSuffixPattern, '')
         const remainingFallbacks = this.varPrefix + remainingContent + this.varSuffix
         return {
-          value: remainingFallbacks,
+          value: withFallback(remainingFallbacks),
           path: valueObject.path,
           originalSource: valueObject.originalSource,
           resolutionHistory: valueObject.resolutionHistory || [],
@@ -2374,10 +2438,11 @@ Missing Value ${missingValue} - ${matchedString}
    * @param variableStrings The overwrite string of variables to populate and choose from.
    * @param valueObject The value object
    * @param originalVar The original variable string
+   * @param {number} [matchIndex] Where originalVar starts in valueObject.value
    * @returns {Promise<any>} A promise resolving to the first validly populating variable
    *  in the given variable strings string.
    */
-  overwrite(variableStrings, valueObject, originalVar) {
+  overwrite(variableStrings, valueObject, originalVar, matchIndex) {
     const propertyString = valueObject.value
     /*
     console.log('overwrite variableStrings', variableStrings)
@@ -2403,7 +2468,7 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('propertyString', typeof propertyString)
     const variableValues = variableStrings.map((variableString) => {
       // This runs on nested variable resolution
-      return this.getValueFromSource(variableString, valueObject, 'overwrite', valueObject.originalSource)
+      return this.getValueFromSource(variableString, valueObject, 'overwrite', originalVar, matchIndex)
     })
 
     // console.log('variableValues', variableValues)
@@ -2453,9 +2518,10 @@ Missing Value ${missingValue} - ${matchedString}
    * @param valueObject The value object
    * @param caller The caller name
    * @param originalVar The original variable string
+   * @param {number} [matchIndex] Where originalVar starts in valueObject.value
    * @returns {Promise<any>} A promise resolving to the given variables value.
    */
-  getValueFromSource(variableString, valueObject, caller, originalVar) {
+  getValueFromSource(variableString, valueObject, caller, originalVar, matchIndex) {
     // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
@@ -2906,7 +2972,7 @@ Missing Value ${missingValue} - ${matchedString}
       // (${empty, ${x}, 'fb'}). Literal text outside every variable (e.g. CloudFormation
       // `{"${Ns}",Path}`) may contain commas that are not fallback separators.
       const enclosingVar = (typeof originalVar === 'string' && originalVar)
-        ? findEnclosingVariable(propertyString, originalVar, this.varPrefix, this.varSuffix)
+        ? findEnclosingVariable(propertyString, originalVar, this.varPrefix, this.varSuffix, matchIndex)
         : null
       const fallbackSource = enclosingVar || propertyString
       const clean = cleanVariable(
@@ -2959,7 +3025,7 @@ Missing Value ${missingValue} - ${matchedString}
           // recurse on fallback and check again
           return this.getValueFromSource(`${variableString})`, {
             value: propertyString,
-          }, 'cleanClean.match(fileRefSyntax)', originalVar)
+          }, 'cleanClean.match(fileRefSyntax)', originalVar, matchIndex)
         }
       }
       // const fallbackValue = split[1]
@@ -2992,6 +3058,7 @@ Missing Value ${missingValue} - ${matchedString}
           // },
           'fallbackValue',
           originalVar,
+          matchIndex,
         ).then((res) => {
           // console.log('res', res)
           // console.log('typeof res', typeof res)
