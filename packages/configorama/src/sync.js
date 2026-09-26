@@ -7,6 +7,22 @@ const { tagDates } = require('./utils/encoders/dates')
 const { decodeLiteralBracesDeep } = require('./utils/encoders/literal-braces')
 
 /**
+ * Make this worker's process.env and cwd match the caller's for this call. The worker
+ * is started once and reused, so without this it keeps the env and cwd it started with.
+ * @param {Record<string, string>} [env] - Caller's process.env
+ * @param {string} [cwd] - Caller's working directory
+ */
+function applyCallerEnvironment(env, cwd) {
+  if (env) {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in env)) delete process.env[key]
+    }
+    Object.assign(process.env, env)
+  }
+  if (cwd && cwd !== process.cwd()) process.chdir(cwd)
+}
+
+/**
  * Force synchronous invocation of async API
  */
 module.exports = function configoramaSync(variableSources = []) {
@@ -57,7 +73,8 @@ module.exports = function configoramaSync(variableSources = []) {
     }
   })
   return async (args) => {
-    const { filePath, settings = {} } = args
+    const { filePath, settings = {}, env, cwd } = args
+    applyCallerEnvironment(env, cwd)
     const syncSettings = { sync: true }
     if (customVariableSources && customVariableSources.length) {
       syncSettings.variableSources = customVariableSources

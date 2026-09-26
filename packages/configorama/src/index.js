@@ -126,7 +126,10 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
   const { reviveDates } = require('./utils/encoders/dates')
   return reviveDates(forceSync(require.resolve('./sync'), _settings.variableSources)({
     filePath: configPathOrObject,
-    settings: _settings
+    settings: _settings,
+    // The worker process outlives this call; send the caller's current env and cwd
+    env: Object.assign({}, process.env),
+    cwd: process.cwd()
   }))
 }
 
