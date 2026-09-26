@@ -1,6 +1,6 @@
 {
   "name": "@davidwells/human-cron",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Convert human-readable schedule phrases (\"every 5 minutes\", \"weekdays\", \"at 9:30\") into cron expressions, with raw-cron passthrough and validation",
   "main": "src/index.js",
   "scripts": {

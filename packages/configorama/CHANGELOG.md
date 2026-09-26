@@ -3,6 +3,68 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/DavidWells/configorama/compare/configorama@1.3.4...configorama@1.4.0) (2026-09-26)
+
+
+### Bug Fixes
+
+* ${file(x.js)} accepts a plain object export, not just a function ([ade330e](https://github.com/DavidWells/configorama/commit/ade330e7af1fe89bae40b52ed2930152110285bd))
+* a boolean value composed with other content no longer errors ([dc0ba5c](https://github.com/DavidWells/configorama/commit/dc0ba5ce2411a556059d513041a8e04c8050fd42))
+* a filter returning null no longer crashes the next filter ([eaae7fb](https://github.com/DavidWells/configorama/commit/eaae7fbf6000b2ad3c1290bd4a1cbee8291883cb))
+* a numeric variable as a filter arg no longer runs the filter early ([b9ebe35](https://github.com/DavidWells/configorama/commit/b9ebe358a96dc2c412420cbb80897f8365e183aa))
+* apply a filter with a variable argument exactly once ([1fed197](https://github.com/DavidWells/configorama/commit/1fed197e513332df1dff41a5a8c8beee9cf837f4))
+* apply filters to a function's result, not its expression ([373e4eb](https://github.com/DavidWells/configorama/commit/373e4ebbd603e0ddb0d6ed799d77a1d2f8503c3a))
+* correct filter-arg marker detection across multiple filters and glued prefixes ([57a5995](https://github.com/DavidWells/configorama/commit/57a5995f7f365c7214b9d1f2a88315063fad6894))
+* decode every marker in a filter argument (compose args) ([060cc6b](https://github.com/DavidWells/configorama/commit/060cc6b496e9ea2507dd6100eee159d5235f14fe))
+* detect filters on the current variable, not the whole value ([7469bc7](https://github.com/DavidWells/configorama/commit/7469bc71fc5c8936c9093349e5ac685cba555edb))
+* encode variable function args so no-space commas work ([400fd14](https://github.com/DavidWells/configorama/commit/400fd140eab4c71f705aaa577a9cdcea5b15990e))
+* **file:** file()/text() paths may contain { } $ ([362971e](https://github.com/DavidWells/configorama/commit/362971e145dae7971295d6ded1a5230778217799))
+* **file:** named exports in .mjs/.ts file refs ([e56acb4](https://github.com/DavidWells/configorama/commit/e56acb41801d67fcd55f44aa2336a82e34333877))
+* **file:** refs inside a referenced file resolve from that file's folder first ([a76790c](https://github.com/DavidWells/configorama/commit/a76790ced66d4c1f34ac639ce34371ddce914763))
+* **filters:** a pipe inside a quoted fallback is literal text ([368b1af](https://github.com/DavidWells/configorama/commit/368b1af647b3da07f78ae997043cd95f76aa7c6c))
+* **filters:** run filters after the last fallback on whichever value wins ([72a53bb](https://github.com/DavidWells/configorama/commit/72a53bb093c5b5346fe51faf99da74da8b54beb1))
+* **functions:** eval strings with braces; nested function calls as arguments ([b00d6a9](https://github.com/DavidWells/configorama/commit/b00d6a935074761780d39264e27437b47685c00b))
+* **metadata:** quoted { } $ show as written in metadata, --info and --verbose ([1838102](https://github.com/DavidWells/configorama/commit/18381022b2b78e2610bef37d7f2d40b9838b22e9))
+* **quoteAware:** honor escaped quotes inside quoted strings ([60b968e](https://github.com/DavidWells/configorama/commit/60b968e97ce3f6cb76393d285e977ca17ca69a1e))
+* recognize filter pipes regardless of whitespace around | ([b6c0222](https://github.com/DavidWells/configorama/commit/b6c022247487a1bf2f03e48ba513af684e713598))
+* **resolve:** { } $ inside quoted fallbacks and inside values nested in a variable ([207eeae](https://github.com/DavidWells/configorama/commit/207eeaec6e52181b15a2d1149dbd474613fa601f))
+* **resolve:** brace-encoding follow-ups for 3-item fallbacks, \' escapes, missing vars from values ([b33ab7f](https://github.com/DavidWells/configorama/commit/b33ab7fa5e5542efa01618e67f7f116a642c28d4))
+* **resolve:** circular file refs and parent self-refs fail instead of hanging ([d3b62bd](https://github.com/DavidWells/configorama/commit/d3b62bde880ab810db01e71e42afb73306682ead))
+* **resolve:** don't cache a bare-word fallback under the var name; name the key in not-found errors ([ef31e48](https://github.com/DavidWells/configorama/commit/ef31e48c8ac82fdc6718d8c554ac59bca010b31a))
+* **resolve:** don't take fallback from literal text around a var ([af4c0a2](https://github.com/DavidWells/configorama/commit/af4c0a2a01a5f542f30cb36b9df3a37722f89464))
+* **resolve:** objects at the start of a string and as fallbacks ([41c7547](https://github.com/DavidWells/configorama/commit/41c754711e78608f08a2dd4a82c61b221577e0e6))
+* **resolve:** resolve each var copy in its own context; keep text around fallbacks ([6e2b44d](https://github.com/DavidWells/configorama/commit/6e2b44daeeb47b74cce2015ad6b4a20572f2b845))
+* separate a glued literal from an encoded filter-arg (terminator) ([001a321](https://github.com/DavidWells/configorama/commit/001a321e2011124f28ac3f41933e36afe71a1116))
+* **sources:** nested option paths, bracket indexes, empty YAML files ([d2efd17](https://github.com/DavidWells/configorama/commit/d2efd17654a380a943aa154ab6be740d6076661e))
+* split multi-arg filters on any comma, not only ", " ([9ef3e38](https://github.com/DavidWells/configorama/commit/9ef3e38952775922616aab03e70f3d31fa81bb58))
+* **stdout:** debug traces and diagnostics go to stderr ([b318d94](https://github.com/DavidWells/configorama/commit/b318d94c84c4ae8ae2a226a173e7ab58e5908249))
+* stop leaking the internal caller marker into filter arguments ([617ce78](https://github.com/DavidWells/configorama/commit/617ce78e8c44ef9d7f933938e19b283da6ae7530))
+* strip quotes around a filter arg containing an escaped quote ([9b9747b](https://github.com/DavidWells/configorama/commit/9b9747b19bee341ceb3c256cb2f69a2fc8d88a98))
+* support JSON object literals as filter/function arguments ([eb496a3](https://github.com/DavidWells/configorama/commit/eb496a3dd0d81fa4a0817e3142b0b05268ac7efa))
+* **sync:** each sync call sees the caller's current env and cwd ([68d978f](https://github.com/DavidWells/configorama/commit/68d978f2be6a05f5bdfcac5daafaca3cf88f4017))
+* **values:** YAML/TOML dates stay Dates instead of becoming {} ([08a7f27](https://github.com/DavidWells/configorama/commit/08a7f27f44c2e14474fcc2ab0b6369b4638fc528))
+* **yaml:** apply bare-var quote-wrap to flow objects too ([e817246](https://github.com/DavidWells/configorama/commit/e817246d531adb11fa2fbc45a50f97580115fcec))
+* **yaml:** don't quote-wrap vars in brackets that are literal scalar text ([febb60c](https://github.com/DavidWells/configorama/commit/febb60c197174fa22b7ea1ba9aa3418746ba6a66))
+* **yaml:** don't quote-wrap vars inside block scalar content ([d19aafc](https://github.com/DavidWells/configorama/commit/d19aafc5ffbd0fc911c8c3ab16c8a4f7f534ed06))
+* **yaml:** don't treat brackets inside a quoted scalar as a flow array ([a6d0962](https://github.com/DavidWells/configorama/commit/a6d0962cb6450dcf311e00b0d63d57ea96d752d4))
+* **yaml:** mask block scalars in CRLF files ([6211b46](https://github.com/DavidWells/configorama/commit/6211b46f7c3620477c8748ccacb3efd7310a7dfc))
+* **yaml:** only quote-wrap bare vars in flow sequences ([83d7cc4](https://github.com/DavidWells/configorama/commit/83d7cc46456a344c19325079d78a741b05c0f763))
+* **yaml:** quote each CloudFormation dynamic ref in place; wrap vars in every flow mapping ([552c7f7](https://github.com/DavidWells/configorama/commit/552c7f7c7ffa42d4dbd4979596557e500c2dfb74))
+* **yaml:** quote-aware flow collection scanner for bare vars and dynamic refs ([ce246ee](https://github.com/DavidWells/configorama/commit/ce246eead5bdbabe68a254f1684fde82277eb434))
+
+
+### Features
+
+* **docs:** add file/param/git/getting-started/file-references examples ([5e9a6cc](https://github.com/DavidWells/configorama/commit/5e9a6cc8067898d29025b16536697b9ddcc59de6))
+* **docs:** generate docs-site examples from tested fixtures ([25417d5](https://github.com/DavidWells/configorama/commit/25417d561c08e38e887bd3bc150b0b2887e1df0d))
+* pass through and validate raw cron expressions in ${cron(...)} ([b7a3e0c](https://github.com/DavidWells/configorama/commit/b7a3e0c64785470deea2f8444fc479cbcfdfe315))
+* **resolve:** suggest nearest key on unresolved variable ([18beb7c](https://github.com/DavidWells/configorama/commit/18beb7c605d85713248d1219b080180c711932d5))
+* **yaml:** clear error for unquoted var in flow collection ([44551c9](https://github.com/DavidWells/configorama/commit/44551c9548cac8c6967cec0c5ca20af5a6b65433))
+
+
+
+
+
 ## [1.3.4](https://github.com/DavidWells/configorama/compare/configorama@1.3.3...configorama@1.3.4) (2026-09-01)
 
 
