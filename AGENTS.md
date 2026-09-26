@@ -26,12 +26,52 @@ at the repo root — it belongs in a package.
 
 ### Releasing
 
-- **Publish through pnpm/lerna, never `npm publish`.** Only pnpm/lerna rewrite
-  `workspace:^` to a real range; `npm publish` ships a literal `workspace:^` and
-  breaks installs.
-- **Both packages changed** → `pnpm run release` (`lerna publish`).
-- **One package changed** → publish just it (`cd packages/<pkg> && pnpm version <bump> && pnpm publish`)
-  **and create the matching `<name>@<version>` git tag**, or lerna's history drifts behind npm.
+Version with lerna, publish with `pnpm publish` using your own npm login. Token-based
+publishing (`npm-auth … lerna publish`) no longer works reliably: npm rejects tokens for
+packages whose publishing access disallows them (a token got `E404 Not found` on
+`@davidwells/human-cron` even though it exists), and npm is phasing out 2FA-bypass
+tokens for publishing entirely (January 2027).
+
+1. **Pre-flight, from the repo root on a clean `master`:**
+   ```bash
+   pnpm -r --if-present typecheck
+   (cd packages/configorama && npm run types)   # what prepublishOnly runs
+   pnpm test
+   ```
+2. **Bump versions, changelogs and tags. No publish yet:**
+   ```bash
+   ./node_modules/.bin/lerna version
+   ```
+   Lerna bumps every changed package, *plus packages that depend on one* (a configorama
+   change also bumps configx) and never-published packages; it commits, tags and pushes.
+3. **Publish each bumped package, dependencies first**, in a real terminal (iTerm2):
+   ```bash
+   cd packages/human-cron  && pnpm publish && cd ../..   # configorama depends on it
+   cd packages/configorama && pnpm publish && cd ../..   # configx depends on it
+   cd packages/configx     && pnpm publish && cd ../..
+   cd packages/op-stash    && pnpm publish && cd ../..   # only if it was bumped
+   ```
+   Skip the ones lerna didn't bump. Each may open npm's browser login/2FA prompt.
+4. **Verify.** New versions can take a few minutes to show up ("Your package is
+   being processed"):
+   ```bash
+   npm view configorama version && npm view @davidwells/configx version
+   ```
+
+Rules:
+
+- **Never `npm publish` configorama or configx.** Only pnpm (or lerna) rewrites
+  `workspace:^` to a real range; `npm publish` ships a literal `workspace:^` and breaks installs.
+- **Never run plain `lerna publish` / `pnpm run release`.** It bumps, commits, tags and
+  pushes *before* uploading, so every failed upload burns a version number. If a publish
+  fails partway, fix the cause and rerun `pnpm publish` for the packages that are
+  missing; don't re-version. (`lerna publish from-package` also publishes whatever
+  versions aren't on npm yet, without bumping, if its auth works.)
+- **A brand-new scoped package** (`@davidwells/…`) needs its first publish to be public:
+  `pnpm publish --access public` (only the first time).
+- **Solo terminal can't reach 1Password.** macOS blocks it from 1Password's app data, so
+  anything using `op` (e.g. `npm-auth`) fails there. Use iTerm2, or give Solo
+  Full Disk Access.
 
 ## Always type-check after changes (load-bearing)
 
