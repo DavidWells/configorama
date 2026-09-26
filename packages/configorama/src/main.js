@@ -216,6 +216,7 @@ const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-value
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
+const { encodeStrayVariableChars } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -1155,8 +1156,12 @@ class Configorama {
 
     const originalConfig = this.originalConfig
 
-    /* If no variables found just return early */
-    if (this.originalString && !this.variableSyntaxTest.test(this.originalString)) {
+    /* If no variables found just return early. The raw text can hide a variable whose quoted
+       literal holds braces (${opt:x, '{a}'}); preprocessing encoded those, so check that too. */
+    const hasNoVariables = this.originalString &&
+      !this.variableSyntaxTest.test(this.originalString) &&
+      !this.variableSyntaxTest.test(JSON.stringify(this.config))
+    if (hasNoVariables) {
       if (this._markdownContent !== undefined) {
         this.originalConfig[this._markdownContentKey] = this._markdownContent
       }
@@ -2094,14 +2099,6 @@ class Configorama {
       console.log('isString currentMatchedString', currentMatchedString)
       console.log('>------')
       /** */
-      // Handle comma ${opt:stage, dev} and remove extra suffix
-      if (
-        this.variableSyntaxTest.test(currentMatchedString) &&
-        !this.variableSyntaxTest.test(valueToPopulate) &&
-        valueToPopulate.match(this.varSuffixPattern)
-      ) {
-        valueToPopulate = valueToPopulate.replace(this.varSuffixPattern, '')
-      }
 
       // For eval/if expressions, string values need quotes unless already quoted
       // BUT don't quote strings that contain variable refs (they need further resolution)
@@ -2127,6 +2124,14 @@ class Configorama {
         !valueToPopulate.match(functionPrefixPattern)
       ) {
         valueToPopulate = encodeFilterArg(valueToPopulate)
+      }
+      // Inside another variable the value's own { } $ are plain text: encode them so they can't
+      // end or break that variable. They are decoded when that variable's text becomes a value.
+      if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
+        const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+        if (enclosing && enclosing !== matchedString) {
+          valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix)
+        }
       }
       property = replaceMatch(currentMatchedString, valueToPopulate, property)
       // console.log('property replaceAll', property)

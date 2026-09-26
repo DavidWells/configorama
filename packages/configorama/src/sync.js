@@ -4,6 +4,7 @@ const Configorama = require('./main')
 const getFullPath = require('./utils/paths/getFullFilePath')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { tagDates } = require('./utils/encoders/dates')
+const { decodeLiteralBracesDeep } = require('./utils/encoders/literal-braces')
 
 /**
  * Force synchronous invocation of async API
@@ -95,13 +96,15 @@ module.exports = function configoramaSync(variableSources = []) {
         }
       }
 
+      // Resolution tracking recorded variable text with its quoted { } $ encoded; show the original
+      const metadataOut = decodeLiteralBracesDeep(enrichedMetadata)
       return {
         variableSyntax: instance.variableSyntax,
         variableTypes: instance.variableTypes,
         config: tagDates(result),
-        originalConfig: instance.originalConfig,
-        metadata: enrichedMetadata,
-        resolutionHistory: enrichedMetadata.resolutionHistory,
+        originalConfig: decodeLiteralBracesDeep(instance.originalConfig),
+        metadata: metadataOut,
+        resolutionHistory: metadataOut.resolutionHistory,
       }
     }
 

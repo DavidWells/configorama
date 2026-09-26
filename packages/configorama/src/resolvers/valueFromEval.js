@@ -2,6 +2,7 @@
 const evalRefSyntax = RegExp(/^eval\((.*)?\)/g)
 const { replaceOutsideQuotes } = require('../utils/strings/quoteAware')
 const { assertSafeEvalExpression } = require('../utils/security/evalSafety')
+const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
 
 // Pattern for encoded objects/arrays: __OBJ:base64__ or __ARR:base64__
 const ENCODED_PATTERN = /__(?:OBJ|ARR):([A-Za-z0-9+/=]+)__/g
@@ -42,10 +43,12 @@ function wrapComparisons(expr) {
 }
 
 async function getValueFromEval(variableString) {
+  // String literals in the expression had their { } $ encoded while inside the variable
+  const expressionString = decodeLiteralBraces(variableString)
   // Extract the expression inside eval()
-  const match = variableString.match(/^eval\((.+)\)$/)
+  const match = expressionString.match(/^eval\((.+)\)$/)
   if (!match) {
-    throw new Error(`Invalid eval syntax: ${variableString}. Expected format: eval(expression)`)
+    throw new Error(`Invalid eval syntax: ${expressionString}. Expected format: eval(expression)`)
   }
 
   const expression = match[1].trim()
