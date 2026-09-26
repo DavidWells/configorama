@@ -3013,6 +3013,7 @@ Missing Value ${missingValue} - ${matchedString}
         const fallbackStr = getFallbackString(split, nestedVar)
         return this.getValueFromSource(variableString, {
           value: fallbackStr,
+          path: valueObject.path,
         }, 'nestedVar', originalVar)
       }
 
@@ -3034,8 +3035,9 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('fallbackValue', fallbackValue)
 
       if (variableString === fallbackValue) {
-        const valuePromise = Promise.resolve(fallbackValue)
-        return this.tracker.add(fallbackValue, valuePromise, propertyString, newHasFilter)
+        // A bare word used as its own fallback is literal only in this fallback list, so
+        // don't cache it under the variable name where another key's ${word} would find it
+        return Promise.resolve(fallbackValue)
       }
       /*
       console.log('what is fallbackValue', fallbackValue)

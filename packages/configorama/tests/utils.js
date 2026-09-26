@@ -1,3 +1,6 @@
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const util = require('util')
 
 // Track accessed config keys across test files
@@ -103,7 +106,34 @@ function deepLog() {
   for (let i = 0; i < arguments.length; i++) logValue(arguments[i], i === 0, i === arguments.length - 1)
 }
 
+/** @type {string|undefined} */
+let yamlTextDir
+
+/**
+ * Resolve YAML text from its own temp file with the async and sync APIs, asserting
+ * both agree. A file per call keeps cases isolated from each other.
+ * @param {string} yml - YAML file contents
+ * @param {object} [settings] - configorama settings (options defaults to {})
+ * @returns {Promise<Record<string, any>>} The resolved config
+ */
+async function resolveYamlText(yml, settings = {}) {
+  const configorama = require('../src')
+  const assert = require('uvu/assert')
+  if (!yamlTextDir) {
+    yamlTextDir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-yaml-'))
+    process.on('exit', () => fs.rmSync(yamlTextDir, { recursive: true, force: true }))
+  }
+  const file = path.join(yamlTextDir, `case-${fs.readdirSync(yamlTextDir).length}.yml`)
+  fs.writeFileSync(file, yml)
+  const opts = Object.assign({ configDir: yamlTextDir, options: {} }, settings)
+  const config = await configorama(file, opts)
+  const syncConfig = configorama.sync(file, opts)
+  assert.equal(syncConfig, config, 'sync and async results differ')
+  return config
+}
+
 module.exports = {
+  resolveYamlText,
   createTrackingProxy,
   checkUnusedConfigValues,
   createDeepTrackingProxy,
