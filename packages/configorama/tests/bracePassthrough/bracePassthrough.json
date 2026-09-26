@@ -1,0 +1,12 @@
+{
+  "stage": "dev",
+  "quotedCommaBrace": "{\"${MetricsNs}\",Path}",
+  "quotedCommaBraceThenCfn": "{\"${MetricsNs}\",Path} ${AWS::Region}",
+  "bareCommaBrace": "{${MetricsNs},Path}",
+  "textAfterComma": "${MetricsNs}, trailing",
+  "resolvedCommaBrace": "{\"${self:stage}\",Path}",
+  "fallbackInText": "pre-${opt:nope, 'dev'}, post",
+  "braceOnly": "{${MetricsNs}}",
+  "braceWords": "{a ${MetricsNs} b} ${AWS::Region}",
+  "escapedQuotes": "x \"${MetricsNs}\" y"
+}

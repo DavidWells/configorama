@@ -3,6 +3,7 @@ const assert = require('uvu/assert')
 const {
   findOutermostBraces,
   findOutermostBracesDepthFirst,
+  findEnclosingVariable,
   findOutermostVariables
 } = require('./bracketMatcher')
 
@@ -129,6 +130,28 @@ test('findOutermostVariables - should handle variables in YAML object context', 
   const text = 'key: { value: ${self:config}, other: ${env:var} }'
   const result = findOutermostVariables(text)
   assert.equal(result, ['${self:config}', '${env:var}'])
+})
+
+test('findEnclosingVariable - returns the variable itself when not nested', () => {
+  assert.is(findEnclosingVariable('{"${MetricsNs}",Path}', '${MetricsNs}', '${', '}'), '${MetricsNs}')
+})
+
+test('findEnclosingVariable - ignores literal text and commas outside any variable', () => {
+  assert.is(findEnclosingVariable('{"${Ns}",Path} ${AWS::Region}', '${Ns}', '${', '}'), '${Ns}')
+})
+
+test('findEnclosingVariable - returns the outer variable enclosing a nested one', () => {
+  const text = "pre ${empty, ${holoDeck}, 'here it is'} post"
+  assert.is(findEnclosingVariable(text, '${holoDeck}', '${', '}'), "${empty, ${holoDeck}, 'here it is'}")
+})
+
+test('findEnclosingVariable - supports custom single-char-suffix syntax', () => {
+  assert.is(findEnclosingVariable('[$[a, $[b]], x]', '$[b]', '$[', ']'), '$[a, $[b]]')
+})
+
+test('findEnclosingVariable - returns null when variable is absent or suffix is multi-char', () => {
+  assert.is(findEnclosingVariable('no vars here', '${a}', '${', '}'), null)
+  assert.is(findEnclosingVariable('{{a}}', '{{a}}', '{{', '}}'), null)
 })
 
 // Run all tests

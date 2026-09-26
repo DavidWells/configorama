@@ -199,6 +199,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
+const { findEnclosingVariable } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -2901,8 +2902,15 @@ Missing Value ${missingValue} - ${matchedString}
     /* fall through case with self refs */
     if (variableString) {
       // console.log('before clean propertyString', propertyString, variableString)
+      // A fallback can only come from the matched variable or a variable enclosing it
+      // (${empty, ${x}, 'fb'}). Literal text outside every variable (e.g. CloudFormation
+      // `{"${Ns}",Path}`) may contain commas that are not fallback separators.
+      const enclosingVar = (typeof originalVar === 'string' && originalVar)
+        ? findEnclosingVariable(propertyString, originalVar, this.varPrefix, this.varSuffix)
+        : null
+      const fallbackSource = enclosingVar || propertyString
       const clean = cleanVariable(
-        propertyString, 
+        fallbackSource,
         this.variableSyntax, 
         true, 
         `getValueFromSrc self ${this.callCount}`

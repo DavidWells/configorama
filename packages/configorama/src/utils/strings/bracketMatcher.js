@@ -79,8 +79,26 @@ function findOutermostVariables(text) {
   return findOutermostBraces(text, '{', '}', '$')
 }
 
+/**
+ * Find the outermost variable in text that contains the given variable occurrence.
+ * A nested variable's fallback lives in its enclosing variable, never in literal text
+ * outside every variable.
+ * @param {string} text - The text containing the variable
+ * @param {string} variable - The variable to locate (including prefix/suffix)
+ * @param {string} prefix - Variable syntax prefix (e.g. '${')
+ * @param {string} suffix - Variable syntax suffix (e.g. '}'); must be one character
+ * @returns {string|null} The enclosing outermost variable, or null if not determinable
+ */
+function findEnclosingVariable(text, variable, prefix, suffix) {
+  if (!prefix || !suffix || suffix.length !== 1) return null
+  const outermost = findOutermostBraces(text, prefix.slice(-1), suffix, prefix.slice(0, -1))
+  const enclosing = outermost.find((match) => match.indexOf(variable) > -1)
+  return enclosing || null
+}
+
 module.exports = {
   findOutermostBraces,
   findOutermostBracesDepthFirst,
-  findOutermostVariables
+  findOutermostVariables,
+  findEnclosingVariable
 }
