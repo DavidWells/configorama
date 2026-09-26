@@ -216,6 +216,7 @@ const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-value
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
+const { bracketsToDots } = require('./utils/paths/bracketsToDots')
 const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
@@ -618,10 +619,12 @@ class Configorama {
         console.log('fallThroughSelfMatcher valueObject', valueObject)
         console.log('fullObject', fullObject)
         /** */
+        // items[1] / objs[0]['n'] are the same paths as items.1 / objs.0.n
+        const keyPath = bracketsToDots(varString)
         /* its file ref so we need to shift lookup for self in nested files */
         if (valueObject.isFileRef) {
           // First check if property exists in the nested file's context (preferred)
-          const nestedPath = [valueObject.path[0]].concat(varString)
+          const nestedPath = [valueObject.path[0]].concat(keyPath)
           const nestedDotPath = nestedPath.join('.')
           if (dotProp.has(fullObject, nestedDotPath)) {
             // Property exists in nested context - return true to indicate match
@@ -629,14 +632,14 @@ class Configorama {
             return true
           }
           // Fall back to top-level lookup
-          if (dotProp.has(fullObject, varString)) {
+          if (dotProp.has(fullObject, keyPath)) {
             return true
           }
           return false
         }
         // console.log('fallthrough fullObject', fullObject)
         /* is simple ${whatever} reference in same file */
-        const startOf = varString.split('.')
+        const startOf = keyPath.split('.')
         // Use has() to properly check existence for falsy values
         return dotProp.has(fullObject, startOf[0])
       },
@@ -1015,6 +1018,10 @@ class Configorama {
         varRegex: this.variableSyntax,
         dynamicArgs: this.settings.dynamicArgs
       })
+      // An empty or comment-only YAML file parses to undefined/null: it is an empty config
+      if (configObject === undefined || configObject === null) {
+        configObject = {}
+      }
       this.configFileContents = ''
       if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
@@ -3205,7 +3212,8 @@ Missing Value ${missingValue} - ${matchedString}
     const split = variableString.split(':')
     const variable = split.length && split[1] ? split[1] : variableString
     const valueToPopulate = this.config
-    let deepProperties = variable.split('.').filter((property) => property)
+    // items[1] / objs[0]['n'] are the same paths as items.1 / objs.0.n
+    let deepProperties = bracketsToDots(variable).split('.').filter((property) => property)
     // console.log('self deep', deepProperties)
     // console.log('self valueToPopulate', valueToPopulate)
 

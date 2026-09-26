@@ -17,6 +17,7 @@ const TOML = require('../parsers/toml')
 const INI = require('../parsers/ini')
 const JSON5 = require('../parsers/json5')
 const HCL = require('../parsers/hcl')
+const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -434,7 +435,7 @@ ${JSON.stringify(options.context, null, 2)}`,
 Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
         return Promise.reject(new Error(errorMessage))
       }
-      const deepProperties = deepPropertiesStr.slice(1).split('.')
+      const deepProperties = bracketsToDots(deepPropertiesStr.slice(1)).split('.')
       return ctx.getDeeperValue(deepProperties, valueToPopulate)
     }
 
@@ -509,7 +510,7 @@ function extractDeepProperties(variableString, matchedFileString, includeFirstPr
   if (!deepPropertiesStr || deepPropertiesStr === '') {
     return []
   }
-  const deepProperties = deepPropertiesStr.slice(1).split('.')
+  const deepProperties = bracketsToDots(deepPropertiesStr.slice(1)).split('.')
   // For named exports, skip first property (it's the module name)
   // For default exports, keep all properties
   if (!includeFirstProperty) {
