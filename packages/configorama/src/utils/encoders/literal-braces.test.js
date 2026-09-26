@@ -71,4 +71,12 @@ test('placeholder-looking text in the input round-trips unchanged', () => {
   assert.is(decodeLiteralBraces(encodeStrayVariableChars(value)), value)
 })
 
+test('encodeQuotedLiterals - backslash-escaped quote inside either quote style', () => {
+  for (const input of ["${opt:x, 'don\\'t {a}'}", '${opt:x, "say \\"{a}\\""}']) {
+    const encoded = encodeQuotedLiterals(input)
+    assert.not.match(encoded.slice(2, -1).replace(/\\/g, ''), /[{}]/, input)
+    assert.is(decodeLiteralBraces(encoded), input)
+  }
+})
+
 test.run()

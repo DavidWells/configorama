@@ -54,7 +54,8 @@ function scanQuoted(str, start, syntax) {
   let i = start + 1
   while (i < str.length) {
     const ch = str[i]
-    if (ch === '\\' && quote === '"') {
+    if (ch === '\\') {
+      // \' and \" are escaped quotes in either quote style, as the quoted-literal resolver reads them
       i += 2
     } else if (ch === quote) {
       return { end: i + 1, encode }

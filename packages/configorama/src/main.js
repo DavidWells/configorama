@@ -216,7 +216,7 @@ const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-value
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
-const { encodeStrayVariableChars } = require('./utils/encoders/literal-braces')
+const { encodeStrayVariableChars, decodeLiteralBraces } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -3063,7 +3063,11 @@ Missing Value ${missingValue} - ${matchedString}
       }
 
       // TODO this should be new in memory resolutionHistory probably?
-      const nestedVar = findNestedVariable(split, valueObject.originalSource)
+      // A nested variable may come from a substituted value (an env value of '${x}'), so it can
+      // be in the enclosing variable's current text without being in the original source
+      const isInsideAnotherVariable = !!enclosingVar && enclosingVar !== originalVar
+      const nestedVar = findNestedVariable(split, valueObject.originalSource) ||
+        (isInsideAnotherVariable ? findNestedVariable(split, enclosingVar) : undefined)
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
@@ -3097,7 +3101,7 @@ Missing Value ${missingValue} - ${matchedString}
       if (variableString === fallbackValue) {
         // A bare word used as its own fallback is literal only in this fallback list, so
         // don't cache it under the variable name where another key's ${word} would find it
-        return Promise.resolve(fallbackValue)
+        return Promise.resolve(decodeLiteralBraces(fallbackValue))
       }
       /*
       console.log('what is fallbackValue', fallbackValue)
