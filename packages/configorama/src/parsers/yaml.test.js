@@ -377,4 +377,9 @@ json: {"a":["\${self:stage}"]}
   assert.is(preProcess(input), expected)
 })
 
+test('preProcess - CRLF line endings: block scalar content untouched', () => {
+  const input = 'v: |\r\n  [ ${self:stage} ]\r\n  x: { a: ${self:stage} }\r\nafter: 1\r\n'
+  assert.is(preProcess(input), input)
+})
+
 test.run()

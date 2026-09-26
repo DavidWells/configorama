@@ -158,7 +158,8 @@ function maskBlockScalars(ymlStr) {
       }
       baseIndent = -1
     }
-    const header = line.match(BLOCK_SCALAR_HEADER)
+    // Drop a CRLF line ending's \r so the header pattern's $ matches
+    const header = line.replace(/\r$/, '').match(BLOCK_SCALAR_HEADER)
     if (header) {
       const lead = header[1]
       const hasKey = !!header[2]
