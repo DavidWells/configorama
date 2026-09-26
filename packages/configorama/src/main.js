@@ -215,6 +215,7 @@ const handleSignalEvents = require('./utils/handleSignalEvents')
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
+const { tagDates, reviveDates } = require('./utils/encoders/dates')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -2153,7 +2154,8 @@ class Configorama {
         const encoded = encodeValueForEval(valueToPopulate)
         property = replaceMatch(matchedString, encoded, property)
       } else {
-        const objStr = JSON.stringify(valueToPopulate)
+        // A Date composed into text reads as its ISO timestamp, not a quoted JSON string
+        const objStr = (valueToPopulate instanceof Date) ? valueToPopulate.toISOString() : JSON.stringify(valueToPopulate)
         /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
         const enclosingVar = (typeof matchIndex === 'number')
           ? findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
@@ -2172,8 +2174,9 @@ class Configorama {
         if (isNestedFilterArgument(property, matchedString)) {
           property = replaceMatch(matchedString, encodeFilterArg(valueToPopulate), property)
         } else if (isNestedInVariable && (isFileOrTextRef || isFallbackItem)) {
-          // Encode object as base64 to avoid breaking variable syntax with nested braces
-          const encodedObj = encodeJsonForVariable(valueToPopulate)
+          // Encode object as base64 to avoid breaking variable syntax with nested braces.
+          // Dates are tagged so they come back as Dates when decoded
+          const encodedObj = encodeJsonForVariable(tagDates(valueToPopulate))
           property = replaceMatch(matchedString, encodedObj, property)
         } else if (isNestedInVariable) {
           const isVar = /^\${[a-zA-Z0-9_]+:/.test(property)
@@ -2555,7 +2558,7 @@ Missing Value ${missingValue} - ${matchedString}
         return Promise.resolve(reconstructed)
       }
       // First valid value, else undefined. An object fallback arrives encoded; decode it back
-      const winner = parseEncodedJson(extractedValues.find(isValidValue))
+      const winner = reviveDates(parseEncodedJson(extractedValues.find(isValidValue)))
       if (winner === undefined || !trailingFilters.length) return Promise.resolve(winner)
       return Promise.resolve(this.applyFilters(winner, trailingFilters.map((f) => f.trim()), valueObject.path))
     })

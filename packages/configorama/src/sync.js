@@ -3,6 +3,7 @@ const fs = require('fs')
 const Configorama = require('./main')
 const getFullPath = require('./utils/paths/getFullFilePath')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
+const { tagDates } = require('./utils/encoders/dates')
 
 /**
  * Force synchronous invocation of async API
@@ -97,13 +98,14 @@ module.exports = function configoramaSync(variableSources = []) {
       return {
         variableSyntax: instance.variableSyntax,
         variableTypes: instance.variableTypes,
-        config: result,
+        config: tagDates(result),
         originalConfig: instance.originalConfig,
         metadata: enrichedMetadata,
         resolutionHistory: enrichedMetadata.resolutionHistory,
       }
     }
 
-    return result
+    /* Dates don't survive sync-rpc's JSON transport; tag them for the parent to revive */
+    return tagDates(result)
   }
 }

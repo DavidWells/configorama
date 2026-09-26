@@ -384,7 +384,8 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
       return obj.map(item => traverseAndFix(item))
     }
 
-    if (obj !== null && typeof obj === 'object') {
+    // Rebuild plain objects only; Date and other class instances are values, not maps
+    if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
       const result = {}
       for (const key in obj) {
         if (obj.hasOwnProperty(key)) {

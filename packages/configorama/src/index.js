@@ -120,10 +120,11 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
     _settings.options = cliArgs
   }
   const forceSync = require('sync-rpc')
-  return forceSync(require.resolve('./sync'), _settings.variableSources)({
+  const { reviveDates } = require('./utils/encoders/dates')
+  return reviveDates(forceSync(require.resolve('./sync'), _settings.variableSources)({
     filePath: configPathOrObject,
     settings: _settings
-  })
+  }))
 }
 
 /**

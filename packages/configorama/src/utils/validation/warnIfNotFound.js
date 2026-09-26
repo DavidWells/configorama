@@ -11,7 +11,8 @@ function isValidValue(val) {
   if (val !== null && typeof val === 'object' && (val.hasOwnProperty('__internal_only_flag') || val.hasOwnProperty('__internal_metadata'))) {
     return false
   }
-  return val !== null && typeof val !== 'undefined' && !(typeof val === 'object' && isEmpty(val))
+  // A Date has no own keys but is a real value, not an empty object
+  return val !== null && typeof val !== 'undefined' && !(typeof val === 'object' && !(val instanceof Date) && isEmpty(val))
 }
 
 /**

@@ -52,7 +52,7 @@ test('isValidValue - should return true for empty string', () => {
   assert.is(isValidValue(''), true)
 })
 
-test.skip('isValidValue - should return true for date object', () => {
+test('isValidValue - should return true for date object', () => {
   assert.is(isValidValue(new Date()), true)
 })
 
