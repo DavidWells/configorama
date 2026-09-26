@@ -88,9 +88,6 @@ function toJson(ymlContents) {
   return json
 }
 
-// https://regex101.com/r/XIltbc/1
-const KEY_OBJECT = /^[ \t]*[^":\s]*:\s+\{/gm
-
 const INNER_ARRAY = /\[(?:[^\[\]])*\]/g
 
 /**
@@ -238,7 +235,7 @@ function preProcess(ymlStr = '') {
 
   /* If have yaml object and vars not wrapped in quotes, wrap them */
   const objScanStr = maskBlockScalars(ymlStr)
-  if (objScanStr.match(KEY_OBJECT)) {
+  if (objScanStr.indexOf('{') > -1) {
     // Flow mappings outside block scalar content, as [start, end) ranges into ymlStr
     const ranges = findOutermostBraceRanges(objScanStr)
       .filter(([start, end]) => objScanStr.slice(start, end) === ymlStr.slice(start, end))
@@ -249,7 +246,11 @@ function preProcess(ymlStr = '') {
     const objEdits = []
     ranges.forEach(([start, end], i) => {
       const txt = values[i]
-      if (txt.match(/{{resolve:/)) return
+      // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html
+      if (txt.match(/{{resolve:/)) {
+        if (!txt.match(/\s/)) objEdits.push([start, end, `"${txt}"`])
+        return
+      }
       // console.log('obj text', txt)
       const hasNestedVars = txt && findOutermostVariables(txt)
       if (hasNestedVars && hasNestedVars.length) {
@@ -262,19 +263,6 @@ function preProcess(ymlStr = '') {
     for (let i = objEdits.length - 1; i >= 0; i--) {
       const [start, end, rep] = objEdits[i]
       ymlStr = ymlStr.slice(0, start) + rep + ymlStr.slice(end)
-    }
-    // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html 
-    const cfParams = values.filter((x) => !x.match(/\s/) && x.match(/{{resolve:/))
-    if (cfParams && cfParams.length) {
-      cfParams.forEach((txt) => {
-        const pat = new RegExp(`([^'"])${txt}([^'"])`, 'g')
-        const cfScanStr = maskBlockScalars(ymlStr)
-        ymlStr = ymlStr.replace(pat, (match, before, after, offset) => {
-          // Leave dynamic references that are block scalar content untouched
-          if (cfScanStr.slice(offset, offset + match.length) !== match) return match
-          return `${before}"${txt}"${after}`
-        })
-      })
     }
   }
   // console.log('ymlStr', ymlStr)
