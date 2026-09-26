@@ -391,6 +391,8 @@ class Configorama {
     // Cache raw file contents per absolute path so repeated ${file:...} refs
     // to the same file (e.g., merged twice into different keys) don't reread.
     this._fileContentCache = new Map()
+    /** @type {Map<string, Set<string>>} file ref -> file refs found in what it expanded to */
+    this._fileRefGraph = new Map()
 
     // rawOriginalConfig (a pre-preProcess snapshot) is only consumed by metadata
     // display paths. Skipping the cloneDeep when none of those paths are active
@@ -2650,6 +2652,13 @@ Missing Value ${missingValue} - ${matchedString}
     }
     // For cycle detection, only track self-references
     if (fromPath && (variableString.startsWith('self:') || !variableString.includes(':'))) {
+      // A value can't contain itself: o.k referencing o would expand forever
+      const targetPath = bracketsToDots(toPath.trim())
+      if (targetPath && fromPath.startsWith(`${targetPath}.`)) {
+        return Promise.reject(new Error(
+          `Circular variable dependency detected: ${fromPath} → ${targetPath} (a value can't reference the object that contains it)`
+        ))
+      }
       if (this.tracker.wouldCreateCycle(fromPath, toPath)) {
         const cyclePath = this.tracker.getCyclePath(fromPath, toPath)
         return Promise.reject(new Error(
@@ -2740,7 +2749,10 @@ Missing Value ${missingValue} - ${matchedString}
 
     // Fallback: loop over all variable types
     if (!found) {
-      found = this.variableTypes.some((r, i) => {
+      found = this.variableTypes.some(/**
+       * @param {{ match: RegExp | ((varString: string, config: any, valueObject: any) => boolean), resolver: Function, type?: string }} r
+       * @param {number} i
+       */ (r, i) => {
         if (r.match instanceof RegExp && variableString.match(r.match)) {
           // set resolver function
           resolverFunction = r.resolver
@@ -3237,6 +3249,75 @@ Missing Value ${missingValue} - ${matchedString}
       return res
     })
   }
+  /**
+   * Record which file refs a file ref expanded into, and fail if that closes a loop
+   * (a.yml -> b.yml -> a.yml), which would otherwise expand forever
+   * @param {string} variableString - The file ref that was expanded
+   * @param {any} value - What it resolved to
+   */
+  recordFileRefExpansion(variableString, value) {
+    const text = typeof value === 'string' ? value : (value && typeof value === 'object' ? JSON.stringify(value) : '')
+    if (!text) return
+    const fileRefKey = (/** @type {string} */ ref) => ref.replace(/\s+/g, '').replace(/^file\(\.\//, 'file(')
+    const from = fileRefKey(variableString)
+    // Variables in a resolved value come back as ${deep:N} placeholders; follow them to their text
+    /** @type {string[]} */
+    const found = []
+    const texts = [text]
+    const seenDeep = new Set()
+    while (texts.length) {
+      const current = /** @type {string} */ (texts.pop())
+      for (const match of current.match(this.variableSyntax) || []) {
+        const inner = match.slice(this.varPrefix.length, match.length - this.varSuffix.length).trim()
+        const deepIndex = inner.match(/^deep:(\d+)/)
+        if (deepIndex && !seenDeep.has(deepIndex[1])) {
+          seenDeep.add(deepIndex[1])
+          const deepText = this.deep[Number(deepIndex[1])]
+          if (typeof deepText === 'string') texts.push(deepText)
+        } else if (inner.startsWith('file(')) {
+          found.push(fileRefKey(inner))
+        }
+      }
+    }
+    if (!found.length) return
+    if (!this._fileRefGraph.has(from)) this._fileRefGraph.set(from, new Set())
+    const edges = this._fileRefGraph.get(from)
+    for (const to of found) {
+      if (edges) edges.add(to)
+      const chain = this.findFileRefPath(to, from)
+      if (chain) {
+        throw new Error(`Circular file reference detected: ${[from].concat(chain).join(' → ')}`)
+      }
+    }
+  }
+
+  /**
+   * Path of file refs from start to target through the recorded expansions, or null
+   * @param {string} start - File ref to search from
+   * @param {string} target - File ref to reach
+   * @returns {string[]|null} Refs from start to target, inclusive
+   */
+  findFileRefPath(start, target) {
+    /** @type {Array<string[]>} */
+    const stack = [[start]]
+    const visited = new Set()
+    while (stack.length) {
+      const chain = /** @type {string[]} */ (stack.pop())
+      const node = chain[chain.length - 1]
+      if (node === target) return chain
+      if (visited.has(node)) continue
+      visited.add(node)
+      for (const next of this._fileRefGraph.get(node) || []) stack.push(chain.concat(next))
+    }
+    return null
+  }
+
+  /**
+   * Resolve a file() ref, remembering expansions for circular reference detection
+   * @param {string} variableString - The file ref, e.g. file(./x.yml):key
+   * @param {object} [options] - Resolver options (asRawText, context)
+   * @returns {Promise<any>} The file's value
+   */
   async getValueFromFile(variableString, options) {
     const ctx = {
       configPath: this.configPath,
@@ -3255,7 +3336,9 @@ Missing Value ${missingValue} - ${matchedString}
       fileContentCache: this._fileContentCache,
       safetyPolicy: this.safetyPolicy
     }
-    return getValueFromFileResolver(ctx, variableString, options)
+    const value = await getValueFromFileResolver(ctx, variableString, options)
+    this.recordFileRefExpansion(variableString, value)
+    return value
   }
   getValueFromDeep(variableString, pathValue) {
     const variable = this.getVariableFromDeep(variableString)
