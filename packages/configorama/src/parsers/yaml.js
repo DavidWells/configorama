@@ -1,7 +1,6 @@
 const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
-const { findOutermostVariables, findOutermostBraceRanges } = require('../utils/strings/bracketMatcher')
 const { isInsideQuotes } = require('../utils/strings/quoteAware')
 
 /**
@@ -88,44 +87,6 @@ function toJson(ymlContents) {
   return json
 }
 
-const INNER_ARRAY = /\[(?:[^\[\]])*\]/g
-
-/**
- * Wrap BARE ${...} variables (those not already inside a quoted scalar) in double
- * quotes so the YAML parser treats them as strings instead of choking on `${`.
- * A variable already inside a quoted element like ['arn/${env:X}'] is already a safe
- * string, so wrapping it would inject literal quotes into the resolved value. A
- * variable whose own text contains a double quote (e.g. a ${opt:x, "def"} fallback)
- * is skipped, since double-wrapping it would produce invalid nested quotes; a
- * variable containing only single quotes is safe to wrap in double quotes.
- * @param {string} txt - A flow array/object substring containing variables
- * @returns {string} The substring with bare variables wrapped
- */
-function wrapBareVariables(txt) {
-  // findOutermostVariables returns one entry per occurrence, so dedupe first.
-  const uniqueVars = [...new Set(findOutermostVariables(txt))]
-  const wraps = []
-  uniqueVars.forEach((nested) => {
-    if (nested.indexOf('"') > -1) return
-    let from = 0
-    let idx
-    while ((idx = txt.indexOf(nested, from)) > -1) {
-      if (!isInsideQuotes(txt, idx)) {
-        wraps.push([idx, idx + nested.length])
-      }
-      from = idx + nested.length
-    }
-  })
-  if (!wraps.length) return txt
-  /* Wrap right-to-left so earlier indices stay valid */
-  wraps.sort((a, b) => b[0] - a[0])
-  let fixedText = txt
-  for (const [start, end] of wraps) {
-    fixedText = `${fixedText.slice(0, start)}"${fixedText.slice(start, end)}"${fixedText.slice(end)}`
-  }
-  return fixedText
-}
-
 /*
  * A line that opens a block scalar: optional `- ` sequence dashes, optional `key: `,
  * optional tags/anchors (!Sub, &a), then `|` or `>` with optional indentation/chomping
@@ -192,6 +153,127 @@ function opensFlowCollection(ymlStr, idx) {
 }
 
 /**
+ * Index just past the end of a quoted scalar opening at idx, or -1 if it never closes.
+ * Double quotes escape with a backslash; single quotes escape with ''.
+ * @param {string} str - YAML text
+ * @param {number} idx - Index of the opening quote
+ * @returns {number} Index after the closing quote, or -1
+ */
+function quotedScalarEnd(str, idx) {
+  const quote = str[idx]
+  for (let i = idx + 1; i < str.length; i++) {
+    if (quote === '"' && str[i] === '\\') {
+      i++
+    } else if (quote === "'" && str[i] === "'" && str[i + 1] === "'") {
+      i++
+    } else if (str[i] === quote) {
+      return i + 1
+    }
+  }
+  return -1
+}
+
+/**
+ * Index just past the `}` closing the ${...} variable (nested ones included) that
+ * starts at idx, or -1 if it doesn't close on the same line
+ * @param {string} str - YAML text
+ * @param {number} idx - Index of the `$`
+ * @returns {number} Index after the closing brace, or -1
+ */
+function variableEnd(str, idx) {
+  let depth = 0
+  for (let i = idx + 1; i < str.length && str[i] !== '\n'; i++) {
+    if (str[i] === '{') {
+      depth++
+    } else if (str[i] === '}') {
+      depth--
+      if (depth === 0) return i + 1
+    }
+  }
+  return -1
+}
+
+/**
+ * Range of a {{resolve:...}} dynamic reference starting at idx, or null. Only a
+ * reference without whitespace is quoted; one with whitespace is left as written.
+ * @param {string} str - YAML text
+ * @param {number} idx - Index of the first `{`
+ * @returns {{ end: number, quotable: boolean }|null} End index and whether to quote it
+ */
+function dynamicReferenceAt(str, idx) {
+  if (!str.startsWith('{{resolve:', idx)) return null
+  const close = str.indexOf('}}', idx)
+  if (close === -1) return null
+  return { end: close + 2, quotable: !/\s/.test(str.slice(idx, close + 2)) }
+}
+
+/**
+ * Scan the flow collection opening at start, matching brackets while skipping quoted
+ * scalars, ${...} variables and comments. Collects the ranges to wrap in quotes: bare
+ * variables and dynamic references that make up an entry.
+ * @param {string} str - YAML text with block scalar content masked
+ * @param {number} start - Index of the opening `[` or `{`
+ * @returns {{ end: number, quote: Array<[number, number]> }|null} Index after the
+ *   closing bracket and ranges to quote, or null if it never closes
+ */
+function scanFlowCollection(str, start) {
+  /** @type {Array<[number, number]>} */
+  const quote = []
+  let depth = 0
+  // At the start of an entry, where a quote opens a quoted scalar and a variable is bare
+  let entryStart = true
+  for (let i = start; i < str.length; i++) {
+    const ch = str[i]
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') continue
+    if (ch === '#' && /\s/.test(str[i - 1])) {
+      const nl = str.indexOf('\n', i)
+      if (nl === -1) return null
+      i = nl - 1
+      continue
+    }
+    if ((ch === '!' || ch === '&') && entryStart) {
+      // Skip a tag or anchor; the entry still starts after it
+      while (i + 1 < str.length && !/[\s,[\]{}]/.test(str[i + 1])) i++
+      continue
+    }
+    if (ch === '{' && entryStart && i !== start) {
+      const ref = dynamicReferenceAt(str, i)
+      if (ref) {
+        if (ref.quotable) quote.push([i, ref.end])
+        i = ref.end - 1
+        entryStart = false
+        continue
+      }
+    }
+    if (ch === '[' || ch === '{') {
+      depth++
+      entryStart = true
+    } else if (ch === ']' || ch === '}') {
+      depth--
+      if (depth === 0) return { end: i + 1, quote }
+      entryStart = false
+    } else if (ch === ',' || ch === ':' || ch === '?') {
+      entryStart = true
+    } else if ((ch === '"' || ch === "'") && entryStart) {
+      const end = quotedScalarEnd(str, i)
+      if (end === -1) return null
+      i = end - 1
+      entryStart = false
+    } else if (ch === '$' && str[i + 1] === '{') {
+      const end = variableEnd(str, i)
+      if (end === -1) return null
+      // Wrapping a variable whose own text has a double quote (${opt:x, "d"}) would nest quotes
+      if (entryStart && str.slice(i, end).indexOf('"') === -1) quote.push([i, end])
+      i = end - 1
+      entryStart = false
+    } else {
+      entryStart = false
+    }
+  }
+  return null
+}
+
+/**
  * Pre-process YAML string to handle nested variables and CloudFormation syntax
  * @param {string} [ymlStr=''] - YAML string to pre-process
  * @returns {string} Pre-processed YAML string
@@ -201,69 +283,35 @@ function preProcess(ymlStr = '') {
   return ymlStr
   /** */
 
-  // Fix nested variables in array brackets
+  // Wrap bare variables in flow collections in quotes so the YAML parser reads them as strings
   // in  -> y: !Not [!Equals [!Join ['', ${param:xyz}]]]
   // out -> y: !Not [!Equals [!Join ['', "${param:xyz}"]]]
-  if (ymlStr && ymlStr.indexOf('[') > -1) {
-    // Collect edits by index so we can skip brackets that are literal content of a
-    // quoted scalar (key: "[${x}]") or plain scalar (key: echo a[${x}]), where a real
-    // flow array's `[` is never inside quotes and always starts a value. Apply
-    // right-to-left so earlier indices stay valid.
-    /** @type {Array<[number, number, string]>} */
-    const edits = []
-    // Scan with block scalar content blanked; a match that differs from the real
-    // text overlaps block scalar content and is left alone.
-    const scanStr = maskBlockScalars(ymlStr)
-    for (const m of scanStr.matchAll(INNER_ARRAY)) {
-      const idx = m.index
-      if (typeof idx !== 'number') continue
-      const txt = ymlStr.slice(idx, idx + m[0].length)
-      if (txt !== m[0]) continue
-      if (!opensFlowCollection(ymlStr, idx)) continue
-      const hasNestedVars = findOutermostVariables(txt)
-      if (!hasNestedVars || !hasNestedVars.length) continue
-      const fixedText = wrapBareVariables(txt)
-      if (fixedText !== txt) {
-        edits.push([idx, idx + txt.length, fixedText])
-      }
+  // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html
+  if (!ymlStr || (ymlStr.indexOf('[') === -1 && ymlStr.indexOf('{') === -1)) return ymlStr
+
+  // Scan with block scalar content blanked: brackets there are literal text
+  const scanStr = maskBlockScalars(ymlStr)
+  /** @type {Array<[number, number]>} */
+  const quote = []
+  for (let i = 0; i < scanStr.length; i++) {
+    const ch = scanStr[i]
+    if ((ch !== '[' && ch !== '{') || !opensFlowCollection(ymlStr, i)) continue
+    const ref = dynamicReferenceAt(scanStr, i)
+    if (ref) {
+      if (ref.quotable) quote.push([i, ref.end])
+      i = ref.end - 1
+      continue
     }
-    for (let i = edits.length - 1; i >= 0; i--) {
-      const [start, end, rep] = edits[i]
-      ymlStr = ymlStr.slice(0, start) + rep + ymlStr.slice(end)
-    }
+    const flow = scanFlowCollection(scanStr, i)
+    if (!flow) continue
+    quote.push(...flow.quote)
+    i = flow.end - 1
   }
 
-  /* If have yaml object and vars not wrapped in quotes, wrap them */
-  const objScanStr = maskBlockScalars(ymlStr)
-  if (objScanStr.indexOf('{') > -1) {
-    // Flow mappings outside block scalar content, as [start, end) ranges into ymlStr
-    const ranges = findOutermostBraceRanges(objScanStr)
-      .filter(([start, end]) => objScanStr.slice(start, end) === ymlStr.slice(start, end))
-      .filter(([start]) => opensFlowCollection(ymlStr, start))
-    const values = ranges.map(([start, end]) => ymlStr.slice(start, end))
-    // console.log('values', values)
-    /** @type {Array<[number, number, string]>} */
-    const objEdits = []
-    ranges.forEach(([start, end], i) => {
-      const txt = values[i]
-      // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html
-      if (txt.match(/{{resolve:/)) {
-        if (!txt.match(/\s/)) objEdits.push([start, end, `"${txt}"`])
-        return
-      }
-      // console.log('obj text', txt)
-      const hasNestedVars = txt && findOutermostVariables(txt)
-      if (hasNestedVars && hasNestedVars.length) {
-        const fixedText = wrapBareVariables(txt)
-        if (fixedText !== txt) {
-          objEdits.push([start, end, fixedText])
-        }
-      }
-    })
-    for (let i = objEdits.length - 1; i >= 0; i--) {
-      const [start, end, rep] = objEdits[i]
-      ymlStr = ymlStr.slice(0, start) + rep + ymlStr.slice(end)
-    }
+  // Apply right-to-left so earlier indices stay valid
+  for (let i = quote.length - 1; i >= 0; i--) {
+    const [start, end] = quote[i]
+    ymlStr = `${ymlStr.slice(0, start)}"${ymlStr.slice(start, end)}"${ymlStr.slice(end)}`
   }
   // console.log('ymlStr', ymlStr)
   return ymlStr

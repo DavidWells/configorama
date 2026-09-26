@@ -81,6 +81,9 @@ const KNOWN_EXTENSIONS = new Set([
  * @returns {Object} Parsed configuration object
  */
 function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
+  if (contents === null) {
+    throw new Error(`Cannot parse "${filePath}": file contents are null`)
+  }
   let fileType = path.extname(filePath)
 
   // Dotenv files have no extension (path.extname('.env') === ''), so detect

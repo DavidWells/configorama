@@ -88,4 +88,73 @@ test('top-level flow mapping', async () => {
   assert.equal(config, { stage: 'dev', a: 'dev' })
 })
 
+// ==========================================
+// Nested sequences and brackets inside quoted flow entries
+// ==========================================
+
+test('var next to a nested sequence', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [ [], \${self:stage} ]
+b: [ [ x ], \${self:stage} ]
+c: [ \${self:stage}, [ x ] ]
+d: [ [ \${self:stage}, [ \${self:stage} ] ] ]
+`)
+  assert.equal(config.a, [[], 'dev'])
+  assert.equal(config.b, [['x'], 'dev'])
+  assert.equal(config.c, ['dev', ['x']])
+  assert.equal(config.d, [['dev', ['dev']]])
+})
+
+test('brackets and braces inside quoted flow entries', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [ 'a]b', \${self:stage} ]
+b: [ "a[b", \${self:stage} ]
+c: { a: "}", b: \${self:stage} }
+d: { a: "{", b: \${self:stage} }
+e: { a: '{}', b: [ ']', \${self:stage} ] }
+`)
+  assert.equal(config.a, ['a]b', 'dev'])
+  assert.equal(config.b, ['a[b', 'dev'])
+  assert.equal(config.c, { a: '}', b: 'dev' })
+  assert.equal(config.d, { a: '{', b: 'dev' })
+  assert.equal(config.e, { a: '{}', b: [']', 'dev'] })
+})
+
+test('quoted flow entry with a bracket spanning lines', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [ 'x [
+  y', \${self:stage} ]
+`)
+  assert.equal(config.a, ['x [ y', 'dev'])
+})
+
+test('comments and apostrophes inside a multi-line flow sequence', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [
+  \${self:stage}, # a comment with ] and [ and \${self:stage}
+  it's,
+  { b: \${self:stage} }
+]
+`)
+  assert.equal(config.a, ['dev', "it's", { b: 'dev' }])
+})
+
+test('unclosed bracket in a plain scalar does not swallow later flow collections', async () => {
+  const config = await resolveYaml(`stage: dev
+note: see [docs
+arr: [ \${self:stage} ]
+`)
+  assert.is(config.note, 'see [docs')
+  assert.equal(config.arr, ['dev'])
+})
+
+test('dynamic references inside flow collections', async () => {
+  const config = await resolveYaml(`stage: dev
+a: [ {{resolve:ssm:/p}}, \${self:stage} ]
+b: { k: {{resolve:ssm:/q}}, v: \${self:stage} }
+`)
+  assert.equal(config.a, ['{{resolve:ssm:/p}}', 'dev'])
+  assert.equal(config.b, { k: '{{resolve:ssm:/q}}', v: 'dev' })
+})
+
 test.run()

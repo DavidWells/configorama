@@ -382,4 +382,20 @@ test('preProcess - CRLF line endings: block scalar content untouched', () => {
   assert.is(preProcess(input), input)
 })
 
+test('preProcess - var after a tag inside a flow collection is wrapped', () => {
+  assert.is(preProcess('a: [ !Ref \${x}, !Sub \${y} ]\n'), 'a: [ !Ref "\${x}", !Sub "\${y}" ]\n')
+})
+
+test('preProcess - var mid-entry or with its own double quotes is not wrapped', () => {
+  const input = 'a: [ x-\${y}, \${opt:z, "d"} ]\n'
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - quoted scalars with escapes inside flow collections', () => {
+  assert.is(
+    preProcess(`a: [ "q\\"]", 'it''s ]', \${x} ]\n`),
+    `a: [ "q\\"]", 'it''s ]', "\${x}" ]\n`
+  )
+})
+
 test.run()
