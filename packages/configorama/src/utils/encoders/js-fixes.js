@@ -88,6 +88,12 @@ function encodeJsonArgObjects(str, varPrefix = '${') {
   const guard = preBrace ? `(?<!${preBrace})` : ''
   const pattern = new RegExp(`(\\w+\\([^{}()]*)(${guard}\\{[^{}]*\\})([^{}()]*\\))`, 'g')
   return str.replace(pattern, (match, open, obj, close) => {
+    // file()/text() take a path, where { } are plain characters
+    if (/^(?:file|text)\(/.test(open)) return match
+    // A { inside a quoted string argument ("{" in eval, '{a},{b}' in split) is text, not JSON
+    const doubleQuotes = (open.match(/"/g) || []).length
+    const singleQuotes = (open.match(/'/g) || []).length
+    if (doubleQuotes % 2 === 1 || singleQuotes % 2 === 1) return match
     const b64 = Buffer.from(obj).toString('base64')
     return `${open}${JSON_ENCODED_PREFIX}${b64}__${close}`
   })

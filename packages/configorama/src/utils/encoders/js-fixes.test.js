@@ -2,7 +2,7 @@
 /* eslint-disable no-template-curly-in-string */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { encodeJsonForVariable, decodeJsonInVariable, parseEncodedJson } = require('./js-fixes')
+const { encodeJsonForVariable, decodeJsonInVariable, parseEncodedJson, encodeJsonArgObjects } = require('./js-fixes')
 
 test('encodeJsonForVariable - output has no braces and decodes back to the JSON text', () => {
   const encoded = encodeJsonForVariable({ a: 1, b: [1, 2] })
@@ -25,6 +25,22 @@ test('parseEncodedJson - anything else is returned unchanged', () => {
   assert.is(parseEncodedJson('plain'), 'plain')
   assert.is(parseEncodedJson(5), 5)
   assert.is(parseEncodedJson('__JSON_B64__bm90IGpzb24=__'), '__JSON_B64__bm90IGpzb24=__')
+})
+
+test('encodeJsonArgObjects - encodes a JSON object passed as a call argument', () => {
+  const out = encodeJsonArgObjects('${self:x | help({"a":1})}')
+  assert.not.match(out.slice(2, -1), /[{}]/)
+  assert.is(decodeJsonInVariable(out), '${self:x | help({"a":1})}')
+})
+
+test('encodeJsonArgObjects - braces inside a quoted string argument are not JSON', () => {
+  assert.is(encodeJsonArgObjects('${eval("{" + "}")}'), '${eval("{" + "}")}')
+  assert.is(encodeJsonArgObjects("${split('{a},{b}', ',')}"), "${split('{a},{b}', ',')}")
+})
+
+test('encodeJsonArgObjects - file() and text() paths are not JSON', () => {
+  assert.is(encodeJsonArgObjects('${file(./br/{x}.json):k}'), '${file(./br/{x}.json):k}')
+  assert.is(encodeJsonArgObjects('${text(./{x}.txt)}'), '${text(./{x}.txt)}')
 })
 
 test.run()

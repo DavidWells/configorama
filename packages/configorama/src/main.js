@@ -2133,11 +2133,18 @@ class Configorama {
       // (${deep:N}, an object arg mid-resolution) or a `> function` marker (a nested function not yet run).
       // Encoding those would wrap the eventual value in a ResolvedFilterArg / preserve the `> function`
       // prefix and leak it into the outer call's result.
+      // A nested function call (${split(...)} as an argument of join(...)) resolves to its own call
+      // text, run later with the outer call; it must stay a call, not become a quoted string.
+      const deferredCall = funcRegex.exec(valueToPopulate)
+      const isDeferredCall = !!deferredCall &&
+        !!(this.functions[deferredCall[1]] || this.functions[deferredCall[1].toLowerCase()]) &&
+        currentMatchedString.trim() === `${this.varPrefix}${valueToPopulate}${this.varSuffix}`
       if (
         isNestedCallArgument(property, currentMatchedString, this._callArgNames) &&
         !this.variableSyntaxTest.test(valueToPopulate) &&
         !valueToPopulate.match(deepRefSyntax) &&
-        !valueToPopulate.match(functionPrefixPattern)
+        !valueToPopulate.match(functionPrefixPattern) &&
+        !isDeferredCall
       ) {
         valueToPopulate = encodeFilterArg(valueToPopulate)
       }
