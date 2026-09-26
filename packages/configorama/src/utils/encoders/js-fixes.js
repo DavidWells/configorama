@@ -46,6 +46,22 @@ function decodeJsonInVariable(value) {
 }
 
 /**
+ * Parse a value that is exactly one encoded JSON object back to the object
+ * @param {any} value - Value that may be an encoded JSON string
+ * @returns {any} The parsed object, or the value unchanged
+ */
+function parseEncodedJson(value) {
+  if (typeof value !== 'string') return value
+  const match = value.match(/^__JSON_B64__([A-Za-z0-9+/=]+)__$/)
+  if (!match) return value
+  try {
+    return JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'))
+  } catch (e) {
+    return value
+  }
+}
+
+/**
  * Check if string contains encoded JSON
  * @param {string} value - String to check
  * @returns {boolean}
@@ -84,6 +100,7 @@ module.exports = {
   decodeJsSyntax,
   encodeJsonForVariable,
   decodeJsonInVariable,
+  parseEncodedJson,
   hasEncodedJson,
   encodeJsonArgObjects,
 }

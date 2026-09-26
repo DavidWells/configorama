@@ -77,6 +77,27 @@ function isInsideOuterVariable(property, matchedString, varPrefix, varSuffix) {
   return opens > closes
 }
 
+// True when the match at matchIndex is a fallback item of the variable enclosing it: a comma at
+// the enclosing variable's own level comes before it, e.g. `${self:obj}` in `${opt:x, ${self:obj}}`
+// but not the source slot of `${env:${self:obj}}`
+function isInFallbackSlot(property, matchedString, matchIndex, varPrefix, varSuffix) {
+  const enclosing = findEnclosingVariable(property, matchedString, varPrefix, varSuffix, matchIndex)
+  if (!enclosing || enclosing === matchedString) return false
+  const start = property.lastIndexOf(enclosing, matchIndex)
+  let depth = 0
+  for (let i = start + varPrefix.length; i < matchIndex; i++) {
+    if (property.startsWith(varPrefix, i)) {
+      depth++
+      i += varPrefix.length - 1
+    } else if (property[i] === varSuffix && depth > 0) {
+      depth--
+    } else if (property[i] === ',' && depth === 0) {
+      return true
+    }
+  }
+  return false
+}
+
 // Narrower check for object/number args: encode only for FILTER arg lists (enclosing `(` follows a `|`).
 // Object/array values passed to a FUNCTION (e.g. merge(${obj})) must stay raw, not base64-encoded.
 function isNestedFilterArgument(property, matchedString) {
@@ -193,7 +214,7 @@ const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
-const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable } = require('./utils/encoders/js-fixes')
+const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -2134,17 +2155,23 @@ class Configorama {
       } else {
         const objStr = JSON.stringify(valueToPopulate)
         /* Check if variable inside another variable. E.g. ${env:${self:someObject}} that resolves to ${env:{...}} */
-        const isNestedInVariable = (
+        const enclosingVar = (typeof matchIndex === 'number')
+          ? findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+          : null
+        const isNestedInVariable = enclosingVar ? enclosingVar !== matchedString : (
           property.trim() !== matchedString.trim() &&
           property.indexOf(matchedString) !== -1 &&
           this.variableSyntaxTest.test(matchedString) &&
           this.variableSyntaxTest.test(property)
         )
-        // Only encode for file() or text() references where JSON braces break regex matching
+        // Only encode for file() or text() references where JSON braces break regex matching,
+        // or for a fallback item (${opt:x, ${self:obj}}), decoded when that fallback wins
         const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
+        const isFallbackItem = isNestedInVariable &&
+          isInFallbackSlot(property, matchedString, matchIndex, this.varPrefix, this.varSuffix)
         if (isNestedFilterArgument(property, matchedString)) {
           property = replaceMatch(matchedString, encodeFilterArg(valueToPopulate), property)
-        } else if (isNestedInVariable && isFileOrTextRef) {
+        } else if (isNestedInVariable && (isFileOrTextRef || isFallbackItem)) {
           // Encode object as base64 to avoid breaking variable syntax with nested braces
           const encodedObj = encodeJsonForVariable(valueToPopulate)
           property = replaceMatch(matchedString, encodedObj, property)
@@ -2527,7 +2554,8 @@ Missing Value ${missingValue} - ${matchedString}
         const reconstructed = this.varPrefix + deepVariableParts.join(', ') + filterSuffix + this.varSuffix
         return Promise.resolve(reconstructed)
       }
-      const winner = extractedValues.find(isValidValue) // first valid value, else undefined
+      // First valid value, else undefined. An object fallback arrives encoded; decode it back
+      const winner = parseEncodedJson(extractedValues.find(isValidValue))
       if (winner === undefined || !trailingFilters.length) return Promise.resolve(winner)
       return Promise.resolve(this.applyFilters(winner, trailingFilters.map((f) => f.trim()), valueObject.path))
     })
