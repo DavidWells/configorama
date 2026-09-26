@@ -44,7 +44,7 @@ function warnIfNotFound(variableString, valueToPopulate, options = {}) {
   if (!isValidValue(valueToPopulate)) {
     const notFoundMsg = `No ${variableTypeText} found to satisfy the '\${${variableString}}' variable. Attempting fallback value`
     if (debug) {
-      console.log(notFoundMsg)
+      console.error(notFoundMsg)
     }
   }
   return valueToPopulate

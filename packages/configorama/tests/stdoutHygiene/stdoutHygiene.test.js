@@ -2,6 +2,8 @@
 /* Ensures configorama never writes diagnostics to stdout during resolution.
    stdout must carry only the caller's data (resolved config), so tools like
    `configx --export` and `configorama config.yml > out.json` stay clean. */
+const path = require('path')
+const { spawnSync } = require('child_process')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const configorama = require('../../src')
@@ -45,6 +47,37 @@ test('slow async resolution progress does not write to stdout', async () => {
   }
   const lines = await captureStdout(() => configorama({ t: '${slow:x}' }, { variableSources: [slow] }))
   assert.equal(lines, [])
+})
+
+test('debug tracing (--debug, DEBUG_IF, DEBUG_EVAL) does not write to stdout', () => {
+  const src = path.join(__dirname, '../../src')
+  const script = `
+    const configorama = require(${JSON.stringify(src)})
+    configorama({
+      stage: 'dev',
+      obj: { a: 1 },
+      a: '\${opt:nope, \${self:stage}}-x',
+      b: '\${if(\${self:stage} === "dev") ? "yes" : "no"}',
+      c: '\${eval(1 + 2)}',
+      d: '\${self:stage | toUpperCase}',
+      e: '\${opt:nope, \${self:obj}}'
+    }, { options: {} }).then((config) => process.stdout.write(JSON.stringify(config)))
+  `
+  const result = spawnSync(process.execPath, ['-e', script, '--', '--debug'], {
+    env: { ...process.env, DEBUG_IF: '1', DEBUG_EVAL: '1' },
+    encoding: 'utf8'
+  })
+  assert.is(result.status, 0, result.stderr)
+  assert.ok(result.stderr.length > 0, 'debug output should go to stderr')
+  assert.equal(JSON.parse(result.stdout), {
+    stage: 'dev',
+    obj: { a: 1 },
+    a: 'dev-x',
+    b: 'yes',
+    c: 3,
+    d: 'DEV',
+    e: { a: 1 }
+  })
 })
 
 test.run()

@@ -655,11 +655,11 @@ class Configorama {
       // ensure each variable source has a type
       options.variableSources.forEach((v) => {
         if (!v.type) {
-          console.log('Variable', v)
+          console.error('Variable', v)
           throw new Error('Variable source must have a type')
         }
         if (!v.match || !v.resolver) {
-          console.log('Variable', v)
+          console.error('Variable', v)
           throw new Error('Variable source must have a match and resolver functions')
         }
       })
@@ -1302,7 +1302,7 @@ class Configorama {
             })
 
             if (DEBUG) {
-              console.log(`Variable process ran ${this.callCount} times`)
+              console.error(`Variable process ran ${this.callCount} times`)
               // console.log('FINAL Value', this.config)
               // console.log(this.deep)
             }
@@ -1367,7 +1367,7 @@ class Configorama {
     this.callCount = this.callCount + 1
 
     if (DEBUG) {
-      deepLog(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
+      deepLog.deepDebug(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
       // process.exit(0)
     }
 
@@ -1378,7 +1378,7 @@ class Configorama {
     // console.log("FILL LEAVES", populations)
 
     if (populations.length === 0) {
-      if (DEBUG) console.log('Config Population Finished')
+      if (DEBUG) console.error('Config Population Finished')
       return Promise.resolve(objectToPopulate)
     }
 
@@ -1871,9 +1871,9 @@ class Configorama {
    */
   populateValue(valueObject, root, caller) {
     if (DEBUG) {
-      console.log('─────────────────────────────────────────────▶')
-      console.log('>>>>>>>> populateValue', caller)
-      console.log(valueObject)
+      console.error('─────────────────────────────────────────────▶')
+      console.error('>>>>>>>> populateValue', caller)
+      console.error(valueObject)
     }
     const property = valueObject.value
     if (this.shouldSkipResolution(valueObject.path, property)) {
@@ -1924,9 +1924,9 @@ class Configorama {
    */
   splitAndGet(variable, valueObject, root, originalVar, matchIndex) {
     if (DEBUG) {
-      console.log('>>>>>>>> Split and Get', variable)
-      console.log('valueObject', valueObject)
-      console.log('root', root)
+      console.error('>>>>>>>> Split and Get', variable)
+      console.error('valueObject', valueObject)
+      console.error('root', root)
     }
     /* requires node 8.11+
     if (valueObject.value.match(/(?<!^)> function /)) {
@@ -1937,12 +1937,12 @@ class Configorama {
 
     const parts = splitByComma(variable, this.variableSyntax)
     if (DEBUG) {
-      console.log('splitAndGet parts', parts)
-      console.log('splitAndGet parts variable:', variable)
-      console.log('splitAndGet parts originalVar:', originalVar)
-      console.log('splitAndGet parts current valueObject:', valueObject)
-      console.log('splitAndGet All parts:', parts)
-      console.log('-----')
+      console.error('splitAndGet parts', parts)
+      console.error('splitAndGet parts variable:', variable)
+      console.error('splitAndGet parts originalVar:', originalVar)
+      console.error('splitAndGet parts current valueObject:', valueObject)
+      console.error('splitAndGet All parts:', parts)
+      console.error('-----')
     }
     if (parts.length <= 1) {
       return this.getValueFromSource(parts[0], valueObject, 'splitAndGet', originalVar, matchIndex)
@@ -1983,17 +1983,17 @@ class Configorama {
     // console.log('init property', property)
 
     if (DEBUG) {
-      console.log('────────START populateVar──────────────')
-      console.log('populateVariable: valueObject', valueObject)
-      console.log('populateVariable: valueToPopulate', valueToPopulate)
-      console.log('populateVariable: typeof valueToPopulate', typeof valueToPopulate)
-      console.log(`populateVariable: path "${valueObject.path}"`)
-      console.log(`populateVariable: value \`${valueObject.value}\``)
-      console.log(`populateVariable: originalSource \`${valueObject.originalSource}\``)
-      console.log('populateVariable: property', property)
-      console.log('populateVariable: matchedString', matchedString)
+      console.error('────────START populateVar──────────────')
+      console.error('populateVariable: valueObject', valueObject)
+      console.error('populateVariable: valueToPopulate', valueToPopulate)
+      console.error('populateVariable: typeof valueToPopulate', typeof valueToPopulate)
+      console.error(`populateVariable: path "${valueObject.path}"`)
+      console.error(`populateVariable: value \`${valueObject.value}\``)
+      console.error(`populateVariable: originalSource \`${valueObject.originalSource}\``)
+      console.error('populateVariable: property', property)
+      console.error('populateVariable: matchedString', matchedString)
       if (valueObject.resolutionHistory && valueObject.resolutionHistory.length > 0) {
-        console.log('populateVariable: resolutionHistory', JSON.stringify(valueObject.resolutionHistory, null, 2))
+        console.error('populateVariable: resolutionHistory', JSON.stringify(valueObject.resolutionHistory, null, 2))
       }
     }
 
@@ -2010,7 +2010,7 @@ class Configorama {
 
     // total replacement
     if (property === matchedString) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE total replacement')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE total replacement')
       const v = valueObject.value || ''
       property = valueToPopulate
       // console.log('hasFilters', hasFilters)
@@ -2064,7 +2064,7 @@ class Configorama {
       }
     // partial replacement, string
     } else if (isString(valueToPopulate)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isString')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isString')
       // if (property.match(/^> function /g)) {
       //
       //   const innerFunc = /> function (\w+)\s*\(((?:[^()]+)*)?\s*\)\s*/
@@ -2136,7 +2136,7 @@ class Configorama {
 
     // partial replacement, number
     } else if (isNumber(valueToPopulate)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isNumber')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isNumber')
       const replacementValue = isNestedFilterArgument(property, matchedString)
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
@@ -2145,7 +2145,7 @@ class Configorama {
       // } else if (isArray(valueToPopulate) && valueToPopulate.length === 1) {
       //  property = replaceAll(matchedString, String(valueToPopulate[0]), property)
     } else if (isObject(valueToPopulate)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isObject')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isObject')
 
       // For eval/if expressions, encode objects to avoid {} breaking variable syntax
       const isEvalOrIf = evalIfPattern.test(property)
@@ -2198,7 +2198,7 @@ class Configorama {
       // eval/if get the bare true/false. But when the match sits INSIDE an outer ${...} that is NOT eval/if
       // (a fallback like ${env:X, ${self:flag}}), leave it to the fallback handler below so the boolean's
       // TYPE is preserved once that fallback is selected.
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isBoolean')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isBoolean')
       const replacementValue = isNestedFilterArgument(property, matchedString)
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
@@ -2206,11 +2206,11 @@ class Configorama {
 
     // partial replacement, null inside eval/if expressions
     } else if (valueToPopulate === null && evalIfPattern.test(property)) {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE isNull in eval/if')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isNull in eval/if')
       property = replaceMatch(matchedString, '__NULL__', property)
 
     } else {
-      if (DEBUG_TYPE) console.log('DEBUG_TYPE else')
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE else')
       let missingValue = matchedString
 
       if (matchedString.match(deepRefSyntax)) {
@@ -2645,13 +2645,13 @@ Missing Value ${missingValue} - ${matchedString}
     let newHasFilter
     // Else lookup value from various sources
     if (DEBUG) {
-      console.log(`>>>>> getValueFromSrc() caller - ${caller}`)
-      console.log('getValueFromSource originalVar', originalVar)
-      console.log('getValueFromSource variableString:', variableString)
-      console.log('getValueFromSource propertyString:', propertyString)
-      console.log('getValueFromSource pathValue:', valueObject.path)
-      console.log('getValueFromSource valueObject:', valueObject)
-      console.log('-----')
+      console.error(`>>>>> getValueFromSrc() caller - ${caller}`)
+      console.error('getValueFromSource originalVar', originalVar)
+      console.error('getValueFromSource variableString:', variableString)
+      console.error('getValueFromSource propertyString:', propertyString)
+      console.error('getValueFromSource pathValue:', valueObject.path)
+      console.error('getValueFromSource valueObject:', valueObject)
+      console.error('-----')
     }
 
     // A filter delimiter is a single `|` that is NOT part of `||` (logical OR) and NOT inside parens
@@ -3097,7 +3097,7 @@ Missing Value ${missingValue} - ${matchedString}
       /** */
       // has fallback but needs deeper lookup. Call getValueFromSrc again
       if (fallbackValue) {
-        if (DEBUG) console.log('fallbackValue', fallbackValue)
+        if (DEBUG) console.error('fallbackValue', fallbackValue)
         // console.log('fallbackValue', fallbackValue)
         // recurse on fallback and check again
         return this.getValueFromSource(

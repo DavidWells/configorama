@@ -49,7 +49,7 @@ async function getValueFromEval(variableString) {
   }
 
   const expression = match[1].trim()
-  if (process.env.DEBUG_EVAL) console.log('eval expression:', expression)
+  if (process.env.DEBUG_EVAL) console.error('eval expression:', expression)
 
   // Use "justin" variant to support strict comparison (===, !==) and other JS-like operators
   try {
@@ -81,7 +81,7 @@ async function getValueFromEval(variableString) {
     // Wrap comparisons in parens for correct precedence with && / ||
     processedExpression = wrapComparisons(processedExpression)
 
-    if (process.env.DEBUG_EVAL) console.log('eval processed:', processedExpression)
+    if (process.env.DEBUG_EVAL) console.error('eval processed:', processedExpression)
 
     // Block prototype-chain escapes (e.g. "".constructor.constructor) before
     // compiling, whether or not safe mode is enabled.

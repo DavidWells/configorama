@@ -37,12 +37,12 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
   let match
   let iteration = 0
   
-  if (debug) console.log(`Initial string: ${input}`)
+  if (debug) console.error(`Initial string: ${input}`)
 
   // First pass: Find all matches and create unique placeholders
   while (true) {
     iteration++
-    if (debug) console.log(`\nIteration ${iteration}:`)
+    if (debug) console.error(`\nIteration ${iteration}:`)
     
     // Reset regex index
     regex.lastIndex = 0
@@ -72,9 +72,9 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     }
     
     if (debug) {
-      console.log(`Match: ${match[0]}`)
-      console.log(`Captured group: ${match[1]}`)
-      console.log(`Position: ${match.index}`)
+      console.error(`Match: ${match[0]}`)
+      console.error(`Captured group: ${match[1]}`)
+      console.error(`Position: ${match.index}`)
     }
     
     matches.push(matchInfo)
@@ -90,10 +90,10 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
     // Replace in working string (to find next match)
     current = current.substring(0, match.index) + placeholder + current.substring(match.index + match[0].length)
     
-    if (debug) console.log(`After replacement: ${current}`)
+    if (debug) console.error(`After replacement: ${current}`)
   }
   
-  if (debug) console.log(`\nTotal matches found: ${matches.length}`)
+  if (debug) console.error(`\nTotal matches found: ${matches.length}`)
   
   // We need to store varString - the variable string with placeholders
   for (let i = 0; i < matches.length; i++) {
@@ -282,13 +282,13 @@ function findNestedVariables(input, regex, variablesKnownTypes, location, variab
   })
   
   if (debug) {
-    console.log("\nReconstructed matches:")
+    console.error("\nReconstructed matches:")
     matches.forEach((m, i) => {
-      console.log(`Match #${i+1} (order ${m.order}):`)
-      console.log(`VarMatch: ${m.varMatch}`)
-      console.log(`Variable: ${m.variable}`)
-      console.log(`VarString: ${m.varString}`)
-      console.log(`Placeholder: ${m.placeholder}`)
+      console.error(`Match #${i+1} (order ${m.order}):`)
+      console.error(`VarMatch: ${m.varMatch}`)
+      console.error(`Variable: ${m.variable}`)
+      console.error(`VarString: ${m.varString}`)
+      console.error(`Placeholder: ${m.placeholder}`)
     })
   }
   
@@ -310,12 +310,12 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
 
   // console.log('input', input)
   
-  if (debug) console.log(`Initial string: ${str}`)
+  if (debug) console.error(`Initial string: ${str}`)
 
   // Process string until no more matches are found
   while (true) {
     iteration++
-    if (debug) console.log(`\nIteration ${iteration}:`)
+    if (debug) console.error(`\nIteration ${iteration}:`)
     
     // Reset regex index
     regex.lastIndex = 0
@@ -326,8 +326,8 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
     
     // Log match details if in debug mode
     if (debug) {
-      console.log(`Match: ${match[0]}`)
-      console.log(`Captured group: ${match[1]}`)
+      console.error(`Match: ${match[0]}`)
+      console.error(`Captured group: ${match[1]}`)
     }
     
     // Store the match
@@ -339,7 +339,7 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
     
     // Replace the match with placeholder
     str = str.replace(regex, `__REPLACED_${iteration - 1}__`)
-    if (debug) console.log(`After replacement: ${str}`)
+    if (debug) console.error(`After replacement: ${str}`)
   }
 
   // Replace the `__REPLACED_${iteration - 1}__` with the original match
@@ -353,7 +353,7 @@ function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false
     return match
   })
 
-  if (debug) console.log(`\nTotal matches found: ${matches.length}`)
+  if (debug) console.error(`\nTotal matches found: ${matches.length}`)
   return matches
 }
 

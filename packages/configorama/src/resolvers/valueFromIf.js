@@ -8,7 +8,7 @@ const { findOutsideQuotes } = require('../utils/strings/quoteAware')
 const ifRefSyntax = RegExp(/^if\s*\(.*\)(\s*\?.*)?/g)
 
 async function getValueFromIf(variableString) {
-  if (process.env.DEBUG_IF) console.log('if resolver input:', variableString)
+  if (process.env.DEBUG_IF) console.error('if resolver input:', variableString)
 
   // Validate: check for empty condition
   const emptyConditionMatch = variableString.match(/^if\s*\(\s*\)/)
@@ -53,7 +53,7 @@ async function getValueFromIf(variableString) {
           const trueVal = ternaryPart.substring(0, colonIdx).trim()
           const falseVal = ternaryPart.substring(colonIdx + 1).trim()
           const expression = `(${condition}) ? ${trueVal} : ${falseVal}`
-          if (process.env.DEBUG_IF) console.log('if resolver external ternary:', expression)
+          if (process.env.DEBUG_IF) console.error('if resolver external ternary:', expression)
           return evalResolver(`eval(${expression})`)
         }
       }
@@ -62,7 +62,7 @@ async function getValueFromIf(variableString) {
 
   // Standard syntax: if(condition ? trueVal : falseVal) or if(boolExpr)
   const converted = variableString.replace(/^if\s*\(/, 'eval(')
-  if (process.env.DEBUG_IF) console.log('if resolver standard syntax:', converted)
+  if (process.env.DEBUG_IF) console.error('if resolver standard syntax:', converted)
   return evalResolver(converted)
 }
 

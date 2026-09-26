@@ -19,7 +19,7 @@ module.exports = function cleanVariable(
   recursive = false,
 ) {
   if (DEBUG) {
-    console.log(`Clean input  [${caller}]`, match)
+    console.error(`Clean input  [${caller}]`, match)
   }
   
   // const outermostMatch = removeOuterMostBraces(match)
@@ -77,7 +77,7 @@ module.exports = function cleanVariable(
   //   return cleanVariable(clean, variableSyntax, simple, caller, true)
   // }
   if (DEBUG) {
-    console.log(`Clean output [${caller}]`, clean)
+    console.error(`Clean output [${caller}]`, clean)
   }
   return clean
 }

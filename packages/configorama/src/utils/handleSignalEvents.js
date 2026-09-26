@@ -34,7 +34,7 @@ Exit received. Waiting for current operation to finish...
     global.signalEventHandling.SIGINTCount += 1
     global.signalEventHandling.shouldExitGracefully = true
     if (global.signalEventHandling.SIGINTCount < 2) {
-      console.log(`${msg} Press CTRL + C again to force an exit\nNOTE: Doing so might corrupt the applications state information!`)
+      console.error(`${msg} Press CTRL + C again to force an exit\nNOTE: Doing so might corrupt the applications state information!`)
     } else {
       process.exit(1)
     }
@@ -42,12 +42,12 @@ Exit received. Waiting for current operation to finish...
 
   process.on('SIGTERM', () => {
     global.signalEventHandling.shouldExitGracefully = true
-    console.log(msg)
+    console.error(msg)
   })
 
   process.on('SIGBREAK', () => {
     global.signalEventHandling.shouldExitGracefully = true
-    console.log(msg)
+    console.error(msg)
   })
 }
 
