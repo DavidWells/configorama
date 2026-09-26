@@ -218,4 +218,96 @@ nested: [[\${opt:stage}, \${opt:stage}], [\${opt:stage}]]
   assert.is(wrappedCount, 3, `Expected 3 wrapped occurrences, got ${wrappedCount}. Output: ${result}`)
 })
 
+// ==========================================
+// Block scalars (| > and variants) hold literal text: preProcess must not edit it
+// ==========================================
+
+const blockIndicators = ['|', '|-', '|+', '>', '>-', '|2', '>+2']
+blockIndicators.forEach((indicator) => {
+  test(`preProcess - leaves "${indicator}" block scalar content untouched`, () => {
+    const input = `stage: dev
+v: ${indicator}
+  [ "\\"A/\${self:stage}\\"" ]
+  [ \\\${self:stage} ]
+  [ \${self:stage} ]
+  x: { a: \${self:stage} }
+after: 1
+`
+    assert.is(preProcess(input), input)
+  })
+})
+
+test('preProcess - leaves tagged (!Sub |) block scalar content untouched', () => {
+  const input = `Resources:
+  Dashboard:
+    Properties:
+      DashboardBody: !Sub |
+        {
+          "widgets": [ { "properties": {
+            "metrics": [ [ { "expression": "SEARCH('{\\"SaaSLayer/RBAC/\${self:provider.stackName}\\",Path} M=\\"x\\"', 'Sum', 60)" } ] ],
+            "region": "\${AWS::Region}",
+            "periods": [ \${Period} ]
+          } } ]
+        }
+      Other: 1
+`
+  assert.is(preProcess(input), input)
+})
+
+test('preProcess - leaves "- |" sequence item block content untouched', () => {
+  const input = `items:
+  - |
+    [ \${self:stage} ]
+  - key: |
+      [ \${self:stage} ]
+    sibling: [ \${self:stage} ]
+`
+  const expected = `items:
+  - |
+    [ \${self:stage} ]
+  - key: |
+      [ \${self:stage} ]
+    sibling: [ "\${self:stage}" ]
+`
+  assert.is(preProcess(input), expected)
+})
+
+test('preProcess - flow array and object right after a block scalar still get bare vars wrapped', () => {
+  const input = `v: |
+  [ \${self:stage} ]
+  { a: \${self:stage} }
+
+arr: [ \${self:stage}, b ]
+obj: { a: \${self:stage} }
+`
+  const expected = `v: |
+  [ \${self:stage} ]
+  { a: \${self:stage} }
+
+arr: [ "\${self:stage}", b ]
+obj: { a: "\${self:stage}" }
+`
+  assert.is(preProcess(input), expected)
+})
+
+test('preProcess - identical flow array inside and after a block: only the one outside is wrapped', () => {
+  const input = `v: >-
+  obj: { a: \${self:stage} }
+obj: { a: \${self:stage} }
+`
+  const expected = `v: >-
+  obj: { a: \${self:stage} }
+obj: { a: "\${self:stage}" }
+`
+  assert.is(preProcess(input), expected)
+})
+
+test('preProcess - CloudFormation dynamic reference inside a block scalar is not quoted', () => {
+  const input = `cfg: { a: 1 }
+script: !Sub |
+  echo {{resolve:ssm:/my/param}} done
+`
+  assert.is(preProcess(input), input)
+})
+
 test.run() 

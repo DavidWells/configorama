@@ -1,7 +1,7 @@
 const YAML = require('js-yaml')
 const TOML = require('./toml')
 const JSON = require('./json5')
-const { findOutermostVariables, findOutermostBracesDepthFirst } = require('../utils/strings/bracketMatcher')
+const { findOutermostVariables, findOutermostBraceRanges } = require('../utils/strings/bracketMatcher')
 const { isInsideQuotes } = require('../utils/strings/quoteAware')
 
 /**
@@ -88,9 +88,6 @@ function toJson(ymlContents) {
   return json
 }
 
-// Alias for backward compatibility
-const matchOutermostBraces = findOutermostBracesDepthFirst
-
 // https://regex101.com/r/XIltbc/1
 const KEY_OBJECT = /^[ \t]*[^":\s]*:\s+\{/gm
 
@@ -132,6 +129,46 @@ function wrapBareVariables(txt) {
   return fixedText
 }
 
+/*
+ * A line that opens a block scalar: optional `- ` sequence dashes, optional `key: `,
+ * optional tags/anchors (!Sub, &a), then `|` or `>` with optional indentation/chomping
+ * indicators (|2, |-, >+2) and an optional trailing comment.
+ */
+const BLOCK_SCALAR_HEADER = /^((?:[ \t]*-(?=[ \t]))*[ \t]*)([^\s#][^\n]*?:[ \t]+)?(?:[!&][^\s]*[ \t]+)*[|>](?:[1-9][+-]?|[+-][1-9]?)?[ \t]*(?:#.*)?$/
+
+/**
+ * Blank out the content of YAML block scalars (| > and variants) with spaces, keeping
+ * every index and newline in place. Block scalar content is literal text, so scans for
+ * flow collections must not see it. Content is every line after the header that is
+ * blank or indented deeper than the header's key (or its last `-` for `- |` items).
+ * @param {string} ymlStr - Raw YAML text
+ * @returns {string} Same-length text with block scalar content replaced by spaces
+ */
+function maskBlockScalars(ymlStr) {
+  if (ymlStr.indexOf('|') === -1 && ymlStr.indexOf('>') === -1) return ymlStr
+  const lines = ymlStr.split('\n')
+  let baseIndent = -1
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (baseIndent > -1) {
+      const indent = line.length - line.replace(/^[ \t]*/, '').length
+      if (!line.trim() || indent > baseIndent) {
+        lines[i] = ' '.repeat(line.length)
+        continue
+      }
+      baseIndent = -1
+    }
+    const header = line.match(BLOCK_SCALAR_HEADER)
+    if (header) {
+      const lead = header[1]
+      const hasKey = !!header[2]
+      const lastDash = lead.lastIndexOf('-')
+      baseIndent = (hasKey || lastDash === -1) ? lead.length : lastDash
+    }
+  }
+  return lines.join('\n')
+}
+
 /**
  * Pre-process YAML string to handle nested variables and CloudFormation syntax
  * @param {string} [ymlStr=''] - YAML string to pre-process
@@ -151,10 +188,14 @@ function preProcess(ymlStr = '') {
     // quotes. Apply right-to-left so earlier indices stay valid.
     /** @type {Array<[number, number, string]>} */
     const edits = []
-    for (const m of ymlStr.matchAll(INNER_ARRAY)) {
-      const txt = m[0]
+    // Scan with block scalar content blanked; a match that differs from the real
+    // text overlaps block scalar content and is left alone.
+    const scanStr = maskBlockScalars(ymlStr)
+    for (const m of scanStr.matchAll(INNER_ARRAY)) {
       const idx = m.index
       if (typeof idx !== 'number') continue
+      const txt = ymlStr.slice(idx, idx + m[0].length)
+      if (txt !== m[0]) continue
       const lineStart = ymlStr.lastIndexOf('\n', idx - 1) + 1
       const nl = ymlStr.indexOf('\n', idx)
       const lineText = ymlStr.slice(lineStart, nl === -1 ? undefined : nl)
@@ -173,30 +214,42 @@ function preProcess(ymlStr = '') {
   }
 
   /* If have yaml object and vars not wrapped in quotes, wrap them */
-  if (ymlStr.match(KEY_OBJECT)) {
-    const values = matchOutermostBraces(ymlStr)
+  const objScanStr = maskBlockScalars(ymlStr)
+  if (objScanStr.match(KEY_OBJECT)) {
+    // Brace pairs outside block scalar content, as [start, end) ranges into ymlStr
+    const ranges = findOutermostBraceRanges(objScanStr)
+      .filter(([start, end]) => objScanStr.slice(start, end) === ymlStr.slice(start, end))
+    const values = ranges.map(([start, end]) => ymlStr.slice(start, end))
     // console.log('values', values)
-    const hasObjects = values.filter((x) => !x.match(/{{resolve:/))
-    // console.log('hasObjects', hasObjects)
-    if (hasObjects && hasObjects.length) {
-      hasObjects.forEach((txt) => {
-        // console.log('obj text', txt)
-        const hasNestedVars = txt && findOutermostVariables(txt)
-        if (hasNestedVars && hasNestedVars.length) {
-          const fixedText = wrapBareVariables(txt)
-          if (fixedText !== txt) {
-            ymlStr = ymlStr.replace(txt, fixedText)
-          }
+    /** @type {Array<[number, number, string]>} */
+    const objEdits = []
+    ranges.forEach(([start, end], i) => {
+      const txt = values[i]
+      if (txt.match(/{{resolve:/)) return
+      // console.log('obj text', txt)
+      const hasNestedVars = txt && findOutermostVariables(txt)
+      if (hasNestedVars && hasNestedVars.length) {
+        const fixedText = wrapBareVariables(txt)
+        if (fixedText !== txt) {
+          objEdits.push([start, end, fixedText])
         }
-      })
+      }
+    })
+    for (let i = objEdits.length - 1; i >= 0; i--) {
+      const [start, end, rep] = objEdits[i]
+      ymlStr = ymlStr.slice(0, start) + rep + ymlStr.slice(end)
     }
     // Automagically wrap CF https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-ssm.html 
     const cfParams = values.filter((x) => !x.match(/\s/) && x.match(/{{resolve:/))
     if (cfParams && cfParams.length) {
       cfParams.forEach((txt) => {
         const pat = new RegExp(`([^'"])${txt}([^'"])`, 'g')
-        const fixedText = `$1"${txt}"$2`
-        ymlStr = ymlStr.replace(pat, fixedText)
+        const cfScanStr = maskBlockScalars(ymlStr)
+        ymlStr = ymlStr.replace(pat, (match, before, after, offset) => {
+          // Leave dynamic references that are block scalar content untouched
+          if (cfScanStr.slice(offset, offset + match.length) !== match) return match
+          return `${before}"${txt}"${after}`
+        })
       })
     }
   }

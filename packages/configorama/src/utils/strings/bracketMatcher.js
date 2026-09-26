@@ -40,15 +40,15 @@ function findOutermostBraces(text, openChar = '{', closeChar = '}', prefix = '')
 }
 
 /**
- * Alternative implementation for finding outermost braces using depth tracking
- * Optimized for simple bracket matching without prefix
+ * Finds the [start, end) index range of every outermost matching brace pair
  * @param {string} text - The text to search
  * @param {string} openChar - The opening character
  * @param {string} closeChar - The closing character
- * @returns {Array<string>} Array of matched substrings including delimiters
+ * @returns {Array<[number, number]>} Ranges; text.slice(start, end) includes delimiters
  */
-function findOutermostBracesDepthFirst(text, openChar = '{', closeChar = '}') {
-  const results = []
+function findOutermostBraceRanges(text, openChar = '{', closeChar = '}') {
+  /** @type {Array<[number, number]>} */
+  const ranges = []
   let depth = 0
   let startIndex = -1
 
@@ -61,13 +61,25 @@ function findOutermostBracesDepthFirst(text, openChar = '{', closeChar = '}') {
     } else if (text[i] === closeChar) {
       depth--
       if (depth === 0 && startIndex !== -1) {
-        results.push(text.substring(startIndex, i + 1))
+        ranges.push([startIndex, i + 1])
         startIndex = -1
       }
     }
   }
 
-  return results
+  return ranges
+}
+
+/**
+ * Alternative implementation for finding outermost braces using depth tracking
+ * Optimized for simple bracket matching without prefix
+ * @param {string} text - The text to search
+ * @param {string} openChar - The opening character
+ * @param {string} closeChar - The closing character
+ * @returns {Array<string>} Array of matched substrings including delimiters
+ */
+function findOutermostBracesDepthFirst(text, openChar = '{', closeChar = '}') {
+  return findOutermostBraceRanges(text, openChar, closeChar).map(([start, end]) => text.substring(start, end))
 }
 
 /**
@@ -99,6 +111,7 @@ function findEnclosingVariable(text, variable, prefix, suffix) {
 module.exports = {
   findOutermostBraces,
   findOutermostBracesDepthFirst,
+  findOutermostBraceRanges,
   findOutermostVariables,
   findEnclosingVariable
 }

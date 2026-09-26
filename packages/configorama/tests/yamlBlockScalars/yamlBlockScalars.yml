@@ -1,0 +1,19 @@
+stage: dev
+provider:
+  stackName: sl-${self:stage}-rbac
+escapedInBlock: |
+  [ "\"A/${self:stage}\"" ]
+backslashInBlock: |-
+  [ \${self:stage} ]
+bareInFolded: >-
+  [ ${self:stage} ]
+indentIndicator: |2
+    [ ${self:stage} ]
+subBody: !Sub |
+  {"metrics": [ [ { "expression": "SEARCH('{\"SaaSLayer/RBAC/${self:provider.stackName}\",Path} M=\"x\"', 'Sum', 60)" } ] ], "region": "${AWS::Region}"}
+userData: !Base64 |
+  echo [ ${self:stage} ]
+seq:
+  - |
+    [ ${self:stage} ]
+flowAfter: [ ${self:stage}, b ]

@@ -4,6 +4,7 @@ const {
   findOutermostBraces,
   findOutermostBracesDepthFirst,
   findEnclosingVariable,
+  findOutermostBraceRanges,
   findOutermostVariables
 } = require('./bracketMatcher')
 
@@ -152,6 +153,17 @@ test('findEnclosingVariable - supports custom single-char-suffix syntax', () => 
 test('findEnclosingVariable - returns null when variable is absent or suffix is multi-char', () => {
   assert.is(findEnclosingVariable('no vars here', '${a}', '${', '}'), null)
   assert.is(findEnclosingVariable('{{a}}', '{{a}}', '{{', '}}'), null)
+})
+
+test('findOutermostBraceRanges - returns [start, end) of each outermost pair', () => {
+  const text = 'a {b {c}} d {e}'
+  const ranges = findOutermostBraceRanges(text)
+  assert.equal(ranges, [[2, 9], [12, 15]])
+  assert.equal(ranges.map(([s, e]) => text.slice(s, e)), findOutermostBracesDepthFirst(text))
+})
+
+test('findOutermostBraceRanges - custom chars and unclosed pair', () => {
+  assert.equal(findOutermostBraceRanges('[a] [b', '[', ']'), [[0, 3]])
 })
 
 // Run all tests
