@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.3](https://github.com/DavidWells/configorama/compare/configorama@1.4.2...configorama@1.4.3) (2026-09-28)
+
+
+### Bug Fixes
+
+* a fallback that resolves to a value with commas stays one value ([270fed8](https://github.com/DavidWells/configorama/commit/270fed8ffd23dd1a160fb67ebab51b4393bfb965))
+
+
+
+
+
 ## [1.4.2](https://github.com/DavidWells/configorama/compare/configorama@1.4.1...configorama@1.4.2) (2026-09-28)
 
 
