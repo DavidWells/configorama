@@ -124,6 +124,41 @@ function findEnclosingVariable(text, variable, prefix, suffix, index) {
 }
 
 /**
+ * Find the innermost variable around the occurrence of `variable` at `index`: its direct
+ * parent, e.g. `${env:C, ${env:D}}` for `${env:D}` in `${env:A, ${env:C, ${env:D}}}`,
+ * where findEnclosingVariable gives the outermost one.
+ * @param {string} text - The text containing the variable
+ * @param {string} variable - The variable occurrence (including prefix/suffix)
+ * @param {string} prefix - Variable syntax prefix (e.g. '${')
+ * @param {string} suffix - Variable syntax suffix; must be one character
+ * @param {number} index - Index of the occurrence in text
+ * @returns {{ start: number, text: string }|null} The parent variable and where it starts, or null
+ */
+function findParentVariable(text, variable, prefix, suffix, index) {
+  if (!prefix || !suffix || suffix.length !== 1) return null
+  if (text.slice(index, index + variable.length) !== variable) return null
+  const end = index + variable.length
+  /** @type {number[]} */
+  const opens = []
+  /** @type {{ start: number, text: string }|null} */
+  let parent = null
+  for (let i = 0; i < text.length; i++) {
+    if (text.startsWith(prefix, i)) {
+      opens.push(i)
+      i += prefix.length - 1
+    } else if (text[i] === suffix && opens.length) {
+      const start = /** @type {number} */ (opens.pop())
+      // Spans close innermost first, so the first one around the occurrence is its parent
+      if (start < index && i + 1 >= end) {
+        parent = { start, text: text.slice(start, i + 1) }
+        break
+      }
+    }
+  }
+  return parent
+}
+
+/**
  * Whether `variable` sits in a fallback slot of the `enclosing` variable expression:
  * after a top-level comma of a plain variable (${env:X, ${self:y}}), not inside a
  * function call's arguments (${merge('a', ${self:y})}), where commas separate arguments.
@@ -153,6 +188,7 @@ function isFallbackSlot(enclosing, variable, prefix, suffix) {
 
 module.exports = {
   isFallbackSlot,
+  findParentVariable,
   findOutermostBraces,
   findOutermostBracesDepthFirst,
   findOutermostBraceRanges,

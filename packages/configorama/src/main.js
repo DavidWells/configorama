@@ -239,7 +239,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable, isFallbackSlot } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, findParentVariable, isFallbackSlot } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -2271,11 +2271,13 @@ class Configorama {
         missingValue = this.deep[i]
       }
 
-      // The fallback list belongs to the variable enclosing this match, not to other
-      // variables or literal text around it (${a} ${opt:x, ${self:nope}, 'z'}).
-      const enclosingVar = (typeof property === 'string' && typeof matchIndex === 'number')
-        ? findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+      // The fallback list belongs to the variable directly around this match, not to other
+      // variables or literal text around it (${a} ${opt:x, ${self:nope}, 'z'}), nor to an
+      // outer variable further up (${env:A, ${env:C, ${env:D}, ${self:v}}}).
+      const parentVar = (typeof property === 'string' && typeof matchIndex === 'number')
+        ? findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
         : null
+      const enclosingVar = parentVar ? parentVar.text : null
       const isPartOfProperty = !!enclosingVar && enclosingVar !== property
       /**
        * Put the enclosing variable's next fallback in place of that variable, keeping
@@ -2284,9 +2286,8 @@ class Configorama {
        * @returns {any} The property with the fallback in place
        */
       const withFallback = (fallback) => {
-        if (!isPartOfProperty) return fallback
-        const start = property.lastIndexOf(enclosingVar, matchIndex)
-        return property.slice(0, start) + String(fallback) + property.slice(start + enclosingVar.length)
+        if (!isPartOfProperty || !parentVar) return fallback
+        return property.slice(0, parentVar.start) + String(fallback) + property.slice(parentVar.start + parentVar.text.length)
       }
 
       const cleanVar = cleanVariable(
