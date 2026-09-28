@@ -2150,15 +2150,34 @@ class Configorama {
       }
       // Inside another variable the value's own { } $ are plain text: encode them so they can't
       // end or break that variable. They are decoded when that variable's text becomes a value.
+      /** @type {string|null} */
+      let fallbackToken = null
       if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
         const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
         if (enclosing && enclosing !== matchedString) {
-          valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix, {
-            commas: isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix),
-          })
+          const inFallbackSlot = isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix)
+          if (inFallbackSlot && !this.variableSyntaxTest.test(valueToPopulate) &&
+            property.slice(matchIndex, matchIndex + matchedString.length) === matchedString) {
+            // A fallback item is one finished value: encode it whole, like an object fallback, so its
+            // | , quotes, edge whitespace and numeric look can't be re-read as syntax. Decoded when it wins
+            fallbackToken = encodeJsonForVariable(valueToPopulate)
+          } else {
+            valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix, {
+              commas: inFallbackSlot,
+            })
+          }
         }
       }
-      property = replaceMatch(currentMatchedString, valueToPopulate, property)
+      if (fallbackToken && typeof matchIndex === 'number') {
+        // The token belongs to this fallback slot only; other copies of the match get the plain value
+        /** @param {string} text */
+        const others = (text) => onlyThisCopy ? text : replaceAll(matchedString, valueToPopulate, text)
+        const before = others(property.slice(0, matchIndex))
+        const after = others(property.slice(matchIndex + matchedString.length))
+        property = before + fallbackToken + after
+      } else {
+        property = replaceMatch(currentMatchedString, valueToPopulate, property)
+      }
       // console.log('property replaceAll', property)
 
       // if (property.match(/^> function /g)) {

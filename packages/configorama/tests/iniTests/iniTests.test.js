@@ -82,20 +82,21 @@ test('ini valueWithEqualSign', () => {
   assert.is(config.valueWithEqualSign, 'this=value=has=equal')
 })
 
+// INI values are strings (valueAsNumber is '1'); a fallback keeps the type of the value it picks
 test('ini valueWithTwoFallbackValues', () => {
-  assert.is(config.valueWithTwoFallbackValues, 1)
+  assert.is(config.valueWithTwoFallbackValues, '1')
 })
 
 test('ini valueWithTwoFallbackValuesTwo', () => {
-  assert.is(config.valueWithTwoFallbackValuesTwo, 1)
+  assert.is(config.valueWithTwoFallbackValuesTwo, '1')
 })
 
 test('ini valueWithTwoFallbackValuesThree', () => {
-  assert.is(config.valueWithTwoFallbackValuesThree, 1)
+  assert.is(config.valueWithTwoFallbackValuesThree, '1')
 })
 
 test('ini valueWithTwoFallbackValuesFour', () => {
-  assert.is(config.valueWithTwoFallbackValuesFour, 2)
+  assert.is(config.valueWithTwoFallbackValuesFour, '2')
 })
 
 test('ini valueAsBoolean', () => {
