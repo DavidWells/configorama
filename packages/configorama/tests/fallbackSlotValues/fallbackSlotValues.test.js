@@ -5,6 +5,10 @@
 /* eslint-disable no-template-curly-in-string */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const configorama = require('../../src')
 const { resolveYamlText } = require('../utils')
 
 const UNSET = 'CONFIGORAMA_FALLBACK_SLOT_UNSET'
@@ -53,6 +57,71 @@ test('filters after the last fallback still apply to the winner', async () => {
 
 test('the same variable twice, once as a fallback, resolves both copies', async () => {
   assert.is(await resolveWith('a|b', '${self:custom.v}-${opt:nope, ${self:custom.v}}'), 'a|b-a|b')
+})
+
+/* Found by the fuzz properties in tests/fuzz */
+test('a missing item three levels deep takes its fallbacks from its own list', async () => {
+  const expr = `\${env:${UNSET}, \${self:custom.missing, \${env:${UNSET}_2, env:${UNSET}_3, \${self:custom.v}}}}`
+  assert.is(await resolveWith('abc', expr), 'abc', 'was "abc}}"')
+  assert.is(await resolveWith('abc', `\${env:${UNSET}, env:${UNSET}_2, \${opt:nope, \${env:${UNSET}_3, env:${UNSET}_4, \${self:custom.v}}}}`), 'abc')
+})
+
+test('a boolean through an alias stays a boolean as a fallback', async () => {
+  const yml = (v) => `custom:\n  v: ${v}\n  alias: \${self:custom.v}\nout: \${env:${UNSET}, self:custom.alias}\nnested: \${self:custom.missing, \${opt:nope, \${self:custom.alias, 'not-this'}}}\n`
+  const off = await resolveYamlText(yml('false'))
+  assert.is(off.out, false)
+  assert.is(off.nested, false)
+  assert.is((await resolveYamlText(yml('true'))).out, true)
+})
+
+test('three or more items, the resolved one in the middle', async () => {
+  assert.is(await resolveWith('a|b', `\${opt:nope, self:custom.v, env:${UNSET}, env:${UNSET}_2}`), 'a|b')
+})
+
+test('an empty object or array as the last fallback is still returned', async () => {
+  const config = await resolveYamlText(`custom:\n  o: {}\n  a: []\no: \${env:${UNSET}, \${self:custom.o}}\na: \${env:${UNSET}, self:custom.a}\n`)
+  assert.equal(config.o, {})
+  assert.equal(config.a, [])
+})
+
+/**
+ * Resolve an expression with a spy source that records its calls
+ * @param {string} expr
+ * @returns {Promise<{ out: any, calls: string[] }>}
+ */
+async function withSpy(expr) {
+  /** @type {string[]} */
+  const calls = []
+  const spy = {
+    type: 'spy', source: 'remote', prefix: 'spy', syntax: '${spy:key}', description: 'records calls',
+    match: RegExp(/^spy:/g),
+    resolver: async (/** @type {string} */ v) => { calls.push(v); return 'from-spy' },
+  }
+  process.env[VAL] = 'present'
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-lazy-'))
+  const file = path.join(dir, 'lazy.yml')
+  fs.writeFileSync(file, `out: ${JSON.stringify(expr)}\n`)
+  const config = await configorama(file, { configDir: dir, variableSources: [spy], options: { present: 'present' } })
+  fs.rmSync(dir, { recursive: true, force: true })
+  return { out: config.out, calls }
+}
+
+test('a fallback is not evaluated when an earlier item resolves', async () => {
+  for (const expr of [
+    `\${env:${VAL}, spy:a}`,
+    `\${env:${VAL}, \${spy:a}}`,
+    '${opt:nope, opt:present, spy:a, spy:b}',
+    `\${env:${UNSET}, env:${UNSET}_2, self:custom.nope, opt:present, spy:a}`,
+    `\${env:${UNSET}, \${opt:nope, opt:present, spy:a}}`,
+  ]) {
+    const { out, calls } = await withSpy(expr)
+    assert.is(out, 'present', expr)
+    assert.equal(calls, [], `${expr} ran its fallback`)
+  }
+  // ...and is, once everything before it came up empty, only as far as needed
+  const { out, calls } = await withSpy('${opt:nope, spy:a, spy:b}')
+  assert.is(out, 'from-spy')
+  assert.equal(calls, ['spy:a'])
 })
 
 /* Every slot must give what direct ${self:custom.v} gives, value and type */

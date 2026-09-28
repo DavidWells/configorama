@@ -214,7 +214,7 @@ const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
 const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
-const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson } = require('./utils/encoders/js-fixes')
+const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson, isEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
 const { bracketsToDots } = require('./utils/paths/bracketsToDots')
 const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
@@ -1680,6 +1680,90 @@ class Configorama {
     })
   }
   /**
+   * A fallback only runs when everything before it came up empty. Variables resolve innermost
+   * first, so a nested fallback item (${spy:x} in ${env:SET, ${spy:x}}) would otherwise run before
+   * its list is read. For each such match, resolve the plain items before it in order; when one
+   * has a value, the whole list is replaced by it and the fallback never runs. Lists with filters,
+   * or earlier items that are still variables, take the normal path.
+   * @param {MatchResult[]} matches - Matches found in the property
+   * @param {any} valueObject - The value object being populated
+   * @returns {Promise<Array<MatchResult & { presolved?: any }>>} Matches, a short-circuited list in place of its items
+   */
+  shortCircuitFallbacks(matches, valueObject) {
+    const property = valueObject.value
+    if (typeof property !== 'string') return Promise.resolve(matches)
+    /**
+     * Resolve items in order until one has a value
+     * @param {string[]} items
+     * @param {{ text: string, start: number }} parent
+     * @param {number} i
+     * @returns {Promise<{ found: boolean, value?: any }>}
+     */
+    const firstValue = (items, parent, i) => {
+      if (i >= items.length) return Promise.resolve({ found: false })
+      const item = items[i]
+      // An item already resolved and encoded into this list is its value
+      const pending = isEncodedJson(item) ? Promise.resolve(item)
+        : this.getValueFromSource(item, valueObject, 'lazyFallback', parent.text, parent.start)
+      return pending.then((result) => {
+        const value = (result && typeof result === 'object' && (result.__internal_only_flag || result.__internal_metadata)) ? result.value : result
+        if (isString(value) && this.variableSyntaxTest.test(value)) return { found: false }
+        if (isValidValue(value)) return { found: true, value: reviveDates(parseEncodedJson(value)) }
+        return firstValue(items, parent, i + 1)
+      })
+    }
+    /** @type {Map<string, Promise<{ found: boolean, value?: any }>>} */
+    const memo = new Map()
+    const checks = matches.map((m) => {
+      const parent = findParentVariable(property, m.match, this.varPrefix, this.varSuffix, m.index)
+      if (!parent || parent.text.includes('|') || !isFallbackSlot(parent.text, m.match, this.varPrefix, this.varSuffix)) return null
+      const inner = parent.text.slice(this.varPrefix.length, parent.text.length - this.varSuffix.length)
+      // Bare items after the first arrive wrapped (env:X -> ${env:X}); a simple one is still plain
+      const before = splitByComma(inner.slice(0, inner.indexOf(m.match)).replace(/,\s*$/, '')).map((item) => {
+        const body = item.slice(this.varPrefix.length, item.length - this.varSuffix.length)
+        const simple = item.startsWith(this.varPrefix) && item.endsWith(this.varSuffix) &&
+          !body.includes(this.varPrefix) && !body.includes(this.varSuffix)
+        return simple ? body.trim() : item
+      })
+      const plain = before.every((item) => item && !item.includes(this.varPrefix) && (isEncodedJson(item) ||
+        item.match(this.variablesKnownTypes) || isSurroundedByQuotes(item) || /^-?\d+(\.\d+)?$/.test(item)))
+      if (!plain) return null
+      const key = `${parent.start}:${before.length}`
+      if (!memo.has(key)) memo.set(key, firstValue(before, parent, 0))
+      return { parent, check: /** @type {Promise<{ found: boolean, value?: any }>} */ (memo.get(key)) }
+    })
+    return Promise.all(checks.map((c) => c ? c.check : null)).then((outcomes) => {
+      // A list with a value replaces every match inside it, once
+      /** @type {Map<number, { text: string, start: number, value: any }>} */
+      const lists = new Map()
+      checks.forEach((c, i) => {
+        const outcome = outcomes[i]
+        if (c && outcome && outcome.found && !lists.has(c.parent.start)) {
+          lists.set(c.parent.start, { text: c.parent.text, start: c.parent.start, value: outcome.value })
+        }
+      })
+      if (!lists.size) return matches
+      /** @type {Array<MatchResult & { presolved?: any }>} */
+      const result = []
+      const added = new Set()
+      for (const m of matches) {
+        const list = [...lists.values()].find((l) => m.index >= l.start && m.index + m.match.length <= l.start + l.text.length)
+        if (!list) {
+          result.push(m)
+        } else if (!added.has(list.start)) {
+          added.add(list.start)
+          result.push({
+            match: list.text,
+            variable: cleanVariable(list.text, this.variableSyntax, true, `shortCircuitFallbacks ${this.callCount}`),
+            index: list.start,
+            presolved: list.value,
+          })
+        }
+      }
+      return result
+    })
+  }
+  /**
    * Populate the given matches, returning an array of Promises which will resolve to the populated
    * values of the given matches
    * @param {MatchResult[]} matches The matches to populate
@@ -1688,6 +1772,7 @@ class Configorama {
   populateMatches(matches, valueObject, root) {
     // console.log('populateMatches matches', matches)
     return map(matches, (match) => {
+      if ('presolved' in match) return Promise.resolve(match.presolved)
       return this.splitAndGet(match.variable, valueObject, root, match.match, match.index)
     })
   }
@@ -1908,11 +1993,15 @@ class Configorama {
     if (!isArray(matches)) {
       return Promise.resolve(property)
     }
-    const populations = this.populateMatches(matches, valueObject, root)
-    return Promise.all(populations)
+    let lazyMatches = matches
+    return this.shortCircuitFallbacks(matches, valueObject)
+      .then((checked) => {
+        lazyMatches = checked
+        return Promise.all(this.populateMatches(lazyMatches, valueObject, root))
+      })
       .then((results) => {
         // console.log('populateMatches results', results)
-        return this.renderMatches(valueObject, matches, results)
+        return this.renderMatches(valueObject, lazyMatches, results)
       })
       .then((result) => {
         // console.log('renderMatches result', result)
@@ -2001,6 +2090,29 @@ class Configorama {
         inThis.slice(matchIndex, matchIndex + replaceThis.length) === replaceThis
       if (!isAtIndex) return replaceAll(replaceThis, withThis, inThis)
       return inThis.slice(0, matchIndex) + withThis + inThis.slice(matchIndex + replaceThis.length)
+    }
+    /**
+     * Whether the match at matchIndex is a fallback item of the variable around it (${env:X, ${self:y}})
+     * @returns {boolean}
+     */
+    const isFallbackItemHere = () => {
+      if (typeof matchIndex !== 'number' || property.slice(matchIndex, matchIndex + matchedString.length) !== matchedString) return false
+      const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+      return !!enclosing && enclosing !== matchedString && isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix)
+    }
+    /**
+     * Put a fallback item's value in as one encoded token, decoded when that fallback wins, so nothing
+     * in it (| , quotes, edge whitespace, a numeric or boolean look) is re-read as syntax. The token
+     * belongs to this copy only; other copies of the match get `plain`.
+     * @param {any} value - The resolved value
+     * @param {string} plain - Text for the other copies
+     * @returns {string} The property with the token in place
+     */
+    const withFallbackToken = (value, plain) => {
+      const at = /** @type {number} */ (matchIndex)
+      /** @param {string} text */
+      const others = (text) => onlyThisCopy ? text : replaceAll(matchedString, plain, text)
+      return others(property.slice(0, at)) + encodeJsonForVariable(value) + others(property.slice(at + matchedString.length))
     }
     // console.log('init property', property)
 
@@ -2148,34 +2260,20 @@ class Configorama {
       ) {
         valueToPopulate = encodeFilterArg(valueToPopulate)
       }
-      // Inside another variable the value's own { } $ are plain text: encode them so they can't
-      // end or break that variable. They are decoded when that variable's text becomes a value.
-      /** @type {string|null} */
-      let fallbackToken = null
-      if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
-        const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
-        if (enclosing && enclosing !== matchedString) {
-          const inFallbackSlot = isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix)
-          if (inFallbackSlot && !this.variableSyntaxTest.test(valueToPopulate) &&
-            property.slice(matchIndex, matchIndex + matchedString.length) === matchedString) {
-            // A fallback item is one finished value: encode it whole, like an object fallback, so its
-            // | , quotes, edge whitespace and numeric look can't be re-read as syntax. Decoded when it wins
-            fallbackToken = encodeJsonForVariable(valueToPopulate)
-          } else {
+      // A finished fallback item goes in whole as a token. Elsewhere inside another variable the value's
+      // own { } $ are plain text: encode them so they can't end or break that variable. They are
+      // decoded when that variable's text becomes a value.
+      if (currentMatchedString === matchedString && isFallbackItemHere() && !this.variableSyntaxTest.test(valueToPopulate)) {
+        property = withFallbackToken(valueToPopulate, valueToPopulate)
+      } else {
+        if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
+          const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+          if (enclosing && enclosing !== matchedString) {
             valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix, {
-              commas: inFallbackSlot,
+              commas: isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix),
             })
           }
         }
-      }
-      if (fallbackToken && typeof matchIndex === 'number') {
-        // The token belongs to this fallback slot only; other copies of the match get the plain value
-        /** @param {string} text */
-        const others = (text) => onlyThisCopy ? text : replaceAll(matchedString, valueToPopulate, text)
-        const before = others(property.slice(0, matchIndex))
-        const after = others(property.slice(matchIndex + matchedString.length))
-        property = before + fallbackToken + after
-      } else {
         property = replaceMatch(currentMatchedString, valueToPopulate, property)
       }
       // console.log('property replaceAll', property)
@@ -2243,6 +2341,11 @@ class Configorama {
       // console.log('property', property)
       // TODO run functions here
       // console.log('other new prop', property)
+
+    // partial replacement, boolean fallback item: keep it a boolean until its fallback list picks a winner
+    } else if (typeof valueToPopulate === 'boolean' && !evalIfPattern.test(property) && isFallbackItemHere()) {
+      if (DEBUG_TYPE) console.error('DEBUG_TYPE isBoolean fallback item')
+      property = withFallbackToken(valueToPopulate, String(valueToPopulate))
 
     // partial replacement, boolean (eval/if keeps the bare true/false; a compose gets the stringified value)
     } else if (typeof valueToPopulate === 'boolean' && (evalIfPattern.test(property) || !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
@@ -2567,13 +2670,36 @@ Missing Value ${missingValue} - ${matchedString}
     }
 
     // console.log('propertyString', typeof propertyString)
-    const variableValues = variableStrings.map((variableString) => {
+    /**
+     * Resolve one item of the list
+     * @param {any} variableString
+     * @returns {Promise<any>}
+     */
+    const resolveItem = (variableString) => {
+      // An item already resolved and encoded into this list (a fallback value) is its value
+      if (isString(variableString) && isEncodedJson(variableString.trim())) return Promise.resolve(variableString.trim())
       // This runs on nested variable resolution
       return this.getValueFromSource(variableString, valueObject, 'overwrite', originalVar, matchIndex)
-    })
+    }
+    /**
+     * Resolve items in order and stop at the first real value, or at one that is still a variable
+     * (resolved in a later pass): a fallback only runs, or fails, when everything before it came up
+     * empty. Items not reached stay undefined.
+     * @param {number} index
+     * @param {any[]} values
+     * @returns {Promise<any[]>}
+     */
+    const resolveInOrder = (index, values) => {
+      if (index >= variableStrings.length) return Promise.resolve(values)
+      return resolveItem(variableStrings[index]).then((value) => {
+        values[index] = value
+        const plain = (value && typeof value === 'object' && (value.__internal_only_flag || value.__internal_metadata)) ? value.value : value
+        if (isValidValue(plain) || (isString(plain) && this.variableSyntaxTest.test(plain))) return values
+        return resolveInOrder(index + 1, values)
+      })
+    }
 
-    // console.log('variableValues', variableValues)
-    return Promise.all(variableValues).then((values) => {
+    return resolveInOrder(0, new Array(variableStrings.length).fill(undefined)).then((values) => {
       let deepProperties = 0
       // console.log('overwrite values', valuesToUse)
       // Extract actual values from metadata objects
@@ -2607,7 +2733,7 @@ Missing Value ${missingValue} - ${matchedString}
         const reconstructed = this.varPrefix + deepVariableParts.join(', ') + filterSuffix + this.varSuffix
         return Promise.resolve(reconstructed)
       }
-      // First valid value, else undefined. An object fallback arrives encoded; decode it back
+      // First valid value, else undefined. A fallback value arrives encoded; decode it back
       const winner = reviveDates(parseEncodedJson(extractedValues.find(isValidValue)))
       if (winner === undefined || !trailingFilters.length) return Promise.resolve(winner)
       return Promise.resolve(this.applyFilters(winner, trailingFilters.map((f) => f.trim()), valueObject.path))

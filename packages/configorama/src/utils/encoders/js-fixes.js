@@ -62,6 +62,15 @@ function parseEncodedJson(value) {
 }
 
 /**
+ * Whether a value is exactly one encoded JSON token
+ * @param {any} value
+ * @returns {boolean}
+ */
+function isEncodedJson(value) {
+  return typeof value === 'string' && /^__JSON_B64__[A-Za-z0-9+/=]+__$/.test(value)
+}
+
+/**
  * Check if string contains encoded JSON
  * @param {string} value - String to check
  * @returns {boolean}
@@ -107,6 +116,7 @@ module.exports = {
   encodeJsonForVariable,
   decodeJsonInVariable,
   parseEncodedJson,
+  isEncodedJson,
   hasEncodedJson,
   encodeJsonArgObjects,
 }
