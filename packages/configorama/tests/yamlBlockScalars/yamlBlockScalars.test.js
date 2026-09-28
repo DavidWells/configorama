@@ -32,8 +32,8 @@ test('indentation indicator block', () => {
   assert.is(config.indentIndicator, '  [ dev ]\n')
 })
 
-test('!Sub literal block: Fn::Sub body stays verbatim, no quotes injected', () => {
-  const expected = '{"metrics": [ [ { "expression": "SEARCH(\'{\\"SaaSLayer/RBAC/${self:provider.stackName}\\",Path} M=\\"x\\"\', \'Sum\', 60)" } ] ], "region": "${AWS::Region}"}\n'
+test('!Sub literal block: self ref resolves, CFN ref stays, no quotes injected', () => {
+  const expected = '{"metrics": [ [ { "expression": "SEARCH(\'{\\"SaaSLayer/RBAC/sl-dev-rbac\\",Path} M=\\"x\\"\', \'Sum\', 60)" } ] ], "region": "${AWS::Region}"}\n'
   assert.equal(config.subBody, { 'Fn::Sub': expected })
 })
 

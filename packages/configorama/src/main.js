@@ -686,12 +686,12 @@ class Configorama {
     this.variablesKnownTypes = variablesKnownTypes
 
     // Explicit configorama types that should still resolve inside ignore-path
-    // contexts like Fn::Sub (file, text, env, opt, cron, git, user sources, ...).
-    // Excludes self/dot.prop refs — those are left verbatim for CloudFormation /
-    // downstream Serverless resolution.
+    // contexts like Fn::Sub (self:, file, text, env, opt, cron, git, user sources, ...).
+    // Excludes bare dot.prop refs (${foo}) — inside Fn::Sub those are CloudFormation
+    // refs (${MyBucket}, ${AWS::Region}) and are left verbatim.
     this.subResolvableTypes = combineRegexes(
       /** @type {RegExp[]} */ (this.variableTypes
-        .filter((v) => v.type !== 'string' && v.type !== 'self' && v.type !== 'dot.prop' && v.match instanceof RegExp)
+        .filter((v) => v.type !== 'string' && v.type !== 'dot.prop' && v.match instanceof RegExp)
         .map((v) => v.match))
     )
 
@@ -1423,7 +1423,7 @@ class Configorama {
     return result
   }
   // True when the value has a configorama-typed token that resolves even inside an
-  // ignore-path (file/text/env/opt/cron/git/custom) — i.e. not just self/CFN refs.
+  // ignore-path (self:/file/text/env/opt/cron/git/custom) — i.e. not just bare/CFN refs.
   hasSubResolvableToken(value) {
     if (typeof value !== 'string') return false
     const matches = this.getMatches(value)
@@ -1433,7 +1433,7 @@ class Configorama {
   shouldSkipResolution(pathValue, value) {
     if (!this.isIgnorePath(pathValue)) return false
     // Under an ignore path (Fn::Sub etc.) keep resolving configorama's own typed
-    // refs; only skip when nothing but self/CFN refs remain.
+    // refs; only skip when nothing but bare/CFN refs remain.
     return !this.hasSubResolvableToken(value)
   }
 
@@ -2675,7 +2675,12 @@ Missing Value ${missingValue} - ${matchedString}
       this.tracker.addDependency(fromPath, toPath)
     }
 
-    if (this.tracker.contains(variableString)) {
+    // Reuse a variable already resolved elsewhere in the config — but not inside an
+    // ignore path (Fn::Sub etc.): there bare refs (${foo}) must stay verbatim, and the
+    // shared result from a plain string would bypass the ignore-path check below.
+    const inIgnorePath = this.isIgnorePath(pathValue)
+    const trackedVariable = variableString
+    if (!inIgnorePath && this.tracker.contains(variableString)) {
       // console.log('try to get', variableString)
       return this.tracker.get(variableString, propertyString)
     }
@@ -2782,12 +2787,18 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('resolverFunction', resolverFunction)
     /** */
 
-    // Inside ignore-path contexts (Fn::Sub, inline code, VTL templates, ...) leave
-    // self refs, bare config refs, and CloudFormation refs verbatim for CloudFormation
-    // / downstream Serverless to resolve. Everything configorama can resolve on its own
-    // (file/text/env/opt/cron/eval/git/custom/string/number) still resolves.
-    if (this.isIgnorePath(pathValue) && (!found || resolverType === 'self' || resolverType === 'dot.prop')) {
+    // Inside ignore-path contexts (Fn::Sub, inline code, VTL templates, ...) leave bare
+    // refs (${foo}) and CloudFormation refs (${MyBucket}, ${AWS::Region}) verbatim: there
+    // they belong to CloudFormation / the embedded language, and resolving them against
+    // the config could inline the wrong value. Explicitly typed refs (self:, file, text,
+    // env, opt, cron, eval, git, custom, string, number) still resolve, as Serverless does.
+    if (inIgnorePath && (!found || resolverType === 'dot.prop')) {
       return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+    }
+    // Types that do resolve inside ignore paths (self:, opt, env, file, ...) can share the
+    // result tracked for the same variable elsewhere, as they do outside ignore paths.
+    if (inIgnorePath && this.tracker.contains(trackedVariable)) {
+      return this.tracker.get(trackedVariable, propertyString)
     }
 
     if (found && resolverFunction) {

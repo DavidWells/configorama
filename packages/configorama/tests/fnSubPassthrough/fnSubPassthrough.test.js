@@ -7,9 +7,11 @@
  * config, the resolver could inline the surrounding template back into
  * itself and corrupt the `Fn::Sub` body.
  *
- * Inside an `Fn::Sub` body, configorama's own typed refs (file/text/env/opt/
- * cron/git/custom) still resolve, while self refs and CloudFormation refs are
- * left verbatim for CloudFormation / downstream Serverless to resolve.
+ * Inside an `Fn::Sub` body, explicitly typed refs (self:/file/text/env/opt/
+ * cron/git/custom) resolve, as Serverless resolves them. Bare refs (`${Foo}`)
+ * and CloudFormation refs (`${MyBucket}`, `${AWS::Region}`) are left verbatim
+ * for CloudFormation: resolving them against the config could inline the wrong
+ * value (a same-named key) or corrupt the body.
  */
 
 const fs = require('fs')
@@ -55,7 +57,7 @@ function getAtPath(node, path) {
   return path.reduce((acc, key) => (acc == null ? undefined : acc[key]), node)
 }
 
-test('Fn::Sub: single CFN ref mixed with self ref stays verbatim', async () => {
+test('Fn::Sub: CFN ref stays verbatim while the self ref beside it resolves', async () => {
   const config = {
     service: 'api-service',
     provider: { stage: '${opt:stage, "dev"}' },
@@ -72,7 +74,7 @@ test('Fn::Sub: single CFN ref mixed with self ref stays verbatim', async () => {
   const result = await resolveFast(config)
   assert.is(
     result.resources.Outputs.ServiceEndpoint.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.amazonaws.com/${self:provider.stage}'
+    'https://${ApiGatewayRestApi}.execute-api.amazonaws.com/dev'
   )
 })
 
@@ -95,7 +97,7 @@ test('Fn::Sub: multiple distinct CFN refs all pass through', async () => {
   )
 })
 
-test('Fn::Sub: CFN ref + AWS pseudo-parameter + self ref stay verbatim', async () => {
+test('Fn::Sub: CFN ref + AWS pseudo-parameter stay verbatim, self ref resolves', async () => {
   const config = {
     service: 'svc',
     provider: { stage: 'prod' },
@@ -112,7 +114,7 @@ test('Fn::Sub: CFN ref + AWS pseudo-parameter + self ref stay verbatim', async (
   const result = await resolveFast(config)
   assert.is(
     result.resources.Outputs.E.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
   )
 })
 
@@ -149,7 +151,7 @@ test('Fn::Sub: CFN ref with minimal surrounding text still passes through', asyn
   assert.is(result.resources.Outputs.E.Value['Fn::Sub'], 'x${ApiGatewayRestApi}')
 })
 
-test('Fn::Sub: only self refs still stay verbatim', async () => {
+test('Fn::Sub: a body of only self refs resolves fully', async () => {
   const config = {
     service: 'svc',
     provider: { stage: 'dev' },
@@ -160,7 +162,7 @@ test('Fn::Sub: only self refs still stay verbatim', async () => {
     }
   }
   const result = await resolveFast(config)
-  assert.is(result.resources.Outputs.E.Value['Fn::Sub'], '${self:service}-${self:provider.stage}')
+  assert.is(result.resources.Outputs.E.Value['Fn::Sub'], 'svc-dev')
 })
 
 test('Fn::Sub: AWS::AccountId, AWS::Region, AWS::StackName pseudo-params preserved', async () => {
@@ -219,11 +221,11 @@ test('Fn::Sub: nested within larger config alongside other resolved values', asy
   assert.is(result.custom.bucketName, 'api-dev-bucket')
   assert.is(
     result.resources.Outputs.Endpoint.Value['Fn::Sub'],
-    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+    'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev'
   )
 })
 
-test('Fn::Sub: multiple Fn::Sub blocks in same config each stay verbatim', async () => {
+test('Fn::Sub: multiple Fn::Sub blocks each keep CFN refs and resolve self refs', async () => {
   const config = {
     provider: { stage: 'staging' },
     resources: {
@@ -235,9 +237,9 @@ test('Fn::Sub: multiple Fn::Sub blocks in same config each stay verbatim', async
     }
   }
   const result = await resolveFast(config)
-  assert.is(result.resources.Outputs.A.Value['Fn::Sub'], '${ApiGatewayRestApi}.${self:provider.stage}')
+  assert.is(result.resources.Outputs.A.Value['Fn::Sub'], '${ApiGatewayRestApi}.staging')
   assert.is(result.resources.Outputs.B.Value['Fn::Sub'], '${UsersTable}.${AWS::Region}')
-  assert.is(result.resources.Outputs.C.Value['Fn::Sub'], 'just-${self:provider.stage}')
+  assert.is(result.resources.Outputs.C.Value['Fn::Sub'], 'just-staging')
 })
 
 test('Fn::Sub: passthrough value contains no internal encoding markers', async () => {
@@ -480,7 +482,7 @@ test('Fn::Sub: file-only body inlines raw JSON text and preserves CFN refs', () 
   }
 })
 
-test('Fn::Sub: file ref resolves while self + CFN refs in same body stay verbatim', () => {
+test('Fn::Sub: file and self refs resolve while CFN refs in the same body stay verbatim', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fn-sub-mixed-'))
   const configFile = path.join(dir, 'serverless.yml')
   const dashboardFile = path.join(dir, 'dashboard.json')
@@ -503,8 +505,8 @@ resources:
     // file() inlined as raw text, CFN ref inside the file preserved
     assert.ok(body.includes('{ "ref": "${AWS::Region}" }'))
     assert.not.ok(body.includes('${file(./dashboard.json)}'))
-    // self ref left verbatim (Serverless resolves it later), not inlined to "dev"
-    assert.ok(body.includes('stage=${self:provider.stage}'))
+    // explicit self ref resolves, as Serverless would
+    assert.ok(body.includes('stage=dev'))
     // bare CFN ref left verbatim for CloudFormation
     assert.ok(body.includes('api=${ApiGatewayRestApi}'))
   } finally {
@@ -590,7 +592,7 @@ test('Fn::Sub: configorama refs inside an inlined file resolve while CFN refs ar
   }
 })
 
-test('Fn::Sub: list form leaves template refs verbatim and resolves the variables map', async () => {
+test('Fn::Sub: list form keeps bare/CFN template refs, resolves self refs and the variables map', async () => {
   const result = await configorama({
     custom: { who: 'world' },
     provider: { stage: 'dev' },
@@ -602,8 +604,8 @@ test('Fn::Sub: list form leaves template refs verbatim and resolves the variable
     } } } } }
   })
   const body = result.resources.Resources.D.Properties.Body['Fn::Sub']
-  // template (index 0) untouched, variables map (index 1) resolved
-  assert.is(body[0], 'hi ${Foo} stage=${self:provider.stage} cfn=${ApiGatewayRestApi}')
+  // template (index 0): bare/CFN refs untouched, self ref resolved; variables map (index 1) resolved
+  assert.is(body[0], 'hi ${Foo} stage=dev cfn=${ApiGatewayRestApi}')
   assert.is(body[1].Foo, 'world')
 })
 
@@ -646,6 +648,130 @@ test('Fn::Sub: custom variable source resolves inside body', async () => {
   })
   const body = result.resources.Resources.D.Properties.Body['Fn::Sub']
   assert.is(body, 'token=RESOLVED cfn=${ApiGatewayRestApi}')
+})
+
+// Regression: self refs inside Fn::Sub used to be left verbatim, except when a custom
+// variable source was registered (its broad match regex sent the body down the resolution
+// path) AND the same ref had already resolved in a plain value — then the shared resolution
+// tracker leaked the value in. The body depended on the rest of the file and on key order
+// (sometimes half-resolved). smart-ci hit this: two parses of the same serverless.yml
+// disagreed, so every plan saw phantom IAM/resource "config changes".
+// Now self refs always resolve inside Fn::Sub and bare/CFN refs never do, whatever else
+// is in the config or registered.
+
+// Like smart-ci's `service` source: broad enough to also match `self:service`.
+const broadServiceSource = () => ({
+  type: 'service',
+  prefix: 'service',
+  source: 'remote',
+  match: /^[a-z][a-z0-9-]*[a-z0-9](@[a-z0-9-]+)?:[A-Za-z][A-Za-z0-9]*$/,
+  resolver: () => Promise.resolve('[SERVICE]')
+})
+
+const TABLE_SUB = 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:service}-${self:provider.stage}'
+const TABLE_SUB_RESOLVED = 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/my-api-dev'
+
+test('Fn::Sub: self refs resolve the same whether or not they also appear in a plain value', async () => {
+  const config = {
+    service: 'my-api',
+    provider: { stage: 'dev' },
+    custom: { tableName: '${self:service}-${self:provider.stage}' },
+    resources: { Resources: { P: { Properties: { Resource: { 'Fn::Sub': TABLE_SUB } } } } }
+  }
+  for (const options of [{}, { variableSources: [broadServiceSource()] }]) {
+    const result = await resolveFast(config, options)
+    assert.is(result.custom.tableName, 'my-api-dev')
+    assert.is(result.resources.Resources.P.Properties.Resource['Fn::Sub'], TABLE_SUB_RESOLVED, JSON.stringify(Object.keys(options)))
+  }
+})
+
+test('Fn::Sub: result does not depend on key order (Fn::Sub before the plain value)', async () => {
+  const config = {
+    service: 'my-api',
+    provider: { stage: 'dev' },
+    resources: { Resources: { P: { Properties: { Resource: { 'Fn::Sub': TABLE_SUB } } } } },
+    custom: { tableName: '${self:service}-${self:provider.stage}' }
+  }
+  for (const options of [{}, { variableSources: [broadServiceSource()] }]) {
+    const result = await resolveFast(config, options)
+    assert.is(result.resources.Resources.P.Properties.Resource['Fn::Sub'], TABLE_SUB_RESOLVED, 'not half-resolved')
+    assert.is(result.custom.tableName, 'my-api-dev')
+  }
+})
+
+test('Fn::Sub: registering a custom variable source does not change how the body resolves', async () => {
+  const yml = [
+    'service: my-api',
+    'provider:',
+    "  stage: ${opt:stage, 'dev'}",
+    "plain: 'table/${self:service}-${self:provider.stage}'",
+    'sub:',
+    "  Fn::Sub: '" + TABLE_SUB + "'",
+    'svcRef: ${other-svc:ApiUrl}',
+    ''
+  ].join('\n')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-fnsub-'))
+  const file = path.join(dir, 'serverless.yml')
+  fs.writeFileSync(file, yml)
+  try {
+    const base = { allowUnknownVariableTypes: true, allowUnresolvedVariables: true, options: { stage: 'dev' } }
+    const without = await configorama(file, base)
+    const withSource = await configorama(file, { ...base, variableSources: [broadServiceSource()] })
+    assert.is(without.sub['Fn::Sub'], TABLE_SUB_RESOLVED)
+    assert.is(withSource.sub['Fn::Sub'], TABLE_SUB_RESOLVED)
+    assert.is(withSource.svcRef, '[SERVICE]', 'the custom source still resolves its own refs')
+    delete without.svcRef
+    delete withSource.svcRef
+    assert.equal(withSource, without, 'apart from its own refs, a custom source changes nothing')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Fn::Sub: opt/env/self refs shared with plain values resolve inside the body, CFN refs stay', async () => {
+  process.env.CONFIGORAMA_FNSUB_TEST = 'from-env'
+  try {
+    const config = {
+      service: 'my-api',
+      plainStage: '${opt:stage}',
+      plainEnv: '${env:CONFIGORAMA_FNSUB_TEST}',
+      plainName: '${self:service}',
+      sub: { 'Fn::Sub': '${AWS::Region}/${opt:stage}/${env:CONFIGORAMA_FNSUB_TEST}/${self:service}/${MyBucket}' }
+    }
+    const result = await resolveFast(config, { options: { stage: 'prod' } })
+    assert.is(result.plainStage, 'prod')
+    assert.is(result.plainEnv, 'from-env')
+    assert.is(result.plainName, 'my-api')
+    assert.is(result.sub['Fn::Sub'], '${AWS::Region}/prod/from-env/my-api/${MyBucket}')
+  } finally {
+    delete process.env.CONFIGORAMA_FNSUB_TEST
+  }
+})
+
+test('Fn::Sub: list form resolves self refs and keeps bare refs when both resolve elsewhere', async () => {
+  const config = {
+    service: 'my-api',
+    name: '${self:service}',
+    Foo: 'config-key-named-like-the-cfn-ref',
+    fooRef: '${Foo}',
+    sub: { 'Fn::Sub': ['${Foo}/${self:service}', { Foo: 'bar' }] }
+  }
+  const result = await resolveFast(config, { variableSources: [broadServiceSource()] })
+  assert.is(result.name, 'my-api')
+  assert.is(result.fooRef, 'config-key-named-like-the-cfn-ref', 'bare ref resolves outside Fn::Sub')
+  assert.equal(result.sub['Fn::Sub'], ['${Foo}/my-api', { Foo: 'bar' }], 'but never inside it')
+})
+
+test('ignore paths: inline Lambda code resolves self refs and keeps bare ${...} verbatim', async () => {
+  const config = {
+    service: 'my-api',
+    name: '${self:service}',
+    who: 'config-value',
+    resources: { Resources: { Fn: { Properties: { Code: { ZipFile: 'exports.name = "${self:service}"; exports.greet = `hi ${who}`' } } } } }
+  }
+  const result = await resolveFast(config, { variableSources: [broadServiceSource()] })
+  assert.is(result.name, 'my-api')
+  assert.is(result.resources.Resources.Fn.Properties.Code.ZipFile, 'exports.name = "my-api"; exports.greet = `hi ${who}`')
 })
 
 test.run()
