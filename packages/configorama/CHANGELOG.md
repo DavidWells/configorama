@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.2](https://github.com/DavidWells/configorama/compare/configorama@1.4.1...configorama@1.4.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* resolve typed ${self:...} refs inside Fn::Sub and other ignore paths; keep bare refs verbatim ([70bdeb4](https://github.com/DavidWells/configorama/commit/70bdeb4c2da536f20f53af40344f4544e84a5ad6))
+
+
+
+
+
 ## [1.4.1](https://github.com/DavidWells/configorama/compare/configorama@1.4.0...configorama@1.4.1) (2026-09-26)
 
 **Note:** Version bump only for package configorama
