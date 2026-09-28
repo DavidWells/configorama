@@ -73,6 +73,21 @@ Rules:
   anything using `op` (e.g. `npm-auth`) fails there. Use iTerm2, or give Solo
   Full Disk Access.
 
+### Fuzz tests
+
+`packages/configorama/tests/fuzz/` holds property-based tests (fast-check). They run
+with a fixed seed as part of `npm test`. Each property in `tests/fuzz/properties/` states
+a rule that must hold for any input, for example "a reference resolves to the same value
+and type in any fallback slot" or "a fallback never runs when an earlier item resolves".
+
+- `npm run fuzz` runs 2000 cases per property on a random seed. A failure prints its
+  seed and path; replay it with `FUZZ_SEED=<seed> FUZZ_PATH=<path>`.
+- `npm run fuzz:survey` runs many cases and groups every distinct failure, smallest
+  example first. Use it to map a bug class before fixing it.
+- When you change the resolver, run `npm run fuzz` once. When it finds a bug, add a
+  plain regression test for the shrunk case too (see `tests/fallbackSlotValues/`),
+  so the case stays covered whatever the seed.
+
 ## Always type-check after changes (load-bearing)
 
 This is a JavaScript project type-checked with TypeScript via JSDoc. **After any
