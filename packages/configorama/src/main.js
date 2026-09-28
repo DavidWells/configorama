@@ -239,7 +239,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, isFallbackSlot } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -2153,7 +2153,9 @@ class Configorama {
       if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
         const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
         if (enclosing && enclosing !== matchedString) {
-          valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix)
+          valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix, {
+            commas: isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix),
+          })
         }
       }
       property = replaceMatch(currentMatchedString, valueToPopulate, property)

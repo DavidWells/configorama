@@ -225,13 +225,16 @@ function encodeQuotedLiterals(str, prefix = '${', suffix = '}') {
 /**
  * Encode syntax chars in a resolved value that is written inside another variable
  * expression ({name}-svc in ${opt:x, ${self:tpl}}). Well-formed variables in the value
- * (${deep:1}) stay live.
+ * (${deep:1}) stay live. With `commas`, commas are encoded too: a value pasted into a
+ * fallback slot (${env:X, ${self:list}} -> ${env:X, a,b,c}) is one resolved result and
+ * must not be re-read as more fallbacks.
  * @param {string} str - Resolved string value
  * @param {string} [prefix='${'] - Variable prefix
  * @param {string} [suffix='}'] - Variable suffix
+ * @param {{ commas?: boolean }} [options]
  * @returns {string} Encoded string
  */
-function encodeStrayVariableChars(str, prefix = '${', suffix = '}') {
+function encodeStrayVariableChars(str, prefix = '${', suffix = '}', options = {}) {
   if (typeof str !== 'string') return str
   const syntax = { prefix, suffix, special: syntaxChars(prefix, suffix) }
   /** @type {number[]} */
@@ -246,7 +249,7 @@ function encodeStrayVariableChars(str, prefix = '${', suffix = '}') {
         continue
       }
     }
-    if (syntax.special.has(str[i]) || startsPlaceholder(str, i)) encode.push(i)
+    if (syntax.special.has(str[i]) || (options.commas && str[i] === ',') || startsPlaceholder(str, i)) encode.push(i)
     i++
   }
   return applyEncoding(str, encode)
