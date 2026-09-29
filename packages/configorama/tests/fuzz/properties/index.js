@@ -4,6 +4,11 @@ const PROPERTIES = [
   require('./slotTransparency'),
   require('./lazyFallback'),
   require('./noCrash'),
+  require('./filterFallback'),
+  require('./keyPaths'),
+  require('./markers'),
+  require('./unknownNames'),
+  require('./equivalence'),
 ]
 
 module.exports = { PROPERTIES }
