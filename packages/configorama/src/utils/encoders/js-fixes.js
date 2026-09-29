@@ -1,5 +1,7 @@
-const PAREN_OPEN_PLACEHOLDER = '__PH_PAREN_OPEN__'
-const OPEN_PAREN_PLACEHOLDER_PATTERN = /__PH_PAREN_OPEN__/g
+// Stands in for ( in raw JS file contents so foo() can't read as a function call. A private-use
+// char (U+E001), so no config text can look like it
+const PAREN_OPEN_PLACEHOLDER = '\uE001'
+const OPEN_PAREN_PLACEHOLDER_PATTERN = /\uE001/g
 
 const JSON_ENCODED_PREFIX = '__JSON_B64__'
 const JSON_ENCODED_PATTERN = /__JSON_B64__([A-Za-z0-9+/=]+)__/g
@@ -14,7 +16,7 @@ function decodeJsSyntax(value) {
 }
 
 function hasParenthesesPlaceholder(value = '') {
-  return OPEN_PAREN_PLACEHOLDER_PATTERN.test(value)
+  return typeof value === 'string' && value.includes(PAREN_OPEN_PLACEHOLDER)
 }
 
 /**
@@ -62,6 +64,15 @@ function parseEncodedJson(value) {
 }
 
 /**
+ * Whether a value is exactly one encoded JSON token
+ * @param {any} value
+ * @returns {boolean}
+ */
+function isEncodedJson(value) {
+  return typeof value === 'string' && /^__JSON_B64__[A-Za-z0-9+/=]+__$/.test(value)
+}
+
+/**
  * Check if string contains encoded JSON
  * @param {string} value - String to check
  * @returns {boolean}
@@ -91,8 +102,10 @@ function encodeJsonArgObjects(str, varPrefix = '${') {
     // file()/text() take a path, where { } are plain characters
     if (/^(?:file|text)\(/.test(open)) return match
     // A { inside a quoted string argument ("{" in eval, '{a},{b}' in split) is text, not JSON
-    const doubleQuotes = (open.match(/"/g) || []).length
-    const singleQuotes = (open.match(/'/g) || []).length
+    // An escaped quote (\' in 'it\'s') doesn't open or close a string
+    const unescaped = open.replace(/\\./g, '')
+    const doubleQuotes = (unescaped.match(/"/g) || []).length
+    const singleQuotes = (unescaped.match(/'/g) || []).length
     if (doubleQuotes % 2 === 1 || singleQuotes % 2 === 1) return match
     const b64 = Buffer.from(obj).toString('base64')
     return `${open}${JSON_ENCODED_PREFIX}${b64}__${close}`
@@ -107,6 +120,7 @@ module.exports = {
   encodeJsonForVariable,
   decodeJsonInVariable,
   parseEncodedJson,
+  isEncodedJson,
   hasEncodedJson,
   encodeJsonArgObjects,
 }

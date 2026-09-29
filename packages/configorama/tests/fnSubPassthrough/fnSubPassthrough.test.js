@@ -19,6 +19,7 @@ const os = require('os')
 const path = require('path')
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { PASSTHROUGH_PREFIX } = require('../../src/utils/encoders/unknown-values')
 const configorama = require('../../src')
 
 // Hard ceiling so a regression of the exponential blowup fails fast instead
@@ -244,7 +245,7 @@ test('Fn::Sub: multiple Fn::Sub blocks each keep CFN refs and resolve self refs'
 
 test('Fn::Sub: passthrough value contains no internal encoding markers', async () => {
   // The fix uses encodeUnknown internally then decodes at output time;
-  // ensure no stray ">passthrough" or base64 markers leak into the result.
+  // ensure no stray passthrough or base64 markers leak into the result.
   const config = {
     resources: {
       Outputs: {
@@ -254,6 +255,7 @@ test('Fn::Sub: passthrough value contains no internal encoding markers', async (
   }
   const result = await resolveFast(config)
   const out = result.resources.Outputs.E.Value['Fn::Sub']
+  assert.not.ok(out.includes(PASSTHROUGH_PREFIX), 'passthrough marker')
   assert.not.match(out, />passthrough/)
   assert.not.match(out, /\[_\[/)
 })

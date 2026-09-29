@@ -91,8 +91,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
     }
 
     // Resolution tracking recorded variable text with its quoted { } $ encoded; show the original
-    const { decodeLiteralBracesDeep } = require('./utils/encoders/literal-braces')
-    const metadataOut = decodeLiteralBracesDeep(enrichedMetadata)
+    const { decodeLiteralBracesDeep, decodeForDisplay } = require('./utils/encoders/literal-braces')
+    const metadataOut = decodeForDisplay(enrichedMetadata)
     return {
       variableSyntax: instance.variableSyntax,
       variableTypes: instance.variableTypes,

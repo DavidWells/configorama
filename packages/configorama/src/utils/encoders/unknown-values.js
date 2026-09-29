@@ -1,11 +1,13 @@
-const PASSTHROUGH_PREFIX = '>passthrough'
-const PASSTHROUGH_PATTERN = />passthrough/g
+// Marks an unknown variable kept as text. It starts with a private-use char (U+E000) so no
+// config value can look like it
+const PASSTHROUGH_PREFIX = '\uE000passthrough'
+const PASSTHROUGH_PATTERN = new RegExp(PASSTHROUGH_PREFIX, 'g')
 
 /**
  * Encode unknown variable for passthrough
  */
 function encodeUnknown(v) {
-  return `>passthrough[_[${Buffer.from(v).toString('base64')}]_]`
+  return `${PASSTHROUGH_PREFIX}[_[${Buffer.from(v).toString('base64')}]_]`
 }
 
 function hasEncodedUnknown(value) {
@@ -47,6 +49,7 @@ function findUnknownValues(text) {
 }
 
 module.exports = {
+  PASSTHROUGH_PREFIX,
   PASSTHROUGH_PATTERN,
   hasEncodedUnknown,
   encodeUnknown,

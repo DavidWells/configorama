@@ -13,7 +13,8 @@ const stringRefSyntax = stringResolver.match
 
 // https://regex101.com/r/4uPmpt/1
 const commasOutsideOfParens = /(?!<(?:\(|\[)[^)\]]+),(?![^(\[]+(?:\)|\]))/
-const PLACEHOLDER_REGEX = /__PLACEHOLDER_(\d+)__/g
+// Private-use chars (U+E002) delimit the placeholders, so no input text can look like one
+const PLACEHOLDER_REGEX = /\uE002(\d+)\uE002/g
 // const commasOutOfParens = /(?!(?:\()[^)\]]+),(?![^(\[]+(?:\)))/g
 function splitByComma(string, regexPattern) {
   // Handle empty or undefined input
@@ -32,7 +33,7 @@ function splitByComma(string, regexPattern) {
   if (regexPattern) {
     protectedString = string.replace(regexPattern, (match) => {
       placeholders.push(match)
-      return `__PLACEHOLDER_${placeholders.length - 1}__`
+      return `\uE002${placeholders.length - 1}\uE002`
     })
   }
 

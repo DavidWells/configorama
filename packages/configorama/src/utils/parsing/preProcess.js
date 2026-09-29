@@ -4,6 +4,7 @@
  * and convert bare references in if() expressions
  */
 const { splitByComma } = require('../strings/splitByComma')
+const { splitOnPipe } = require('../strings/splitOnPipe')
 const { getQuoteRanges } = require('../strings/quoteAware')
 const { extractVariableWrapper } = require('../variables/variableUtils')
 const { encodeJsonArgObjects } = require('../encoders/js-fixes')
@@ -334,7 +335,11 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
                   const alreadyWrapped = trimmed.startsWith(varPrefix) && trimmed.endsWith(varSuffix)
 
                   if (looksLikeRef && !alreadyWrapped) {
-                    return ` ${varPrefix}${trimmed}${varSuffix}`
+                    // Filters after the last fallback apply to the whole list (${a, self:b | Number}),
+                    // so they stay outside the wrapped reference
+                    const [ref, ...filters] = index === parts.length - 1 ? splitOnPipe(trimmed) : [trimmed]
+                    const filterText = filters.map((f) => ` | ${f.trim()}`).join('')
+                    return ` ${varPrefix}${ref.trim()}${varSuffix}${filterText}`
                   }
 
                   return ` ${trimmed}`

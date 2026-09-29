@@ -295,7 +295,7 @@ ${JSON.stringify(options.context, null, 2)}`,
     && argsToPass[0] && typeof argsToPass[0] === 'string' && argsToPass[0].toLowerCase() === 'raw')
     || opts.asRawText
   ) {
-    // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
+    // Encode the ( of foo() (encodeJsSyntax) to avoid function collisions
     valueToPopulate = encodeJsSyntax(variableFileContents)
     return Promise.resolve(valueToPopulate)
   }
@@ -439,7 +439,8 @@ ${JSON.stringify(options.context, null, 2)}`,
 Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
         return Promise.reject(new Error(errorMessage))
       }
-      const deepProperties = bracketsToDots(deepPropertiesStr.slice(1)).split('.')
+      // A key pasted in from another variable (${file(./x.json):${opt:k}}) arrives encoded
+      const deepProperties = bracketsToDots(deepPropertiesStr.slice(1)).split('.').map(decodeLiteralBraces)
       return ctx.getDeeperValue(deepProperties, valueToPopulate)
     }
 
@@ -520,7 +521,8 @@ function extractDeepProperties(variableString, matchedFileString, includeFirstPr
   if (!includeFirstProperty) {
     deepProperties.splice(0, 1)
   }
-  return deepProperties.map((prop) => trim(prop)).filter(Boolean)
+  // A key pasted in from another variable (${file(./x.js):${opt:k}}) arrives encoded
+  return deepProperties.map((prop) => decodeLiteralBraces(trim(prop))).filter(Boolean)
 }
 
 /**

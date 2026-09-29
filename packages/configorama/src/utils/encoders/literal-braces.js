@@ -2,6 +2,8 @@
 // expression, so they can't end, start or break it; decoded when the text becomes a value
 const PLACEHOLDER_PATTERN = /__CFG_C(\d+)__/g
 const WORD_CHAR = /[A-Za-z0-9_.)\]]/
+// Chars that would split a key pasted into a variable's path (a paren hides the commas after it)
+const PATH_CHARS = /[|:'"()\s]/
 
 /**
  * Placeholder for one char: letters, digits and underscores only, which every variable
@@ -231,7 +233,11 @@ function encodeQuotedLiterals(str, prefix = '${', suffix = '}') {
  * @param {string} str - Resolved string value
  * @param {string} [prefix='${'] - Variable prefix
  * @param {string} [suffix='}'] - Variable suffix
- * @param {{ commas?: boolean }} [options]
+ * With `path`, the chars that separate fallbacks, filters, sources and quoted literals
+ * (, | : quotes, parens, whitespace) are encoded too: a value pasted into a key path
+ * (${self:map.${opt:k}} -> ${self:map.a,b}) is one key, decoded before the lookup. Dots stay
+ * path separators.
+ * @param {{ commas?: boolean, path?: boolean }} [options]
  * @returns {string} Encoded string
  */
 function encodeStrayVariableChars(str, prefix = '${', suffix = '}', options = {}) {
@@ -249,7 +255,8 @@ function encodeStrayVariableChars(str, prefix = '${', suffix = '}', options = {}
         continue
       }
     }
-    if (syntax.special.has(str[i]) || (options.commas && str[i] === ',') || startsPlaceholder(str, i)) encode.push(i)
+    if (syntax.special.has(str[i]) || ((options.commas || options.path) && str[i] === ',') ||
+      (options.path && PATH_CHARS.test(str[i])) || startsPlaceholder(str, i)) encode.push(i)
     i++
   }
   return applyEncoding(str, encode)
@@ -312,7 +319,28 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   return value
 }
 
+/**
+ * decodeLiteralBracesDeep for metadata shown to people: also turns encoded fallback values
+ * (__JSON_B64__...__) back into their JSON text. Not for resolved config values, where such
+ * text could be the value itself
+ * @param {any} value - Metadata to decode
+ * @returns {any} Decoded copy
+ */
+function decodeForDisplay(value) {
+  const { decodeJsonInVariable } = require('./js-fixes')
+  if (typeof value === 'string') return decodeJsonInVariable(decodeLiteralBraces(value))
+  if (Array.isArray(value)) return value.map(decodeForDisplay)
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    /** @type {Record<string, any>} */
+    const result = {}
+    for (const key of Object.keys(value)) result[decodeJsonInVariable(decodeLiteralBraces(key))] = decodeForDisplay(value[key])
+    return result
+  }
+  return value
+}
+
 module.exports = {
+  decodeForDisplay,
   decodeLiteralBracesDeep,
   encodeQuotedLiteralsDeep,
   encodeQuotedLiterals,

@@ -102,7 +102,7 @@ function buildVariableSyntax(prefix = '${', suffix = '}', excludePatterns = ['AW
   // NOTE: { and } are intentionally excluded - they break nested variable matching
   // NOTE: $ is intentionally excluded - it's part of variable prefix and breaks nesting
   const allChars = [
-    ' ', '~', ':', 'a-z', 'A-Z', '0-9', '=', '+', '!', '@', '#', '%',
+    ' ', '\\t', '~', ':', 'a-z', 'A-Z', '0-9', '=', '+', '!', '@', '#', '%',
     '\\^', '&', ';', '`', '\\*', '<', '>', '\\?', '\\.', '_', "'", '"', ',',
     '\\|', '\\-', '\\/', '\\(', '\\)', '\\[', '\\]', '\\\\'
   ]
