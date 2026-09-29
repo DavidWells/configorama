@@ -30,7 +30,7 @@ function parse(ymlContents) {
   // Get document, or throw exception on error
   let ymlObject = {}
   try {
-    ymlObject = YAML.safeLoad(ymlContents)
+    ymlObject = YAML.load(ymlContents)
   } catch (e) {
     throw new Error(e)
   }
@@ -46,7 +46,7 @@ function parse(ymlContents) {
 function dump(object) {
   let yml
   try {
-    yml = YAML.safeDump(object, {
+    yml = YAML.dump(object, {
       noRefs: true
     })
   } catch (e) {

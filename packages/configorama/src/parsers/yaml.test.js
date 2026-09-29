@@ -398,4 +398,19 @@ test('preProcess - quoted scalars with escapes inside flow collections', () => {
   )
 })
 
+// Parsing YAML must not pull in esprima (only needed for unsafe !!js/function tags)
+test('parsing a YAML config does not load esprima', () => {
+  const path = require('path')
+  const { execFileSync } = require('child_process')
+  const script = `
+    const configorama = require(${JSON.stringify(path.join(__dirname, '..'))})
+    configorama({ a: 1 }).then(() => {
+      require(${JSON.stringify(path.join(__dirname, 'yaml.js'))}).parse('a: 1')
+      console.log('esprima-loaded=' + Object.keys(require.cache).some(f => f.includes('esprima')))
+    })
+  `
+  const out = execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' })
+  assert.ok(out.includes('esprima-loaded=false'), out)
+})
+
 test.run()

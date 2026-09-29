@@ -61,7 +61,7 @@ const createSchema = () => {
   const types = functionNames.flatMap(functionName =>
     ['mapping', 'scalar', 'sequence'].map(kind => yamlType(functionName, kind))
   )
-  return YAML.Schema.create(YAML.DEFAULT_SAFE_SCHEMA, types);
+  return YAML.DEFAULT_SCHEMA.extend(types);
 };
 
 module.exports = {
