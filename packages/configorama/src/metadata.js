@@ -3,7 +3,6 @@
 
 const path = require('path')
 const fs = require('fs')
-const traverse = require('traverse')
 const dotProp = require('dot-prop')
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
 const { shouldIgnorePath } = require('./utils/paths/ignorePaths')
@@ -47,6 +46,8 @@ function collectVariableMetadata({
   const referencesMap = new Map()
   let matchCount = 1
 
+  // Loaded on demand: traverse pulls in a large polyfill tree that slows every require('configorama')
+  const traverse = require('traverse')
   traverse(displayConfig).forEach(function (rawValue) {
     if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
       const configValuePath = this.path.join('.')
