@@ -123,7 +123,36 @@ function findEnclosingVariable(text, variable, prefix, suffix, index) {
   return null
 }
 
+/**
+ * Whether `variable` sits in a fallback slot of the `enclosing` variable expression:
+ * after a top-level comma of a plain variable (${env:X, ${self:y}}), not inside a
+ * function call's arguments (${merge('a', ${self:y})}), where commas separate arguments.
+ * @param {string} enclosing - Enclosing variable text, e.g. '${env:X, ${self:y}}'
+ * @param {string} variable - The nested variable text, e.g. '${self:y}'
+ * @param {string} prefix - Variable prefix
+ * @param {string} suffix - Variable suffix
+ * @returns {boolean}
+ */
+function isFallbackSlot(enclosing, variable, prefix, suffix) {
+  if (!enclosing || !enclosing.startsWith(prefix) || !enclosing.endsWith(suffix)) return false
+  const inner = enclosing.slice(prefix.length, enclosing.length - suffix.length)
+  if (/^\s*[A-Za-z_][\w.]*\s*\(/.test(inner)) return false
+  const at = inner.indexOf(variable)
+  if (at <= 0) return false
+  const before = inner.slice(0, at)
+  let depth = 0
+  let quote = ''
+  for (const ch of before) {
+    if (quote) { if (ch === quote) quote = ''; continue }
+    if (ch === "'" || ch === '"') quote = ch
+    else if (ch === '(' || ch === '[') depth++
+    else if (ch === ')' || ch === ']') depth--
+  }
+  return depth === 0 && !quote && before.trimEnd().endsWith(',')
+}
+
 module.exports = {
+  isFallbackSlot,
   findOutermostBraces,
   findOutermostBracesDepthFirst,
   findOutermostBraceRanges,
