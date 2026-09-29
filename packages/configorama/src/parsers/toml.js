@@ -1,11 +1,11 @@
-const TOML = require('@iarna/toml')
+// @iarna/toml loaded on demand so non-TOML configs skip its require cost
 const YAML = require('./yaml')
 const JSON = require('./json5')
 
 function parse(contents) {
   let object
   try {
-    object = TOML.parse(contents)
+    object = require('@iarna/toml').parse(contents)
   } catch (e) {
     throw new Error(e)
   }
@@ -15,7 +15,7 @@ function parse(contents) {
 function dump(object) {
   let toml
   try {
-    toml = TOML.stringify(object)
+    toml = require('@iarna/toml').stringify(object)
   } catch (e) {
     throw new Error(e)
   }
