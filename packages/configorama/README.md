@@ -1472,8 +1472,8 @@ objectTwo:
 mergeObjects: ${merge(${object}, ${objectTwo})}
 # Result: { one: 'once', two: 'twice', three: 'third', four: 'fourth' }
 
-# String concatenation
-fullName: ${concat(${firstName}, ' ', ${lastName})}
+# Strings compose without a function
+fullName: ${firstName} ${lastName}
 
 # Array operations
 items:
@@ -1485,9 +1485,14 @@ joinedItems: ${join(${items}, ', ')}  # 'a, b, c'
 ```
 
 **Built-in functions:**
-- `merge(obj1, obj2, ...)` - Merge multiple objects
-- `concat(str1, str2, ...)` - Concatenate strings
-- `join(array, separator)` - Join array elements
+- `merge(a, b)` - Merge two objects or arrays; two strings are joined
+- `join(array, separator)` - Join array elements (separator defaults to `,`)
+- `split(string, separator, limit)` - Split a string into an array
+- `length(value)` - Length of a string or array, or the key count of an object
+- `upperKeys(object)` - Uppercase an object's keys
+- `md5(value)` - MD5 hash of a value
+
+Calling a function that doesn't exist is an error that lists the available ones.
 
 **Custom functions:**
 

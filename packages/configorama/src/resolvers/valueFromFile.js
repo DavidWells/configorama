@@ -295,7 +295,7 @@ ${JSON.stringify(options.context, null, 2)}`,
     && argsToPass[0] && typeof argsToPass[0] === 'string' && argsToPass[0].toLowerCase() === 'raw')
     || opts.asRawText
   ) {
-    // Encode foo() to foo__PH_PAREN_OPEN__) to avoid function collisions
+    // Encode the ( of foo() (encodeJsSyntax) to avoid function collisions
     valueToPopulate = encodeJsSyntax(variableFileContents)
     return Promise.resolve(valueToPopulate)
   }

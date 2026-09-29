@@ -212,7 +212,7 @@ const {
 const PromiseTracker = require('./utils/PromiseTracker')
 const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
-const { encodeUnknown, decodeUnknown } = require('./utils/encoders/unknown-values')
+const { encodeUnknown, decodeUnknown, PASSTHROUGH_PREFIX } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson, isEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
@@ -237,9 +237,9 @@ const { splitCsv } = require('./utils/strings/splitCsv')
 const { replaceAll } = require('./utils/strings/replaceAll')
 const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/textUtils')
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
-const { splitOnPipe } = require('./utils/strings/splitOnPipe')
+const { splitOnPipe, splitOnTopLevelPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable, findParentVariable, isFallbackSlot } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, findParentVariable, isFallbackSlot, isPathSlot } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -305,9 +305,34 @@ const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const selfRefSyntax = RegExp(/^self:/g)
+/**
+ * Error text for a call to an unknown function, with the closest name or the filter form
+ * @param {string} name - Function name as written
+ * @param {string} variable - The variable, e.g. ${concat('a', 'b')}
+ * @param {{ functions: Record<string, Function>, filters: Record<string, Function>, varPrefix: string, varSuffix: string }} instance
+ * @returns {string}
+ */
+function unknownFunctionMessage(name, variable, instance) {
+  const functions = Object.keys(instance.functions)
+  let hint = ''
+  if (instance.filters[name]) {
+    hint = `\n"${name}" is a filter, not a function. Filters go after a value: ${instance.varPrefix}'value' | ${name}${instance.varSuffix}`
+  } else {
+    const close = didYouMean(name, functions)
+    if (close) hint = `\nDid you mean "${close}"?`
+  }
+  return `Unknown function "${name}" in ${variable}${hint}\nAvailable functions: ${functions.join(', ')}. Add your own with the "functions" option.`
+}
+
+// Resolvers that look a key or name up, so get it decoded (see getValueFromSource)
+const KEY_LOOKUP_TYPES = new Set(['self', 'env', 'options', 'opt', 'dot.prop'])
 const logLines = '─────────────────────────────────────────────────'
 const evalIfPattern = /\b(eval|if)\s*\(/
-const functionPrefixPattern = /^> function /
+// Marks a function call still to run. It starts with a private-use char (U+E000) so no config
+// value can look like it
+const FUNCTION_MARKER = '\uE000function '
+const functionPrefixPattern = new RegExp(`^${FUNCTION_MARKER}`)
+const innerFunctionPattern = new RegExp(`(?<!^)${FUNCTION_MARKER}`)
 
 let DEBUG = process.argv.includes('--debug') ? true : false
 let VERBOSE = process.argv.includes('--verbose') ? true : false
@@ -1249,7 +1274,7 @@ class Configorama {
                 /* Process inline functions like merge() */
                 if (rawValue.match(functionPrefixPattern)) {
                   // console.log('RAW FUNCTION', rawFunction)
-                  const withoutPrefix = rawValue.replace(/> function /g, '')
+                  const withoutPrefix = rawValue.split(FUNCTION_MARKER).join('')
                   // Separate the function call from any trailing filters (paren-aware, so pipes inside the
                   // args are left alone). Run the BARE call — otherwise runFunction keeps the ` | filter`
                   // text and it leaks into the result — then apply the filters to that result below.
@@ -1311,7 +1336,7 @@ class Configorama {
                 }
 
                 /* Allow for unknown variables to pass through */
-                if (rawValue.match(/>passthrough/)) {
+                if (rawValue.includes(PASSTHROUGH_PREFIX)) {
                   const newValues = decodeUnknown(rawValue)
                   // console.log('>>>> newValues', newValues)
                   this.update(newValues)
@@ -1716,8 +1741,10 @@ class Configorama {
     const memo = new Map()
     const checks = matches.map((m) => {
       const parent = findParentVariable(property, m.match, this.varPrefix, this.varSuffix, m.index)
-      if (!parent || parent.text.includes('|') || !isFallbackSlot(parent.text, m.match, this.varPrefix, this.varSuffix)) return null
-      const inner = parent.text.slice(this.varPrefix.length, parent.text.length - this.varSuffix.length)
+      if (!parent || !isFallbackSlot(parent.text, m.match, this.varPrefix, this.varSuffix)) return null
+      // Filters after the list (${a, ${b} | Number}) apply to whichever item wins
+      const [inner, ...filters] = splitOnTopLevelPipe(parent.text.slice(this.varPrefix.length, parent.text.length - this.varSuffix.length), this.varPrefix, this.varSuffix)
+      if (inner.indexOf(m.match) === -1 || filters.some((f) => f.includes(this.varPrefix))) return null
       // Bare items after the first arrive wrapped (env:X -> ${env:X}); a simple one is still plain
       const before = splitByComma(inner.slice(0, inner.indexOf(m.match)).replace(/,\s*$/, '')).map((item) => {
         const body = item.slice(this.varPrefix.length, item.length - this.varSuffix.length)
@@ -1729,7 +1756,13 @@ class Configorama {
         item.match(this.variablesKnownTypes) || isSurroundedByQuotes(item) || /^-?\d+(\.\d+)?$/.test(item)))
       if (!plain) return null
       const key = `${parent.start}:${before.length}`
-      if (!memo.has(key)) memo.set(key, firstValue(before, parent, 0))
+      if (!memo.has(key)) {
+        memo.set(key, firstValue(before, parent, 0).then((outcome) => {
+          if (!outcome.found || !filters.length) return outcome
+          return Promise.resolve(this.applyFilters(outcome.value, filters.map((f) => f.trim()), valueObject.path))
+            .then((value) => ({ found: true, value }))
+        }))
+      }
       return { parent, check: /** @type {Promise<{ found: boolean, value?: any }>} */ (memo.get(key)) }
     })
     return Promise.all(checks.map((c) => c ? c.check : null)).then((outcomes) => {
@@ -1860,7 +1893,7 @@ class Configorama {
       }
 
       historyEntry.resultType = typeof finalResult
-      if (historyEntry.resultType === 'string' && typeof cleanResult === 'string' && cleanResult.match(/^>passthrough\[/)) {
+      if (historyEntry.resultType === 'string' && typeof cleanResult === 'string' && cleanResult.startsWith(`${PASSTHROUGH_PREFIX}[`)) {
         historyEntry.variableType = 'encodedUnknown'
       }
       historyEntry.valueBeforeResolution = valueBeforeResolution
@@ -2040,7 +2073,7 @@ class Configorama {
       console.error('root', root)
     }
     /* requires node 8.11+
-    if (valueObject.value.match(/(?<!^)> function /)) {
+    if (valueObject.value.match(innerFunctionPattern)) {
       // valueObject.value = valueObject.value.replace(/(?<!^)> function /, '')
       // valueObject.value = valueObject.value.replace(/^> function /, '')
       // valueObject.value = `> function ${valueObject.value}`
@@ -2097,8 +2130,21 @@ class Configorama {
      */
     const isFallbackItemHere = () => {
       if (typeof matchIndex !== 'number' || property.slice(matchIndex, matchIndex + matchedString.length) !== matchedString) return false
-      const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
-      return !!enclosing && enclosing !== matchedString && isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix)
+      const parent = findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+      return !!parent && isFallbackSlot(parent.text, matchedString, this.varPrefix, this.varSuffix)
+    }
+    /**
+     * Whether the match is an argument of an eval()/if() expression directly around it, where values
+     * are quoted and booleans stay bare. An if() elsewhere in the property (${env:X, ${if(...)}}) doesn't count
+     * @returns {boolean}
+     */
+    const parentIsEvalOrIf = () => {
+      if (typeof property !== 'string') return false
+      if (typeof matchIndex !== 'number' || property.slice(matchIndex, matchIndex + matchedString.length) !== matchedString) {
+        return evalIfPattern.test(property)
+      }
+      const parent = findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+      return !!parent && /^\s*(?:eval|if)\s*\(/.test(parent.text.slice(this.varPrefix.length))
     }
     /**
      * Put a fallback item's value in as one encoded token, decoded when that fallback wins, so nothing
@@ -2160,8 +2206,9 @@ class Configorama {
         console.log('parentDetails', parentDetails)
         /** */
 
-        /* Convert a fallback number to string */
-        if (currentDetails && 
+        /* Convert a fallback number to string, unless a filter made it a number (${a, env:N | toNumber}) */
+        const hasFilters = splitOnPipe(cleanVariable(matchedString, this.variableSyntax, true, 'populateVariable filters')).length > 1
+        if (currentDetails && !hasFilters &&
           currentDetails.resultType === 'number' && 
           parentDetails && parentDetails.resultType === 'string' && 
           parentDetails.result.match(/^\d+$/) && parentDetails.variableType === 'env'
@@ -2211,7 +2258,7 @@ class Configorama {
 
       let currentMatchedString = matchedString
       /* Address fall through values if found */
-      if (valueToPopulate.match(/>passthrough/)) {
+      if (valueToPopulate.includes(PASSTHROUGH_PREFIX)) {
         const decoded = decodeUnknown(valueToPopulate)
         if (decoded === property) {
           currentMatchedString = valueObject.value
@@ -2230,7 +2277,7 @@ class Configorama {
 
       // For eval/if expressions, string values need quotes unless already quoted
       // BUT don't quote strings that contain variable refs (they need further resolution)
-      if (evalIfPattern.test(property) && !this.variableSyntaxTest.test(valueToPopulate)) {
+      if (parentIsEvalOrIf() && !this.variableSyntaxTest.test(valueToPopulate)) {
         const matchIdx = property.indexOf(currentMatchedString)
         const charBefore = matchIdx > 0 ? property[matchIdx - 1] : ''
         // Always escape quotes in values for eval/if context
@@ -2269,8 +2316,12 @@ class Configorama {
         if (currentMatchedString === matchedString && typeof matchIndex === 'number') {
           const enclosing = findEnclosingVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
           if (enclosing && enclosing !== matchedString) {
+            const parent = findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
             valueToPopulate = encodeStrayVariableChars(valueToPopulate, this.varPrefix, this.varSuffix, {
               commas: isFallbackSlot(enclosing, matchedString, this.varPrefix, this.varSuffix),
+              // A key pasted into a path (${self:map.${opt:k}}) is one key, whatever it holds
+              path: !!parent && !this.variableSyntaxTest.test(valueToPopulate) &&
+                isPathSlot(parent.text, matchedString, this.varPrefix, this.varSuffix),
             })
           }
         }
@@ -2296,7 +2347,7 @@ class Configorama {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isObject')
 
       // For eval/if expressions, encode objects to avoid {} breaking variable syntax
-      const isEvalOrIf = evalIfPattern.test(property)
+      const isEvalOrIf = parentIsEvalOrIf()
       if (isEvalOrIf) {
         const encoded = encodeValueForEval(valueToPopulate)
         property = replaceMatch(matchedString, encoded, property)
@@ -2343,12 +2394,12 @@ class Configorama {
       // console.log('other new prop', property)
 
     // partial replacement, boolean fallback item: keep it a boolean until its fallback list picks a winner
-    } else if (typeof valueToPopulate === 'boolean' && !evalIfPattern.test(property) && isFallbackItemHere()) {
+    } else if (typeof valueToPopulate === 'boolean' && isFallbackItemHere()) {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isBoolean fallback item')
       property = withFallbackToken(valueToPopulate, String(valueToPopulate))
 
     // partial replacement, boolean (eval/if keeps the bare true/false; a compose gets the stringified value)
-    } else if (typeof valueToPopulate === 'boolean' && (evalIfPattern.test(property) || !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
+    } else if (typeof valueToPopulate === 'boolean' && (parentIsEvalOrIf() || !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
       // A boolean composed into literal text or a filter arg is stringified (flag=${b} -> "flag=true"), and
       // eval/if get the bare true/false. But when the match sits INSIDE an outer ${...} that is NOT eval/if
       // (a fallback like ${env:X, ${self:flag}}), leave it to the fallback handler below so the boolean's
@@ -2360,7 +2411,7 @@ class Configorama {
       property = replaceMatch(matchedString, replacementValue, property)
 
     // partial replacement, null inside eval/if expressions
-    } else if (valueToPopulate === null && evalIfPattern.test(property)) {
+    } else if (valueToPopulate === null && parentIsEvalOrIf()) {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isNull in eval/if')
       property = replaceMatch(matchedString, '__NULL__', property)
 
@@ -2391,6 +2442,24 @@ class Configorama {
       const withFallback = (fallback) => {
         if (!isPartOfProperty || !parentVar) return fallback
         return property.slice(0, parentVar.start) + String(fallback) + property.slice(parentVar.start + parentVar.text.length)
+      }
+
+      // A missing fallback item drops out of its list; the items before it and any filters
+      // after the list stay (${a, ${b} | Number} -> ${a | Number}). A list always keeps its first item.
+      if (parentVar && typeof matchIndex === 'number' && isFallbackSlot(parentVar.text, matchedString, this.varPrefix, this.varSuffix)) {
+        const at = matchIndex - parentVar.start
+        const before = parentVar.text.slice(0, at).trimEnd()
+        if (before.endsWith(',')) {
+          const rebuilt = before.slice(0, -1) + parentVar.text.slice(at + matchedString.length)
+          return {
+            value: property.slice(0, parentVar.start) + rebuilt + property.slice(parentVar.start + parentVar.text.length),
+            path: valueObject.path,
+            originalSource: valueObject.originalSource,
+            resolutionHistory: valueObject.resolutionHistory || [],
+            __internal_only_flag: true,
+            caller: 'missingFallbackItem',
+          }
+        }
       }
 
       const cleanVar = cleanVariable(
@@ -2491,7 +2560,7 @@ Missing Value ${missingValue} - ${matchedString}
           nestedTwo: ${merge('nice', 'wow')}
           mergeNested: ${merge('lol', ${nestedTwo})}
         */
-        const finalProp = property.match(/(?<!^)> function /) ? prop : property
+        const finalProp = property.match(innerFunctionPattern) ? prop : property
 
         return {
           value: finalProp, // prop to fix nested ¯\_(ツ)_/¯
@@ -2544,7 +2613,7 @@ Missing Value ${missingValue} - ${matchedString}
         const filterSuffix = (foundFilters && foundFilters.length)
           ? ' ' + foundFilters.map((f) => `| ${f}`).join(' ')
           : ''
-        property = `> function ${repFn}${filterSuffix}`
+        property = `${FUNCTION_MARKER}${repFn}${filterSuffix}`
       }
       // if (prop.match(/\s\|/)) {
       //   console.log('HAS FILTER')
@@ -2949,6 +3018,14 @@ Missing Value ${missingValue} - ${matchedString}
       return this.tracker.get(trackedVariable, propertyString)
     }
 
+    // A call to a function that doesn't exist (${concat('a', 'b')}) is a mistake, not text to keep.
+    // Only generic resolvers (a quoted string, a bare path) would take it, and they'd return it as text
+    const call = /^\s*([A-Za-z_$][\w$]*)\s*\(/.exec(variableString)
+    if (call && (!found || resolverType === 'string' || resolverType === 'dot.prop') &&
+      !this.settings.allowUnknownVariableTypes && !this.settings.allowUnresolvedVariables &&
+      !this.functions[call[1]] && !this.functions[call[1].toLowerCase()]) {
+      throw new Error(unknownFunctionMessage(call[1], `${this.varPrefix}${variableString}${this.varSuffix}`, this))
+    }
     if (found && resolverFunction) {
       /*
       console.log(`----------Resolver [${resolverType}]----------------------`)
@@ -2960,9 +3037,12 @@ Missing Value ${missingValue} - ${matchedString}
       console.log('valueObject:    ', valueObject)
       // process.exit(1)
       /** */
+      // A key or name pasted in from another variable arrives encoded (${self:map.${opt:k}}); lookups
+      // get it back as written. Literal resolvers decode their own text later
+      const lookupString = KEY_LOOKUP_TYPES.has(resolverType) ? decodeLiteralBraces(variableString) : variableString
       // TODO finalize resolverFunction API
       const valuePromise = resolverFunction(
-        variableString,
+        lookupString,
         this.options,
         this.config,
         valueObject,
@@ -3223,7 +3303,12 @@ Missing Value ${missingValue} - ${matchedString}
       // A fallback can only come from the matched variable or a variable enclosing it
       // (${empty, ${x}, 'fb'}). Literal text outside every variable (e.g. CloudFormation
       // `{"${Ns}",Path}`) may contain commas that are not fallback separators.
-      const enclosingVar = (typeof originalVar === 'string' && originalVar)
+      // The list is the variable directly around this one, not an outer one further up
+      // (${a, ${b, ${length(x)}}}: the list of length(x) is ${b, ${length(x)}})
+      const parentVar = (typeof originalVar === 'string' && originalVar && typeof matchIndex === 'number')
+        ? findParentVariable(propertyString, originalVar, this.varPrefix, this.varSuffix, matchIndex)
+        : null
+      const enclosingVar = parentVar ? parentVar.text : (typeof originalVar === 'string' && originalVar)
         ? findEnclosingVariable(propertyString, originalVar, this.varPrefix, this.varSuffix, matchIndex)
         : null
       const fallbackSource = enclosingVar || propertyString
@@ -3387,8 +3472,9 @@ Missing Value ${missingValue} - ${matchedString}
     console.log('getValueFromSelf variableString', variableString)
     /** */
     // console.log('self data', data)
-    const split = variableString.split(':')
-    const variable = split.length && split[1] ? split[1] : variableString
+    // Everything after the source prefix is the path; a key can hold a colon (${self:map.${opt:k}})
+    const colon = variableString.indexOf(':')
+    const variable = colon !== -1 && variableString.slice(colon + 1) ? variableString.slice(colon + 1) : variableString
     const valueToPopulate = this.config
     // items[1] / objs[0]['n'] are the same paths as items.1 / objs.0.n
     let deepProperties = bracketsToDots(variable).split('.').filter((property) => property)
@@ -3680,7 +3766,7 @@ Missing Value ${missingValue} - ${matchedString}
     }
     // Skip file/text when they match resolver regex OR contain encoded passthrough values
     // Malformed patterns (with %, \, etc) should still error
-    const hasPassthrough = variableString.includes('>passthrough')
+    const hasPassthrough = variableString.includes(PASSTHROUGH_PREFIX)
     if (hasFunc[1] === 'file' && (variableString.match(fileRefSyntax) || hasPassthrough)) {
       return variableString
     }

@@ -11,6 +11,7 @@ const {
   decodeUnknown,
   findUnknownValues,
   hasEncodedUnknown,
+  PASSTHROUGH_PREFIX,
   PASSTHROUGH_PATTERN
 } = require('./unknown-values')
 
@@ -20,13 +21,13 @@ const {
 
 test('encodeUnknown - encodes string with passthrough wrapper', () => {
   const result = encodeUnknown('${param:test}')
-  assert.ok(result.startsWith('>passthrough[_['))
+  assert.ok(result.startsWith(`${PASSTHROUGH_PREFIX}[_[`))
   assert.ok(result.endsWith(']_]'))
 })
 
 test('encodeUnknown - produces valid base64', () => {
   const result = encodeUnknown('${param:test}')
-  const base64Part = result.replace('>passthrough[_[', '').replace(']_]', '')
+  const base64Part = result.replace(`${PASSTHROUGH_PREFIX}[_[`, '').replace(']_]', '')
   // Should not throw
   const decoded = Buffer.from(base64Part, 'base64').toString('utf8')
   assert.is(decoded, '${param:test}')

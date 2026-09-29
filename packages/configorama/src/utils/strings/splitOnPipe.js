@@ -25,6 +25,12 @@ function splitOnPipe(str) {
 
     // Inside a quoted arg: copy verbatim, close only on the matching quote char
     if (quote) {
+      // An escaped char (\' in 'it\'s') doesn't close the quote
+      if (ch === '\\' && i + 1 < str.length) {
+        current += ch + str[i + 1]
+        i++
+        continue
+      }
       current += ch
       if (ch === quote) quote = null
       continue
@@ -73,4 +79,38 @@ function splitOnPipe(str) {
   return parts
 }
 
-module.exports = { splitOnPipe }
+/**
+ * splitOnPipe for the text inside a variable, ignoring pipes inside nested variables: the
+ * filters of `a, ${b | f} | g` are just `g`
+ * @param {string} str - Text inside a variable
+ * @param {string} prefix - Variable prefix, e.g. '${'
+ * @param {string} suffix - Variable suffix, one character, e.g. '}'
+ * @returns {string[]} Parts, as splitOnPipe gives them
+ */
+function splitOnTopLevelPipe(str, prefix, suffix) {
+  if (!str || typeof str !== 'string') return [str]
+  // Mask nested variables with same-length filler so their pipes can't split
+  let masked = ''
+  let depth = 0
+  for (let i = 0; i < str.length; i++) {
+    if (str.startsWith(prefix, i)) {
+      depth++
+      masked += '_'.repeat(prefix.length)
+      i += prefix.length - 1
+    } else if (str[i] === suffix && depth > 0) {
+      depth--
+      masked += '_'
+    } else {
+      masked += depth > 0 ? '_' : str[i]
+    }
+  }
+  const parts = []
+  let at = 0
+  for (const part of splitOnPipe(masked)) {
+    parts.push(str.slice(at, at + part.length))
+    at += part.length + 1
+  }
+  return parts
+}
+
+module.exports = { splitOnPipe, splitOnTopLevelPipe }

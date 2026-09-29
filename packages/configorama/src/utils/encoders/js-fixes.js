@@ -1,5 +1,7 @@
-const PAREN_OPEN_PLACEHOLDER = '__PH_PAREN_OPEN__'
-const OPEN_PAREN_PLACEHOLDER_PATTERN = /__PH_PAREN_OPEN__/g
+// Stands in for ( in raw JS file contents so foo() can't read as a function call. A private-use
+// char (U+E001), so no config text can look like it
+const PAREN_OPEN_PLACEHOLDER = '\uE001'
+const OPEN_PAREN_PLACEHOLDER_PATTERN = /\uE001/g
 
 const JSON_ENCODED_PREFIX = '__JSON_B64__'
 const JSON_ENCODED_PATTERN = /__JSON_B64__([A-Za-z0-9+/=]+)__/g
@@ -14,7 +16,7 @@ function decodeJsSyntax(value) {
 }
 
 function hasParenthesesPlaceholder(value = '') {
-  return OPEN_PAREN_PLACEHOLDER_PATTERN.test(value)
+  return typeof value === 'string' && value.includes(PAREN_OPEN_PLACEHOLDER)
 }
 
 /**

@@ -3,6 +3,15 @@
  */
 
 /**
+ * Unescape \' and \" in a quoted literal's body
+ * @param {string} body
+ * @returns {string}
+ */
+function unescapeQuotes(body) {
+  return body.split('\\"').join('"').split("\\'").join("'")
+}
+
+/**
  * Removes surrounding quotes (single, double, or backtick) from a string
  * @param {string} str - The string to trim
  * @param {boolean} includeBackticks - Whether to also trim backticks (default: true)
@@ -10,10 +19,11 @@
  */
 function trimSurroundingQuotes(str = '', includeBackticks = true) {
   // Allow an escaped quote (\" \' \`) inside the quoted body so `'it\'s'` strips correctly, then unescape
-  // only that surrounding-quote char — other escapes (\\, \n, Windows paths, ...) are left untouched.
+  // the quote chars — \' and \" in either quote style, as in JS, so 'it\'s' and "it\'s" are the same.
+  // Other escapes (\\, \n, Windows paths, ...) are left untouched.
   let m
-  if ((m = str.match(/^"((?:\\.|[^"\n])*)"$/))) return m[1].split('\\"').join('"')
-  if ((m = str.match(/^'((?:\\.|[^'\n])*)'$/))) return m[1].split("\\'").join("'")
+  if ((m = str.match(/^"((?:\\.|[^"\n])*)"$/))) return unescapeQuotes(m[1])
+  if ((m = str.match(/^'((?:\\.|[^'\n])*)'$/))) return unescapeQuotes(m[1])
   if (includeBackticks && (m = str.match(/^`((?:\\.|[^`\n])*)`$/))) return m[1].split('\\`').join('`')
   return str
 }

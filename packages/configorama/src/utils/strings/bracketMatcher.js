@@ -186,8 +186,42 @@ function isFallbackSlot(enclosing, variable, prefix, suffix) {
   return depth === 0 && !quote && before.trimEnd().endsWith(',')
 }
 
+/**
+ * Whether `variable` sits in the source path of `parent`, its first item: the key in
+ * ${self:map.${opt:k}} or ${file(./x.json):${opt:k}}, not a fallback (${a, ${b}}), a filter
+ * (${a | f(${b})}), a function argument or a file()/text() path argument.
+ * @param {string} parent - The variable directly around it, e.g. '${self:map.${opt:k}}'
+ * @param {string} variable - The nested variable text
+ * @param {string} prefix - Variable prefix
+ * @param {string} suffix - Variable suffix
+ * @returns {boolean}
+ */
+function isPathSlot(parent, variable, prefix, suffix) {
+  if (!parent || !parent.startsWith(prefix) || !parent.endsWith(suffix)) return false
+  const inner = parent.slice(prefix.length, parent.length - suffix.length)
+  if (/^\s*[A-Za-z_][\w.]*\s*\(/.test(inner) && !/^\s*(?:file|text)\s*\(/.test(inner)) return false
+  const at = inner.indexOf(variable)
+  if (at < 0) return false
+  let depth = 0
+  let nested = 0
+  let quote = ''
+  for (let i = 0; i < at; i++) {
+    const ch = inner[i]
+    if (quote) { if (ch === quote) quote = ''; continue }
+    if (inner.startsWith(prefix, i)) { nested++; i += prefix.length - 1; continue }
+    if (ch === suffix && nested > 0) { nested--; continue }
+    if (nested > 0) continue
+    if (ch === "'" || ch === '"') quote = ch
+    else if (ch === '(' || ch === '[') depth++
+    else if (ch === ')' || ch === ']') depth--
+    else if ((ch === ',' || ch === '|') && depth === 0) return false
+  }
+  return depth === 0 && !quote
+}
+
 module.exports = {
   isFallbackSlot,
+  isPathSlot,
   findParentVariable,
   findOutermostBraces,
   findOutermostBracesDepthFirst,
