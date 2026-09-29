@@ -7,7 +7,6 @@ const { trim } = require('../utils/lodash')
 const { splitCsv } = require('../utils/strings/splitCsv')
 const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
-const { makeBox } = require('@davidwells/box-logger')
 const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 const { checkFileAccess } = require('../utils/security/safetyPolicy')
 const { applyDotenvFileRefMetadata, isIniLikeFilePath } = require('../utils/security/dotenvFileRefs')
@@ -260,7 +259,7 @@ async function getValueFromFile(ctx, variableString, options) {
       ctx.opts.allowUnknownFileRefs // backward compat
 
     if (!hasFallback && !isFileAllowed) {
-      const errorMsg = makeBox({
+      const errorMsg = require('@davidwells/box-logger').makeBox({
         title: `File Not Found in ${originalVar}`,
         minWidth: '100%',
         content: `Variable ${variableString} cannot resolve due to missing file.

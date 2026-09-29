@@ -3,12 +3,20 @@
 
 const chalk = require('./utils/ui/chalk')
 const { logHeader } = require('./utils/ui/logs')
-const { makeStackedBoxes } = require('@davidwells/box-logger')
 const { findLineForKey } = require('./utils/paths/findLineForKey')
 const { createEditorLink, toClickablePath } = require('./utils/ui/createEditorLink')
 const { isSensitiveVariable } = require('./utils/redaction/redact')
 
 const SPACING = '           '
+
+/**
+ * Renders stacked boxes. box-logger is loaded on demand so non-display runs skip its require cost
+ * @param {Parameters<typeof import('@davidwells/box-logger').makeStackedBoxes>[0]} boxes
+ * @param {Parameters<typeof import('@davidwells/box-logger').makeStackedBoxes>[1]} options
+ */
+function makeStackedBoxes(boxes, options) {
+  return require('@davidwells/box-logger').makeStackedBoxes(boxes, options)
+}
 const TITLE_TEXT = `Variable:${SPACING}`
 const VALUE_HEX = '#899499'
 
