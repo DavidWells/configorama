@@ -9,6 +9,7 @@ const PROPERTIES = [
   require('./markers'),
   require('./unknownNames'),
   require('./equivalence'),
+  require('./customSyntax'),
 ]
 
 module.exports = { PROPERTIES }
