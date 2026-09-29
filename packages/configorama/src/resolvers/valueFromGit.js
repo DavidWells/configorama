@@ -3,13 +3,20 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 const childProcess = require('child_process')
-const GitUrlParse = require('git-url-parse')
 const { functionRegex } = require('../utils/regex')
 const formatFunctionArgs = require('../utils/strings/formatFunctionArgs')
 const { findProjectRoot } = require('../utils/paths/findProjectRoot')
 const BoundedMap = require('../utils/BoundedMap')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
+
+/**
+ * Parses a git remote URL. git-url-parse is loaded on demand so configs without git refs skip its require cost
+ * @param {string} url
+ */
+function GitUrlParse(url) {
+  return require('git-url-parse')(url)
+}
 
 /**
  * Check if a directory is inside a git repository.
