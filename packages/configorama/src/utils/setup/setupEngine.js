@@ -1,7 +1,6 @@
 // Orchestrates the config setup wizard: analyze config, prompt for missing values,
 // and return grouped answers plus a redacted copy safe for display.
 const path = require('path')
-const { runConfigWizard } = require('../ui/configWizard')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { redactUserInputsByRequirements } = require('../redaction/setupRedaction')
 
@@ -64,7 +63,8 @@ async function runSetup(configPathOrObject, settings = {}, deps = {}) {
     ? path.resolve(configPathOrObject)
     : null
 
-  const renderPrompts = promptRenderer || runConfigWizard
+  // Wizard (and @clack/prompts) loaded on demand so non-setup runs skip its require cost
+  const renderPrompts = promptRenderer || require('../ui/configWizard').runConfigWizard
   const userInputs = await renderPrompts(analysis, analysis.originalConfig || {}, configPath || '', streams)
 
   const answers = normalizeAnswerGroups(userInputs)
