@@ -1,7 +1,15 @@
 // Resolves the ${cron(...)} variable type: cleans the reference, then delegates human-readable/raw cron
 // conversion to the standalone @davidwells/human-cron package.
 const { trimSurroundingQuotes } = require('../utils/strings/quoteUtils')
-const { parseCron } = require('@davidwells/human-cron')
+
+/**
+ * Converts a human-readable or raw cron expression. human-cron is loaded on demand so configs without cron refs skip its require cost
+ * @param {string} expression
+ */
+function parseCron(expression) {
+  return require('@davidwells/human-cron').parseCron(expression)
+}
+
 const cronRefSyntax = RegExp(/^cron\((~?[\{\}\:\$a-zA-Z0-9._\-\/,'"\*\`?# ]+?)?\)/g)
 
 function getValueFromCron(variableString) {
