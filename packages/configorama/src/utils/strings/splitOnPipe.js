@@ -84,7 +84,7 @@ function splitOnPipe(str) {
  * filters of `a, ${b | f} | g` are just `g`
  * @param {string} str - Text inside a variable
  * @param {string} prefix - Variable prefix, e.g. '${'
- * @param {string} suffix - Variable suffix, one character, e.g. '}'
+ * @param {string} suffix - Variable suffix, e.g. '}'
  * @returns {string[]} Parts, as splitOnPipe gives them
  */
 function splitOnTopLevelPipe(str, prefix, suffix) {
@@ -97,9 +97,10 @@ function splitOnTopLevelPipe(str, prefix, suffix) {
       depth++
       masked += '_'.repeat(prefix.length)
       i += prefix.length - 1
-    } else if (str[i] === suffix && depth > 0) {
+    } else if (depth > 0 && str.startsWith(suffix, i)) {
       depth--
-      masked += '_'
+      masked += '_'.repeat(suffix.length)
+      i += suffix.length - 1
     } else {
       masked += depth > 0 ? '_' : str[i]
     }

@@ -4,7 +4,7 @@ const Configorama = require('./main')
 const getFullPath = require('./utils/paths/getFullFilePath')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { tagDates } = require('./utils/encoders/dates')
-const { decodeLiteralBracesDeep } = require('./utils/encoders/literal-braces')
+const { decodeLiteralBracesDeep, decodeForDisplay } = require('./utils/encoders/literal-braces')
 
 /**
  * Make this worker's process.env and cwd match the caller's for this call. The worker
@@ -114,7 +114,7 @@ module.exports = function configoramaSync(variableSources = []) {
       }
 
       // Resolution tracking recorded variable text with its quoted { } $ encoded; show the original
-      const metadataOut = decodeLiteralBracesDeep(enrichedMetadata)
+      const metadataOut = decodeForDisplay(enrichedMetadata)
       return {
         variableSyntax: instance.variableSyntax,
         variableTypes: instance.variableTypes,

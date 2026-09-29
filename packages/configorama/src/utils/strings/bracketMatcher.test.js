@@ -4,6 +4,7 @@ const {
   findOutermostBraces,
   findOutermostBracesDepthFirst,
   findEnclosingVariable,
+  findParentVariable,
   findOutermostBraceRanges,
   findOutermostVariables
 } = require('./bracketMatcher')
@@ -150,9 +151,21 @@ test('findEnclosingVariable - supports custom single-char-suffix syntax', () => 
   assert.is(findEnclosingVariable('[$[a, $[b]], x]', '$[b]', '$[', ']'), '$[a, $[b]]')
 })
 
-test('findEnclosingVariable - returns null when variable is absent or suffix is multi-char', () => {
+test('findEnclosingVariable - returns null when variable is absent', () => {
   assert.is(findEnclosingVariable('no vars here', '${a}', '${', '}'), null)
-  assert.is(findEnclosingVariable('{{a}}', '{{a}}', '{{', '}}'), null)
+  assert.is(findEnclosingVariable('{{a}}', '{{b}}', '{{', '}}'), null)
+})
+
+test('findEnclosingVariable - multi-char suffix ({{ }}, ${{ }})', () => {
+  assert.is(findEnclosingVariable('{{a}}', '{{a}}', '{{', '}}'), '{{a}}')
+  assert.is(findEnclosingVariable('x {{env:A, {{b}}}} y', '{{b}}', '{{', '}}', 11), '{{env:A, {{b}}}}')
+  assert.is(findEnclosingVariable('${{a, ${{b}}}} ${{b}}', '${{b}}', '${{', '}}', 15), '${{b}}')
+})
+
+test('findParentVariable - the variable directly around, for any suffix', () => {
+  assert.equal(findParentVariable('${a, ${b, ${c}}}', '${c}', '${', '}', 10), { start: 5, text: '${b, ${c}}' })
+  assert.equal(findParentVariable('{{a, {{b, {{c}}}}}}', '{{c}}', '{{', '}}', 10), { start: 5, text: '{{b, {{c}}}}' })
+  assert.is(findParentVariable('${c}', '${c}', '${', '}', 0), null)
 })
 
 test('findEnclosingVariable - index picks the occurrence: nested copy first', () => {

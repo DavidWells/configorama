@@ -102,8 +102,10 @@ function encodeJsonArgObjects(str, varPrefix = '${') {
     // file()/text() take a path, where { } are plain characters
     if (/^(?:file|text)\(/.test(open)) return match
     // A { inside a quoted string argument ("{" in eval, '{a},{b}' in split) is text, not JSON
-    const doubleQuotes = (open.match(/"/g) || []).length
-    const singleQuotes = (open.match(/'/g) || []).length
+    // An escaped quote (\' in 'it\'s') doesn't open or close a string
+    const unescaped = open.replace(/\\./g, '')
+    const doubleQuotes = (unescaped.match(/"/g) || []).length
+    const singleQuotes = (unescaped.match(/'/g) || []).length
     if (doubleQuotes % 2 === 1 || singleQuotes % 2 === 1) return match
     const b64 = Buffer.from(obj).toString('base64')
     return `${open}${JSON_ENCODED_PREFIX}${b64}__${close}`

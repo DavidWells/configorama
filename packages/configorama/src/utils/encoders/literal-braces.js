@@ -319,7 +319,28 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   return value
 }
 
+/**
+ * decodeLiteralBracesDeep for metadata shown to people: also turns encoded fallback values
+ * (__JSON_B64__...__) back into their JSON text. Not for resolved config values, where such
+ * text could be the value itself
+ * @param {any} value - Metadata to decode
+ * @returns {any} Decoded copy
+ */
+function decodeForDisplay(value) {
+  const { decodeJsonInVariable } = require('./js-fixes')
+  if (typeof value === 'string') return decodeJsonInVariable(decodeLiteralBraces(value))
+  if (Array.isArray(value)) return value.map(decodeForDisplay)
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    /** @type {Record<string, any>} */
+    const result = {}
+    for (const key of Object.keys(value)) result[decodeJsonInVariable(decodeLiteralBraces(key))] = decodeForDisplay(value[key])
+    return result
+  }
+  return value
+}
+
 module.exports = {
+  decodeForDisplay,
   decodeLiteralBracesDeep,
   encodeQuotedLiteralsDeep,
   encodeQuotedLiterals,

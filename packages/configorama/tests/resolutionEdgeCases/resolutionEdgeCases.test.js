@@ -1,6 +1,7 @@
-/* Regressions found by the fuzz properties in tests/fuzz (round 2): filters after fallbacks, */
-/* keys built from variables, values that look like internal markers, unknown functions,     */
-/* whitespace and quote styles, and if()/eval() mixed with fallbacks.                        */
+/* Regressions found by the fuzz properties in tests/fuzz and follow-up probes: filters     */
+/* after fallbacks, keys built from variables, values that look like internal markers,      */
+/* unknown functions and filters, whitespace and quote styles, if()/eval() mixed with       */
+/* fallbacks, custom variable syntaxes, file() keys, metadata and allowUnresolvedVariables. */
 /* eslint-disable no-template-curly-in-string */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
@@ -132,6 +133,68 @@ test('if() and eval() inside fallbacks, and fallbacks inside if()', async () => 
 test('a function call three levels into fallbacks resolves instead of looping', async () => {
   assert.is(await resolveOut(`\${self:custom.missing, \${env:${UNSET}, opt:nope, \${length(\${self:custom.s})}}}`), 8)
   assert.is(await resolveOut(`\${opt:nope, \${env:${UNSET}, \${merge(\${self:custom.v}, '!')}}}`), 'val!')
+})
+
+/* Pass 3 */
+test('fallback and key fixes hold under multi-char suffix syntaxes ({{ }}, ${{ }})', async () => {
+  const { buildVariableSyntax } = require('../../src/utils/variables/variableUtils')
+  for (const [pre, suf] of [['{{', '}}'], ['${{', '}}'], ['#{', '}']]) {
+    const e = (/** @type {string} */ t) => t.split('{P}').join(pre).split('{S}').join(suf)
+    const yml = `custom:\n  v: 'a|b'\n  list: 'a,b,c'\n  f: false\n  alias: ${JSON.stringify(e('{P}self:custom.f{S}'))}\n  w: w\nmap:\n  'x:y': found\n` +
+      `pipe: ${JSON.stringify(e(`{P}env:${UNSET}, self:custom.v{S}`))}\n` +
+      `comma: ${JSON.stringify(e(`{P}env:${UNSET}, self:custom.list{S}`))}\n` +
+      `bool: ${JSON.stringify(e(`{P}env:${UNSET}, self:custom.alias{S}`))}\n` +
+      `deep: ${JSON.stringify(e('{P}env:A_UNSET, {P}self:custom.missing, {P}env:C_UNSET, env:D_UNSET, {P}self:custom.w{S}{S}{S}{S}'))}\n` +
+      `key: ${JSON.stringify(e('{P}self:map.{P}opt:k{S}{S}'))}\n`
+    const config = await resolveYamlText(yml, { syntax: buildVariableSyntax(pre, suf), options: { k: 'x:y' } })
+    assert.equal([config.pipe, config.comma, config.bool, config.deep, config.key], ['a|b', 'a,b,c', false, 'w', 'found'], `${pre} ${suf}`)
+  }
+})
+
+test('a key from a variable into a file() path', async () => {
+  const fs = require('fs')
+  const os = require('os')
+  const path = require('path')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-edge-'))
+  fs.writeFileSync(path.join(dir, 'data.json'), JSON.stringify({ map: { 'x:y': 'found', 'a,b': 'found2' }, flag: false }))
+  fs.writeFileSync(path.join(dir, 'c.yml'), `colon: \${file(./data.json):map.\${opt:k}}\ncomma: \${file(./data.json):map.\${opt:k2}}\nflag: \${env:${UNSET}, file(./data.json):flag}\n`)
+  const config = await require('../../src')(path.join(dir, 'c.yml'), { configDir: dir, options: { k: 'x:y', k2: 'a,b' } })
+  assert.equal(config, { colon: 'found', comma: 'found2', flag: false })
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('metadata shows fallback values, not internal tokens', async () => {
+  const fs = require('fs')
+  const os = require('os')
+  const path = require('path')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-edge-'))
+  fs.writeFileSync(path.join(dir, 'c.yml'), `custom:\n  v: 'a|b'\nout: \${env:${UNSET}, \${opt:nope, \${self:custom.v}}}\n`)
+  const result = await require('../../src')(path.join(dir, 'c.yml'), { configDir: dir, returnMetadata: true })
+  const text = JSON.stringify(result)
+  for (const token of ['__JSON_B64__', '__CFG_C', '', '', '']) assert.not.ok(text.includes(token), token)
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('allowUnresolvedVariables: filters skip an unresolved value, and nested lists stay unresolved', async () => {
+  const settings = { allowUnresolvedVariables: true }
+  assert.is(await resolveOut('${opt:nope, self:custom.nope | toUpperCase}', settings), '${self:custom.nope}', 'no leaked marker')
+  // Kept for a later resolver as one of its references (this ran out of memory before)
+  const nested = await resolveOut(`\${env:${UNSET}, \${opt:nope, \${self:custom.nope}}}`, settings)
+  assert.ok(['${opt:nope}', '${self:custom.nope}'].includes(nested), nested)
+  assert.is(await resolveOut('${opt:nope, self:custom.v}', settings), 'val', 'a later item that resolves still wins')
+})
+
+test("a { and } in different function arguments aren't a JSON object", async () => {
+  assert.is(await resolveOut("${merge('\\'.{', ':,}\"')}"), "'.{:,}\"")
+})
+
+test('an unknown filter is an error that names it', async () => {
+  assert.match(await errorFor('${self:custom.v | nopeFilter}'), 'Filter "nopeFilter" not found')
+})
+
+test('a long fallback list resolves', async () => {
+  const items = Array.from({ length: 50 }, (_, i) => `env:${UNSET}_${i}`).join(', ')
+  assert.is(await resolveOut(`\${${items}, self:custom.v}`), 'val', 'was "Invalid variable reference syntax"')
 })
 
 test.run()

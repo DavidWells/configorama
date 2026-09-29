@@ -89,8 +89,9 @@ function isInFallbackSlot(property, matchedString, matchIndex, varPrefix, varSuf
     if (property.startsWith(varPrefix, i)) {
       depth++
       i += varPrefix.length - 1
-    } else if (property[i] === varSuffix && depth > 0) {
+    } else if (depth > 0 && property.startsWith(varSuffix, i)) {
       depth--
+      i += varSuffix.length - 1
     } else if (property[i] === ',' && depth === 0) {
       return true
     }
@@ -217,7 +218,7 @@ const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson, isEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
 const { bracketsToDots } = require('./utils/paths/bracketsToDots')
-const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
+const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, decodeForDisplay, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
@@ -239,7 +240,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe, splitOnTopLevelPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable, findParentVariable, isFallbackSlot, isPathSlot } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, findParentVariable, isFallbackSlot, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 /* Utils - ui */
@@ -305,6 +306,15 @@ const deepPrefixReplacePattern = /(?:^deep:)\d+\.?/g
 // TODO update file regex ^file\((~?[a-zA-Z0-9._\-\/, ]+?)\)
 // To match file(asyncValue.js, lol) input params
 const selfRefSyntax = RegExp(/^self:/g)
+/**
+ * Whether a value is an unresolved variable kept as text (allowUnresolvedVariables)
+ * @param {any} value
+ * @returns {boolean}
+ */
+function isPassthrough(value) {
+  return typeof value === 'string' && value.includes(PASSTHROUGH_PREFIX)
+}
+
 /**
  * Error text for a call to an unknown function, with the closest name or the filter form
  * @param {string} name - Function name as written
@@ -1096,10 +1106,10 @@ class Configorama {
     if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
       // Metadata is collected from encoded text (quoted { } $); decode once for display and callers
       const encodedMetadata = this.collectVariableMetadata()
-      const metadata = decodeLiteralBracesDeep(encodedMetadata)
+      const metadata = decodeForDisplay(encodedMetadata)
       const shownOriginalConfig = decodeLiteralBracesDeep(this.originalConfig)
 
-      const enrich = decodeLiteralBracesDeep(await enrichMetadata(
+      const enrich = decodeForDisplay(await enrichMetadata(
         encodedMetadata,
         this.resolutionTracking,
         this.variableSyntax,
@@ -1716,71 +1726,107 @@ class Configorama {
    */
   shortCircuitFallbacks(matches, valueObject) {
     const property = valueObject.value
-    if (typeof property !== 'string') return Promise.resolve(matches)
+    if (typeof property !== 'string' || !matches.length) return Promise.resolve(matches)
+    const prefix = this.varPrefix
+    const suffix = this.varSuffix
+    // Spans close innermost first, so the first span around a match is its parent
+    const spans = variableSpans(property, prefix, suffix)
     /**
-     * Resolve items in order until one has a value
-     * @param {string[]} items
-     * @param {{ text: string, start: number }} parent
-     * @param {number} i
-     * @returns {Promise<{ found: boolean, value?: any }>}
+     * @typedef {{ start: number, text: string, filters: string[], commas: number[], outcome: Promise<{ found: boolean, index?: number, value?: any }> }} List
+     * @type {Map<number, List|null>}
      */
-    const firstValue = (items, parent, i) => {
-      if (i >= items.length) return Promise.resolve({ found: false })
-      const item = items[i]
-      // An item already resolved and encoded into this list is its value
-      const pending = isEncodedJson(item) ? Promise.resolve(item)
-        : this.getValueFromSource(item, valueObject, 'lazyFallback', parent.text, parent.start)
-      return pending.then((result) => {
-        const value = (result && typeof result === 'object' && (result.__internal_only_flag || result.__internal_metadata)) ? result.value : result
-        if (isString(value) && this.variableSyntaxTest.test(value)) return { found: false }
-        if (isValidValue(value)) return { found: true, value: reviveDates(parseEncodedJson(value)) }
-        return firstValue(items, parent, i + 1)
-      })
-    }
-    /** @type {Map<string, Promise<{ found: boolean, value?: any }>>} */
-    const memo = new Map()
-    const checks = matches.map((m) => {
-      const parent = findParentVariable(property, m.match, this.varPrefix, this.varSuffix, m.index)
-      if (!parent || !isFallbackSlot(parent.text, m.match, this.varPrefix, this.varSuffix)) return null
+    const lists = new Map()
+    /**
+     * Read a fallback list once: where its items split, its filters, and the first of its leading
+     * plain items that has a value (resolved in order, stopping at the first that isn't plain)
+     * @param {{ start: number, end: number }} span
+     * @returns {List|null}
+     */
+    const readList = (span) => {
+      if (lists.has(span.start)) return /** @type {List|null} */ (lists.get(span.start))
+      const text = property.slice(span.start, span.end)
+      const body = text.slice(prefix.length, text.length - suffix.length)
+      // A function call's commas separate arguments, not fallbacks
+      if (/^\s*[A-Za-z_][\w.]*\s*\(/.test(body)) { lists.set(span.start, null); return null }
       // Filters after the list (${a, ${b} | Number}) apply to whichever item wins
-      const [inner, ...filters] = splitOnTopLevelPipe(parent.text.slice(this.varPrefix.length, parent.text.length - this.varSuffix.length), this.varPrefix, this.varSuffix)
-      if (inner.indexOf(m.match) === -1 || filters.some((f) => f.includes(this.varPrefix))) return null
-      // Bare items after the first arrive wrapped (env:X -> ${env:X}); a simple one is still plain
-      const before = splitByComma(inner.slice(0, inner.indexOf(m.match)).replace(/,\s*$/, '')).map((item) => {
-        const body = item.slice(this.varPrefix.length, item.length - this.varSuffix.length)
-        const simple = item.startsWith(this.varPrefix) && item.endsWith(this.varSuffix) &&
-          !body.includes(this.varPrefix) && !body.includes(this.varSuffix)
-        return simple ? body.trim() : item
-      })
-      const plain = before.every((item) => item && !item.includes(this.varPrefix) && (isEncodedJson(item) ||
-        item.match(this.variablesKnownTypes) || isSurroundedByQuotes(item) || /^-?\d+(\.\d+)?$/.test(item)))
-      if (!plain) return null
-      const key = `${parent.start}:${before.length}`
-      if (!memo.has(key)) {
-        memo.set(key, firstValue(before, parent, 0).then((outcome) => {
-          if (!outcome.found || !filters.length) return outcome
-          return Promise.resolve(this.applyFilters(outcome.value, filters.map((f) => f.trim()), valueObject.path))
-            .then((value) => ({ found: true, value }))
-        }))
+      const [inner, ...filters] = splitOnTopLevelPipe(body, prefix, suffix)
+      if (filters.some((f) => f.includes(prefix))) { lists.set(span.start, null); return null }
+      /** @type {number[]} Offsets in inner of its top-level commas */
+      const commas = []
+      let nested = 0
+      let depth = 0
+      let quote = ''
+      for (let i = 0; i < inner.length; i++) {
+        const ch = inner[i]
+        if (quote) { if (ch === '\\') i++; else if (ch === quote) quote = ''; continue }
+        if (inner.startsWith(prefix, i)) { nested++; i += prefix.length - 1; continue }
+        if (nested && inner.startsWith(suffix, i)) { nested--; i += suffix.length - 1; continue }
+        if (nested) continue
+        if (ch === "'" || ch === '"') quote = ch
+        else if (ch === '(' || ch === '[') depth++
+        else if (ch === ')' || ch === ']') depth--
+        else if (ch === ',' && depth === 0) commas.push(i)
       }
-      return { parent, check: /** @type {Promise<{ found: boolean, value?: any }>} */ (memo.get(key)) }
+      const items = [0, ...commas.map((c) => c + 1)].map((from, k) => inner.slice(from, k < commas.length ? commas[k] : inner.length).trim())
+        // Bare items after the first arrive wrapped (env:X -> ${env:X}); a simple one is still plain
+        .map((item) => {
+          const bare = item.slice(prefix.length, item.length - suffix.length)
+          const simple = item.startsWith(prefix) && item.endsWith(suffix) && !bare.includes(prefix) && !bare.includes(suffix)
+          return simple ? bare.trim() : item
+        })
+      const isPlain = (/** @type {string} */ item) => !!item && !item.includes(prefix) && (isEncodedJson(item) ||
+        !!item.match(this.variablesKnownTypes) || isSurroundedByQuotes(item) || /^-?\d+(\.\d+)?$/.test(item))
+      /**
+       * @param {number} i
+       * @returns {Promise<{ found: boolean, index?: number, value?: any }>}
+       */
+      const firstValue = (i) => {
+        // The last item is the list's own fallback of last resort, resolved on the normal path
+        if (i >= items.length - 1 || !isPlain(items[i])) return Promise.resolve({ found: false })
+        // An item already resolved and encoded into this list is its value
+        const pending = isEncodedJson(items[i]) ? Promise.resolve(items[i])
+          : this.getValueFromSource(items[i], valueObject, 'lazyFallback', text, span.start)
+        return pending.then((result) => {
+          const value = (result && typeof result === 'object' && (result.__internal_only_flag || result.__internal_metadata)) ? result.value : result
+          if (isString(value) && this.variableSyntaxTest.test(value)) return { found: false }
+          if (isValidValue(value) && !isPassthrough(value)) return { found: true, index: i, value: reviveDates(parseEncodedJson(value)) }
+          return firstValue(i + 1)
+        })
+      }
+      const outcome = firstValue(0).then((found) => {
+        if (!found.found || !filters.length) return found
+        return Promise.resolve(this.applyFilters(found.value, filters.map((f) => f.trim()), valueObject.path))
+          .then((value) => Object.assign({}, found, { value }))
+      })
+      const list = { start: span.start, text, filters, commas, outcome }
+      lists.set(span.start, list)
+      return list
+    }
+    const checks = matches.map((m) => {
+      const span = spans.find((sp) => sp.start < m.index && sp.end >= m.index + m.match.length)
+      const list = span ? readList(span) : null
+      if (!list) return null
+      // Which item of the list the match is: the number of top-level commas before it
+      const at = m.index - list.start - prefix.length
+      const item = list.commas.filter((c) => c < at).length
+      return item > 0 ? { list, item } : null
     })
-    return Promise.all(checks.map((c) => c ? c.check : null)).then((outcomes) => {
-      // A list with a value replaces every match inside it, once
+    return Promise.all(checks.map((c) => c ? c.list.outcome : null)).then((outcomes) => {
+      // A list with a value before a match replaces every match inside it, once
       /** @type {Map<number, { text: string, start: number, value: any }>} */
-      const lists = new Map()
+      const replaced = new Map()
       checks.forEach((c, i) => {
         const outcome = outcomes[i]
-        if (c && outcome && outcome.found && !lists.has(c.parent.start)) {
-          lists.set(c.parent.start, { text: c.parent.text, start: c.parent.start, value: outcome.value })
+        if (c && outcome && outcome.found && /** @type {number} */ (outcome.index) < c.item && !replaced.has(c.list.start)) {
+          replaced.set(c.list.start, { text: c.list.text, start: c.list.start, value: outcome.value })
         }
       })
-      if (!lists.size) return matches
+      if (!replaced.size) return matches
       /** @type {Array<MatchResult & { presolved?: any }>} */
       const result = []
       const added = new Set()
       for (const m of matches) {
-        const list = [...lists.values()].find((l) => m.index >= l.start && m.index + m.match.length <= l.start + l.text.length)
+        const list = [...replaced.values()].find((l) => m.index >= l.start && m.index + m.match.length <= l.start + l.text.length)
         if (!list) {
           result.push(m)
         } else if (!added.has(list.start)) {
@@ -2449,8 +2495,9 @@ class Configorama {
       if (parentVar && typeof matchIndex === 'number' && isFallbackSlot(parentVar.text, matchedString, this.varPrefix, this.varSuffix)) {
         const at = matchIndex - parentVar.start
         const before = parentVar.text.slice(0, at).trimEnd()
+        const after = parentVar.text.slice(at + matchedString.length)
         if (before.endsWith(',')) {
-          const rebuilt = before.slice(0, -1) + parentVar.text.slice(at + matchedString.length)
+          const rebuilt = before.slice(0, -1) + after
           return {
             value: property.slice(0, parentVar.start) + rebuilt + property.slice(parentVar.start + parentVar.text.length),
             path: valueObject.path,
@@ -2682,8 +2729,11 @@ Missing Value ${missingValue} - ${matchedString}
    * @returns {any} The filtered value
    */
   applyFilters(value, filters, pathValue) {
+    // An unresolved variable kept as text (allowUnresolvedVariables) has no value to filter yet
+    if (isPassthrough(value)) return value
     const filtered = filters.reduce((acc, filter) => {
       const { name, args } = parseFilter(filter, this.config)
+      if (typeof this.filters[name] !== 'function') throw new Error(`Filter "${name}" not found`)
       const newVal = args && args.length > 0
         ? this.filters[name](acc, ...args)
         : this.filters[name](acc)
@@ -2802,7 +2852,8 @@ Missing Value ${missingValue} - ${matchedString}
         const reconstructed = this.varPrefix + deepVariableParts.join(', ') + filterSuffix + this.varSuffix
         return Promise.resolve(reconstructed)
       }
-      // First valid value, else undefined. A fallback value arrives encoded; decode it back
+      // First valid value, else undefined. A fallback value arrives encoded; decode it back. An item kept
+      // unresolved (allowUnresolvedVariables) is a value too: it is left for a later resolver
       const winner = reviveDates(parseEncodedJson(extractedValues.find(isValidValue)))
       if (winner === undefined || !trailingFilters.length) return Promise.resolve(winner)
       return Promise.resolve(this.applyFilters(winner, trailingFilters.map((f) => f.trim()), valueObject.path))

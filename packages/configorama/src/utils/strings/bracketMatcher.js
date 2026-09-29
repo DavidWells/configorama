@@ -98,14 +98,15 @@ function findOutermostVariables(text) {
  * @param {string} text - The text containing the variable
  * @param {string} variable - The variable to locate (including prefix/suffix)
  * @param {string} prefix - Variable syntax prefix (e.g. '${')
- * @param {string} suffix - Variable syntax suffix (e.g. '}'); must be one character
+ * @param {string} suffix - Variable syntax suffix (e.g. '}' or '}}')
  * @param {number} [index] - Index of the occurrence in text. The same variable can sit
  *   in different enclosing variables (${a, ${x}, 'fb'} ${x}); without an index the
  *   first occurrence is used.
  * @returns {string|null} The enclosing outermost variable, or null if not determinable
  */
 function findEnclosingVariable(text, variable, prefix, suffix, index) {
-  if (!prefix || !suffix || suffix.length !== 1) return null
+  if (!prefix || !suffix) return null
+  if (suffix.length !== 1) return findEnclosingMultiChar(text, variable, prefix, suffix, index)
   const outermost = findOutermostBraces(text, prefix.slice(-1), suffix, prefix.slice(0, -1))
   if (typeof index !== 'number') {
     const enclosing = outermost.find((match) => match.indexOf(variable) > -1)
@@ -124,6 +125,50 @@ function findEnclosingVariable(text, variable, prefix, suffix, index) {
 }
 
 /**
+ * Every variable span in text, for any prefix and suffix ({{ }}, ${{ }}): matched by a stack,
+ * innermost first
+ * @param {string} text
+ * @param {string} prefix
+ * @param {string} suffix
+ * @returns {Array<{ start: number, end: number }>} Spans; text.slice(start, end) is the variable
+ */
+function variableSpans(text, prefix, suffix) {
+  /** @type {number[]} */
+  const opens = []
+  /** @type {Array<{ start: number, end: number }>} */
+  const spans = []
+  for (let i = 0; i < text.length; i++) {
+    if (text.startsWith(prefix, i)) {
+      opens.push(i)
+      i += prefix.length - 1
+    } else if (opens.length && text.startsWith(suffix, i)) {
+      spans.push({ start: /** @type {number} */ (opens.pop()), end: i + suffix.length })
+      i += suffix.length - 1
+    }
+  }
+  return spans
+}
+
+/**
+ * findEnclosingVariable for a multi-char suffix: the outermost span around the occurrence
+ * @param {string} text
+ * @param {string} variable
+ * @param {string} prefix
+ * @param {string} suffix
+ * @param {number} [index]
+ * @returns {string|null}
+ */
+function findEnclosingMultiChar(text, variable, prefix, suffix, index) {
+  const at = typeof index === 'number' ? index : text.indexOf(variable)
+  if (at < 0 || text.slice(at, at + variable.length) !== variable) return null
+  let best = null
+  for (const span of variableSpans(text, prefix, suffix)) {
+    if (span.start <= at && at + variable.length <= span.end && (!best || span.end - span.start > best.end - best.start)) best = span
+  }
+  return best ? text.slice(best.start, best.end) : null
+}
+
+/**
  * Find the innermost variable around the occurrence of `variable` at `index`: its direct
  * parent, e.g. `${env:C, ${env:D}}` for `${env:D}` in `${env:A, ${env:C, ${env:D}}}`,
  * where findEnclosingVariable gives the outermost one.
@@ -135,27 +180,12 @@ function findEnclosingVariable(text, variable, prefix, suffix, index) {
  * @returns {{ start: number, text: string }|null} The parent variable and where it starts, or null
  */
 function findParentVariable(text, variable, prefix, suffix, index) {
-  if (!prefix || !suffix || suffix.length !== 1) return null
+  if (!prefix || !suffix) return null
   if (text.slice(index, index + variable.length) !== variable) return null
   const end = index + variable.length
-  /** @type {number[]} */
-  const opens = []
-  /** @type {{ start: number, text: string }|null} */
-  let parent = null
-  for (let i = 0; i < text.length; i++) {
-    if (text.startsWith(prefix, i)) {
-      opens.push(i)
-      i += prefix.length - 1
-    } else if (text[i] === suffix && opens.length) {
-      const start = /** @type {number} */ (opens.pop())
-      // Spans close innermost first, so the first one around the occurrence is its parent
-      if (start < index && i + 1 >= end) {
-        parent = { start, text: text.slice(start, i + 1) }
-        break
-      }
-    }
-  }
-  return parent
+  // Spans close innermost first, so the first one around the occurrence is its parent
+  const parent = variableSpans(text, prefix, suffix).find((span) => span.start < index && span.end >= end)
+  return parent ? { start: parent.start, text: text.slice(parent.start, parent.end) } : null
 }
 
 /**
@@ -209,7 +239,7 @@ function isPathSlot(parent, variable, prefix, suffix) {
     const ch = inner[i]
     if (quote) { if (ch === quote) quote = ''; continue }
     if (inner.startsWith(prefix, i)) { nested++; i += prefix.length - 1; continue }
-    if (ch === suffix && nested > 0) { nested--; continue }
+    if (nested > 0 && inner.startsWith(suffix, i)) { nested--; i += suffix.length - 1; continue }
     if (nested > 0) continue
     if (ch === "'" || ch === '"') quote = ch
     else if (ch === '(' || ch === '[') depth++
@@ -220,6 +250,7 @@ function isPathSlot(parent, variable, prefix, suffix) {
 }
 
 module.exports = {
+  variableSpans,
   isFallbackSlot,
   isPathSlot,
   findParentVariable,
