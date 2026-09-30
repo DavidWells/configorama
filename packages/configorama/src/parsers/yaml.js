@@ -291,19 +291,24 @@ function preProcess(ymlStr = '') {
   const scanStr = maskBlockScalars(ymlStr)
   /** @type {Array<[number, number]>} */
   const quote = []
-  for (let i = 0; i < scanStr.length; i++) {
-    const ch = scanStr[i]
-    if ((ch !== '[' && ch !== '{') || !opensFlowCollection(ymlStr, i)) continue
+  // Let the native scanner skip text without flow openers. Each invocation has
+  // its own regex cursor; recognized collections/references advance it exactly
+  // as the previous character loop did.
+  const openers = /[\[{]/g
+  let match
+  while ((match = openers.exec(scanStr)) !== null) {
+    const i = match.index
+    if (!opensFlowCollection(ymlStr, i)) continue
     const ref = dynamicReferenceAt(scanStr, i)
     if (ref) {
       if (ref.quotable) quote.push([i, ref.end])
-      i = ref.end - 1
+      openers.lastIndex = ref.end
       continue
     }
     const flow = scanFlowCollection(scanStr, i)
     if (!flow) continue
     quote.push(...flow.quote)
-    i = flow.end - 1
+    openers.lastIndex = flow.end
   }
 
   // Apply right-to-left so earlier indices stay valid
