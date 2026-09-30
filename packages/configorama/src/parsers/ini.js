@@ -1,6 +1,4 @@
 const INI = require('ini')
-const YAML = require('./yaml')
-const JSON5 = require('./json5')
 
 function parse(contents) {
   let object
@@ -25,7 +23,7 @@ function dump(object) {
 function toYaml(iniContents) {
   let yml
   try {
-    yml = YAML.dump(parse(iniContents))
+    yml = require('./yaml').dump(parse(iniContents))
   } catch (e) {
     throw new Error(e)
   }

@@ -1,6 +1,4 @@
 const JSON5 = require('json5')
-const TOML = require('./toml')
-const YAML = require('./yaml')
 
 function parse(contents) {
   let jsonObject
@@ -25,7 +23,7 @@ function dump(object) {
 function toYaml(jsonContents) {
   let yml
   try {
-    yml = YAML.dump(parse(jsonContents))
+    yml = require('./yaml').dump(parse(jsonContents))
   } catch (e) {
     throw new Error(e)
   }
@@ -35,7 +33,7 @@ function toYaml(jsonContents) {
 function toToml(jsonContents) {
   let toml
   try {
-    toml = TOML.dump(parse(jsonContents))
+    toml = require('./toml').dump(parse(jsonContents))
   } catch (e) {
     throw new Error(e)
   }

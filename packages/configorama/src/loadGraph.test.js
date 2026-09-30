@@ -9,16 +9,25 @@ const { execFileSync } = require('child_process')
 
 /**
  * Parse a YAML config with configorama in a fresh process
+ * @param {string} yaml - config contents
+ * @param {Object.<string, string>} expected - key/value pairs the result must contain
+ * @param {Object.<string, string>} [siblingFiles] - extra files written next to the config
  * @returns {string[]} files in require.cache after parsing
  */
-function loadedFilesAfterYamlParse() {
+function loadedFilesAfterYamlParse(yaml, expected, siblingFiles = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-load-graph-'))
   const configPath = path.join(dir, 'config.yml')
-  fs.writeFileSync(configPath, 'name: demo\nstage: ${env:LOAD_GRAPH_STAGE, dev}\nlabel: ${self:name}-${self:stage}\n')
+  fs.writeFileSync(configPath, yaml)
+  for (const [name, contents] of Object.entries(siblingFiles)) {
+    fs.writeFileSync(path.join(dir, name), contents)
+  }
   const script = `
     const configorama = require(${JSON.stringify(__dirname)})
     configorama(${JSON.stringify(configPath)}).then((config) => {
-      if (config.label !== 'demo-dev') throw new Error('unexpected config ' + JSON.stringify(config))
+      const expected = ${JSON.stringify(expected)}
+      for (const key of Object.keys(expected)) {
+        if (config[key] !== expected[key]) throw new Error('unexpected config ' + JSON.stringify(config))
+      }
       console.log('LOADED=' + JSON.stringify(Object.keys(require.cache)))
     })
   `
@@ -28,13 +37,22 @@ function loadedFilesAfterYamlParse() {
   return JSON.parse(line.slice('LOADED='.length))
 }
 
-const loaded = loadedFilesAfterYamlParse()
+const loaded = loadedFilesAfterYamlParse(
+  'name: demo\nstage: ${env:LOAD_GRAPH_STAGE, dev}\nlabel: ${self:name}-${self:stage}\n',
+  { label: 'demo-dev' }
+)
+const loadedWithDotenvRef = loadedFilesAfterYamlParse(
+  'val: ${file(.env).KEY}\n',
+  { val: 'abc' },
+  { '.env': 'KEY=abc\n' }
+)
 
 /**
  * @param {string} fragment - path fragment identifying a module
+ * @param {string[]} [files] - require.cache keys to search
  */
-function isLoaded(fragment) {
-  return loaded.some(f => f.includes(fragment))
+function isLoaded(fragment, files = loaded) {
+  return files.some(f => f.includes(fragment))
 }
 
 const NOT_LOADED_FOR_YAML = [
@@ -63,6 +81,18 @@ const NOT_LOADED_FOR_YAML = [
 for (const fragment of NOT_LOADED_FOR_YAML) {
   test(`YAML parse does not load ${fragment}`, () => {
     assert.is(isLoaded(fragment), false)
+  })
+}
+
+const NOT_LOADED_FOR_DOTENV_REF = [
+  `${path.sep}json5${path.sep}`,
+  path.join('src', 'parsers', 'json5.js'),
+  path.join('src', 'parsers', 'toml.js'),
+]
+
+for (const fragment of NOT_LOADED_FOR_DOTENV_REF) {
+  test(`YAML with a .env file ref does not load ${fragment}`, () => {
+    assert.is(isLoaded(fragment, loadedWithDotenvRef), false)
   })
 }
 

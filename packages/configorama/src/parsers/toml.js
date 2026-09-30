@@ -1,6 +1,4 @@
 // @iarna/toml loaded on demand so non-TOML configs skip its require cost
-const YAML = require('./yaml')
-const JSON = require('./json5')
 
 function parse(contents) {
   let object
@@ -25,7 +23,7 @@ function dump(object) {
 function toYaml(tomlContents) {
   let yml
   try {
-    yml = YAML.dump(parse(tomlContents))
+    yml = require('./yaml').dump(parse(tomlContents))
   } catch (e) {
     throw new Error(e)
   }
@@ -35,7 +33,7 @@ function toYaml(tomlContents) {
 function toJson(tomlContents) {
   let json
   try {
-    json = JSON.dump(parse(tomlContents))
+    json = require('./json5').dump(parse(tomlContents))
   } catch (e) {
     throw new Error(e)
   }

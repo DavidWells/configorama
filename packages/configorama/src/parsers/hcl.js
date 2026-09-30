@@ -1,6 +1,3 @@
-const YAML = require('./yaml')
-const JSON = require('./json5')
-
 /**
  * Get the hcl2json module, throwing helpful error if not installed
  * @returns {{ parse: Function }} The hcl2json module
@@ -57,12 +54,12 @@ function parseSync(hclContents, filename = 'config.tf') {
       encoding: 'utf8',
       maxBuffer: 10 * 1024 * 1024  // 10MB buffer
     })
-    return JSON.parse(result.trim())
+    return require('./json5').parse(result.trim())
   } catch (error) {
     // Check if error output contains JSON error
     if (error.stderr) {
       try {
-        const errorData = JSON.parse(error.stderr)
+        const errorData = require('./json5').parse(error.stderr)
         throw new Error(`Failed to parse HCL: ${errorData.error}`)
       } catch (parseErr) {
         // If stderr is not JSON, use original error
@@ -96,7 +93,7 @@ async function toYaml(hclContents, filename = 'config.tf') {
   let yml
   try {
     const parsed = await parse(hclContents, filename)
-    yml = YAML.dump(parsed)
+    yml = require('./yaml').dump(parsed)
   } catch (e) {
     throw new Error(`Failed to convert HCL to YAML: ${e.message}`)
   }
@@ -114,7 +111,7 @@ async function toJson(hclContents, filename = 'config.tf') {
   let json
   try {
     const parsed = await parse(hclContents, filename)
-    json = JSON.dump(parsed)
+    json = require('./json5').dump(parsed)
   } catch (e) {
     throw new Error(`Failed to convert HCL to JSON: ${e.message}`)
   }
