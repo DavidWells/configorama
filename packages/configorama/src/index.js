@@ -1,16 +1,8 @@
 const Configorama = require('./main')
 const parsers = require('./parsers')
-const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const { buildVariableSyntax } = require('./utils/variables/variableUtils')
-const { serializeRequirements } = require('./utils/requirements/serializeRequirements')
-const { buildConfigRequirements } = require('./utils/requirements/configRequirements')
-const { runSetup } = require('./utils/setup/setupEngine')
-const { writeDotenv } = require('./utils/setup/writeDotenv')
-const { writeAnswers } = require('./utils/setup/writeAnswers')
-const { buildIntrospection } = require('./utils/introspection/model')
-const { buildAuditReport } = require('./utils/introspection/audit')
-const { formatGraph } = require('./utils/introspection/graph')
 const { ConfigoramaError } = require('./errors')
+// Metadata, setup, requirements and introspection helpers are required where used; plain config loads never need them
 
 const INSPECT_VIEWS = ['requirements', 'audit', 'graph']
 
@@ -63,7 +55,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
     const metadata = instance.collectVariableMetadata()
 
     // Enrich metadata with resolution tracking data collected during execution
-    const enrichedMetadata = await enrichMetadata(
+    const enrichedMetadata = await require('./utils/parsing/enrichMetadata')(
       metadata,
       instance.resolutionTracking,
       instance.variableSyntax,
@@ -147,7 +139,7 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
   const options = settings.options || {}
   const analysis = await instance.init(options)
   if (settings.instructions) {
-    return serializeRequirements(analysis, { configPathOrObject })
+    return require('./utils/requirements/serializeRequirements').serializeRequirements(analysis, { configPathOrObject })
   }
   return analysis
 }
@@ -159,14 +151,30 @@ module.exports.analyze = async (configPathOrObject, settings = {}) => {
  * @return {Promise<object>} { schemaVersion, configPath, requirements, answers, redactedAnswers }
  */
 module.exports.setup = async (configPathOrObject, settings = {}) => {
-  return runSetup(configPathOrObject, settings, { analyze: module.exports.analyze })
+  return require('./utils/setup/setupEngine').runSetup(configPathOrObject, settings, { analyze: module.exports.analyze })
 }
 
 /**
  * Safe writers for persisting setup answers (0600, atomic, overwrite-guarded)
  */
-module.exports.writeDotenv = writeDotenv
-module.exports.writeAnswers = writeAnswers
+/**
+ * @param {string} filePath - target dotenv path
+ * @param {Object.<string, any>} values - env key/value pairs to write
+ * @param {{ merge?: boolean, force?: boolean }} [opts] - write behavior
+ * @returns {{ path: string, keys: string[] }} written target and key names for summaries
+ */
+module.exports.writeDotenv = function writeDotenv(filePath, values, opts) {
+  return require('./utils/setup/writeDotenv').writeDotenv(filePath, values, opts)
+}
+/**
+ * @param {string} filePath - target path
+ * @param {Object} answers - answer groups { options, env, self, dotProp }
+ * @param {{ force?: boolean }} [opts] - write behavior
+ * @returns {{ path: string, groups: Object.<string, string[]> }} written target and key names per group
+ */
+module.exports.writeAnswers = function writeAnswers(filePath, answers, opts) {
+  return require('./utils/setup/writeAnswers').writeAnswers(filePath, answers, opts)
+}
 
 module.exports.introspect = async (configPathOrObject, settings = {}) => {
   const analysis = await module.exports.analyze(configPathOrObject, {
@@ -175,8 +183,8 @@ module.exports.introspect = async (configPathOrObject, settings = {}) => {
     blockCustomFunctions: false,
     blockDotEnv: false,
   })
-  const requirements = buildConfigRequirements(analysis)
-  return buildIntrospection(analysis, { requirements })
+  const requirements = require('./utils/requirements/configRequirements').buildConfigRequirements(analysis)
+  return require('./utils/introspection/model').buildIntrospection(analysis, { requirements })
 }
 
 module.exports.audit = async (configPathOrObject, settings = {}) => {
@@ -186,8 +194,8 @@ module.exports.audit = async (configPathOrObject, settings = {}) => {
     blockCustomFunctions: false,
     blockDotEnv: false,
   })
-  const requirements = buildConfigRequirements(analysis)
-  const introspection = buildIntrospection(analysis, { requirements })
+  const requirements = require('./utils/requirements/configRequirements').buildConfigRequirements(analysis)
+  const introspection = require('./utils/introspection/model').buildIntrospection(analysis, { requirements })
   const customResolvers = Array.isArray(settings.variableSources)
     ? settings.variableSources
       .filter(source => source.type)
@@ -199,7 +207,7 @@ module.exports.audit = async (configPathOrObject, settings = {}) => {
       }))
     : []
   const originalConfig = analysis.originalConfig || {}
-  return buildAuditReport(introspection, {
+  return require('./utils/introspection/audit').buildAuditReport(introspection, {
     safeMode: settings.safeMode === true || settings.safe === true,
     dotenv: originalConfig.useDotenv === true || originalConfig.useDotEnv === true || settings.useDotEnvFiles === true,
     customResolvers,
@@ -209,7 +217,7 @@ module.exports.audit = async (configPathOrObject, settings = {}) => {
 module.exports.graph = async (configPathOrObject, settings = {}) => {
   const graph = await module.exports.introspect(configPathOrObject, settings)
   if (settings.formatGraph === false) return graph
-  return formatGraph(graph, settings.format || 'json')
+  return require('./utils/introspection/graph').formatGraph(graph, settings.format || 'json')
 }
 
 /**

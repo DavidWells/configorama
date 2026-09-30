@@ -49,6 +49,15 @@ const NOT_LOADED_FOR_YAML = [
   path.join('src', 'parsers', 'hcl.js'),
   path.join('src', 'parsers', 'typescript.js'),
   path.join('src', 'parsers', 'esm.js'),
+  path.join('src', 'utils', 'parsing', 'enrichMetadata.js'),
+  path.join('src', 'display.js'),
+  path.join('src', 'metadata.js'),
+  path.join('src', 'utils', 'requirements', 'configRequirements.js'),
+  path.join('src', 'utils', 'requirements', 'serializeRequirements.js'),
+  path.join('src', 'utils', 'introspection', 'model.js'),
+  path.join('src', 'utils', 'introspection', 'audit.js'),
+  path.join('src', 'utils', 'setup', 'setupEngine.js'),
+  path.join('src', 'utils', 'setup', 'writeDotenv.js'),
 ]
 
 for (const fragment of NOT_LOADED_FOR_YAML) {

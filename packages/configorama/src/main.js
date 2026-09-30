@@ -220,7 +220,6 @@ const { tagDates, reviveDates } = require('./utils/encoders/dates')
 const { bracketsToDots } = require('./utils/paths/bracketsToDots')
 const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, decodeForDisplay, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
-const enrichMetadata = require('./utils/parsing/enrichMetadata')
 const preProcess = require('./utils/parsing/preProcess')
 const { parseFileContents } = require('./utils/parsing/parse')
 const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
@@ -243,16 +242,11 @@ const { didYouMean } = require('./utils/strings/didYouMean')
 const { findEnclosingVariable, findParentVariable, isFallbackSlot, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
+// Metadata, display and setup modules are required where used; plain config loads never need them
 /* Utils - ui */
 const chalk = require('./utils/ui/chalk')
 const deepLog = require('./utils/ui/deep-log')
 const { logHeader } = require('./utils/ui/logs')
-const { runSetup } = require('./utils/setup/setupEngine')
-const { applyAnswers } = require('./utils/setup/applyAnswers')
-/* Display */
-const { displayNoVariablesFound, displayVariableDetails, displayUniqueVariables, displayConfigurableVariables } = require('./display')
-/* Metadata */
-const { collectVariableMetadata: collectMetadata } = require('./metadata')
 /* Utils - validation */
 const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
 const {
@@ -1108,7 +1102,7 @@ class Configorama {
       const metadata = decodeForDisplay(encodedMetadata)
       const shownOriginalConfig = decodeLiteralBracesDeep(this.originalConfig)
 
-      const enrich = decodeForDisplay(await enrichMetadata(
+      const enrich = decodeForDisplay(await require('./utils/parsing/enrichMetadata')(
         encodedMetadata,
         this.resolutionTracking,
         this.variableSyntax,
@@ -1139,7 +1133,7 @@ class Configorama {
       }
 
       if (!varKeys.length) {
-        displayNoVariablesFound(this.configFilePath, variableSyntax, this.variableTypes)
+        require('./display').displayNoVariablesFound(this.configFilePath, variableSyntax, this.variableTypes)
       }
 
       const lines = this.configFileContents ? this.configFileContents.split('\n') : []
@@ -1148,23 +1142,23 @@ class Configorama {
 
       const displayParams = { lines, fileType, configFilePath, uniqueVariables, uniqueVarKeys }
 
-      displayVariableDetails({
+      require('./display').displayVariableDetails({
         varKeys, variableData, uniqueVariables,
         varPrefixPattern: this.varPrefixPattern,
         varSuffixPattern: this.varSuffixPattern,
         lines, fileType, configFilePath,
       })
 
-      displayUniqueVariables(displayParams)
+      require('./display').displayUniqueVariables(displayParams)
 
-      displayConfigurableVariables(displayParams)
+      require('./display').displayConfigurableVariables(displayParams)
 
 
       // WALK through CLI prompt when setup mode is active
       if (this.setupMode) {
         logHeader('Setup Mode')
         // deepLog('enrich', enrich)
-        const setupResult = await runSetup(this.configFilePath || this.config, this.settings, {
+        const setupResult = await require('./utils/setup/setupEngine').runSetup(this.configFilePath || this.config, this.settings, {
           analysis: Object.assign({ originalConfig: shownOriginalConfig }, enrich),
         })
         this.setupRequirements = setupResult.requirements
@@ -1182,7 +1176,7 @@ class Configorama {
         console.log(JSON.stringify(displayInputs, null, 2))
 
         // Apply user inputs to options, environment, and config
-        applyAnswers({ options: this.options, env: process.env, config: this.config }, setupResult.answers)
+        require('./utils/setup/applyAnswers').applyAnswers({ options: this.options, env: process.env, config: this.config }, setupResult.answers)
 
         console.log()
         logHeader('Resolving Configuration')
@@ -1391,7 +1385,7 @@ class Configorama {
       return this._cachedMetadata
     }
 
-    this._cachedMetadata = collectMetadata({
+    this._cachedMetadata = require('./metadata').collectVariableMetadata({
       variableSyntax: this.variableSyntax,
       variablesKnownTypes: this.variablesKnownTypes,
       variableTypes: this.variableTypes,
