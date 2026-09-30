@@ -1,6 +1,5 @@
 const path = require('path')
 const fs = require('fs')
-const findUp = require('find-up')
 
 const DEBUG = false
 const DEBUG_LOG = (message) => {
@@ -9,8 +8,24 @@ const DEBUG_LOG = (message) => {
   }
 }
 
-// Maximum number of parent directories to search through
-const MAX_PARENT_DIRS = 5
+/**
+ * Match find-up 3's synchronous search without throwing/catching an access
+ * error for every missing file. Its stopAt option was ignored, so the search
+ * still includes every ancestor up to the filesystem root.
+ * @param {string} filename
+ * @param {string} configDir
+ * @returns {string|null}
+ */
+function findAncestorConfig(filename, configDir) {
+  let dir = path.resolve(configDir)
+  while (true) {
+    const candidate = path.join(dir, filename)
+    if (fs.existsSync(candidate)) return candidate
+    const parent = path.dirname(dir)
+    if (parent === dir) return null
+    dir = parent
+  }
+}
 
 /**
  * Finds the nearest config file (tsconfig.json or jsconfig.json) in the directory tree
@@ -19,19 +34,13 @@ const MAX_PARENT_DIRS = 5
  */
 function findConfigFile(configDir) {
   // Try tsconfig.json first
-  const tsconfigPath = findUp.sync('tsconfig.json', { 
-    cwd: configDir,
-    stopAt: path.resolve(configDir, Array(MAX_PARENT_DIRS).fill('..').join('/'))
-  })
+  const tsconfigPath = findAncestorConfig('tsconfig.json', configDir)
   if (tsconfigPath) {
     return tsconfigPath
   }
 
   // Fall back to jsconfig.json
-  const jsconfigPath = findUp.sync('jsconfig.json', { 
-    cwd: configDir,
-    stopAt: path.resolve(configDir, Array(MAX_PARENT_DIRS).fill('..').join('/'))
-  })
+  const jsconfigPath = findAncestorConfig('jsconfig.json', configDir)
   if (jsconfigPath) {
     return jsconfigPath
   }
@@ -149,4 +158,4 @@ function getAliases(configDir) {
 module.exports = {
   resolveAlias,
   getAliases
-} 
+}
