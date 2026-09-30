@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.4](https://github.com/DavidWells/configorama/compare/configorama@1.4.3...configorama@1.4.4) (2026-09-30)
+
+
+### Bug Fixes
+
+* a fallback value resolves the same as referencing it directly ([be4c157](https://github.com/DavidWells/configorama/commit/be4c1571c488dc7d21703b9bd086df6f7acd6e70))
+* a missing nested variable takes its fallbacks from its direct parent ([a55513b](https://github.com/DavidWells/configorama/commit/a55513b974c551d9f73b4a4f4723f8844fa91589))
+* custom syntaxes, file() keys, metadata tokens, lenient filters, wide lists ([cfcdac6](https://github.com/DavidWells/configorama/commit/cfcdac6b114531e2dab421b916a54542836f6e62))
+* fallbacks only run when everything before them came up empty ([7f5d50c](https://github.com/DavidWells/configorama/commit/7f5d50c2dd13842c64b48f45f0b3f7fe11670e56))
+* filters after fallbacks, keys from variables, marker-like values, unknown functions ([f65077b](https://github.com/DavidWells/configorama/commit/f65077b2f15bba606a573f44ab0c950f399cdbb5))
+
+
+### Performance Improvements
+
+* **require:** lazy-load @davidwells/human-cron in cron resolver ([b53bfb4](https://github.com/DavidWells/configorama/commit/b53bfb4e71a795723166080da781a48f8160ba25))
+* **require:** lazy-load @iarna/toml in toml parser ([43b6b33](https://github.com/DavidWells/configorama/commit/43b6b3359190bbb1f1e19f8792609b82a2a7a11a))
+* **require:** lazy-load box-logger in lib display paths ([d42eaeb](https://github.com/DavidWells/configorama/commit/d42eaebde01216ba999e4aac00f4840bf4f4f3ae))
+* **require:** lazy-load git-url-parse in git resolver ([eff557a](https://github.com/DavidWells/configorama/commit/eff557a8a1cd3812626a32440a70b3d50168be17))
+* **require:** lazy-load setup wizard and @clack/prompts ([deccd42](https://github.com/DavidWells/configorama/commit/deccd42194f88b91181b7214587a89884275cb38))
+* **require:** lazy-load traverse in metadata collection ([ebe0da7](https://github.com/DavidWells/configorama/commit/ebe0da7e56f87b3f8469a3a08bb93778e74245bc))
+* **yaml:** upgrade js-yaml 3 -> 4, drops esprima from the load path ([d836473](https://github.com/DavidWells/configorama/commit/d8364732217f421cd383a5f7bb718c049d084f64))
+
+
+
+
+
 ## [1.4.3](https://github.com/DavidWells/configorama/compare/configorama@1.4.2...configorama@1.4.3) (2026-09-28)
 
 
