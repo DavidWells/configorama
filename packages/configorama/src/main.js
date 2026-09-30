@@ -244,8 +244,6 @@ const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs
 const { validateOneOf } = require('./utils/filters/oneOf')
 // Metadata, display and setup modules are required where used; plain config loads never need them
 /* Utils - ui */
-const chalk = require('./utils/ui/chalk')
-const deepLog = require('./utils/ui/deep-log')
 const { logHeader } = require('./utils/ui/logs')
 /* Utils - validation */
 const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
@@ -1089,7 +1087,7 @@ class Configorama {
     if (VERBOSE) {
       logHeader('Config Input before processing')
       console.log()
-      deepLog(decodeLiteralBracesDeep(this.originalConfig))
+      require('./utils/ui/deep-log')(decodeLiteralBracesDeep(this.originalConfig))
       console.log()
     }
 
@@ -1116,6 +1114,7 @@ class Configorama {
       ))
 
       if (showFoundVariables) {
+        const deepLog = require('./utils/ui/deep-log')
         deepLog('metadata', metadata)
         deepLog('enrich', enrich)
       }
@@ -1363,7 +1362,7 @@ class Configorama {
           if (VERBOSE) {
             logHeader('Resolved Configuration value')
             console.log()
-            deepLog(this.config)
+            require('./utils/ui/deep-log')(this.config)
             console.log()
           }
           // Re-attach markdown body content after variable resolution
@@ -1417,7 +1416,7 @@ class Configorama {
     this.callCount = this.callCount + 1
 
     if (DEBUG) {
-      deepLog.deepDebug(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
+      require('./utils/ui/deep-log').deepDebug(`objectToPopulate called ${this.callCount} times`, objectToPopulate)
       // process.exit(0)
     }
 

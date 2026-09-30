@@ -56,6 +56,11 @@ function isLoaded(fragment, files = loaded) {
 }
 
 const NOT_LOADED_FOR_YAML = [
+  `${path.sep}chalk${path.sep}`,
+  `${path.sep}safe-chalk${path.sep}`,
+  `${path.sep}supports-color${path.sep}`,
+  path.join('src', 'utils', 'ui', 'chalk.js'),
+  path.join('src', 'utils', 'ui', 'deep-log.js'),
   `${path.sep}esprima${path.sep}`,
   `${path.sep}json5${path.sep}`,
   `${path.sep}ini${path.sep}`,
