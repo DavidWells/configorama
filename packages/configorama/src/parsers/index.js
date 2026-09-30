@@ -4,22 +4,16 @@
  * @property {Function} stringify - Convert object to string format
  */
 
-const json = require('./json5')
-const toml = require('./toml')
-const yaml = require('./yaml')
-const ini = require('./ini')
-const hcl = require('./hcl')
-const markdown = require('./markdown')
-
 /**
- * Collection of format parsers for different config file types
+ * Collection of format parsers for different config file types. Each parser
+ * loads on first access so reading one format never pays for the others.
  * @type {Object.<string, ParserFunction>}
  */
 module.exports = {
-  json: json,
-  toml: toml,
-  yaml: yaml,
-  ini: ini,
-  hcl: hcl,
-  markdown: markdown
+  get json() { return require('./json5') },
+  get toml() { return require('./toml') },
+  get yaml() { return require('./yaml') },
+  get ini() { return require('./ini') },
+  get hcl() { return require('./hcl') },
+  get markdown() { return require('./markdown') }
 }

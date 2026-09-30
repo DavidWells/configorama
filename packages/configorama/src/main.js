@@ -280,7 +280,6 @@ const getValueFromIf = require('./resolvers/valueFromIf')
 const createGitResolver = require('./resolvers/valueFromGit')
 const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
 /* Parsers */
-const JSON5 = require('./parsers/json5')
 /* Functions */
 const md5Function = require('./functions/md5')
 
@@ -789,7 +788,7 @@ class Configorama {
         return JSON.stringify(val)
       },
       toObject: (val) => {
-        return JSON5.parse(val)
+        return require('./parsers/json5').parse(val)
       },
       /* Type validation filters */
       Number: (value) => {
@@ -816,7 +815,7 @@ class Configorama {
         const trimmed = value.trim()
         if (!trimmed) return []
         try {
-          const parsed = JSON5.parse(trimmed)
+          const parsed = require('./parsers/json5').parse(trimmed)
           if (Array.isArray(parsed)) return parsed
           throw new Error('not-array')
         } catch (error) {
@@ -832,7 +831,7 @@ class Configorama {
           throw new Error(`Configorama Error: Expected Object, got "${value}"`)
         }
         try {
-          const parsed = JSON5.parse(value)
+          const parsed = require('./parsers/json5').parse(value)
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
         } catch (error) {
           // Fall through to consistent error below.

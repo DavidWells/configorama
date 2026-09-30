@@ -1,6 +1,4 @@
 const YAML = require('js-yaml')
-const TOML = require('./toml')
-const JSON = require('./json5')
 const { isInsideQuotes } = require('../utils/strings/quoteAware')
 
 /**
@@ -64,7 +62,7 @@ function dump(object) {
 function toToml(ymlContents) {
   let toml
   try {
-    toml = TOML.dump(parse(ymlContents))
+    toml = require('./toml').dump(parse(ymlContents))
   } catch (e) {
     throw new Error(e)
   }
@@ -80,7 +78,7 @@ function toToml(ymlContents) {
 function toJson(ymlContents) {
   let json
   try {
-    json = JSON.dump(parse(ymlContents))
+    json = require('./json5').dump(parse(ymlContents))
   } catch (e) {
     throw new Error(e)
   }

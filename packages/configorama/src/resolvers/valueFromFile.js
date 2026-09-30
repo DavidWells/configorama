@@ -12,11 +12,8 @@ const { checkFileAccess } = require('../utils/security/safetyPolicy')
 const { applyDotenvFileRefMetadata, isIniLikeFilePath } = require('../utils/security/dotenvFileRefs')
 
 /* File Parsers */
+// Other format parsers are required where used, so a file only loads its own format's parser
 const YAML = require('../parsers/yaml')
-const TOML = require('../parsers/toml')
-const INI = require('../parsers/ini')
-const JSON5 = require('../parsers/json5')
-const HCL = require('../parsers/hcl')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
 const { rebaseFileRefs } = require('../utils/paths/rebaseFileRefs')
@@ -81,16 +78,16 @@ function parseFileContents(content, filePath) {
   const ext = filePath.split('.').pop().toLowerCase()
 
   if (ext === 'json' || ext === 'json5') {
-    return JSON5.parse(content)
+    return require('../parsers/json5').parse(content)
   }
   if (ext === 'yml' || ext === 'yaml') {
     return YAML.parse(content)
   }
   if (ext === 'toml' || ext === 'tml') {
-    return TOML.parse(content)
+    return require('../parsers/toml').parse(content)
   }
   if (isIniLikeExtension(ext, filePath)) {
-    return INI.parse(content)
+    return require('../parsers/ini').parse(content)
   }
 
   // Return raw content for other files
@@ -410,18 +407,18 @@ ${JSON.stringify(options.context, null, 2)}`,
         valueToPopulate = JSON.stringify(YAML.parse(valueToPopulate))
       }
       if (fileExtension === 'toml' || fileExtension === 'tml') {
-        valueToPopulate = JSON.stringify(TOML.parse(valueToPopulate))
+        valueToPopulate = JSON.stringify(require('../parsers/toml').parse(valueToPopulate))
       }
       if (isIniLikeExtension(fileExtension, relativePath)) {
-        valueToPopulate = INI.toJson(valueToPopulate)
+        valueToPopulate = require('../parsers/ini').toJson(valueToPopulate)
       }
       if (fileExtension === 'tf' || fileExtension === 'hcl') {
         // Parse HCL and convert $[...] to main config's syntax for variable resolution
-        const parsed = convertHclVarSyntax(HCL.parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
+        const parsed = convertHclVarSyntax(require('../parsers/hcl').parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
         valueToPopulate = JSON.stringify(parsed)
       }
       if (fileExtension === 'json' || fileExtension === 'json5') {
-        let parsed = JSON5.parse(valueToPopulate)
+        let parsed = require('../parsers/json5').parse(valueToPopulate)
         // Convert $[...] to main config's syntax for .tf.json files
         if (relativePath.endsWith('.tf.json')) {
           parsed = convertHclVarSyntax(parsed, ctx.varPrefix, ctx.varSuffix)
@@ -449,17 +446,17 @@ Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
     }
 
     if (fileExtension === 'toml' || fileExtension === 'tml') {
-      valueToPopulate = TOML.parse(valueToPopulate)
+      valueToPopulate = require('../parsers/toml').parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }
 
     if (isIniLikeExtension(fileExtension, relativePath)) {
-      valueToPopulate = INI.parse(valueToPopulate)
+      valueToPopulate = require('../parsers/ini').parse(valueToPopulate)
       return Promise.resolve(valueToPopulate)
     }
 
     if (fileExtension === 'json' || fileExtension === 'json5') {
-      valueToPopulate = JSON5.parse(valueToPopulate)
+      valueToPopulate = require('../parsers/json5').parse(valueToPopulate)
       // Convert $[...] to main config's syntax for .tf.json files (Terraform JSON format)
       if (relativePath.endsWith('.tf.json')) {
         valueToPopulate = convertHclVarSyntax(valueToPopulate, ctx.varPrefix, ctx.varSuffix)
@@ -469,7 +466,7 @@ Please use ":" or "." to reference sub properties. ${deepPropertiesStr}`
 
     if (fileExtension === 'tf' || fileExtension === 'hcl') {
       // Parse HCL and convert $[...] to main config's syntax for variable resolution
-      valueToPopulate = convertHclVarSyntax(HCL.parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
+      valueToPopulate = convertHclVarSyntax(require('../parsers/hcl').parse(valueToPopulate, relativePath), ctx.varPrefix, ctx.varSuffix)
       return Promise.resolve(valueToPopulate)
     }
   }

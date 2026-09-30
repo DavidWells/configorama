@@ -2,15 +2,9 @@
 const fs = require('fs')
 const path = require('path')
 const YAML = require('../../parsers/yaml')
-const TOML = require('../../parsers/toml')
-const INI = require('../../parsers/ini')
-const DOTENV = require('../../parsers/dotenv')
-const JSON5 = require('../../parsers/json5')
-const HCL = require('../../parsers/hcl')
+// Other format parsers are required where used, so a config only loads its own format's parser
 const { isEnvFile } = require('../paths/fileType')
 const { detectFormat } = require('./detectFormat')
-const { executeTypeScriptFileSync } = require('../../parsers/typescript')
-const { executeESMFileSync } = require('../../parsers/esm')
 const cloudFormationSchema = require('./cloudformationSchema')
 
 const DEFAULT_VAR_SYNTAX = '\\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._\'",|\\-\\/\\(\\)\\\\]+?)}'
@@ -120,21 +114,21 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       }
     }
   } else if (fileType.match(/\.(toml|tml)/i)) {
-    configObject = TOML.parse(contents)
+    configObject = require('../../parsers/toml').parse(contents)
   } else if (fileType.match(/\.(ini)/i)) {
-    configObject = INI.parse(contents)
+    configObject = require('../../parsers/ini').parse(contents)
   } else if (fileType === '.env') {
-    configObject = DOTENV.parse(contents)
+    configObject = require('../../parsers/dotenv').parse(contents)
   } else if (fileType.match(/\.(json|json5|jsonc)/i)) {
-    configObject = JSON5.parse(contents)
+    configObject = require('../../parsers/json5').parse(contents)
   } else if (fileType.match(/\.(tf|hcl)$/i) || filePath.match(/\.tf\.json$/i)) {
     // Handle Terraform HCL files (.tf, .hcl) and Terraform JSON (.tf.json)
     if (filePath.match(/\.tf\.json$/i)) {
       // .tf.json files are just JSON
-      configObject = JSON5.parse(contents)
+      configObject = require('../../parsers/json5').parse(contents)
     } else {
       // .tf and .hcl files need HCL parsing
-      configObject = HCL.parse(contents, path.basename(filePath))
+      configObject = require('../../parsers/hcl').parse(contents, path.basename(filePath))
     }
   } else if (fileType.match(/\.(md|mdx|markdown|mdown|mkdn|mkd|mdwn|markdn|mdtxt|mdtext)/i)) {
     const { extractFrontmatter } = require('../../parsers/markdown')
@@ -143,9 +137,9 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
     if (!frontmatterContent) {
       configObject = {}
     } else if (format === 'toml') {
-      configObject = TOML.parse(frontmatterContent)
+      configObject = require('../../parsers/toml').parse(frontmatterContent)
     } else if (format === 'json') {
-      configObject = JSON5.parse(frontmatterContent)
+      configObject = require('../../parsers/json5').parse(frontmatterContent)
     } else {
       const ymlText = YAML.preProcess(frontmatterContent)
       configObject = YAML.parse(ymlText)
@@ -181,7 +175,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       if (jsArgs && typeof jsArgs === 'function') {
         jsArgs = jsArgs()
       }
-      configObject = executeTypeScriptFileSync(filePath, { dynamicArgs })
+      configObject = require('../../parsers/typescript').executeTypeScriptFileSync(filePath, { dynamicArgs })
       if (configObject.config) {
         configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
       } else if (configObject.default) {
@@ -199,7 +193,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       if (jsArgs && typeof jsArgs === 'function') {
         jsArgs = jsArgs()
       }
-      configObject = executeESMFileSync(filePath, { dynamicArgs })
+      configObject = require('../../parsers/esm').executeESMFileSync(filePath, { dynamicArgs })
       if (configObject.config) {
         configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
       } else if (configObject.default) {
