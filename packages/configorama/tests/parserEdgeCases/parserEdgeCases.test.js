@@ -1,6 +1,7 @@
 /* Parser edge cases for various file formats */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { rejects } = require('node:assert/strict')
 const path = require('path')
 const fs = require('fs')
 const configorama = require('../../src')
@@ -11,18 +12,15 @@ const dirname = __dirname
 // Empty file handling
 // ============================================
 
-test('parser edge case - empty YAML file throws error', async () => {
+test('parser edge case - empty YAML file resolves to an empty config', async () => {
   const emptyYaml = path.join(dirname, 'empty.yml')
   fs.writeFileSync(emptyYaml, '')
 
   try {
-    await configorama(emptyYaml, {
+    const config = await configorama(emptyYaml, {
       configDir: dirname
     })
-    assert.unreachable('should throw on empty YAML')
-  } catch (error) {
-    // Empty YAML file causes init error
-    assert.ok(error)
+    assert.equal(config, {})
   } finally {
     fs.unlinkSync(emptyYaml)
   }
@@ -33,13 +31,9 @@ test('parser edge case - empty JSON file', async () => {
   fs.writeFileSync(emptyJson, '')
 
   try {
-    await configorama(emptyJson, {
+    await rejects(() => configorama(emptyJson, {
       configDir: dirname
-    })
-    assert.unreachable('should throw on empty JSON')
-  } catch (error) {
-    // Empty JSON is invalid
-    assert.ok(error)
+    }), /JSON5:/)
   } finally {
     fs.unlinkSync(emptyJson)
   }
@@ -50,12 +44,9 @@ test('parser edge case - JSON with only whitespace', async () => {
   fs.writeFileSync(wsJson, '   \n\t  ')
 
   try {
-    await configorama(wsJson, {
+    await rejects(() => configorama(wsJson, {
       configDir: dirname
-    })
-    assert.unreachable('should throw on whitespace-only JSON')
-  } catch (error) {
-    assert.ok(error)
+    }), /JSON5:/)
   } finally {
     fs.unlinkSync(wsJson)
   }
@@ -73,8 +64,7 @@ test('parser edge case - YAML with only comments', async () => {
     const config = await configorama(commentYaml, {
       configDir: dirname
     })
-    // Should be empty or null
-    assert.ok(config === null || config === undefined || (typeof config === 'object' && Object.keys(config).length === 0))
+    assert.equal(config, {})
   } finally {
     fs.unlinkSync(commentYaml)
   }
@@ -86,13 +76,9 @@ test('parser edge case - YAML multiple documents throws error', async () => {
   fs.writeFileSync(multiDocYaml, '---\nkey: value1\n---\nkey: value2\n')
 
   try {
-    await configorama(multiDocYaml, {
+    await rejects(() => configorama(multiDocYaml, {
       configDir: dirname
-    })
-    assert.unreachable('should throw on multi-document YAML')
-  } catch (error) {
-    // Multi-document YAML throws "expected a single document" error
-    assert.ok(error.message.includes('single document'))
+    }), /single document/)
   } finally {
     fs.unlinkSync(multiDocYaml)
   }
@@ -277,11 +263,7 @@ test('parser edge case - old Mac CR line endings', async () => {
     const config = await configorama(crFile, {
       configDir: dirname
     })
-    // CR-only might work or might not parse correctly
-    assert.ok(config)
-  } catch (error) {
-    // It's acceptable if CR-only fails
-    assert.ok(error)
+    assert.equal(config, { key: 'value', ref: 'value' })
   } finally {
     fs.unlinkSync(crFile)
   }
@@ -308,7 +290,9 @@ test('parser edge case - unicode in keys does not resolve in refs', async () => 
   assert.is(config['キー'], 'value')
   assert.is(config['clé'], 'valeur')
   // The refs remain as literal strings
-  assert.is(typeof config.ref1, 'string')
+  assert.is(config.ref1, '${self:キー}')
+  assert.is(config.ref2, '${self:clé}')
+  assert.is(config.ref3, '${self:مفتاح}')
 })
 
 test('parser edge case - emoji in keys does not resolve', async () => {
@@ -322,7 +306,7 @@ test('parser edge case - emoji in keys does not resolve', async () => {
 
   // Emoji key exists but ref doesn't resolve
   assert.is(config['🔑'], 'secret')
-  assert.is(typeof config.ref, 'string')
+  assert.is(config.ref, '${self:🔑}')
 })
 
 test('parser edge case - unicode in values preserved', async () => {
@@ -349,7 +333,8 @@ test('parser edge case - very large number', async () => {
   })
 
   // BigInt handling
-  assert.ok(config.ref !== undefined)
+  assert.is(config.ref, 9999999999999999999999999999n)
+  assert.type(config.ref, 'bigint')
 })
 
 test('parser edge case - special YAML values', async () => {
@@ -367,11 +352,13 @@ tilde_null: ~
     configDir: dirname
   })
 
-  // YAML 1.1 treats these as booleans/null
+  // js-yaml's default schema preserves YAML 1.1 boolean spellings as strings.
   assert.is(config.null_val, null)
   assert.is(config.tilde_null, null)
-  // yes/no/on/off may be boolean or string depending on parser
-  assert.ok(config.yes_val === true || config.yes_val === 'yes')
+  assert.is(config.yes_val, 'yes')
+  assert.is(config.no_val, 'no')
+  assert.is(config.on_val, 'on')
+  assert.is(config.off_val, 'off')
   fs.unlinkSync(specialYaml)
 })
 
@@ -386,9 +373,10 @@ datetime: 2024-01-15T10:30:00Z
     configDir: dirname
   })
 
-  // Dates might be parsed as Date objects or strings
-  assert.ok(config.date)
-  assert.ok(config.datetime)
+  assert.instance(config.date, Date)
+  assert.instance(config.datetime, Date)
+  assert.is(config.date.toISOString(), '2024-01-15T00:00:00.000Z')
+  assert.is(config.datetime.toISOString(), '2024-01-15T10:30:00.000Z')
   fs.unlinkSync(dateYaml)
 })
 

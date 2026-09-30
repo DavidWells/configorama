@@ -57,4 +57,13 @@ test('a nested function result passed to an outer function', async () => {
   assert.is(out.r, 'xhaho')
 })
 
+test('quoted function-looking arguments with escaped quotes remain data', async () => {
+  // Random fuzz seed -464770790 shrank to merge("", "a(\\\")").
+  for (const value of ['a(")', "a(')", 'notAFunction(x)']) {
+    const expression = '${merge("",' + JSON.stringify(value) + ')}'
+    assert.is((await configorama({ out: expression })).out, value)
+    assert.is(configorama.sync({ out: expression }, { options: {} }).out, value)
+  }
+})
+
 test.run()

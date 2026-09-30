@@ -1,5 +1,6 @@
 // Tags Date values as JSON-safe objects and revives them, so resolved config keeps its
 // dates across the JSON transport the sync API uses between processes
+const { setOwn } = require('../objects')
 const DATE_TAG = '__configoramaDate'
 
 /**
@@ -13,7 +14,7 @@ function tagDates(value) {
   if (value && typeof value === 'object') {
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of Object.keys(value)) result[key] = tagDates(value[key])
+    for (const key of Object.keys(value)) setOwn(result, key, tagDates(value[key]))
     return result
   }
   return value
@@ -31,7 +32,7 @@ function reviveDates(value) {
     if (keys.length === 1 && keys[0] === DATE_TAG) return new Date(value[DATE_TAG])
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of keys) result[key] = reviveDates(value[key])
+    for (const key of keys) setOwn(result, key, reviveDates(value[key]))
     return result
   }
   return value

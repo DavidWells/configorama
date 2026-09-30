@@ -6,9 +6,8 @@ const configorama = require('../../src')
 // console.log output below prints only with TEST_VERBOSE=1
 const console = require('../utils').quietConsole
 
-let order = ['one']
-
 test('API is asynchronous', async () => {
+  const order = ['one']
   const configFile = path.join(__dirname, 'api.yml')
 
   const config = configorama(configFile, {
@@ -25,6 +24,7 @@ test('API is asynchronous', async () => {
     assert.equal(order, ['one', 'two', 'three'])
   })
   order.push('two')
+  await config
 })
 
 test('API does not install signal handlers by default', async () => {

@@ -6,7 +6,6 @@ const childProcess = require('child_process')
 const { functionRegex } = require('../utils/regex')
 const formatFunctionArgs = require('../utils/strings/formatFunctionArgs')
 const { findProjectRoot } = require('../utils/paths/findProjectRoot')
-const BoundedMap = require('../utils/BoundedMap')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
 
@@ -121,6 +120,9 @@ const GIT_KEYS = {
 }
 
 function createResolver(cwd) {
+  // Capture the config directory once. Caches belong to this config load only,
+  // so other repositories and subsequent Git changes cannot reuse stale values.
+  cwd = path.resolve(cwd || process.cwd())
   let gitRepo
   const gitResultCache = new Map()
 
@@ -140,11 +142,11 @@ function createResolver(cwd) {
 
   function gitExec(args) {
     const key = `git:${JSON.stringify(args)}`
-    return cachedSafeGit(key, () => _execFile('git', args))
+    return cachedSafeGit(key, () => _execFile('git', args, { cwd, timeout: 1000 }))
   }
 
   function gitRemote(name = 'origin') {
-    return cachedSafeGit(`remote:${name}`, () => getGitRemote(name))
+    return cachedSafeGit(`remote:${name}`, () => getGitRemote(name, cwd))
   }
 
   async function _getValueFromGit(variableString) {
@@ -175,7 +177,11 @@ function createResolver(cwd) {
       const funcName = argsMatch[1]
       const args = argsMatch[2]
       if (funcName === 'timestamp' && args) {
-        value = await getGitTimestamp(args, cwd, false)
+        const key = `timestamp:${args}`
+        if (!gitResultCache.has(key)) {
+          gitResultCache.set(key, getGitTimestamp(args, cwd, false))
+        }
+        value = await gitResultCache.get(key)
       }
     }
 
@@ -300,8 +306,6 @@ function createResolver(cwd) {
   return _getValueFromGit
 }
 
-const cache = new BoundedMap(200)
-
 /**
  * Gets the last Git commit timestamp for a file
  * @param {string} _file - Path to the file to check
@@ -325,9 +329,6 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
     throw new Error('File path contains invalid characters')
   }
 
-  const cachedTimestamp = cache.get(file)
-  if (cachedTimestamp) return cachedTimestamp
-
   if (!fs.existsSync(cwd)) {
     if (throwOnMissing) {
       throw new Error(`Directory ${cwd} does not exist`)
@@ -339,7 +340,6 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
     const output = await _execFile('git', ['log', '-1', '--pretty=%ai', '--', file], { cwd })
     const date = new Date(output)
     const dateString = date.toISOString()
-    cache.set(file, dateString)
     return dateString
   } catch (err) {
     const projectRoot = findProjectRoot(cwd)
@@ -355,7 +355,6 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
       const output = await _execFile('git', ['log', '-1', '--pretty=%ai', '--', backupFile], { cwd: projectRoot })
       const date = new Date(output)
       const dateString = date.toISOString()
-      cache.set(file, dateString)
       return dateString
     } catch (err) {
       if (throwOnMissing) {
@@ -366,13 +365,8 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
   }
 }
 
-const remoteCache = new BoundedMap(20)
-
-async function getGitRemote(name = 'origin') {
-  if (remoteCache.has(name)) {
-    return remoteCache.get(name)
-  }
-  const remoteValues = await _execFile('git', ['remote', '-v'])
+async function getGitRemote(name, cwd) {
+  const remoteValues = await _execFile('git', ['remote', '-v'], { cwd, timeout: 1000 })
   const remotes = remoteValues.toString().split(os.EOL)
     .filter(function filterOnlyFetchRows(remote) {
       return remote.match('(fetch)')
@@ -406,7 +400,6 @@ async function getGitRemote(name = 'origin') {
   // console.log('parsed', parsed)
   if (parsed && parsed.source && parsed.full_name) {
     const result = `https://${parsed.source}/${parsed.full_name}`
-    remoteCache.set(name, result)
     return result
   }
 }

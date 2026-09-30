@@ -7,13 +7,31 @@
  * Returns a regex-exec-like array: [fullMatch, funcName, args] with index and input properties
  * or null if no function found
  * @param {string} str - String to search for function call
- * @returns {any} Regex-like result array or null
+ * @returns {RegExpExecArray|null} Regex-like result array or null
  */
 function parseFunctionCall(str) {
   if (!str || typeof str !== 'string' || str.indexOf('(') === -1) return null
 
-  // Find function name followed by opening paren
-  const funcMatch = str.match(/(\w+)\s*\(/)
+  // Find a call outside quoted literals. A string argument such as "a(\")"
+  // is data, not a nested call to a(). Escapes apply to both quote styles.
+  let funcMatch = null
+  let quote = null
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i]
+    if (quote) {
+      if (char === '\\') i++
+      else if (char === quote) quote = null
+    } else if (char === '"' || char === "'") {
+      quote = char
+    } else {
+      const match = /^(\w+)\s*\(/.exec(str.slice(i))
+      if (match) {
+        match.index = i
+        funcMatch = match
+        break
+      }
+    }
+  }
   if (!funcMatch) return null
   
   const funcName = funcMatch[1]
@@ -27,10 +45,12 @@ function parseFunctionCall(str) {
   // Track parenthesis depth to find matching closing paren
   while (pos < str.length && depth > 0) {
     const char = str[pos]
-    const prevChar = pos > 0 ? str[pos - 1] : ''
-
+    if (inString && char === '\\') {
+      pos += 2
+      continue
+    }
     // Toggle string state on unescaped quotes
-    if ((char === '"' || char === "'") && prevChar !== '\\') {
+    if (char === '"' || char === "'") {
       if (!inString) {
         inString = char
       } else if (char === inString) {
@@ -59,11 +79,10 @@ function parseFunctionCall(str) {
   const fullMatch = str.substring(funcMatch.index, endPos)
   
   // Create regex-exec-like result array with index and input properties
-  /** @type {any} */
-  const result = [fullMatch, funcName, args || undefined]
-  result.index = funcMatch.index
-  result.input = str
-  return result
+  return Object.assign(/** @type {[string, string, string]} */ ([fullMatch, funcName, args || undefined]), {
+    index: funcMatch.index,
+    input: str
+  })
 }
 
 /**

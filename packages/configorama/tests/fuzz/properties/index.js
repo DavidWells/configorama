@@ -10,6 +10,7 @@ const PROPERTIES = [
   require('./unknownNames'),
   require('./equivalence'),
   require('./customSyntax'),
+  require('./structures'),
 ]
 
 module.exports = { PROPERTIES }

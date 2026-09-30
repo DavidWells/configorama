@@ -12,6 +12,7 @@
  */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { rejects } = require('node:assert/strict')
 const path = require('path')
 const configorama = require('../../src')
 // console.log output below prints only with TEST_VERBOSE=1
@@ -610,42 +611,27 @@ test('complex object with many nested variables', async () => {
 test('allowUnknownVars with partial resolution in dynamic key', async () => {
   // allowUnknownVars doesn't prevent errors from missing self: references in dynamic keys
   // The inner ${self:unknownKey} fails before the fallback can be applied
-  // This is expected behavior - just test that we handle it
-  try {
-    await configorama({
-      data: {
-        known: 'value'
-      },
-      result: '${self:data.${self:unknownKey}, "fallback"}'
-    }, {
-      configDir: dirname,
-      allowUnknownVars: true
-    })
-    // If it doesn't throw, check that we got something reasonable
-    assert.ok(true)
-  } catch (error) {
-    // It's also acceptable for this to throw since unknownKey doesn't exist
-    assert.ok(error)
-  }
+  await rejects(() => configorama({
+    data: {
+      known: 'value'
+    },
+    result: '${self:data.${self:unknownKey}, "fallback"}'
+  }, {
+    configDir: dirname,
+    allowUnknownVars: true
+  }), /unknownKey/)
 })
 
 test('allowUnknownVars with nested unknown variables', async () => {
   // allowUnknownVars doesn't prevent errors from nested self: references that don't exist
   // This will throw because unknown1 doesn't exist
-  try {
-    await configorama({
-      // Both inner variables unknown
-      result: '${self:${self:unknown1}, ${self:${self:unknown2}}}'
-    }, {
-      configDir: dirname,
-      allowUnknownVars: true
-    })
-    // If it resolves, check we got something
-    assert.ok(true)
-  } catch (error) {
-    // Expected - self references to missing keys still throw
-    assert.ok(error)
-  }
+  await rejects(() => configorama({
+    // Both inner variables unknown
+    result: '${self:${self:unknown1}, ${self:${self:unknown2}}}'
+  }, {
+    configDir: dirname,
+    allowUnknownVars: true
+  }), /unknown1|unknown2/)
 })
 
 // ============================================

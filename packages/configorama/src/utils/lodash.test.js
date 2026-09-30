@@ -3,7 +3,8 @@
  */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
-const { set, trim } = require('./lodash')
+const { deepStrictEqual } = require('node:assert')
+const { set, trim, cloneDeep } = require('./lodash')
 
 // ==========================================
 // set() - basic functionality
@@ -167,6 +168,44 @@ test('trim - removes custom characters', () => {
 
 test('trim - handles string with no trim needed', () => {
   assert.is(trim('hello'), 'hello')
+})
+
+test('set - prototype paths create own data without mutating shared prototypes', () => {
+  const before = Object.getOwnPropertyDescriptors(Object.prototype)
+  for (const keys of [['__proto__', 'configoramaRegression'], ['constructor', 'prototype', 'configoramaRegression']]) {
+    const obj = {}
+    set(obj, keys, 'own data')
+    assert.is(Object.getPrototypeOf(obj), Object.prototype)
+    assert.ok(Object.prototype.hasOwnProperty.call(obj, keys[0]))
+    assert.is(keys.reduce((current, key) => current[key], obj), 'own data')
+  }
+  deepStrictEqual(Object.getOwnPropertyDescriptors(Object.prototype), before)
+})
+
+test('cloneDeep - preserves prototype-named data and separates config snapshots', () => {
+  const input = JSON.parse('{"__proto__":{"value":"raw"},"constructor":"data","nested":{"__proto__":"literal"}}')
+  const output = cloneDeep(input)
+  deepStrictEqual(output, input)
+  assert.ok(Object.prototype.hasOwnProperty.call(output, '__proto__'))
+  assert.ok(Object.prototype.hasOwnProperty.call(output.nested, '__proto__'))
+  assert.is(Object.getPrototypeOf(output), Object.prototype)
+  output.__proto__.value = 'resolved'
+  assert.is(input.__proto__.value, 'raw')
+})
+
+test('cloneDeep - keeps Dates, functions, shared references and cyclic dictionaries', () => {
+  const fn = () => 'value'
+  const shared = { date: new Date('2020-01-01T00:00:00Z'), fn }
+  const input = { first: shared, second: shared, dictionary: Object.assign(Object.create(null), { key: 'value' }) }
+  input.self = input
+  const output = cloneDeep(input)
+  assert.is(output.self, output)
+  assert.is(output.first, output.second)
+  assert.is(output.first.fn, fn)
+  assert.instance(output.first.date, Date)
+  assert.is(output.first.date.toISOString(), '2020-01-01T00:00:00.000Z')
+  assert.ok(output.first.date !== input.first.date)
+  assert.is(Object.getPrototypeOf(output.dictionary), null)
 })
 
 test.run()

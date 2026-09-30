@@ -1,4 +1,5 @@
 // Native replacements for lodash utilities used across the codebase
+const { setOwn } = require('./objects')
 const isArray = Array.isArray
 const isString = (val) => typeof val === 'string'
 const isNumber = (val) => typeof val === 'number' && !isNaN(val)
@@ -22,7 +23,38 @@ function isEmpty(val) {
 // Non-trivial utilities kept as dependencies
 const camelCase = require('lodash.camelcase')
 const kebabCase = require('lodash.kebabcase')
-const cloneDeep = require('lodash.clonedeep')
+const cloneOther = require('lodash.clonedeep')
+
+/**
+ * Clone config dictionaries with own data properties. lodash.clonedeep assigns
+ * __proto__ through its setter, losing it in original-config snapshots.
+ * Keep its handling of Date, RegExp and other non-dictionary values.
+ * @param {*} value
+ * @returns {*}
+ */
+function cloneDeep(value) {
+  const seen = new WeakMap()
+  function clone(node) {
+    if (node === null || typeof node !== 'object') return node
+    if (seen.has(node)) return seen.get(node)
+    const prototype = Object.getPrototypeOf(node)
+    if (!Array.isArray(node) && prototype !== Object.prototype && prototype !== null) {
+      const copy = cloneOther(node)
+      seen.set(node, copy)
+      return copy
+    }
+    const copy = Array.isArray(node) ? new Array(node.length) : Object.create(prototype)
+    seen.set(node, copy)
+    for (const key of Reflect.ownKeys(node)) {
+      if (Object.prototype.propertyIsEnumerable.call(node, key)) {
+        if (typeof key === 'symbol') copy[key] = clone(node[key])
+        else setOwn(copy, key, clone(node[key]))
+      }
+    }
+    return copy
+  }
+  return clone(value)
+}
 
 /**
  * @param {string} str
@@ -54,7 +86,7 @@ function mapValues(obj, fn) {
   const result = {}
   const keys = Object.keys(obj)
   for (let i = 0; i < keys.length; i++) {
-    result[keys[i]] = fn(obj[keys[i]], keys[i], obj)
+    setOwn(result, keys[i], fn(obj[keys[i]], keys[i], obj))
   }
   return result
 }
@@ -84,16 +116,16 @@ function set(object, path, value) {
     const key = keys[i]
 
     // Check if value is undefined, null, or not an object (primitives can't have properties)
-    if (current[key] == null || typeof current[key] !== 'object') {
+    if (!Object.prototype.hasOwnProperty.call(current, key) || current[key] == null || typeof current[key] !== 'object') {
       // Create appropriate container based on next key type
       const nextKey = keys[i + 1]
-      current[key] = Number.isInteger(nextKey) && /** @type {number} */ (nextKey) >= 0 ? [] : {}
+      setOwn(current, key, Number.isInteger(nextKey) && /** @type {number} */ (nextKey) >= 0 ? [] : {})
     }
 
     current = current[key]
   }
 
-  current[keys[lastIndex]] = value
+  setOwn(current, keys[lastIndex], value)
   return object
 }
 

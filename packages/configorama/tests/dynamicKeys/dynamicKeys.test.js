@@ -13,6 +13,7 @@
  */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { rejects } = require('node:assert/strict')
 const path = require('path')
 const configorama = require('../../src')
 // console.log output below prints only with TEST_VERBOSE=1
@@ -495,39 +496,27 @@ test('nested dynamic key in file path', async () => {
 // ============================================
 
 test('dynamic key resolves to invalid path throws error', async () => {
-  try {
-    await configorama({
-      keyName: 'invalid.path.with.dots',
-      data: {
-        valid: 'value'
-      },
-      result: '${self:data.${self:keyName}}'
-    }, {
-      configDir: dirname
-    })
-    assert.unreachable('should have thrown')
-  } catch (error) {
-    assert.ok(error)
-    assert.ok(error.message)
-  }
+  await rejects(() => configorama({
+    keyName: 'invalid.path.with.dots',
+    data: {
+      valid: 'value'
+    },
+    result: '${self:data.${self:keyName}}'
+  }, {
+    configDir: dirname
+  }), /resolved to "undefined"/)
 })
 
 test('dynamic key is undefined without fallback throws', async () => {
-  try {
-    await configorama({
-      data: {
-        key: 'value'
-      },
-      // missingKey doesn't exist
-      result: '${self:data.${self:missingKey}}'
-    }, {
-      configDir: dirname
-    })
-    assert.unreachable('should have thrown')
-  } catch (error) {
-    assert.ok(error)
-    assert.ok(error.message)
-  }
+  await rejects(() => configorama({
+    data: {
+      key: 'value'
+    },
+    // missingKey doesn't exist
+    result: '${self:data.${self:missingKey}}'
+  }, {
+    configDir: dirname
+  }), /missingKey/)
 })
 
 // ============================================

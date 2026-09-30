@@ -216,4 +216,20 @@ test('real-world: git remote', () => {
   assert.is(result[2], "'origin'")
 })
 
+test('parseFunctionCall - ignores function-looking text inside quoted literals', () => {
+  assert.is(parseFunctionCall(JSON.stringify('a(")')), null)
+  assert.is(parseFunctionCall('"notAFunction(x)"'), null)
+  const input = '"ignore(x)" real("value")'
+  const result = parseFunctionCall(input)
+  assert.is(result[1], 'real')
+  assert.is(result.index, input.indexOf('real'))
+})
+
+test('parseFunctionCall - handles an escaped backslash before a closing quote', () => {
+  const arg = JSON.stringify('path\\')
+  const input = 'merge(' + arg + ',"tail")'
+  assert.is(parseFunctionCall(input)[0], input)
+  assert.is(parseFunctionCall(input)[2], arg + ',"tail"')
+})
+
 test.run()

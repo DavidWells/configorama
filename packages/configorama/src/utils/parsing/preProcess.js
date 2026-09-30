@@ -9,6 +9,7 @@ const { getQuoteRanges } = require('../strings/quoteAware')
 const { extractVariableWrapper } = require('../variables/variableUtils')
 const { encodeJsonArgObjects } = require('../encoders/js-fixes')
 const { encodeQuotedLiterals } = require('../encoders/literal-braces')
+const { setOwn } = require('../objects')
 
 /**
  * Preprocess config to fix malformed fallback references
@@ -395,10 +396,8 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
     // Rebuild plain objects only; Date and other class instances are values, not maps
     if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
       const result = {}
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          result[key] = traverseAndFix(obj[key])
-        }
+      for (const key of Object.keys(obj)) {
+        setOwn(result, key, traverseAndFix(obj[key]))
       }
       return result
     }

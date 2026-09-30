@@ -13,6 +13,7 @@
  */
 const { test } = require('uvu')
 const assert = require('uvu/assert')
+const { rejects } = require('node:assert/strict')
 const path = require('path')
 const configorama = require('../../src')
 // console.log output below prints only with TEST_VERBOSE=1
@@ -391,15 +392,9 @@ test('file reference to directory instead of file', async () => {
     value: '${file(./edgeCases):key}'
   }
 
-  try {
-    await configorama(object, {
-      configDir: __dirname
-    })
-    assert.unreachable('should have thrown - directory not file')
-  } catch (error) {
-    // Will fail because it's a directory, not a file
-    assert.ok(error)
-  }
+  await rejects(() => configorama(object, {
+    configDir: __dirname
+  }), /EISDIR/)
 })
 
 // ============================================
@@ -826,14 +821,9 @@ test('silent failure prevention - malformed variable syntax', async () => {
     value: '${self:value with spaces}'
   }
 
-  try {
-    await configorama(object, {
-      configDir: dirname
-    })
-    assert.unreachable('should have thrown - malformed syntax')
-  } catch (error) {
-    assert.ok(error.message)
-  }
+  await rejects(() => configorama(object, {
+    configDir: dirname
+  }), /Unable to resolve config variable/)
 })
 
 test('zero and false values should not trigger fallbacks', async () => {

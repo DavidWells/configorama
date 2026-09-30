@@ -1,5 +1,6 @@
 // Encodes variable-syntax chars ({ } $ for ${...}) that are plain text inside a ${...}
 // expression, so they can't end, start or break it; decoded when the text becomes a value
+const { setOwn } = require('../objects')
 const PLACEHOLDER_PATTERN = /__CFG_C(\d+)__/g
 const WORD_CHAR = /[A-Za-z0-9_.)\]]/
 // Chars that would split a key pasted into a variable's path (a paren hides the commas after it)
@@ -291,10 +292,10 @@ function decodeLiteralBraces(value) {
 function decodeLiteralBracesDeep(value) {
   if (typeof value === 'string') return decodeLiteralBraces(value)
   if (Array.isArray(value)) return value.map(decodeLiteralBracesDeep)
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of Object.keys(value)) result[decodeLiteralBraces(key)] = decodeLiteralBracesDeep(value[key])
+    for (const key of Object.keys(value)) setOwn(result, decodeLiteralBraces(key), decodeLiteralBracesDeep(value[key]))
     return result
   }
   return value
@@ -310,10 +311,10 @@ function decodeLiteralBracesDeep(value) {
 function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   if (typeof value === 'string') return encodeQuotedLiterals(value, prefix, suffix)
   if (Array.isArray(value)) return value.map((item) => encodeQuotedLiteralsDeep(item, prefix, suffix))
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of Object.keys(value)) result[key] = encodeQuotedLiteralsDeep(value[key], prefix, suffix)
+    for (const key of Object.keys(value)) setOwn(result, key, encodeQuotedLiteralsDeep(value[key], prefix, suffix))
     return result
   }
   return value
@@ -330,10 +331,10 @@ function decodeForDisplay(value) {
   const { decodeJsonInVariable } = require('./js-fixes')
   if (typeof value === 'string') return decodeJsonInVariable(decodeLiteralBraces(value))
   if (Array.isArray(value)) return value.map(decodeForDisplay)
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
     /** @type {Record<string, any>} */
     const result = {}
-    for (const key of Object.keys(value)) result[decodeJsonInVariable(decodeLiteralBraces(key))] = decodeForDisplay(value[key])
+    for (const key of Object.keys(value)) setOwn(result, decodeJsonInVariable(decodeLiteralBraces(key)), decodeForDisplay(value[key]))
     return result
   }
   return value

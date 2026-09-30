@@ -434,7 +434,7 @@ class Configorama {
     this.fileRefsFound = []
 
     // Track variable resolutions for metadata (keyed by path)
-    this.resolutionTracking = {}
+    this.resolutionTracking = Object.create(null)
     // Only track per-call metadata when returnMetadata is requested
     this._trackCalls = !!(this.settings.returnMetadata)
 
@@ -1513,8 +1513,8 @@ class Configorama {
       }
     } else {
       // Compute path once, then skip work for paths already known to be fully resolved.
-      const thePath = context.length > 1 ? context.join('.') : context[0]
-      if (this._resolvedPaths.has(thePath)) {
+      const cacheKey = JSON.stringify(context)
+      if (this._resolvedPaths.has(cacheKey)) {
         return results
       }
       // TODO Add values to leaves here
@@ -1522,14 +1522,13 @@ class Configorama {
         path: context,
         value: current,
       }
-      // console.log('thePath', thePath)
       // console.log('this.originalConfig', this.originalConfig)
 
       // Check cache first (perf: avoid repeated dotProp.get calls)
       let originalValue
       let originalValuePath
-      if (this._originalValueCache.has(thePath)) {
-        const cached = this._originalValueCache.get(thePath)
+      if (this._originalValueCache.has(cacheKey)) {
+        const cached = this._originalValueCache.get(cacheKey)
         originalValue = cached.value
         originalValuePath = cached.originalValuePath
       } else {
@@ -1566,7 +1565,7 @@ class Configorama {
             }
           }
         }
-        this._originalValueCache.set(thePath, { value: originalValue, originalValuePath })
+        this._originalValueCache.set(cacheKey, { value: originalValue, originalValuePath })
       }
       if (originalValuePath) {
         leaf.originalValuePath = originalValuePath
@@ -1575,7 +1574,7 @@ class Configorama {
       leaf.originalSource = originalValue
 
       // Check if we have existing resolution history from previous iterations
-      const pathKey = thePath
+      const pathKey = context.join('.')
       if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].resolutionHistory) {
         leaf.resolutionHistory = this.resolutionTracking[pathKey].resolutionHistory
       } else {
@@ -1591,7 +1590,6 @@ class Configorama {
       // Pre-compute hasVar so populateVariables doesn't have to re-test every leaf
       // every iteration. Non-string values can never contain a variable.
       leaf.hasVar = isString(current) && this.variableSyntaxTest.test(current)
-      // dotProp.get(this.originalConfig, thePath)
       results.push(leaf)
     }
     return results
@@ -1617,7 +1615,7 @@ class Configorama {
       if (property.hasVar) return true
       if (property.value !== undefined) {
         const p = property.path
-        this._resolvedPaths.add(p.length > 1 ? p.join('.') : p[0])
+        this._resolvedPaths.add(JSON.stringify(p))
       }
       return false
     })
@@ -1667,7 +1665,7 @@ class Configorama {
         const populated = result.populated
         if (populated !== undefined && (typeof populated !== 'string' || !this.variableSyntaxTest.test(populated))) {
           const p = result.path
-          this._resolvedPaths.add(p.length > 1 ? p.join('.') : p[0])
+          this._resolvedPaths.add(JSON.stringify(p))
         }
       })
     })
@@ -2921,18 +2919,22 @@ Missing Value ${missingValue} - ${matchedString}
     if (fromPath && (variableString.startsWith('self:') || !variableString.includes(':'))) {
       // A value can't contain itself: o.k referencing o would expand forever
       const targetPath = bracketsToDots(toPath.trim())
-      if (targetPath && fromPath.startsWith(`${targetPath}.`)) {
+      const targetSegments = targetPath.split('.')
+      if (targetPath && targetSegments.length < pathValue.length && targetSegments.every((segment, i) => segment === String(pathValue[i]))) {
         return Promise.reject(new Error(
           `Circular variable dependency detected: ${fromPath} → ${targetPath} (a value can't reference the object that contains it)`
         ))
       }
-      if (this.tracker.wouldCreateCycle(fromPath, toPath)) {
-        const cyclePath = this.tracker.getCyclePath(fromPath, toPath)
+      // Dependency identity must distinguish a literal 'a.b' key from a.b.
+      const fromKey = JSON.stringify(pathValue.map(String))
+      const toKey = JSON.stringify(targetSegments)
+      if (this.tracker.wouldCreateCycle(fromKey, toKey)) {
+        const cyclePath = this.tracker.getCyclePath(fromKey, toKey).map((key) => JSON.parse(key).join('.'))
         return Promise.reject(new Error(
           `Circular variable dependency detected: ${cyclePath.join(' → ')}`
         ))
       }
-      this.tracker.addDependency(fromPath, toPath)
+      this.tracker.addDependency(fromKey, toKey)
     }
 
     // Reuse a variable already resolved elsewhere in the config — but not inside an
@@ -3257,7 +3259,7 @@ Missing Value ${missingValue} - ${matchedString}
           (settledValue.replace(this.variableSyntax, '').trim() !== '' || !!settledValue.match(/deep:/))
         if (settledIsCompose) {
           this._filterDeferKeys = this._filterDeferKeys || new Set()
-          const deferKey = `${valueObject.path ? valueObject.path.join('.') : ''}::${settledValue}::${newHasFilter.join('|')}`
+          const deferKey = JSON.stringify([valueObject.path || [], settledValue, newHasFilter])
           if (!this._filterDeferKeys.has(deferKey)) {
             this._filterDeferKeys.add(deferKey)
             return this.populateValue({ value: settledValue }, true, 'getValueFromSrc filter-defer').then(
@@ -3852,6 +3854,9 @@ Missing Value ${missingValue} - ${matchedString}
     }
 
     const funcValue = theFunction(...argsToPass)
+    // A call's result is data. Do not interpret function-looking text returned
+    // by merge()/split()/custom functions as another call.
+    if (variableString.trim() === hasFunc[0].trim()) return funcValue
     // console.log('funcValue', funcValue)
     // console.log('typeof funcValue', typeof funcValue)
     let replaceVal = funcValue

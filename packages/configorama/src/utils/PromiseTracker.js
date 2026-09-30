@@ -7,9 +7,9 @@ class PromiseTracker {
   }
   reset() {
     this.promiseList = []
-    this.promiseMap = {}
+    this.promiseMap = Object.create(null)
     // Track which variables depend on which (for cycle detection)
-    this.dependencyGraph = {}
+    this.dependencyGraph = Object.create(null)
     this.startTime = Date.now()
     this.cursor = 0
   }
