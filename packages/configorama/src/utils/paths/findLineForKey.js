@@ -14,34 +14,32 @@ function findLineForKey(keyToFind, lines, fileType) {
 
   const escapedKey = keyToFind.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  const lineIdx = lines.findIndex((line) => {
-    // YAML: key: or key :
-    if (fileType === '.yml' || fileType === '.yaml') {
-      return new RegExp(`^\\s*${escapedKey}\\s*:`).test(line)
-    }
-    // TOML/HCL: key = or key=
-    if (fileType === '.toml' || fileType === '.hcl') {
-      return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
-    }
-    // JSON: "key": or "key" :
-    if (fileType === '.json' || fileType === '.json5') {
-      return new RegExp(`"${escapedKey}"\\s*:`).test(line)
-    }
-    // INI: key = or key=
-    if (fileType === '.ini') {
-      return new RegExp(`^\\s*${escapedKey}\\s*=`).test(line)
-    }
-    // dotenv: KEY= or export KEY=
-    if (fileType === '.env') {
-      return new RegExp(`^\\s*(?:export\\s+)?${escapedKey}\\s*=`).test(line)
-    }
-    // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
-    if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
-      return new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`).test(line)
-    }
-    // Default fallback: try YAML-style
-    return line.includes(`${keyToFind}:`)
-  })
+  // One pattern per call (not per line): same match for every line.
+  let pattern = null
+  // YAML: key: or key :
+  if (fileType === '.yml' || fileType === '.yaml') {
+    pattern = new RegExp(`^\\s*${escapedKey}\\s*:`)
+  // TOML/HCL: key = or key=
+  } else if (fileType === '.toml' || fileType === '.hcl') {
+    pattern = new RegExp(`^\\s*${escapedKey}\\s*=`)
+  // JSON: "key": or "key" :
+  } else if (fileType === '.json' || fileType === '.json5') {
+    pattern = new RegExp(`"${escapedKey}"\\s*:`)
+  // INI: key = or key=
+  } else if (fileType === '.ini') {
+    pattern = new RegExp(`^\\s*${escapedKey}\\s*=`)
+  // dotenv: KEY= or export KEY=
+  } else if (fileType === '.env') {
+    pattern = new RegExp(`^\\s*(?:export\\s+)?${escapedKey}\\s*=`)
+  // JS/TS/ESM: key: or "key": or 'key': or `key`: or [`key`]:
+  } else if (['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts'].includes(fileType)) {
+    pattern = new RegExp(`(?:${escapedKey}|"${escapedKey}"|'${escapedKey}'|\`${escapedKey}\`|\\[\`${escapedKey}\`\\])\\s*:`)
+  }
+  // Default fallback: try YAML-style
+  const needle = `${keyToFind}:`
+  const lineIdx = pattern
+    ? lines.findIndex((line) => pattern.test(line))
+    : lines.findIndex((line) => line.includes(needle))
 
   return lineIdx !== -1 ? lineIdx + 1 : 0
 }
