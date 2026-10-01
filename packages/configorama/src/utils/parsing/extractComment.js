@@ -109,12 +109,28 @@ function buildCommentResult(commentLines, fallbackDescriptionSource) {
   return result
 }
 
-function extractComment(configPath, lines, fileType) {
+/**
+ * @param {string} configPath - Dot-separated config path
+ * @param {string[]} lines - Raw file lines
+ * @param {string} fileType - File extension
+ * @param {Map<string, number>} [lineCache] - Line numbers by path, for callers that look up
+ *   many paths in the same unchanged `lines` (several occurrences often share a path)
+ */
+function extractComment(configPath, lines, fileType, lineCache) {
   try {
     const markers = getCommentMarkers(fileType)
     if (!markers.length || !configPath || !Array.isArray(lines) || !lines.length) return null
 
-    const lineNumber = getLineNumber(configPath, lines, fileType)
+    let lineNumber
+    if (lineCache && typeof configPath === 'string') {
+      lineNumber = lineCache.get(configPath)
+      if (lineNumber === undefined) {
+        lineNumber = getLineNumber(configPath, lines, fileType)
+        lineCache.set(configPath, lineNumber)
+      }
+    } else {
+      lineNumber = getLineNumber(configPath, lines, fileType)
+    }
     if (!lineNumber) return null
 
     const lineIndex = lineNumber - 1

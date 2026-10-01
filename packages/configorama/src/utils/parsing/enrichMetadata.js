@@ -159,9 +159,12 @@ async function enrichMetadata(
     }
   }
 
+  /** @type {Map<string, number>} line number per path in commentLines */
+  const commentLineCache = new Map()
+
   function applyCommentFallback(occurrence) {
     if (!occurrence) return occurrence
-    const comment = extractComment(occurrence.path, commentLines, commentFileType)
+    const comment = extractComment(occurrence.path, commentLines, commentFileType, commentLineCache)
     if (comment) {
       if (comment.description && (!occurrence.description || comment.descriptionSource === 'commentTag')) {
         occurrence.description = comment.description
