@@ -50,9 +50,11 @@ function findLineForKey(keyToFind, lines, fileType) {
  * @param {string} configPath - Dot-separated path (e.g. 'resources.Parameters.Description')
  * @param {string[]} lines - Array of file lines
  * @param {string} fileType - File extension (e.g., '.yml', '.json')
+ * @param {Map<string, { li: number, indent: number } | null>} [prefixCache] - YAML walk state
+ *   per path prefix, for callers resolving many paths in the same unchanged `lines`
  * @returns {number} Line number (1-indexed) or 0 if not found
  */
-function findLineByPath(configPath, lines, fileType) {
+function findLineByPath(configPath, lines, fileType, prefixCache) {
   if (!configPath || !lines || !lines.length) return 0
 
   const isYaml = fileType === '.yml' || fileType === '.yaml'
@@ -62,7 +64,7 @@ function findLineByPath(configPath, lines, fileType) {
 
   const segments = configPath.split('.')
   if (isEnv) return findLineByPathEnv(segments, lines)
-  if (isYaml) return findLineByPathYaml(segments, lines)
+  if (isYaml) return findLineByPathYaml(segments, lines, prefixCache)
   return findLineByPathJson(segments, lines)
 }
 
@@ -86,47 +88,69 @@ function findLineByPathEnv(segments, lines) {
 /**
  * @param {string[]} segments
  * @param {string[]} lines
+ * @param {Map<string, { li: number, indent: number } | null>} [prefixCache] - Walk state per
+ *   path prefix for these `lines`: paths sharing a prefix skip re-finding it
  * @returns {number}
  */
-function findLineByPathYaml(segments, lines) {
+function findLineByPathYaml(segments, lines, prefixCache) {
   let searchStart = 0
   let parentIndent = -1
+  let prefix = ''
 
   for (let si = 0; si < segments.length; si++) {
     const key = segments[si]
-    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const keyPattern = new RegExp(`^(\\s*)${escaped}\\s*:`)
-    let found = false
-
-    for (let li = searchStart; li < lines.length; li++) {
-      const match = keyPattern.exec(lines[li])
-      if (!match) continue
-
-      const indent = match[1].length
-      // Must be exactly one level deeper than parent (or top-level if parentIndent is -1)
-      if (parentIndent === -1 && indent === 0) {
-        // Top-level key
-      } else if (indent <= parentIndent) {
-        // We've left the parent's scope — key not found under this parent
-        break
-      } else if (indent <= parentIndent) {
-        continue
-      }
-
-      // Found the key at this nesting level
-      if (si === segments.length - 1) {
-        return li + 1
-      }
-      // Descend: next segment must be indented deeper, starting after this line
-      parentIndent = indent
-      searchStart = li + 1
-      found = true
-      break
+    // The walk state after a prefix depends only on the prefix (and lines).
+    prefix = si === 0 ? key : `${prefix}.${key}`
+    let hit
+    if (prefixCache && prefixCache.has(prefix)) {
+      hit = prefixCache.get(prefix)
+    } else {
+      hit = findYamlSegment(key, lines, searchStart, parentIndent)
+      if (prefixCache) prefixCache.set(prefix, hit)
     }
+    if (!hit) return 0
 
-    if (!found) return 0
+    // Found the key at this nesting level
+    if (si === segments.length - 1) {
+      return hit.li + 1
+    }
+    // Descend: next segment must be indented deeper, starting after this line
+    parentIndent = hit.indent
+    searchStart = hit.li + 1
   }
   return 0
+}
+
+/**
+ * One step of findLineByPathYaml: the line of `key` under the current parent.
+ * @param {string} key
+ * @param {string[]} lines
+ * @param {number} searchStart
+ * @param {number} parentIndent
+ * @returns {{ li: number, indent: number } | null}
+ */
+function findYamlSegment(key, lines, searchStart, parentIndent) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const keyPattern = new RegExp(`^(\\s*)${escaped}\\s*:`)
+
+  for (let li = searchStart; li < lines.length; li++) {
+    const match = keyPattern.exec(lines[li])
+    if (!match) continue
+
+    const indent = match[1].length
+    // Must be exactly one level deeper than parent (or top-level if parentIndent is -1)
+    if (parentIndent === -1 && indent === 0) {
+      // Top-level key
+    } else if (indent <= parentIndent) {
+      // We've left the parent's scope — key not found under this parent
+      break
+    } else if (indent <= parentIndent) {
+      continue
+    }
+
+    return { li, indent }
+  }
+  return null
 }
 
 /**

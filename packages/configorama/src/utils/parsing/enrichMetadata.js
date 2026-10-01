@@ -159,8 +159,8 @@ async function enrichMetadata(
     }
   }
 
-  /** @type {Map<string, number>} line number per path in commentLines */
-  const commentLineCache = new Map()
+  // Line number per path (and YAML walk state per path prefix) in commentLines
+  const commentLineCache = { lines: new Map(), yamlPrefixes: new Map() }
 
   function applyCommentFallback(occurrence) {
     if (!occurrence) return occurrence

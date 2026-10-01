@@ -51,9 +51,9 @@ function findCommentStart(line, markers) {
   return null
 }
 
-function getLineNumber(configPath, lines, fileType) {
+function getLineNumber(configPath, lines, fileType, yamlPrefixes) {
   if (['.yml', '.yaml', '.json5', '.jsonc'].includes(fileType)) {
-    const byPath = findLineByPath(configPath, lines, fileType)
+    const byPath = findLineByPath(configPath, lines, fileType, yamlPrefixes)
     if (byPath) return byPath
   }
 
@@ -113,8 +113,9 @@ function buildCommentResult(commentLines, fallbackDescriptionSource) {
  * @param {string} configPath - Dot-separated config path
  * @param {string[]} lines - Raw file lines
  * @param {string} fileType - File extension
- * @param {Map<string, number>} [lineCache] - Line numbers by path, for callers that look up
- *   many paths in the same unchanged `lines` (several occurrences often share a path)
+ * @param {{ lines: Map<string, number>, yamlPrefixes: Map<string, any> }} [lineCache] - Line
+ *   numbers by path (and YAML walk state by path prefix), for callers that look up many paths
+ *   in the same unchanged `lines` (occurrences often share a path or a prefix)
  */
 function extractComment(configPath, lines, fileType, lineCache) {
   try {
@@ -123,10 +124,10 @@ function extractComment(configPath, lines, fileType, lineCache) {
 
     let lineNumber
     if (lineCache && typeof configPath === 'string') {
-      lineNumber = lineCache.get(configPath)
+      lineNumber = lineCache.lines.get(configPath)
       if (lineNumber === undefined) {
-        lineNumber = getLineNumber(configPath, lines, fileType)
-        lineCache.set(configPath, lineNumber)
+        lineNumber = getLineNumber(configPath, lines, fileType, lineCache.yamlPrefixes)
+        lineCache.lines.set(configPath, lineNumber)
       }
     } else {
       lineNumber = getLineNumber(configPath, lines, fileType)
