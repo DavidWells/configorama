@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.5](https://github.com/DavidWells/configorama/compare/configorama@1.4.4...configorama@1.4.5) (2026-10-01)
+
+
+### Bug Fixes
+
+* isolate loads and preserve config data ([675741e](https://github.com/DavidWells/configorama/commit/675741ef2f96aba2a475196c94d840864bfe6fb2))
+
+
+### Performance Improvements
+
+* **metadata:** replace traverse with a local pre-order walker ([6c7dae4](https://github.com/DavidWells/configorama/commit/6c7dae440afdd6cc999ca4d63ec33fd77c9e338c))
+* **paths:** avoid exceptions when discovering alias configs ([21d8f56](https://github.com/DavidWells/configorama/commit/21d8f5605011e4f68794899822ce8332bb1c4cc0))
+* **require:** format parsers load each other only for conversions ([59b410a](https://github.com/DavidWells/configorama/commit/59b410a553a1eb12b72eab90aae4cd0407d2c3b4))
+* **require:** load format parsers on demand ([86f0d7d](https://github.com/DavidWells/configorama/commit/86f0d7dfd2b630096a79f46fc6ae217c887fba86))
+* **require:** load metadata, display, setup and introspection on demand ([1342652](https://github.com/DavidWells/configorama/commit/13426528915a628a747bae3388c609a3828db0a2))
+* **startup:** load UI logging helpers only when used ([a6f24e8](https://github.com/DavidWells/configorama/commit/a6f24e89b2d60a79f5567eea43a52066fec5d29f))
+* **yaml:** skip non-opener text in flow preprocessing ([9c67c79](https://github.com/DavidWells/configorama/commit/9c67c79f95efa62b3ae0176118fb4367dd4c56a4))
+
+
+
+
+
 ## [1.4.4](https://github.com/DavidWells/configorama/compare/configorama@1.4.3...configorama@1.4.4) (2026-09-30)
 
 
