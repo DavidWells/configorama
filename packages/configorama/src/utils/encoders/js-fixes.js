@@ -37,6 +37,8 @@ function encodeJsonForVariable(obj) {
  */
 function decodeJsonInVariable(value) {
   if (!value || typeof value !== 'string') return value
+  // Every match starts with the marker; most strings have none (replace would return them as-is)
+  if (!value.includes('__JSON_B64__')) return value
   return value.replace(JSON_ENCODED_PATTERN, (match, b64) => {
     try {
       const jsonStr = Buffer.from(b64, 'base64').toString('utf8')
