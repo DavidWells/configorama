@@ -137,7 +137,12 @@ function variableSpans(text, prefix, suffix) {
   const opens = []
   /** @type {Array<{ start: number, end: number }>} */
   const spans = []
+  // Most characters can't start either token: check one char code before startsWith.
+  const p0 = prefix.charCodeAt(0)
+  const s0 = suffix.charCodeAt(0)
   for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    if (c !== p0 && c !== s0) continue
     if (text.startsWith(prefix, i)) {
       opens.push(i)
       i += prefix.length - 1
