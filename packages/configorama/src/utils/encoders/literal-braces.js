@@ -320,6 +320,9 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   return value
 }
 
+/** @type {typeof import('./js-fixes') | undefined} */
+let jsFixes
+
 /**
  * decodeLiteralBracesDeep for metadata shown to people: also turns encoded fallback values
  * (__JSON_B64__...__) back into their JSON text. Not for resolved config values, where such
@@ -328,7 +331,8 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
  * @returns {any} Decoded copy
  */
 function decodeForDisplay(value) {
-  const { decodeJsonInVariable } = require('./js-fixes')
+  // Resolved once, not per node of the tree (still lazy: most loads never display metadata)
+  const decodeJsonInVariable = jsFixes ? jsFixes.decodeJsonInVariable : (jsFixes = require('./js-fixes')).decodeJsonInVariable
   if (typeof value === 'string') return decodeJsonInVariable(decodeLiteralBraces(value))
   if (Array.isArray(value)) return value.map(decodeForDisplay)
   if (value && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
