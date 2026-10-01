@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/DavidWells/configorama/compare/configorama@1.4.5...configorama@1.4.6) (2026-10-01)
+
+
+### Performance Improvements
+
+* **encoders:** skip decodeJsonInVariable's replace when there's no marker ([2087f31](https://github.com/DavidWells/configorama/commit/2087f31560c76dc0be96b43a93585ed1c31e08f6))
+* **metadata:** build findLineForKey's pattern once per call, not per line ([b036608](https://github.com/DavidWells/configorama/commit/b036608e7cdc59b24f050c1f777fa1770697b59a))
+* **metadata:** look up each config path's line once per enrichMetadata ([508fee2](https://github.com/DavidWells/configorama/commit/508fee266fe68322b09a33cdd12c28bb50135416))
+* **metadata:** resolve js-fixes once in decodeForDisplay ([4d8c9de](https://github.com/DavidWells/configorama/commit/4d8c9de8a13ba729a9ffcffe3facfb1c44b5bfa4))
+* **metadata:** reuse the YAML path walk for shared path prefixes ([717bc02](https://github.com/DavidWells/configorama/commit/717bc02dcd88dbb64f969bd7eea153250adc1821))
+* **resolver:** skip characters that can't start a token in variableSpans ([54c7932](https://github.com/DavidWells/configorama/commit/54c79322fe080c123a70c75f9649510357028c47))
+
+
+
+
+
 ## [1.4.5](https://github.com/DavidWells/configorama/compare/configorama@1.4.4...configorama@1.4.5) (2026-10-01)
 
 
