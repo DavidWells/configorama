@@ -11,6 +11,34 @@ const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { applyDotenvFileRefMetadata } = require('./utils/security/dotenvFileRefs')
 
 /**
+ * Pre-order walk equivalent to `traverse(root).forEach(fn)` for a callback that only
+ * reads `this.path` and never returns a value: string keys from Object.keys (no
+ * symbols), `this.path` is a fresh copy per node, and a node already on the ancestor
+ * chain is visited but not descended into (traverse's `circular` rule). Replaces the
+ * `traverse` package, whose polyfill dependency tree cost ~45ms at require time.
+ *
+ * @param {*} root
+ * @param {(this: {path: string[]}, value: any) => void} callback
+ */
+function forEachNode(root, callback) {
+  const path = []
+  const ancestors = []
+  function visit(node) {
+    callback.call({ path: path.slice() }, node)
+    if (typeof node !== 'object' || node === null || ancestors.includes(node)) return
+    ancestors.push(node)
+    const keys = Object.keys(node)
+    for (let i = 0; i < keys.length; i++) {
+      path.push(keys[i])
+      visit(node[keys[i]])
+      path.pop()
+    }
+    ancestors.pop()
+  }
+  visit(root)
+}
+
+/**
  * Collect metadata about all variables found in the configuration
  * @param {Object} params
  * @param {RegExp} params.variableSyntax
@@ -46,9 +74,7 @@ function collectVariableMetadata({
   const referencesMap = new Map()
   let matchCount = 1
 
-  // Loaded on demand: traverse pulls in a large polyfill tree that slows every require('configorama')
-  const traverse = require('traverse')
-  traverse(displayConfig).forEach(function (rawValue) {
+  forEachNode(displayConfig, function (rawValue) {
     if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
       const configValuePath = this.path.join('.')
       /* Skip opaque paths that contain non-configorama ${...} syntax. */
