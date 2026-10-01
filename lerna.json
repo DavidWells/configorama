@@ -2,6 +2,9 @@
   "version": "independent",
   "npmClient": "pnpm",
   "command": {
+    "version": {
+      "excludeDependents": true
+    },
     "publish": {
       "conventionalCommits": true,
       "message": "chore(release): publish"

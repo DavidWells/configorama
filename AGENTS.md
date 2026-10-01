@@ -42,8 +42,11 @@ tokens for publishing entirely (January 2027).
    ```bash
    ./node_modules/.bin/lerna version
    ```
-   Lerna bumps every changed package, *plus packages that depend on one* (a configorama
-   change also bumps configx) and never-published packages; it commits, tags and pushes.
+   Lerna bumps every package whose own files changed, plus never-published packages; it
+   commits, tags and pushes. It does **not** bump dependents (`command.version.excludeDependents`
+   in lerna.json): a configorama-only change doesn't release configx, whose published
+   `^1.x` range already accepts the new configorama. When configx needs a newer configorama,
+   raise its range in `packages/configx/package.json` in the same change; that bumps configx.
 3. **Publish each bumped package, dependencies first**, in a real terminal (iTerm2):
    ```bash
    cd packages/human-cron  && pnpm publish && cd ../..   # configorama depends on it
