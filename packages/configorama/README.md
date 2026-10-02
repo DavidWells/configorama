@@ -3458,3 +3458,34 @@ Bug reports and reproductions are very welcome. Please open an [issue](https://g
 - 🐛 [Report bugs](https://github.com/DavidWells/configorama/issues)
 - 💡 [Request features](https://github.com/DavidWells/configorama/issues)
 - 📖 [Read the docs](https://github.com/DavidWells/configorama#readme)
+
+
+### Resolver reliability settings
+
+Each load snapshots cwd, environment and options. For concurrent callers, use
+`dotEnvMode: 'isolated'` to keep dotenv values local; the default `'process'`
+retains the existing process.env mutation. `moduleCacheMode: 'load'` evaluates a
+fresh config-owned JS/TS/MJS dependency graph per load. `'process'` shares that
+graph across calls; `'legacy'` retains existing format-specific defaults.
+
+Async resolution accepts `timeoutMs` and an AbortSignal as `signal`. Deadlines
+start at API entry and are cooperative. `resolutionLimits` controls maxPasses
+(default 1000), maxDepth (512), and maxVisitedNodes (1000000). Sync supports the
+same deadline and work bounds but rejects a live AbortSignal.
+
+The sync API preserves undefined, BigInt, Dates, RegExp state, sparse arrays,
+null-prototype objects and shared acyclic aliases. Unsupported values, accessors
+and cycles produce structured path errors. Literal strings that resemble private
+markers and own keys such as `__proto__` are data. Markdown preserves existing
+frontmatter keys and selects the first free body key.
+
+Inspection adds authored occurrences and `defaultAvailability`:
+`'guaranteed'`, `'conditional'`, or `'none'`. A variable/file fallback or an
+error-capable filter is conditional even if the legacy requirements view reports
+it optional. Graph/audit report possible branches without executing them.
+Relative dynamic file targets retain their authored file's directory; aliases,
+overrides and safe-root checks apply to the selected target.
+
+[Detailed contracts and migration guidance](docs/testing/resolver-reliability.md)
+include the supported limitations and regression owners. Library diagnostics go
+to stderr so JSON output and configx shell exports remain usable in pipelines.
