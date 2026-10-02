@@ -1,1 +1,1 @@
-value: ${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:stage}-manifest'}
+value: ${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:instanceId}-manifest'}

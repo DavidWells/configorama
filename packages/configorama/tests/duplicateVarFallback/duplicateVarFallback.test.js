@@ -48,9 +48,10 @@ test('controls: unchanged behavior', () => {
   assert.is(config.knownThrice, 'dev/dev/dev')
 })
 
-test('AWS pseudo params (and vars wrapping them) are left verbatim', () => {
-  assert.is(config.awsPseudoFirst, "${opt:nope, ${AWS::Region}, 'us-east-1'} and ${AWS::Region}")
-  assert.is(config.awsPseudoSecond, "${AWS::Region} and ${opt:nope, ${AWS::Region}, 'us-east-1'}")
+test('AWS pseudo params are left verbatim; a var wrapping one resolves to it as a passthrough', () => {
+  // opt:nope is missing, so the fallback list picks ${AWS::Region}, kept for CloudFormation
+  assert.is(config.awsPseudoFirst, '${AWS::Region} and ${AWS::Region}')
+  assert.is(config.awsPseudoSecond, '${AWS::Region} and ${AWS::Region}')
 })
 
 test('sync API: each occurrence resolves in its own context', () => {

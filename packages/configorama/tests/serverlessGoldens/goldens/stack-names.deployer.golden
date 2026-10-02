@@ -6,7 +6,8 @@
     "prefixed": "app-acme-prod-ui",
     "prefixedStackName": "app-acme-prod-svc",
     "stackName": "app-acme-prod-svc",
-    "tableName": "app-acme-prod-svc-table"
+    "tableName": "app-acme-prod-svc-table",
+    "upperStackName": "APP-ACME-PROD-SVC"
   },
   "provider": {
     "apiName": "app-acme-prod-svc",

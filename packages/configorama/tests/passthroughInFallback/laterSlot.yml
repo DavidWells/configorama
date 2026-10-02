@@ -1,4 +1,4 @@
 stage: dev
 # Quoted passthrough fallback after other unresolvable items in the list
-afterMissingEnv: ${env:CONFIGORAMA_TEST_UNSET, ${env:CONFIGORAMA_TEST_UNSET2}, 'sl-${sls:stage}'}
-afterMissingSelf: ${env:CONFIGORAMA_TEST_UNSET, ${self:nope}, 'c-${sls:stage}'}
+afterMissingEnv: ${env:CONFIGORAMA_TEST_UNSET, ${env:CONFIGORAMA_TEST_UNSET2}, 'sl-${sls:instanceId}'}
+afterMissingSelf: ${env:CONFIGORAMA_TEST_UNSET, ${self:nope}, 'c-${sls:instanceId}'}

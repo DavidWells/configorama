@@ -1,17 +1,18 @@
 {
   "custom": {
     "defaultStackName": "admin-ui-qa",
-    "frameworkStackName": "app-${sls:stage}-manifest",
+    "frameworkStackName": "app-qa-manifest",
     "inlineStackName": "admin-ui-qa",
     "prefixed": "app-qa-ui",
     "prefixedStackName": "app-qa-ui",
     "stackName": "admin-ui-qa",
-    "tableName": "admin-ui-qa-table"
+    "tableName": "admin-ui-qa-table",
+    "upperStackName": "APP-QA"
   },
   "provider": {
     "apiName": "admin-ui-qa",
     "environment": {
-      "FRAMEWORK_STAGE": "${sls:stage}",
+      "FRAMEWORK_STAGE": "qa",
       "STAGE_TAG": "qa",
       "TABLE_NAME": "admin-ui-qa-table"
     },

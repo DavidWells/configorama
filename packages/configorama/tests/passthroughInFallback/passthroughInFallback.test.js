@@ -1,4 +1,4 @@
-/* Unknown variable types (${sls:stage}, ${ssm:/path}) inside a quoted fallback string pass */
+/* Unknown variable types (${sls:instanceId}, ${ssm:/path}) inside a quoted fallback string pass */
 /* through verbatim when allowUnknownVariableTypes is on, with the text around them kept. */
 /* eslint-disable no-template-curly-in-string */
 const path = require('path')
@@ -29,35 +29,35 @@ test('resolves fixture', async () => {
 })
 
 test('passthrough with text around it in a quoted fallback', () => {
-  assert.is(config.textAround, 'sl-${sls:stage}-manifest')
+  assert.is(config.textAround, 'sl-${sls:instanceId}-manifest')
 })
 
 test('passthrough as the whole quoted fallback', () => {
-  assert.is(config.onlyPassthrough, '${sls:stage}')
+  assert.is(config.onlyPassthrough, '${sls:instanceId}')
 })
 
 test('double-quoted fallback', () => {
-  assert.is(config.doubleQuoted, 'sl-${sls:stage}-manifest')
+  assert.is(config.doubleQuoted, 'sl-${sls:instanceId}-manifest')
 })
 
 test('two passthroughs in one quoted fallback', () => {
-  assert.is(config.twoPassthroughs, '${ssm:/app/prefix}-${sls:stage}')
+  assert.is(config.twoPassthroughs, '${ssm:/app/prefix}-${sls:instanceId}')
 })
 
 test('self ref resolves next to a passthrough in a quoted fallback', () => {
-  assert.is(config.mixedWithSelf, 'dev-${sls:stage}')
+  assert.is(config.mixedWithSelf, 'dev-${sls:instanceId}')
 })
 
 test('self ref to a passthrough fallback value keeps it', () => {
-  assert.is(config.derived, 'sl-${sls:stage}-manifest-tables')
+  assert.is(config.derived, 'sl-${sls:instanceId}-manifest-tables')
 })
 
 test('fallback variable with text on both sides', () => {
-  assert.is(config.inText, 'prefix-sl-${sls:stage}-suffix')
+  assert.is(config.inText, 'prefix-sl-${sls:instanceId}-suffix')
 })
 
 test('outer opt: variable missing uses the passthrough fallback', () => {
-  assert.is(config.optMissing, 'sl-${sls:stage}-manifest')
+  assert.is(config.optMissing, 'sl-${sls:instanceId}-manifest')
 })
 
 test('outer opt: variable set ignores the passthrough fallback', () => {
@@ -65,12 +65,12 @@ test('outer opt: variable set ignores the passthrough fallback', () => {
 })
 
 test('inside arrays and nested objects', () => {
-  assert.equal(config.nested.list, ['a-${sls:stage}'])
+  assert.equal(config.nested.list, ['a-${sls:instanceId}'])
   assert.is(config.nested.obj.key, 'b-${ssm:/x/y}')
 })
 
 test('passthrough as an unquoted fallback variable', () => {
-  assert.is(config.bareFallback, '${sls:stage}')
+  assert.is(config.bareFallback, '${sls:instanceId}')
 })
 
 test('env set: fallback unused', () => {
@@ -78,20 +78,20 @@ test('env set: fallback unused', () => {
 })
 
 test('control: passthrough outside a fallback', () => {
-  assert.is(config.bare, 'sl-${sls:stage}-manifest')
+  assert.is(config.bare, 'sl-${sls:instanceId}-manifest')
 })
 
 test('allowUnknownVariableTypes as a type list', async () => {
   const listed = await configorama(fixture, { configDir: __dirname, ...settings, allowUnknownVariableTypes: ['sls', 'ssm'] })
-  assert.is(listed.textAround, 'sl-${sls:stage}-manifest')
-  assert.is(listed.twoPassthroughs, '${ssm:/app/prefix}-${sls:stage}')
-  assert.is(listed.bare, 'sl-${sls:stage}-manifest')
+  assert.is(listed.textAround, 'sl-${sls:instanceId}-manifest')
+  assert.is(listed.twoPassthroughs, '${ssm:/app/prefix}-${sls:instanceId}')
+  assert.is(listed.bare, 'sl-${sls:instanceId}-manifest')
 })
 
 test('quoted passthrough fallback after other unresolvable list items', async () => {
   const later = await configorama(path.join(__dirname, 'laterSlot.yml'), { configDir: __dirname, options: {}, allowUnknownVariableTypes: true })
-  assert.is(later.afterMissingEnv, 'sl-${sls:stage}')
-  assert.is(later.afterMissingSelf, 'c-${sls:stage}')
+  assert.is(later.afterMissingEnv, 'sl-${sls:instanceId}')
+  assert.is(later.afterMissingSelf, 'c-${sls:instanceId}')
 })
 
 /**
@@ -111,13 +111,13 @@ async function resolveError(file, opts) {
 
 test('unknown types not allowed: passthrough in a quoted fallback is an error, not mangled text', async () => {
   const err = await resolveError('strict.yml', {})
-  assert.match(err.message, 'Variable: "sls:stage"')
+  assert.match(err.message, 'Variable: "sls:instanceId"')
   assert.match(err.message, 'not found')
 })
 
 test('type list without the type: passthrough in a quoted fallback is an error', async () => {
   const err = await resolveError('strict.yml', { allowUnknownVariableTypes: ['ssm'] })
-  assert.match(err.message, 'Variable: "sls:stage"')
+  assert.match(err.message, 'Variable: "sls:instanceId"')
 })
 
 test('missing self ref in a quoted fallback is an error', async () => {
@@ -127,10 +127,10 @@ test('missing self ref in a quoted fallback is an error', async () => {
 
 test('sync API', () => {
   const syncConfig = configorama.sync(fixture, settings)
-  assert.is(syncConfig.textAround, 'sl-${sls:stage}-manifest')
-  assert.is(syncConfig.onlyPassthrough, '${sls:stage}')
-  assert.is(syncConfig.derived, 'sl-${sls:stage}-manifest-tables')
-  assert.is(syncConfig.inText, 'prefix-sl-${sls:stage}-suffix')
+  assert.is(syncConfig.textAround, 'sl-${sls:instanceId}-manifest')
+  assert.is(syncConfig.onlyPassthrough, '${sls:instanceId}')
+  assert.is(syncConfig.derived, 'sl-${sls:instanceId}-manifest-tables')
+  assert.is(syncConfig.inText, 'prefix-sl-${sls:instanceId}-suffix')
   assert.is(syncConfig.optSet, 'qa')
 })
 
