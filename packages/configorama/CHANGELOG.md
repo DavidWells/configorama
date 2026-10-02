@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.9](https://github.com/DavidWells/configorama/compare/configorama@1.4.8...configorama@1.4.9) (2026-10-02)
+
+
+### Bug Fixes
+
+* **preprocess:** JSON objects in calls outside a variable stay text (VTL #set($m = {...})) ([#82](https://github.com/DavidWells/configorama/issues/82)) ([30ab85b](https://github.com/DavidWells/configorama/commit/30ab85bcf9e0a3f1187abf1cc0370aa780f4e6fb))
+
+
+
+
+
 ## [1.4.8](https://github.com/DavidWells/configorama/compare/configorama@1.4.7...configorama@1.4.8) (2026-10-02)
 
 
