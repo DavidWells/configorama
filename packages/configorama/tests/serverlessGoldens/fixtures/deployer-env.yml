@@ -1,0 +1,26 @@
+# Values a deploy tool injects through env vars, each with a standalone default.
+service: ${env:SG_PREFIX, 'app'}-registry
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  deploymentBucket:
+    name: ${env:SG_DEPLOYMENT_BUCKET, ''}
+  deploymentPrefix: ${env:SG_DEPLOYMENT_PREFIX, 'serverless'}
+  stackTags:
+    deploymentId: ${env:SG_DEPLOYMENT_ID, 'local'}
+    environment: ${env:SG_ENVIRONMENT, self:provider.stage}
+    region: ${env:SG_TARGET_REGION, self:provider.region}
+    instance: ${env:SG_INSTANCE, '_'}
+    tenancy: ${env:SG_TENANCY, 'pooled'}
+  iam:
+    deploymentRole: ${env:SG_EXEC_ROLE_ARN, ''}
+    role:
+      name: ${self:service}-${self:provider.stage}-${env:SG_REGION_CODE, self:provider.region}-lambda
+      permissionsBoundary: ${env:SG_BOUNDARY_ARN, ''}
+  environment:
+    BUCKET: app-registry-${env:SG_BUCKET_TOKEN, 'local'}
+    RETRIES: ${env:SG_RETRIES, 3}
+    # A bare true/false fallback currently resolves to the string 'true'/'false' (numbers keep
+    # their type). The golden records that; update it if booleans start keeping their type.
+    ENABLED: ${env:SG_ENABLED, true}

@@ -1,0 +1,24 @@
+{
+  "custom": {
+    "defaultStackName": "admin-ui-qa",
+    "frameworkStackName": "app-${sls:stage}-manifest",
+    "inlineStackName": "admin-ui-qa",
+    "prefixed": "app-qa-ui",
+    "prefixedStackName": "app-qa-ui",
+    "stackName": "admin-ui-qa",
+    "tableName": "admin-ui-qa-table"
+  },
+  "provider": {
+    "apiName": "admin-ui-qa",
+    "environment": {
+      "FRAMEWORK_STAGE": "${sls:stage}",
+      "STAGE_TAG": "qa",
+      "TABLE_NAME": "admin-ui-qa-table"
+    },
+    "name": "aws",
+    "region": "us-east-1",
+    "stackName": "admin-ui-qa",
+    "stage": "qa"
+  },
+  "service": "admin-ui"
+}

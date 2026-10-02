@@ -1,0 +1,22 @@
+# CodeBuild BuildSpec block scalar: shell ${VAR} expansions stay verbatim, quotes untouched.
+service: builder
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+resources:
+  Resources:
+    Project:
+      Type: AWS::CodeBuild::Project
+      Properties:
+        Name: ${self:service}-${self:provider.stage}
+        Source:
+          Type: NO_SOURCE
+          BuildSpec: |
+            version: 0.2
+            phases:
+              build:
+                commands:
+                  - test -n "$REPOSITORY_URL"
+                  - if [ -n "$TOKEN" ]; then git clone "https://x-access-token:${TOKEN}@${REPOSITORY_URL#https://}" repo; else git clone "$REPOSITORY_URL" repo; fi
+                  - export ELAPSED=$(( $(date +%s) - START ))
+                  - echo "stage ${self:provider.stage}"

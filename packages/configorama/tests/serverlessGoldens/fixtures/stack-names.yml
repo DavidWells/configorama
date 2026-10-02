@@ -1,0 +1,26 @@
+# Stack-name fallbacks as Serverless services write them. A deploy tool may inject
+# SERVERLESS_STACK_NAME; standalone deploys fall back to a name built from other values.
+service: admin-ui
+custom:
+  # Fallback to a self value composed of self refs (regressed in 1.4.4-1.4.7)
+  defaultStackName: ${self:service}-${self:provider.stage}
+  # Stage-first fallback through a custom key
+  stackName: ${env:SG_STACK_NAME, self:custom.defaultStackName}
+  # Composed inline in the fallback slot
+  inlineStackName: ${env:SG_STACK_NAME, ${self:service}-${self:provider.stage}}
+  # Literal prefix + self ref in a custom value used as fallback
+  prefixedStackName: ${env:SG_STACK_NAME, self:custom.prefixed}
+  prefixed: app-${self:provider.stage}-ui
+  # Framework variable (resolved later by Serverless) inside a quoted fallback
+  frameworkStackName: ${env:SG_STACK_NAME, 'app-${sls:stage}-manifest'}
+  tableName: ${self:custom.stackName}-table
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  stackName: ${self:custom.stackName}
+  apiName: ${self:provider.stackName}
+  environment:
+    TABLE_NAME: ${self:custom.tableName}
+    STAGE_TAG: ${env:SG_ENVIRONMENT, self:provider.stage}
+    FRAMEWORK_STAGE: ${env:SG_ENVIRONMENT, '${sls:stage}'}

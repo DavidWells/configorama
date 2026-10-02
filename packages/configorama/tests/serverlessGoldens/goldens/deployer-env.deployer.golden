@@ -1,0 +1,31 @@
+{
+  "provider": {
+    "deploymentBucket": {
+      "name": "shared-artifacts-use1"
+    },
+    "deploymentPrefix": "dep_123/svc",
+    "environment": {
+      "BUCKET": "app-registry-tok123",
+      "ENABLED": "false",
+      "RETRIES": "5"
+    },
+    "iam": {
+      "deploymentRole": "arn:aws:iam::123456789012:role/exec",
+      "role": {
+        "name": "sl-registry-acme-prod-usw2-lambda",
+        "permissionsBoundary": "arn:aws:iam::123456789012:policy/boundary"
+      }
+    },
+    "name": "aws",
+    "region": "us-west-2",
+    "stackTags": {
+      "deploymentId": "dep_123",
+      "environment": "prod",
+      "instance": "blue",
+      "region": "us-west-2",
+      "tenancy": "isolated"
+    },
+    "stage": "acme-prod"
+  },
+  "service": "sl-registry"
+}
