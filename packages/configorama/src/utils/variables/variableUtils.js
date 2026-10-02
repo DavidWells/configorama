@@ -104,7 +104,10 @@ function buildVariableSyntax(prefix = '${', suffix = '}', excludePatterns = ['AW
   const allChars = [
     ' ', '\\t', '~', ':', 'a-z', 'A-Z', '0-9', '=', '+', '!', '@', '#', '%',
     '\\^', '&', ';', '`', '\\*', '<', '>', '\\?', '\\.', '_', "'", '"', ',',
-    '\\|', '\\-', '\\/', '\\(', '\\)', '\\[', '\\]', '\\\\'
+    '\\|', '\\-', '\\/', '\\(', '\\)', '\\[', '\\]', '\\\\',
+    // Private-use char that starts an encoded passthrough value, so a variable whose fallback
+    // holds one (${env:X, 'sl-${sls:stage}'}) still matches and resolves
+    '\\uE000'
   ]
 
   // Map of unescaped char to its escaped form in regex character class

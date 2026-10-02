@@ -3357,6 +3357,10 @@ Missing Value ${missingValue} - ${matchedString}
         ? findEnclosingVariable(propertyString, originalVar, this.varPrefix, this.varSuffix, matchIndex)
         : null
       const fallbackSource = enclosingVar || propertyString
+      // The parent's list holds this variable's fallbacks only when the variable is one of its
+      // items (${env:X, ${sls:stage}}). Nested in an item's text ('sl-${sls:stage}') it has none.
+      const parentListIsOwnFallback = !parentVar ||
+        isFallbackSlot(parentVar.text, String(originalVar), this.varPrefix, this.varSuffix)
       const clean = cleanVariable(
         fallbackSource,
         this.variableSyntax, 
@@ -3378,7 +3382,9 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('typeof split', typeof split)
       // @TODO refactor this. USE FILTER [ 'commas', 'split("-"' ] is wrong
       let fallbackValue
-      if (split.length === 2 || split.length === 3) {
+      if (!parentListIsOwnFallback) {
+        fallbackValue = undefined
+      } else if (split.length === 2 || split.length === 3) {
         fallbackValue = split[1]
       } else if (clean.match(/\|/)) {
         fallbackValue = split[0]
@@ -3388,8 +3394,8 @@ Missing Value ${missingValue} - ${matchedString}
       // A nested variable may come from a substituted value (an env value of '${x}'), so it can
       // be in the enclosing variable's current text without being in the original source
       const isInsideAnotherVariable = !!enclosingVar && enclosingVar !== originalVar
-      const nestedVar = findNestedVariable(split, valueObject.originalSource) ||
-        (isInsideAnotherVariable ? findNestedVariable(split, enclosingVar) : undefined)
+      const nestedVar = parentListIsOwnFallback ? (findNestedVariable(split, valueObject.originalSource) ||
+        (isInsideAnotherVariable ? findNestedVariable(split, enclosingVar) : undefined)) : undefined
       // console.log('nestedVar', nestedVar)
 
       if (nestedVar) {
@@ -3498,8 +3504,9 @@ Missing Value ${missingValue} - ${matchedString}
 
 
 
-    /* Pass through unknown variable types */
-    if (allowSpecialCase || this.isUnknownTypeAllowed(propertyString)) {
+    /* Pass through unknown variable types. Checks this variable, not the whole property: a */
+    /* passthrough nested in a known variable's fallback ('${env:X, 'sl-${sls:stage}'}') qualifies */
+    if (allowSpecialCase || this.isUnknownTypeAllowed(variableString)) {
       // Return only the encoded current variable, not the whole propertyString.
       // The caller substitutes this value at the matched position; returning the
       // full property would re-insert the surrounding context (including this
