@@ -222,6 +222,25 @@ function isFallbackSlot(enclosing, variable, prefix, suffix) {
 }
 
 /**
+ * Whether `variable` is a whole fallback item of the `enclosing` variable expression: in a
+ * fallback slot (see isFallbackSlot) with only whitespace before the next top-level comma,
+ * filter pipe or the end (${env:X, ${self:a}}), not the start of a longer item
+ * (${env:X, ${self:a}-${self:b}}).
+ * @param {string} enclosing - Enclosing variable text, e.g. '${env:X, ${self:y}}'
+ * @param {string} variable - The nested variable text, e.g. '${self:y}'
+ * @param {string} prefix - Variable prefix
+ * @param {string} suffix - Variable suffix
+ * @returns {boolean}
+ */
+function isWholeFallbackItem(enclosing, variable, prefix, suffix) {
+  if (!isFallbackSlot(enclosing, variable, prefix, suffix)) return false
+  const inner = enclosing.slice(prefix.length, enclosing.length - suffix.length)
+  const after = inner.slice(inner.indexOf(variable) + variable.length)
+  const itemEnd = after.search(/[,|]/)
+  return (itemEnd === -1 ? after : after.slice(0, itemEnd)).trim() === ''
+}
+
+/**
  * Whether `variable` sits in the source path of `parent`, its first item: the key in
  * ${self:map.${opt:k}} or ${file(./x.json):${opt:k}}, not a fallback (${a, ${b}}), a filter
  * (${a | f(${b})}), a function argument or a file()/text() path argument.
@@ -257,6 +276,7 @@ function isPathSlot(parent, variable, prefix, suffix) {
 module.exports = {
   variableSpans,
   isFallbackSlot,
+  isWholeFallbackItem,
   isPathSlot,
   findParentVariable,
   findOutermostBraces,

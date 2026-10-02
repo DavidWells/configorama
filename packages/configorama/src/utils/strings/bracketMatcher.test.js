@@ -6,6 +6,7 @@ const {
   findEnclosingVariable,
   findParentVariable,
   isFallbackSlot,
+  isWholeFallbackItem,
   findOutermostBraceRanges,
   findOutermostVariables
 } = require('./bracketMatcher')
@@ -223,6 +224,26 @@ test('isFallbackSlot - first item (source path) is not a slot', () => {
 
 test('isFallbackSlot - function call arguments are not slots', () => {
   assert.not.ok(isFallbackSlot("${merge('a', ${self:y})}", '${self:y}', '${', '}'))
+})
+
+// isWholeFallbackItem: a fallback slot whose item is nothing but the variable
+test('isWholeFallbackItem - the variable alone is the item', () => {
+  assert.ok(isWholeFallbackItem('${env:X, ${self:a}}', '${self:a}', '${', '}'))
+  assert.ok(isWholeFallbackItem("${env:X, ${self:a}, 'z'}", '${self:a}', '${', '}'))
+  assert.ok(isWholeFallbackItem('${env:X,${self:a} }', '${self:a}', '${', '}'))
+  assert.ok(isWholeFallbackItem('${env:X, ${self:a} | toUpperCase}', '${self:a}', '${', '}'))
+})
+
+test('isWholeFallbackItem - text or another variable after it in the item', () => {
+  assert.not.ok(isWholeFallbackItem('${env:X, ${self:a}-${self:b}}', '${self:a}', '${', '}'))
+  assert.not.ok(isWholeFallbackItem('${env:X, ${self:a}-suffix}', '${self:a}', '${', '}'))
+  assert.not.ok(isWholeFallbackItem("${env:X, ${self:a}-suffix, 'z'}", '${self:a}', '${', '}'))
+})
+
+test('isWholeFallbackItem - not a fallback slot at all', () => {
+  assert.not.ok(isWholeFallbackItem('${env:X, prefix-${self:a}}', '${self:a}', '${', '}'))
+  assert.not.ok(isWholeFallbackItem("${env:X, '${self:a}'}", '${self:a}', '${', '}'))
+  assert.not.ok(isWholeFallbackItem('${self:map.${opt:k}}', '${opt:k}', '${', '}'))
 })
 
 // Run all tests
