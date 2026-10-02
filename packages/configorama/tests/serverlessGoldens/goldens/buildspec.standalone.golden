@@ -9,7 +9,7 @@
         "Properties": {
           "Name": "builder-qa",
           "Source": {
-            "BuildSpec": "version: 0.2/nphases:/n  build:/n    commands:/n      - test -n /"$REPOSITORY_URL/"/n      - if [ -n /"$TOKEN/" ]; then git clone /"https://x-access-token:${TOKEN}@${REPOSITORY_URL#https://}/" repo; else git clone /"$REPOSITORY_URL/" repo; fi/n      - export ELAPSED=$(( $(date +%s) - START ))/n      - echo /"stage qa/"/n",
+            "BuildSpec": "version: 0.2\nphases:\n  build:\n    commands:\n      - test -n \"$REPOSITORY_URL\"\n      - if [ -n \"$TOKEN\" ]; then git clone \"https://x-access-token:${TOKEN}@${REPOSITORY_URL#https://}\" repo; else git clone \"$REPOSITORY_URL\" repo; fi\n      - export ELAPSED=$(( $(date +%s) - START ))\n      - echo \"stage qa\"\n",
             "Type": "NO_SOURCE"
           }
         },

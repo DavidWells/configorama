@@ -6,13 +6,19 @@ const assert = require('uvu/assert')
 const ROOT = path.resolve(__dirname, '../..')
 const GOLDEN_DIR = path.join(__dirname, 'goldens')
 
-function canonicalize(value) {
+/**
+ * Stable text for a golden: sorted JSON keys, LF endings, machine paths masked
+ * @param {any} value
+ * @param {{ keepBackslashes?: boolean }} [options] - keepBackslashes: leave \ as is (config values,
+ *   where \n or \" is data) instead of turning Windows path separators into /
+ * @returns {string}
+ */
+function canonicalize(value, options = {}) {
   if (typeof value !== 'string') {
     value = JSON.stringify(value, stableJsonReplacer, 2)
   }
-  return String(value)
-    .replace(/\r\n/g, '\n')
-    .replace(/\\/g, '/')
+  const text = String(value).replace(/\r\n/g, '\n')
+  return (options.keepBackslashes ? text : text.replace(/\\/g, '/'))
     .replaceAll(ROOT, '<ROOT>')
     .replace(/\/Users\/[^/\n]+/g, '/Users/<USER>')
     .trimEnd() + '\n'
@@ -30,9 +36,9 @@ function goldenPath(name, dir = GOLDEN_DIR) {
   return path.join(dir, `${name}.golden`)
 }
 
-function assertGolden(name, actual, dir = GOLDEN_DIR) {
+function assertGolden(name, actual, dir = GOLDEN_DIR, options = {}) {
   const expectedPath = goldenPath(name, dir)
-  const output = canonicalize(actual)
+  const output = canonicalize(actual, options)
 
   if (process.env.UPDATE_GOLDENS) {
     fs.mkdirSync(path.dirname(expectedPath), { recursive: true })

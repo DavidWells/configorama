@@ -90,7 +90,7 @@ for (const file of fixtures) {
         }
       }
       assert.equal(resolvedSync, resolved, 'sync and async APIs resolve the same')
-      assertGolden(`${name}.${mode}`, resolved, GOLDENS)
+      assertGolden(`${name}.${mode}`, resolved, GOLDENS, { keepBackslashes: true })
     })
   }
 }
