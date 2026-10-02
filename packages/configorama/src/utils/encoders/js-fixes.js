@@ -152,4 +152,5 @@ module.exports = {
   isEncodedJson,
   hasEncodedJson,
   encodeJsonArgObjects,
+  isInsideVariable,
 }

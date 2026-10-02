@@ -1,9 +1,11 @@
 {
   "custom": {
-    "bareFallback": "${sls:stage}",
+    "awsInFallback": "app-${aws:accountId}-${aws:region}",
+    "bareFallback": "acme-prod",
     "bucket": "app-acme-prod-ui-${aws:accountId}-${aws:region}",
-    "frameworkStage": "${sls:stage}",
-    "inFallback": "prefix-${sls:stage}-${ssm:/app/x}",
+    "frameworkStage": "acme-prod",
+    "inFallback": "prefix-acme-prod-${ssm:/app/x}",
+    "instanceInFallback": "run-${sls:instanceId}",
     "principalTagArn": "arn:aws:s3:::bucket/${aws:PrincipalTag/team}/*",
     "ssmKey": "${ssm:/app/acme-prod/key}",
     "stackOutput": "${cf:other-stack-acme-prod.ApiUrl}"

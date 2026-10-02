@@ -10,4 +10,6 @@ custom:
   frameworkStage: ${sls:stage}
   inFallback: ${env:SG_UNSET, 'prefix-${sls:stage}-${ssm:/app/x}'}
   bareFallback: ${env:SG_UNSET, ${sls:stage}}
+  awsInFallback: ${env:SG_UNSET, 'app-${aws:accountId}-${aws:region}'}
+  instanceInFallback: ${env:SG_UNSET, 'run-${sls:instanceId}'}
   principalTagArn: arn:aws:s3:::bucket/${aws:PrincipalTag/team}/*

@@ -1,9 +1,11 @@
 {
   "custom": {
-    "bareFallback": "${sls:stage}",
+    "awsInFallback": "app-${aws:accountId}-${aws:region}",
+    "bareFallback": "qa",
     "bucket": "app-qa-ui-${aws:accountId}-${aws:region}",
-    "frameworkStage": "${sls:stage}",
-    "inFallback": "prefix-${sls:stage}-${ssm:/app/x}",
+    "frameworkStage": "qa",
+    "inFallback": "prefix-qa-${ssm:/app/x}",
+    "instanceInFallback": "run-${sls:instanceId}",
     "principalTagArn": "arn:aws:s3:::bucket/${aws:PrincipalTag/team}/*",
     "ssmKey": "${ssm:/app/qa/key}",
     "stackOutput": "${cf:other-stack-qa.ApiUrl}"
