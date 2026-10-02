@@ -94,13 +94,40 @@ function hasEncodedJson(value) {
  * @param {string} [varPrefix] - the variable opening, e.g. `${` or `#{`
  * @returns {string}
  */
+/**
+ * Whether index sits inside a variable expression. Inside one every { } counts, so a JSON object
+ * argument (${merge({"a":1})}) doesn't end it early; outside, only varPrefix opens one.
+ * @param {string} str
+ * @param {number} index
+ * @param {string} varPrefix - the variable opening, ending in `{`
+ * @returns {boolean}
+ */
+function isInsideVariable(str, index, varPrefix) {
+  let depth = 0
+  for (let i = 0; i < index; i++) {
+    if (depth === 0) {
+      if (str.startsWith(varPrefix, i)) {
+        depth = 1
+        i += varPrefix.length - 1
+      }
+    } else if (str[i] === '{') {
+      depth++
+    } else if (str[i] === '}') {
+      depth--
+    }
+  }
+  return depth > 0
+}
+
 function encodeJsonArgObjects(str, varPrefix = '${') {
   if (!str || typeof str !== 'string' || str.indexOf('{') === -1) return str
   if (!varPrefix.endsWith('{')) return str // non-brace syntaxes (e.g. `$[`) don't conflict with JSON braces
   const preBrace = varPrefix.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const guard = preBrace ? `(?<!${preBrace})` : ''
   const pattern = new RegExp(`(\\w+\\([^{}()]*)(${guard}\\{[^{}]*\\})([^{}()]*\\))`, 'g')
-  return str.replace(pattern, (match, open, obj, close) => {
+  return str.replace(pattern, (match, open, obj, close, offset) => {
+    // Only a call inside a variable is configorama syntax; elsewhere (VTL #set($m = {...})) it's text
+    if (!isInsideVariable(str, offset, varPrefix)) return match
     // file()/text() take a path, where { } are plain characters
     if (/^(?:file|text)\(/.test(open)) return match
     // A { inside a quoted string argument ("{" in eval, '{a},{b}' in split) is text, not JSON

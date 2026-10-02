@@ -38,6 +38,17 @@ test('encodeJsonArgObjects - braces inside a quoted string argument are not JSON
   assert.is(encodeJsonArgObjects("${split('{a},{b}', ',')}"), "${split('{a},{b}', ',')}")
 })
 
+test('encodeJsonArgObjects - a call outside any variable is plain text (VTL #set($m = {...}))', () => {
+  assert.is(encodeJsonArgObjects('#set($m = { "a": "b" })'), '#set($m = { "a": "b" })')
+  const vtl = '#set($inputRoot = $input.path(\'$\'))\n#set($mfaMap = {\n  "SMS_MFA": "SMS"\n})\n'
+  assert.is(encodeJsonArgObjects(vtl), vtl)
+})
+
+test('encodeJsonArgObjects - only the call inside a variable is encoded when both appear', () => {
+  const out = encodeJsonArgObjects('#set($m = {"a":1}) ${self:x | help({"k":2})}')
+  assert.ok(out.startsWith('#set($m = {"a":1}) ${self:x | help(__JSON_B64__'), out)
+})
+
 test('encodeJsonArgObjects - file() and text() paths are not JSON', () => {
   assert.is(encodeJsonArgObjects('${file(./br/{x}.json):k}'), '${file(./br/{x}.json):k}')
   assert.is(encodeJsonArgObjects('${text(./{x}.txt)}'), '${text(./{x}.txt)}')

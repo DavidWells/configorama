@@ -1,0 +1,35 @@
+{
+  "provider": {
+    "name": "aws",
+    "stage": "qa"
+  },
+  "resources": {
+    "Resources": {
+      "GetUser": {
+        "Properties": {
+          "Integration": {
+            "IntegrationResponses": [
+              {
+                "ResponseTemplates": {
+                  "application/json": {
+                    "Fn::If": [
+                      "CustomMapping",
+                      "#set($inputRoot = $input.path('$'))\n#set($mfaMap = {\n  \"SMS_MFA\": \"SMS\",\n  \"SOFTWARE_TOKEN_MFA\": \"TOKEN\"\n})\n#set($flags = { \"stage\": \"qa\" })\n{\n  \"username\": \"$inputRoot.Username\",\n  \"attributes\": {\n    #foreach($attr in $inputRoot.UserAttributes)\n      \"$attr.Name\": \"$attr.Value\"#if($foreach.hasNext),#end\n    #end\n  },\n  \"mfaSetting\": \"$mfaMap.get($inputRoot.PreferredMfaSetting)\",\n  \"stage\": \"qa\"\n}\n",
+                      "$input.json('$')"
+                    ]
+                  }
+                },
+                "StatusCode": "200"
+              }
+            ],
+            "RequestTemplates": {
+              "application/json": "#set($token = $input.params('Authorization').replace('Bearer ', ''))\n{\n  \"AccessToken\": \"$token\"\n}\n"
+            }
+          }
+        },
+        "Type": "AWS::ApiGateway::Method"
+      }
+    }
+  },
+  "service": "proxy"
+}
