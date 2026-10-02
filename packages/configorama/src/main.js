@@ -1,3 +1,9 @@
+const { originAt } = require('./utils/paths/fileOrigin')
+const { scan: scanExpression, references: expressionReferences } = require('./utils/expressions/scan')
+const { encodePathIdentity, decodePathIdentity, displayPath, lookupPathSegments } = require('./utils/paths/pathIdentity')
+const validateStructure = require('./utils/validateStructure')
+const opaque = require('./utils/encoders/opaque')
+const { resolutionRecord, isResolutionRecord } = require('./utils/resolutionRecord')
 /* Node built-ins */
 const os = require('os')
 const path = require('path')
@@ -32,7 +38,7 @@ function walkAndUpdate(root, callback) {
       const isArr = Array.isArray(current)
       for (let i = 0; i < keys.length; i++) {
         const k = keys[i]
-        const idx = isArr ? Number(k) : k
+        const idx = isArr && /^(?:0|[1-9]\d*)$/.test(k) ? Number(k) : k
         visit(current[k], path.concat(idx), current, k)
       }
     }
@@ -46,74 +52,40 @@ function walkAndUpdate(root, callback) {
 // parenthesis depth at the match position (not global pipe/paren indices, which misfire with multiple calls)
 // and requires the enclosing `(` to directly follow a name in callNames — so eval/if/cron/file/text (which
 // are resolvers, not in this.functions/this.filters) handle their own args and are left alone.
-function isNestedCallArgument(property, matchedString, callNames) {
-  if (typeof property !== 'string' || typeof matchedString !== 'string') return false
-  if (property.trim() === matchedString.trim()) return false
-  if (!callNames) return false
-  const matchIdx = property.indexOf(matchedString)
-  if (matchIdx === -1) return false
-  const openParens = []
-  for (let i = 0; i < matchIdx; i++) {
-    if (property[i] === '(') openParens.push(i)
-    else if (property[i] === ')') openParens.pop()
-  }
-  if (openParens.length === 0) return false // not inside any open paren
-  const enclosingOpen = openParens[openParens.length - 1]
-  const nameMatch = property.slice(0, enclosingOpen).match(/(\w+)\s*$/)
-  if (!nameMatch) return false
-  const name = nameMatch[1]
-  return callNames.has(name) || callNames.has(name.toLowerCase())
+function isNestedCallArgument(property, matchedString, callNames, prefix, suffix) {
+  if(typeof property!=='string'||typeof matchedString!=='string'||!callNames)return false
+  const at=property.indexOf(matchedString);if(at<0||property.trim()===matchedString.trim())return false
+  const call=scanExpression(property,{prefix,suffix}).nodes.filter(n=>n.kind==='Call'&&n.contentStart<=at&&n.end>at).sort((a,b)=>b.start-a.start)[0]
+  return !!call&&(callNames.has(call.name)||callNames.has(call.name.toLowerCase()))
 }
 
 // True when matchedString sits INSIDE an outer variable expression — the text before it has more variable
 // openers than closers, e.g. `${self:flag}` inside `${env:X, ${self:flag}}`. Used to keep a substituted
 // value's type (a boolean fallback) intact instead of stringifying it into the outer expression.
 function isInsideOuterVariable(property, matchedString, varPrefix, varSuffix) {
-  const idx = property.indexOf(matchedString)
-  if (idx <= 0) return false
-  const before = property.slice(0, idx)
-  const opens = before.split(varPrefix).length - 1
-  const closes = before.split(varSuffix).length - 1
-  return opens > closes
+  const index=property.indexOf(matchedString)
+  return !!findParentVariable(property,matchedString,varPrefix,varSuffix,index)
 }
 
 // True when the match at matchIndex is a fallback item of the variable enclosing it: a comma at
 // the enclosing variable's own level comes before it, e.g. `${self:obj}` in `${opt:x, ${self:obj}}`
 // but not the source slot of `${env:${self:obj}}`
 function isInFallbackSlot(property, matchedString, matchIndex, varPrefix, varSuffix) {
-  const enclosing = findEnclosingVariable(property, matchedString, varPrefix, varSuffix, matchIndex)
-  if (!enclosing || enclosing === matchedString) return false
-  const start = property.lastIndexOf(enclosing, matchIndex)
-  let depth = 0
-  for (let i = start + varPrefix.length; i < matchIndex; i++) {
-    if (property.startsWith(varPrefix, i)) {
-      depth++
-      i += varPrefix.length - 1
-    } else if (depth > 0 && property.startsWith(varSuffix, i)) {
-      depth--
-      i += varSuffix.length - 1
-    } else if (property[i] === ',' && depth === 0) {
-      return true
-    }
-  }
-  return false
+  const parent=findParentVariable(property,matchedString,varPrefix,varSuffix,matchIndex)
+  return !!parent&&isFallbackSlot(parent.text,matchedString,varPrefix,varSuffix)
 }
 
 // Narrower check for object/number args: encode only for FILTER arg lists (enclosing `(` follows a `|`).
 // Object/array values passed to a FUNCTION (e.g. merge(${obj})) must stay raw, not base64-encoded.
-function isNestedFilterArgument(property, matchedString) {
-  if (typeof property !== 'string' || typeof matchedString !== 'string') return false
-  if (property.trim() === matchedString.trim()) return false
-  const matchIdx = property.indexOf(matchedString)
-  if (matchIdx === -1) return false
-  const openParens = []
-  for (let i = 0; i < matchIdx; i++) {
-    if (property[i] === '(') openParens.push(i)
-    else if (property[i] === ')') openParens.pop()
-  }
-  if (openParens.length === 0) return false
-  const enclosingOpen = openParens[openParens.length - 1]
-  return property.lastIndexOf('|', enclosingOpen) !== -1
+function isNestedFilterArgument(property, matchedString, prefix, suffix) {
+  if(typeof property!=='string'||typeof matchedString!=='string')return false
+  const at=property.indexOf(matchedString);if(at<0)return false
+  const syntax=scanExpression(property,{prefix,suffix})
+  const call=syntax.nodes.filter(n=>n.kind==='Call'&&n.contentStart<=at&&n.end>at).sort((a,b)=>b.start-a.start)[0]
+  if(!call)return false
+  let id=call.parentId
+  while(id!==null){const node=syntax.nodes[id];if(node.kind==='Filter')return true;id=node.parentId}
+  return false
 }
 
 /**
@@ -124,7 +96,7 @@ function isNestedFilterArgument(property, matchedString) {
  */
 function isSameResult(a, b) {
   /** @param {any} r */
-  const unwrap = (r) => (r && typeof r === 'object' && (r.__internal_only_flag || r.__internal_metadata)) ? r.value : r
+  const unwrap = (r) => (isResolutionRecord(r)) ? r.value : r
   const x = unwrap(a)
   const y = unwrap(b)
   if (x === y) return true
@@ -197,7 +169,7 @@ function filterCacheKey(filterExpression, config) {
   // both to a single token so the same filter is recognized as already-run; literal args keep their value so
   // `append('X')` and `append('Y')` stay distinct.
   const normalized = args.map((a) => {
-    if (a && a.__resolvedFilterArg) return '\x00VAR\x00'
+    if (isResolvedFilterArg(a)) return '\x00VAR\x00'
     if (typeof a === 'string' && /\$\{.*\}/.test(a)) return '\x00VAR\x00'
     return a
   })
@@ -213,7 +185,7 @@ const {
 const PromiseTracker = require('./utils/PromiseTracker')
 const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
-const { encodeUnknown, decodeUnknown, PASSTHROUGH_PREFIX } = require('./utils/encoders/unknown-values')
+const { encodeUnknown, decodeUnknown, hasEncodedUnknown } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson, isEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
@@ -221,7 +193,7 @@ const { bracketsToDots } = require('./utils/paths/bracketsToDots')
 const { encodeStrayVariableChars, decodeLiteralBraces, decodeLiteralBracesDeep, decodeForDisplay, encodeQuotedLiteralsDeep } = require('./utils/encoders/literal-braces')
 /* Utils - parsing */
 const preProcess = require('./utils/parsing/preProcess')
-const { parseFileContents } = require('./utils/parsing/parse')
+const { parseFileContents, getBodyContentKey } = require('./utils/parsing/parse')
 const { mergeByKeys } = require('./utils/parsing/mergeByKeys')
 const { arrayToJsonPath } = require('./utils/parsing/arrayToJsonPath')
 /* Utils - paths */
@@ -240,11 +212,11 @@ const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./u
 const { splitOnPipe, splitOnTopLevelPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
 const { findEnclosingVariable, findParentVariable, isFallbackSlot, isWholeFallbackItem, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
-const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
+const { encodeFilterArg, unwrapFilterArg, isResolvedFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 // Metadata, display and setup modules are required where used; plain config loads never need them
 /* Utils - ui */
-const { logHeader } = require('./utils/ui/logs')
+const { logDiagnosticHeader: logHeader } = require('./utils/ui/logs')
 /* Utils - validation */
 const { warnIfNotFound, isValidValue } = require('./utils/validation/warnIfNotFound')
 const {
@@ -303,7 +275,7 @@ const selfRefSyntax = RegExp(/^self:/g)
  * @returns {boolean}
  */
 function isPassthrough(value) {
-  return typeof value === 'string' && value.includes(PASSTHROUGH_PREFIX)
+  return typeof value === 'string' && hasEncodedUnknown(value)
 }
 
 /**
@@ -342,12 +314,20 @@ let DEBUG_TYPE = false
 
 class Configorama {
   constructor(fileOrObject, opts) {
+    if (!opaque.currentContext()) return opaque.withContext(() => new Configorama(fileOrObject, opts))
+    this._encodingContext = opaque.currentContext()
     /* CLI-only by default. Library consumers should not get process-level signal handlers. */
     if (opts && opts.handleSignalEvents && !opts.sync) {
       handleSignalEvents()
     }
   
-    const options = opts || {}
+    const options = { ...cloneDeep(opts || {}), signal: opts && opts.signal }
+    this.loadContext = require('./utils/loadContext')(fileOrObject, options)
+    this.budget = require('./utils/resolutionBudget').createBudget(options)
+    this.loadContext.budget = this.budget
+    this._encodingContext.budget = this.budget
+    this.budget.check()
+    options.options = this.loadContext.options
     // Setup wizard is explicit opt-in: the CLI translates --setup/`setup` into options.setup
     this.setupMode = options.setup === true
     // Set opts to pass into JS file calls
@@ -405,7 +385,7 @@ class Configorama {
     }
     this.settings.allowUnresolvedVariables = unresolvedSetting
 
-    this.filterCache = {}
+    this.filterCache = Object.create(null)
     // Cache for originalValue lookups (perf: avoid repeated dotProp.get)
     this._originalValueCache = new Map()
     // Paths whose current value is a literal with no variables — skip rebuilding
@@ -418,7 +398,6 @@ class Configorama {
     // to the same file (e.g., merged twice into different keys) don't reread.
     this._fileContentCache = new Map()
     /** @type {Map<string, Set<string>>} file ref -> file refs found in what it expanded to */
-    this._fileRefGraph = new Map()
 
     // rawOriginalConfig (a pre-preProcess snapshot) is only consumed by metadata
     // display paths. Skipping the cloneDeep when none of those paths are active
@@ -477,6 +456,7 @@ class Configorama {
 
     // Set initial config object to populate
     if (typeof fileOrObject === 'object') {
+      validateStructure(fileOrObject, options.resolutionLimits)
       // Store truly raw config before any preprocessing (only when needed)
       if (this._needsRawClone) {
         this.rawOriginalConfig = cloneDeep(fileOrObject)
@@ -511,6 +491,7 @@ class Configorama {
 
     // Track promise resolution
     this.tracker = new PromiseTracker()
+    this.budget.onClose = () => this.tracker.stop()
 
     // Variable Sources
     this.variableTypes = [
@@ -520,7 +501,7 @@ class Configorama {
        * ${env:Key}
        * ${env:KeyTwo, "fallbackValue"}
        */
-      getValueFromEnv,
+      { ...getValueFromEnv, resolver: variable => getValueFromEnv.resolver(variable, this.loadContext.env) },
       /**
        * CLI flags
        * Usage:
@@ -848,7 +829,7 @@ class Configorama {
 
     // Apply user defined filters
     if (options.filters) {
-      this.filters = Object.assign({}, this.filters, options.filters)
+      this.filters = Object.fromEntries([...Object.entries(this.filters), ...Object.entries(options.filters)])
     }
 
     // (\|\s*(toUpperCase|toLowerCase|toCamelCase|toKebabCase|capitalize)\s*)+$
@@ -912,7 +893,7 @@ class Configorama {
 
     // Apply user defined functions
     if (options.functions) {
-      this.functions = Object.assign({}, this.functions, options.functions)
+      this.functions = Object.fromEntries([...Object.entries(this.functions), ...Object.entries(options.functions)])
     }
 
     // Names whose (...) argument list holds values to encode on substitution (filters + functions), so a
@@ -922,6 +903,7 @@ class Configorama {
     )
 
     this.deep = []
+    this._deepOrigins = new Map()
     this.leaves = []
     this.callCount = 0
   }
@@ -1008,18 +990,8 @@ class Configorama {
     if (cleanVar.endsWith(this.varSuffix)) {
       cleanVar = cleanVar.slice(0, -this.varSuffix.length)
     }
-    const typePrefix = this.extractTypePrefix(cleanVar)
-
-    // Check if this is a known type (has a resolver) - known types should not be treated as "unknown allowed"
-    const isKnownType = typePrefix && this._resolverByPrefix && this._resolverByPrefix.has(typePrefix + ':')
-    if (isKnownType) return false
-
-    if (setting === true) return true
-
-    if (Array.isArray(setting)) {
-      if (typePrefix && setting.includes(typePrefix)) return true
-    }
-    return false
+    const {classify,allowedForeign}=require('./utils/expressions/ownership')
+    return allowedForeign(classify(cleanVar,{knownPrefixes:this._resolverByPrefix,prefix:this.varPrefix,suffix:this.varSuffix}),setting)
   }
 
   // ################
@@ -1032,7 +1004,12 @@ class Configorama {
    * @returns {Promise<any>} A promise resolving to the populated service.
    */
   async init(cliOpts) {
-    this.options = cliOpts || {}
+    if (opaque.currentContext() !== this._encodingContext) return opaque.runInContext(this._encodingContext, () => this.init(cliOpts))
+    return this.budget.run(() => this._init(cliOpts))
+  }
+  async _init(cliOpts) {
+    this.options = cloneDeep(cliOpts || this.loadContext.options)
+    this.settings.options = this.options
     const configoramaOpts = this.settings
 
     const showFoundVariables = configoramaOpts && configoramaOpts.dynamicArgs && (configoramaOpts.dynamicArgs.list || configoramaOpts.dynamicArgs.info)
@@ -1044,12 +1021,15 @@ class Configorama {
         contents: this.originalString,
         filePath: this.configFilePath,
         varRegex: this.variableSyntax,
-        dynamicArgs: this.settings.dynamicArgs
+        dynamicArgs: this.settings.dynamicArgs,
+        loadContext: this.loadContext,
+        moduleCacheMode: this.settings.moduleCacheMode
       })
       // An empty or comment-only YAML file parses to undefined/null: it is an empty config
       if (configObject === undefined || configObject === null) {
         configObject = {}
       }
+      validateStructure(configObject, { ...this.settings.resolutionLimits, source: this.configFilePath })
       this.configFileContents = ''
       if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
         this.configFileContents = fs.readFileSync(this.configFilePath, 'utf8')
@@ -1062,6 +1042,13 @@ class Configorama {
         this.rawOriginalConfig = cloneDeep(configObject)
       }
 
+      const markdownBodyKey = getBodyContentKey(configObject)
+      if (markdownBodyKey !== undefined) {
+        this._markdownContent = configObject[markdownBodyKey]
+        this._markdownContentKey = markdownBodyKey
+        delete configObject[markdownBodyKey]
+      }
+
       /* Preprocess step here - escapes ${} in help() args, fixes malformed fallbacks */
       configObject = preProcess(configObject, this.variableSyntax, this.variableTypes)
       /*
@@ -1069,16 +1056,6 @@ class Configorama {
       /** */
       //process.exit(1)
 
-      // Strip body content before variable resolution, re-attach after
-      if (configObject && configObject._body !== undefined) {
-        this._markdownContent = configObject._body
-        this._markdownContentKey = '_body'
-        delete configObject._body
-      } else if (configObject && configObject._content !== undefined) {
-        this._markdownContent = configObject._content
-        this._markdownContentKey = '_content'
-        delete configObject._content
-      }
 
       this.config = configObject
       this.originalConfig = cloneDeep(configObject)
@@ -1086,9 +1063,9 @@ class Configorama {
 
     if (VERBOSE) {
       logHeader('Config Input before processing')
-      console.log()
-      require('./utils/ui/deep-log')(decodeLiteralBracesDeep(this.originalConfig))
-      console.log()
+      console.error()
+      require('./utils/ui/deep-log').deepDebug(decodeLiteralBracesDeep(this.originalConfig))
+      console.error()
     }
 
     const variableSyntax = this.variableSyntax
@@ -1114,7 +1091,7 @@ class Configorama {
       ))
 
       if (showFoundVariables) {
-        const deepLog = require('./utils/ui/deep-log')
+        const deepLog = require('./utils/ui/deep-log').deepDebug
         deepLog('metadata', metadata)
         deepLog('enrich', enrich)
       }
@@ -1171,15 +1148,18 @@ class Configorama {
         }
 
         logHeader('User Inputs Summary')
-        console.log()
-        console.log(JSON.stringify(displayInputs, null, 2))
+        console.error()
+        console.error(JSON.stringify(displayInputs, null, 2))
 
         // Apply user inputs to options, environment, and config
-        require('./utils/setup/applyAnswers').applyAnswers({ options: this.options, env: process.env, config: this.config }, setupResult.answers)
+        const setupEnv = { ...this.loadContext.env }
+        require('./utils/setup/applyAnswers').applyAnswers({ options: this.options, env: setupEnv, config: this.config }, setupResult.answers)
+        this.loadContext.env = Object.freeze(setupEnv)
+        if (this.settings.dotEnvMode !== 'isolated') Object.assign(process.env, setupEnv)
 
-        console.log()
+        console.error()
         logHeader('Resolving Configuration')
-        console.log()
+        console.error()
 
         // process.exit(1)
 
@@ -1195,17 +1175,6 @@ class Configorama {
 
     const originalConfig = this.originalConfig
 
-    /* If no variables found just return early. The raw text can hide a variable whose quoted
-       literal holds braces (${opt:x, '{a}'}); preprocessing encoded those, so check that too. */
-    const hasNoVariables = this.originalString &&
-      !this.variableSyntaxTest.test(this.originalString) &&
-      !this.variableSyntaxTest.test(JSON.stringify(this.config))
-    if (hasNoVariables) {
-      if (this._markdownContent !== undefined) {
-        this.originalConfig[this._markdownContentKey] = this._markdownContent
-      }
-      return Promise.resolve(this.originalConfig)
-    }
 
     const useDotEnv = this.originalConfig.useDotenv || this.originalConfig.useDotEnv
     if ((useDotEnv && useDotEnv === true) || this.settings.useDotEnvFiles) {
@@ -1223,15 +1192,20 @@ class Configorama {
       ) {
         providerStage = this.originalConfig.provider.stage
       }
-      const stage = cliOpts.stage || providerStage || process.env.NODE_ENV || 'dev'
-      /* Load env variables into process.env */
-      require('env-stage-loader')({
-        silent: this.settings.dotEnvSilent,
-        debug: this.settings.dotEnvDebug,
-        env: stage,
-        // defaultEnv: 'prod',
-        // ignoreFiles: ['.env']
-      })
+      const stage = cliOpts.stage || providerStage || this.loadContext.env.NODE_ENV || 'dev'
+      require('./utils/loadDotenv')(this.loadContext, this.settings, stage)
+    }
+
+    /* If no variables found just return early. The raw text can hide a variable whose quoted
+       literal holds braces (${opt:x, '{a}'}); preprocessing encoded those, so check that too. */
+    const hasNoVariables = this.originalString &&
+      !this.variableSyntaxTest.test(this.originalString) &&
+      !this.variableSyntaxTest.test(JSON.stringify(this.config))
+    if (hasNoVariables) {
+      if (this._markdownContent !== undefined) {
+        this.originalConfig[this._markdownContentKey] = this._markdownContent
+      }
+      return Promise.resolve(this.originalConfig)
     }
 
     /* Parse variables */
@@ -1239,6 +1213,7 @@ class Configorama {
       return Promise.resolve()
         .then(() => {
           return this.populateObjectImpl(this.config).finally(() => {
+            this.budget.check()
             // TODO populate function values here?
             // console.log('Final Config', this.config)
             // console.log(this.deep)
@@ -1252,14 +1227,14 @@ class Configorama {
             walkAndUpdate(this.config, function (rawValue) {
               /* Pass through unknown variables */
               if (!configoramaOpts.allowUndefinedValues && typeof rawValue === 'undefined') {
-                const configValuePath = this.path.join('.')
+                const configValuePath = displayPath(this.path)
                 /*
                 console.log(this.path)
                 /** */
-                const ogValue = dotProp.get(originalConfig, configValuePath)
+                const ogValue = this.path.reduce((node, key) => node == null ? undefined : node[key], originalConfig)
                 const varDisplay = ogValue ? `"${ogValue}" variable` : 'variable'
 
-                const leaf = leaves.find((l) => l.path.join('.') === configValuePath)
+                const leaf = leaves.find((l) => encodePathIdentity(l.path) === encodePathIdentity(this.path))
                 // if (leaf) {
                 //   deepLog('leaf', leaf)
                 // }
@@ -1338,12 +1313,16 @@ class Configorama {
                 }
 
                 /* Allow for unknown variables to pass through */
-                if (rawValue.includes(PASSTHROUGH_PREFIX)) {
+                if (hasEncodedUnknown(rawValue)) {
                   const newValues = decodeUnknown(rawValue)
                   // console.log('>>>> newValues', newValues)
                   this.update(newValues)
                 }
               }
+            })
+
+            walkAndUpdate(this.config, function (value) {
+              if (typeof value === 'string') this.update(opaque.decodeAll(value))
             })
 
             if (DEBUG) {
@@ -1361,9 +1340,9 @@ class Configorama {
           }
           if (VERBOSE) {
             logHeader('Resolved Configuration value')
-            console.log()
-            require('./utils/ui/deep-log')(this.config)
-            console.log()
+            console.error()
+            require('./utils/ui/deep-log').deepDebug(this.config)
+            console.error()
           }
           // Re-attach markdown body content after variable resolution
           if (this._markdownContent !== undefined) {
@@ -1413,6 +1392,7 @@ class Configorama {
     return this.initialCall(() => this.populateObjectImpl(objectToPopulate))
   }
   populateObjectImpl(objectToPopulate) {
+    this.budget.pass()
     this.callCount = this.callCount + 1
 
     if (DEBUG) {
@@ -1423,6 +1403,10 @@ class Configorama {
     const leaves = this.getProperties(objectToPopulate, true, objectToPopulate)
     this.leaves = leaves
     // console.log('leaves', leaves)
+    const signature = JSON.stringify(leaves.filter(leaf => typeof leaf.value === 'string').map(leaf => [leaf.path, leaf.value]))
+    const progress = `${signature}:${this.deep.length}:${this.tracker.getSettled().length}`
+    if (this._lastProgress === progress && leaves.some(leaf => typeof leaf.value === 'string' && this.variableSyntaxTest.test(leaf.value))) throw new ConfigoramaError('resolution_no_progress', 'Configuration resolution stopped making progress')
+    this._lastProgress = progress
     const populations = this.populateVariables(leaves)
     // console.log("FILL LEAVES", populations)
 
@@ -1441,8 +1425,7 @@ class Configorama {
   // #######################
   isIgnorePath(pathValue) {
     if (!this.ignorePathPatterns.length) return false
-    // NUL-join so distinct path arrays can never collide on a shared key.
-    const key = isArray(pathValue) ? pathValue.join('\x00') : String(pathValue)
+    const key = encodePathIdentity(isArray(pathValue) ? pathValue : lookupPathSegments(String(pathValue)))
     const cached = this._ignorePathCache.get(key)
     if (cached !== undefined) return cached
     const result = shouldIgnorePath(pathValue, this.ignorePathPatterns)
@@ -1506,19 +1489,20 @@ class Configorama {
       return this.getProperties(root, false, value, context.concat(key), results)
     }
     if (isArray(current)) {
-      map(current, addContext)
+      for (const key of Object.keys(current)) addContext(current[key], key)
     } else if (isObject(current) && !isDate(current) && !isRegExp(current) && !isFunction(current)) {
       if (atRoot || current !== root) {
         mapValues(current, addContext)
       }
     } else {
       // Compute path once, then skip work for paths already known to be fully resolved.
-      const cacheKey = JSON.stringify(context)
+      const cacheKey = encodePathIdentity(context)
       if (this._resolvedPaths.has(cacheKey)) {
         return results
       }
       // TODO Add values to leaves here
       const leaf = {
+        origin: originAt(this.loadContext, context, this.configFilePath),
         path: context,
         value: current,
       }
@@ -1574,7 +1558,7 @@ class Configorama {
       leaf.originalSource = originalValue
 
       // Check if we have existing resolution history from previous iterations
-      const pathKey = context.join('.')
+      const pathKey = encodePathIdentity(context)
       if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].resolutionHistory) {
         leaf.resolutionHistory = this.resolutionTracking[pathKey].resolutionHistory
       } else {
@@ -1615,7 +1599,7 @@ class Configorama {
       if (property.hasVar) return true
       if (property.value !== undefined) {
         const p = property.path
-        this._resolvedPaths.add(JSON.stringify(p))
+        this._resolvedPaths.add(encodePathIdentity(p))
       }
       return false
     })
@@ -1655,6 +1639,9 @@ class Configorama {
     // eslint-disable-line class-methods-use-this
     return Promise.all(populations).then((results) => {
       return results.forEach((result) => {
+        if(result.nextOrigin && (typeof result.value !== 'string' || this.isWholeReference(result.value))) {
+          this.loadContext.origins.set(encodePathIdentity(result.path),result.nextOrigin)
+        }
         if (result.value !== result.populated) {
           set(target, result.path, result.populated)
         }
@@ -1665,7 +1652,7 @@ class Configorama {
         const populated = result.populated
         if (populated !== undefined && (typeof populated !== 'string' || !this.variableSyntaxTest.test(populated))) {
           const p = result.path
-          this._resolvedPaths.add(JSON.stringify(p))
+          this._resolvedPaths.add(encodePathIdentity(p))
         }
       })
     })
@@ -1688,21 +1675,13 @@ class Configorama {
    */
   getMatches(property) {
     if (typeof property !== 'string') return property
-    const matches = property.match(this.variableSyntax)
-    if (!matches || !matches.length) return property
-    // Matches are ordered and non-overlapping, so each starts at the first occurrence
-    // of its text after the previous match ends.
-    let cursor = 0
-    return map(matches, (match) => {
-      // console.log('match', match)
-      const index = property.indexOf(match, cursor)
-      cursor = index + match.length
-      return {
-        match: match,
-        variable: cleanVariable(match, this.variableSyntax, true, `getMatches ${this.callCount}`),
-        index: index,
-      }
-    })
+    const syntax=scanExpression(property,{prefix:this.varPrefix,suffix:this.varSuffix})
+    const refs=expressionReferences(syntax)
+    const matches=refs.filter(node=>node.complete&&!refs.some(child=>child.start>node.start&&child.end<=node.end))
+      .filter(node=>{const match=node.raw.match(this.variableSyntax);return !!match&&match[0]===node.raw})
+      .sort((a,b)=>a.start-b.start)
+    if(!matches.length)return property
+    return matches.map(node=>({match:node.raw,variable:property.slice(node.contentStart,node.contentEnd).trim(),index:node.start}))
   }
   /**
    * A fallback only runs when everything before it came up empty. Variables resolve innermost
@@ -1720,7 +1699,8 @@ class Configorama {
     const prefix = this.varPrefix
     const suffix = this.varSuffix
     // Spans close innermost first, so the first span around a match is its parent
-    const spans = variableSpans(property, prefix, suffix)
+    const parsed = scanExpression(property,{prefix,suffix})
+    const spans = expressionReferences(parsed).filter(n=>n.complete).sort((a,b)=>a.end-b.end||b.start-a.start)
     /**
      * @typedef {{ start: number, text: string, filters: string[], commas: number[], outcome: Promise<{ found: boolean, index?: number, value?: any }> }} List
      * @type {Map<number, List|null>}
@@ -1741,22 +1721,8 @@ class Configorama {
       // Filters after the list (${a, ${b} | Number}) apply to whichever item wins
       const [inner, ...filters] = splitOnTopLevelPipe(body, prefix, suffix)
       if (filters.some((f) => f.includes(prefix))) { lists.set(span.start, null); return null }
-      /** @type {number[]} Offsets in inner of its top-level commas */
-      const commas = []
-      let nested = 0
-      let depth = 0
-      let quote = ''
-      for (let i = 0; i < inner.length; i++) {
-        const ch = inner[i]
-        if (quote) { if (ch === '\\') i++; else if (ch === quote) quote = ''; continue }
-        if (inner.startsWith(prefix, i)) { nested++; i += prefix.length - 1; continue }
-        if (nested && inner.startsWith(suffix, i)) { nested--; i += suffix.length - 1; continue }
-        if (nested) continue
-        if (ch === "'" || ch === '"') quote = ch
-        else if (ch === '(' || ch === '[') depth++
-        else if (ch === ')' || ch === ']') depth--
-        else if (ch === ',' && depth === 0) commas.push(i)
-      }
+      const node=expressionReferences(parsed).find(n=>n.start===span.start)
+      const commas=(node.commas||[]).map(at=>at-span.start-prefix.length).filter(at=>at<inner.length)
       const items = [0, ...commas.map((c) => c + 1)].map((from, k) => inner.slice(from, k < commas.length ? commas[k] : inner.length).trim())
         // Bare items after the first arrive wrapped (env:X -> ${env:X}); a simple one is still plain
         .map((item) => {
@@ -1777,13 +1743,14 @@ class Configorama {
         const pending = isEncodedJson(items[i]) ? Promise.resolve(items[i])
           : this.getValueFromSource(items[i], valueObject, 'lazyFallback', text, span.start)
         return pending.then((result) => {
-          const value = (result && typeof result === 'object' && (result.__internal_only_flag || result.__internal_metadata)) ? result.value : result
+          const value = (isResolutionRecord(result)) ? result.value : result
           if (isString(value) && this.variableSyntaxTest.test(value)) return { found: false }
           if (isValidValue(value) && !isPassthrough(value)) return { found: true, index: i, value: reviveDates(parseEncodedJson(value)) }
           return firstValue(i + 1)
         })
       }
       const outcome = firstValue(0).then((found) => {
+        if(found.found)this.recordFallbackSelection(valueObject, text, found.index, items.length)
         if (!found.found || !filters.length) return found
         return Promise.resolve(this.applyFilters(found.value, filters.map((f) => f.trim()), valueObject.path))
           .then((value) => Object.assign({}, found, { value }))
@@ -1888,7 +1855,7 @@ class Configorama {
       // Extract metadata from result if present
       let actualResult = results[i]
       let resolverType = undefined
-      if (results[i] && typeof results[i] === 'object') {
+      if (isResolutionRecord(results[i])) {
         if (results[i].__internal_metadata) {
           actualResult = results[i].value
           resolverType = results[i].__resolverType
@@ -1900,13 +1867,13 @@ class Configorama {
 
       // Extract clean result to avoid circular references
       let cleanResult = actualResult
-      if (actualResult && typeof actualResult === 'object' && actualResult.__internal_only_flag) {
+      if (isResolutionRecord(actualResult)) {
         cleanResult = actualResult.value
       }
 
       let valueBeforeResolution = result
 
-      if (typeof valueBeforeResolution === 'object' && valueBeforeResolution.__internal_only_flag) {
+      if (isResolutionRecord(valueBeforeResolution)) {
         valueBeforeResolution = valueBeforeResolution.value
       }
 
@@ -1929,7 +1896,7 @@ class Configorama {
       }
 
       historyEntry.resultType = typeof finalResult
-      if (historyEntry.resultType === 'string' && typeof cleanResult === 'string' && cleanResult.startsWith(`${PASSTHROUGH_PREFIX}[`)) {
+      if (historyEntry.resultType === 'string' && typeof cleanResult === 'string' && hasEncodedUnknown(cleanResult)) {
         historyEntry.variableType = 'encodedUnknown'
       }
       historyEntry.valueBeforeResolution = valueBeforeResolution
@@ -2000,7 +1967,7 @@ class Configorama {
       // Process the match
       let valueToPop = results[i]
       // TODO refactor this. __internal_only_flag needed to stop clash with sync/async file resolution
-      if (results[i] && typeof results[i] === 'object' && (results[i].__internal_only_flag || results[i].__internal_metadata)) {
+      if (isResolutionRecord(results[i])) {
         valueToPop = results[i].value
       }
       // Copies of the same variable text can resolve differently (one inside a fallback
@@ -2019,10 +1986,12 @@ class Configorama {
 
     // Save resolution history to tracking map for persistence across iterations
     if (valueObject.path && valueObject.path.length) {
-      const pathKey = valueObject.path.join('.')
+      const pathKey = encodePathIdentity(valueObject.path)
       if (!this.resolutionTracking[pathKey]) {
         this.resolutionTracking[pathKey] = {
-          path: pathKey,
+          path: displayPath(valueObject.path),
+          pathSegments: valueObject.path.map(String),
+          pathIdentity: pathKey,
           originalPropertyString: valueObject.originalSource,
           resolvedPropertyValue: undefined,
           calls: []
@@ -2137,6 +2106,7 @@ class Configorama {
    * @param {any} valueObject.value The property to replace the matched string with the value.
    * @param {string[]} [valueObject.path] The path to the value in the config.
    * @param {string} [valueObject.originalSource] The original source string.
+   * @param {string} [valueObject.originalValuePath] Ancestor where a container was expanded.
    * @param {Array} [valueObject.resolutionHistory] History of resolution steps.
    * @param matchedString The string in the given property that was matched and is to be replaced.
    * @param valueToPopulate The value to replace the given matched string in the property with.
@@ -2226,15 +2196,12 @@ class Configorama {
       }
     }
 
-    const originalSrc = (typeof valueObject.originalSource === 'string') ? valueObject.originalSource : ''
-    const hasFilters = originalSrc.match(this.filterMatch)
-    let foundFilters = []
-    if (hasFilters) {
-      const filterPart = hasFilters[0].replace(this.varSuffixPattern, '')
-      foundFilters = splitOnPipe(filterPart)
-        .map((filter) => filter.trim())
-        .filter(Boolean)
-    }
+    const originalSrc = (!valueObject.originalValuePath && typeof valueObject.originalSource === 'string') ? valueObject.originalSource : ''
+    const originalSyntax=scanExpression(originalSrc,{prefix:this.varPrefix,suffix:this.varSuffix})
+    const originalRoot=expressionReferences(originalSyntax).find(n=>n.complete&&n.raw.trim()===originalSrc.trim())
+    const ownFilters=originalRoot?originalSyntax.nodes.filter(n=>n.parentId===originalRoot.id&&n.kind==='Filter'):[]
+    const hasFilters=ownFilters.length>0
+    let foundFilters=ownFilters.map(n=>n.raw.trim()).filter(Boolean)
     // console.log('foundFilters', foundFilters)
 
     // total replacement
@@ -2269,29 +2236,8 @@ class Configorama {
 
       }
 
-      /* Handle ${self:custom.ref, ''} with deep values.
-         Only re-expand the deep placeholder to its raw source when valueToPopulate is itself still
-         unresolved (a variable/deep ref that needs another pass). Once it is a concrete value the
-         deep ref has fully resolved — reverting to the raw source here would drop an applied filter. */
-      const valueStillUnresolved = typeof valueToPopulate === 'string' &&
-        (this.variableSyntaxTest.test(valueToPopulate) || !!valueToPopulate.match(deepRefSyntax))
-      if (v.match(deepRefSyntax) && this.variableSyntaxTest.test(originalSrc) && !v.match(/deep\:(\d*)\..*}$/) && valueStillUnresolved) {
-        // console.log('deep ref syntax')
-        // console.log('deep var', this.deep)
-        // console.log('originalSrc', originalSrc)
-        // console.log('value', v)
-        let deepIndex = Number(v.match(deepIndexPattern)[1])
-        let item = this.deep[deepIndex]
-
-        // Only follow chain if item IS a deep ref (not just contains one)
-        // e.g. item = "${deep:0}" should follow, but item = "https://...${deep:0}..." should not
-        if (/^\$\{deep:\d+\}$/.test(item)) {
-          deepIndex = Number(item.match(deepIndexPattern)[1])
-          item = this.deep[deepIndex]
-        }
-        property = this.deep[deepIndex]
-        // console.log('NEW PROPERTY after deep ref', property)
-      }
+      // Preserve a new deep reference: its private origin belongs to the newly
+      // selected value. Expanding the previous deep source loses that provenance.
     // partial replacement, string
     } else if (isString(valueToPopulate)) {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isString')
@@ -2307,7 +2253,7 @@ class Configorama {
 
       let currentMatchedString = matchedString
       /* Address fall through values if found */
-      if (valueToPopulate.includes(PASSTHROUGH_PREFIX)) {
+      if (hasEncodedUnknown(valueToPopulate)) {
         const decoded = decodeUnknown(valueToPopulate)
         if (decoded === property) {
           currentMatchedString = valueObject.value
@@ -2348,7 +2294,7 @@ class Configorama {
         !!(this.functions[deferredCall[1]] || this.functions[deferredCall[1].toLowerCase()]) &&
         currentMatchedString.trim() === `${this.varPrefix}${valueToPopulate}${this.varSuffix}`
       if (
-        isNestedCallArgument(property, currentMatchedString, this._callArgNames) &&
+        isNestedCallArgument(property, currentMatchedString, this._callArgNames, this.varPrefix, this.varSuffix) &&
         !this.variableSyntaxTest.test(valueToPopulate) &&
         !valueToPopulate.match(deepRefSyntax) &&
         !valueToPopulate.match(functionPrefixPattern) &&
@@ -2385,7 +2331,7 @@ class Configorama {
     // partial replacement, number
     } else if (isNumber(valueToPopulate)) {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isNumber')
-      const replacementValue = isNestedFilterArgument(property, matchedString)
+      const replacementValue = (isNestedFilterArgument(property, matchedString, this.varPrefix, this.varSuffix) || isNestedCallArgument(property, matchedString, this._callArgNames, this.varPrefix, this.varSuffix))
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
       property = replaceMatch(matchedString, replacementValue, property)
@@ -2418,7 +2364,7 @@ class Configorama {
         const isFileOrTextRef = /\bfile\s*\(|\btext\s*\(/.test(property)
         const isFallbackItem = isNestedInVariable &&
           isInFallbackSlot(property, matchedString, matchIndex, this.varPrefix, this.varSuffix)
-        if (isNestedFilterArgument(property, matchedString)) {
+        if ((isNestedFilterArgument(property, matchedString, this.varPrefix, this.varSuffix) || isNestedCallArgument(property, matchedString, this._callArgNames, this.varPrefix, this.varSuffix))) {
           property = replaceMatch(matchedString, encodeFilterArg(valueToPopulate), property)
         } else if (isNestedInVariable && (isFileOrTextRef || isFallbackItem)) {
           // Encode object as base64 to avoid breaking variable syntax with nested braces.
@@ -2455,7 +2401,7 @@ class Configorama {
       // (a fallback like ${env:X, ${self:flag}}), leave it to the fallback handler below so the boolean's
       // TYPE is preserved once that fallback is selected.
       if (DEBUG_TYPE) console.error('DEBUG_TYPE isBoolean')
-      const replacementValue = isNestedFilterArgument(property, matchedString)
+      const replacementValue = (isNestedFilterArgument(property, matchedString, this.varPrefix, this.varSuffix) || isNestedCallArgument(property, matchedString, this._callArgNames, this.varPrefix, this.varSuffix))
         ? encodeFilterArg(valueToPopulate)
         : String(valueToPopulate)
       property = replaceMatch(matchedString, replacementValue, property)
@@ -2502,14 +2448,14 @@ class Configorama {
         const after = parentVar.text.slice(at + matchedString.length)
         if (before.endsWith(',')) {
           const rebuilt = before.slice(0, -1) + after
-          return {
+          return resolutionRecord({
             value: property.slice(0, parentVar.start) + rebuilt + property.slice(parentVar.start + parentVar.text.length),
             path: valueObject.path,
             originalSource: valueObject.originalSource,
             resolutionHistory: valueObject.resolutionHistory || [],
             __internal_only_flag: true,
             caller: 'missingFallbackItem',
-          }
+          })
         }
       }
 
@@ -2529,7 +2475,7 @@ class Configorama {
           verifyVariable(nestedVar, valueObject, this.variableTypes, this.config)
         }
 
-        return {
+        return resolutionRecord({
           value: withFallback(fallbackStr),
           path: valueObject.path,
           originalSource: valueObject.originalSource,
@@ -2537,7 +2483,7 @@ class Configorama {
           // set __internal_only_flag to note this is object we make not a resolved value
           __internal_only_flag: true,
           caller: 'nestedVar',
-        }
+        })
       }
 
       // If allowUnresolvedVariables and there are fallbacks, use the fallback
@@ -2562,17 +2508,17 @@ class Configorama {
         // Next fallback is another variable
         const remainingContent = splitVars.slice(1).join(', ').replace(this.varSuffixPattern, '')
         const remainingFallbacks = this.varPrefix + remainingContent + this.varSuffix
-        return {
+        return resolutionRecord({
           value: withFallback(remainingFallbacks),
           path: valueObject.path,
           originalSource: valueObject.originalSource,
           resolutionHistory: valueObject.resolutionHistory || [],
           __internal_only_flag: true,
           caller: 'allowUnresolvedVariables-fallback',
-        }
+        })
       }
 
-      const currentPath = valueObject.path.join('.')
+      const currentPath = displayPath(valueObject.path)
 
       const errorMessage = `
 Missing Value ${missingValue} - ${matchedString}
@@ -2700,9 +2646,9 @@ Missing Value ${missingValue} - ${matchedString}
     //console.log('> property', property)
     if (runFilters) {
       // If filter cache exists we need to remove filter that have already been run
-      if (this.filterCache[valueObject.path]) {
+      if (this.filterCache[encodePathIdentity(valueObject.path || [])]) {
         foundFilters = foundFilters.filter((filter) => {
-          return !this.filterCache[valueObject.path].includes(filterCacheKey(filter, this.config))
+          return !this.filterCache[encodePathIdentity(valueObject.path || [])].includes(filterCacheKey(filter, this.config))
         })
       }
       property = this.applyFilters(property, foundFilters, valueObject.path)
@@ -2714,7 +2660,7 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('XXXX path', valueObject.path)
     // console.log('XXXX originalSource', valueObject.originalSource)
     // console.log('end property', property)
-    return {
+    return resolutionRecord({
       value: property,
       path: valueObject.path,
       originalSource: valueObject.originalSource,
@@ -2722,7 +2668,7 @@ Missing Value ${missingValue} - ${matchedString}
       __internal_only_flag: true, // set __internal_only_flag to note this is object we make not a resolved value
       caller: 'end',
       count: this.callCount,
-    }
+    })
   }
   /**
    * Run filters on a value and record them in the path's filter cache so the same
@@ -2744,7 +2690,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('PROPERTY', newVal)
       return newVal
     }, value)
-    const cacheKey = String(pathValue)
+    const cacheKey = encodePathIdentity(pathValue || [])
     this.filterCache[cacheKey] = (this.filterCache[cacheKey] || []).concat(filters.map((f) => filterCacheKey(f, this.config)))
     return filtered
   }
@@ -2816,8 +2762,8 @@ Missing Value ${missingValue} - ${matchedString}
       if (index >= variableStrings.length) return Promise.resolve(values)
       return resolveItem(variableStrings[index]).then((value) => {
         values[index] = value
-        const plain = (value && typeof value === 'object' && (value.__internal_only_flag || value.__internal_metadata)) ? value.value : value
-        if (isValidValue(plain) || (isString(plain) && this.variableSyntaxTest.test(plain))) return values
+        const plain = (isResolutionRecord(value)) ? value.value : value
+        if (isValidValue(plain) || (isString(plain) && this.variableSyntaxTest.test(plain))) { this.recordFallbackSelection(valueObject, originalVar, index, variableStrings.length); return values }
         return resolveInOrder(index + 1, values)
       })
     }
@@ -2827,7 +2773,7 @@ Missing Value ${missingValue} - ${matchedString}
       // console.log('overwrite values', valuesToUse)
       // Extract actual values from metadata objects
       const extractedValues = values.map((value) => {
-        if (value && typeof value === 'object' && (value.__internal_only_flag || value.__internal_metadata)) {
+        if (isResolutionRecord(value)) {
           return value.value
         }
         return value
@@ -2841,7 +2787,7 @@ Missing Value ${missingValue} - ${matchedString}
         if (isString(value) && this.variableSyntaxTest.test(value)) {
           deepProperties += 1
           // console.log('makeDeepVariable overwrite', value)
-          const deepVariable = this.makeDeepVariable(value, 'via overwrite')
+          const deepVariable = this.makeDeepVariable(value, 'via overwrite', isResolutionRecord(values[index]) ? values[index].sourceOrigin : valueObject.nextOrigin || valueObject.origin)
           // console.log('deepVariable', deepVariable)
           const newValue = cleanVariable(deepVariable, this.variableSyntax, true, `overwrite ${this.callCount}`)
           // console.log(`overwrite newValue ${variableStrings[index]}`, newValue)
@@ -2880,16 +2826,29 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('getValueFromSrc caller', caller)
     const propertyString = valueObject.value
     const pathValue = valueObject.path
-    // Cache joined path to avoid repeated array.join('.') calls
-    const pathJoined = pathValue && pathValue.length ? pathValue.join('.') : null
+    // Keep display labels separate from cache/dependency identity.
+    const pathJoined = pathValue && pathValue.length ? displayPath(pathValue) : null
+    const pathIdentity = encodePathIdentity(pathValue || [])
+    const origin=valueObject.origin || originAt(this.loadContext,pathValue,this.configFilePath)
+    const requestIdentity=origin.authoredFile?JSON.stringify([origin.authoredFile,variableString]):variableString
+    const reuseTracked = (key) => this.tracker.get(key, propertyString).then((record) => {
+      this.budget.check()
+      if (isResolutionRecord(record) && record.appliedFilters) {
+        this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(record.appliedFilters.map(f => filterCacheKey(f, this.config)))
+      }
+      if(isResolutionRecord(record)&&record.sourceOrigin)valueObject.nextOrigin=record.sourceOrigin
+      return record
+    })
 
 
     // Track every call to getValueFromSource for metadata
     if (this._trackCalls && pathJoined) {
-      const pathKey = pathJoined
+      const pathKey = pathIdentity
       if (!this.resolutionTracking[pathKey]) {
         this.resolutionTracking[pathKey] = {
-          path: pathKey,
+          path: pathJoined,
+          pathSegments: pathValue.map(String),
+          pathIdentity,
           originalPropertyString: propertyString,
           resolvedPropertyValue: undefined,
           calls: []
@@ -2920,7 +2879,7 @@ Missing Value ${missingValue} - ${matchedString}
     }
 
     // console.log('getValueFromSrc propertyString', propertyString)
-    // console.log(`tracker contains ${variableString}`, this.tracker.contains(variableString))
+    // console.log(`tracker contains ${variableString}`, this.tracker.contains(requestIdentity))
 
     // Cycle detection: track dependencies and check for cycles
     const fromPath = pathJoined
@@ -2933,17 +2892,17 @@ Missing Value ${missingValue} - ${matchedString}
     if (fromPath && (variableString.startsWith('self:') || !variableString.includes(':'))) {
       // A value can't contain itself: o.k referencing o would expand forever
       const targetPath = bracketsToDots(toPath.trim())
-      const targetSegments = targetPath.split('.')
+      const targetSegments = lookupPathSegments(toPath.trim())
       if (targetPath && targetSegments.length < pathValue.length && targetSegments.every((segment, i) => segment === String(pathValue[i]))) {
         return Promise.reject(new Error(
           `Circular variable dependency detected: ${fromPath} → ${targetPath} (a value can't reference the object that contains it)`
         ))
       }
       // Dependency identity must distinguish a literal 'a.b' key from a.b.
-      const fromKey = JSON.stringify(pathValue.map(String))
-      const toKey = JSON.stringify(targetSegments)
+      const fromKey = encodePathIdentity(pathValue)
+      const toKey = encodePathIdentity(targetSegments)
       if (this.tracker.wouldCreateCycle(fromKey, toKey)) {
-        const cyclePath = this.tracker.getCyclePath(fromKey, toKey).map((key) => JSON.parse(key).join('.'))
+        const cyclePath = this.tracker.getCyclePath(fromKey, toKey).map((key) => displayPath(decodePathIdentity(key)))
         return Promise.reject(new Error(
           `Circular variable dependency detected: ${cyclePath.join(' → ')}`
         ))
@@ -2955,10 +2914,10 @@ Missing Value ${missingValue} - ${matchedString}
     // ignore path (Fn::Sub etc.): there bare refs (${foo}) must stay verbatim, and the
     // shared result from a plain string would bypass the ignore-path check below.
     const inIgnorePath = this.isIgnorePath(pathValue)
-    const trackedVariable = variableString
-    if (!inIgnorePath && this.tracker.contains(variableString)) {
+    const trackedVariable = requestIdentity
+    if (!inIgnorePath && this.tracker.contains(requestIdentity)) {
       // console.log('try to get', variableString)
-      return this.tracker.get(variableString, propertyString)
+      return reuseTracked(requestIdentity)
     }
 
     let newHasFilter
@@ -3069,21 +3028,27 @@ Missing Value ${missingValue} - ${matchedString}
     // the config could inline the wrong value. Explicitly typed refs (self:, file, text,
     // env, opt, cron, eval, git, custom, string, number) still resolve, as Serverless does.
     if (inIgnorePath && (!found || resolverType === 'dot.prop')) {
-      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+      return Promise.resolve(encodeUnknown(originalVar || this.varPrefix + variableString + this.varSuffix))
     }
     // Types that do resolve inside ignore paths (self:, opt, env, file, ...) can share the
     // result tracked for the same variable elsewhere, as they do outside ignore paths.
     if (inIgnorePath && this.tracker.contains(trackedVariable)) {
-      return this.tracker.get(trackedVariable, propertyString)
+      return reuseTracked(trackedVariable)
     }
 
     // A call to a function that doesn't exist (${concat('a', 'b')}) is a mistake, not text to keep.
     // Only generic resolvers (a quoted string, a bare path) would take it, and they'd return it as text
     const call = /^\s*([A-Za-z_$][\w$]*)\s*\(/.exec(variableString)
     if (call && (!found || resolverType === 'string' || resolverType === 'dot.prop') &&
-      !this.settings.allowUnknownVariableTypes && !this.settings.allowUnresolvedVariables &&
       !this.functions[call[1]] && !this.functions[call[1].toLowerCase()]) {
       throw new Error(unknownFunctionMessage(call[1], `${this.varPrefix}${variableString}${this.varSuffix}`, this))
+    }
+    if (!found) {
+      const ownership=require('./utils/expressions/ownership').classify(variableString,{knownPrefixes:this._resolverByPrefix,prefix:this.varPrefix,suffix:this.varSuffix})
+      if(ownership.kind==='foreign') {
+        if(this.isUnknownTypeAllowed(variableString))return Promise.resolve(encodeUnknown(originalVar || this.varPrefix+variableString+this.varSuffix))
+        throw new Error(`Unknown variable source "${ownership.type}": invalid variable syntax. Variable: "${variableString}" not found`)
+      }
     }
     if (found && resolverFunction) {
       /*
@@ -3100,20 +3065,21 @@ Missing Value ${missingValue} - ${matchedString}
       // get it back as written. Literal resolvers decode their own text later
       const lookupString = KEY_LOOKUP_TYPES.has(resolverType) ? decodeLiteralBraces(variableString) : variableString
       // TODO finalize resolverFunction API
-      const valuePromise = resolverFunction(
+      const valuePromise = Promise.resolve().then(() => resolverFunction(
         lookupString,
         this.options,
         this.config,
         valueObject,
-      ).then((val) => {
+      )).then((val) => {
+        this.budget.check()
         // Update the last call with the resolved value
         if (this._trackCalls && pathJoined) {
-          const pathKey = pathJoined
+          const pathKey = pathIdentity
           if (this.resolutionTracking[pathKey] && this.resolutionTracking[pathKey].calls.length) {
             // Find the most recent call for this variableString
             for (let i = this.resolutionTracking[pathKey].calls.length - 1; i >= 0; i--) {
               if (this.resolutionTracking[pathKey].calls[i].variableString === variableString) {
-                const v = (val && typeof val === 'object' && val.__internal_only_flag) ? val.value : val
+                const v = (isResolutionRecord(val)) ? val.value : val
                 this.resolutionTracking[pathKey].calls[i].resolvedValue = v
                 this.resolutionTracking[pathKey].calls[i].resolverType = resolverType
                 break
@@ -3128,6 +3094,7 @@ Missing Value ${missingValue} - ${matchedString}
         if (
           (val === null && !isEvalOrIfResolver) ||
           typeof val === 'undefined' ||
+          (isResolutionRecord(val) && val.value === undefined && this.isUnresolvedAllowed(resolverType)) ||
           /* match deep refs as empty {}, they need resolving via functions */
           (typeof val === 'object' && isEmpty(val) && variableString.match(/deep\:/))
         ) {
@@ -3171,10 +3138,15 @@ Missing Value ${missingValue} - ${matchedString}
           }
 
           const isUnresolvedAllowed =
-            this.settings.allowUnresolvedVariables === true ||
-            (isFileRef && this.isUnresolvedAllowed('file'))
+            this.isUnresolvedAllowed(resolverType) || (isFileRef && this.isUnresolvedAllowed('file'))
 
           if (isUnresolvedAllowed) {
+            // A missing earlier slot must still let the next fallback run.
+            if(caller==='overwrite' && originalVar) {
+              const slots=splitByComma(cleanVariable(originalVar,this.variableSyntax,true,'unresolved fallback'),this.variableSyntax)
+              const slot=slots.findIndex(item=>item.trim()===variableString.trim())
+              if(slot>=0 && slot<slots.length-1)return undefined
+            }
             // Check if outer expression has fallbacks we can use
             if (valueCount.length > 1) {
               const primaryVar = valueCount[0]
@@ -3185,7 +3157,7 @@ Missing Value ${missingValue} - ${matchedString}
               }
             }
             // Encode only the unknown variable, not the entire string
-            return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+            return Promise.resolve(encodeUnknown(originalVar && cleanVariable(originalVar,this.variableSyntax,true,'unresolved source').trim()===variableString.trim() ? originalVar : this.varPrefix + variableString + this.varSuffix))
           }
 
           if (valueCount.length === 1 && noNestedVars) {
@@ -3223,17 +3195,17 @@ Missing Value ${missingValue} - ${matchedString}
           // console.log('> RESOLVER RETURN newValue 3', val, originalVar)
           // Wrap value with resolverType metadata for resolution tracking
           // But don't wrap if it's already an internal flag object
-          if (val && typeof val === 'object' && val.__internal_only_flag) {
+          if (isResolutionRecord(val)) {
             // Attach resolverType to existing internal object
             val.__resolverType = resolverType
             return Promise.resolve(val)
           }
-          return Promise.resolve({
+          return Promise.resolve(resolutionRecord({
             value: val,
             __resolverType: resolverType,
             __variableString: variableString,
             __internal_metadata: true
-          })
+          }))
         }
 
         const newUse = newHasFilter.reduce((acc, currentFilter, i) => {
@@ -3260,7 +3232,7 @@ Missing Value ${missingValue} - ${matchedString}
         // Fully resolve that value first (recursively, with NO path so it can't re-enter this path and cycle),
         // THEN apply the filters. A re-entrancy guard prevents pathological recursion. A lone nested variable
         // / ${deep:N} placeholder is excluded — that is handled by the carry-over below.
-        const settledValue = (val && typeof val === 'object' && val.__internal_only_flag && typeof val.value === 'string') ? val.value : null
+        const settledValue = (isResolutionRecord(val) && typeof val.value === 'string') ? val.value : null
         // A lone ${deep:N} placeholder is handled by the carry-over below; everything else that still holds
         // unresolved variables must be fully resolved before filtering. That covers a compose with literal
         // text (${a}-${b}) AND a fallback expression still carrying a ${deep:N} (${env:MISSING, deep:2}),
@@ -3279,17 +3251,17 @@ Missing Value ${missingValue} - ${matchedString}
             return this.populateValue({ value: settledValue }, true, 'getValueFromSrc filter-defer').then(
               (resolvedObj) => {
                 this._filterDeferKeys.delete(deferKey)
-                const resolved = (resolvedObj && typeof resolvedObj === 'object' && resolvedObj.__internal_only_flag) ? resolvedObj.value : resolvedObj
+                const resolved = (isResolutionRecord(resolvedObj)) ? resolvedObj.value : resolvedObj
                 const filtered = newUse.reduce((acc, c) => {
-                  const tv = (acc && typeof acc === 'object' && acc.__internal_only_flag) ? acc.value : acc
+                  const tv = (isResolutionRecord(acc)) ? acc.value : acc
                   if (typeof c.filter !== 'function') return tv
                   // Record in filterCache (like the regular reduce) so populateVariable's dedup won't
                   // re-apply this filter to the whole assembled value — e.g. lit-${self:cc | up} where the
                   // filter would otherwise run again on "lit-VALUE-GOOSE".
-                  this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
+                  this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(filterCacheKey(c.filterString, this.config))
                   return c.args ? c.filter(tv, ...c.args) : c.filter(tv)
                 }, resolved)
-                return { value: filtered, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true }
+                return resolutionRecord({ value: filtered, appliedFilters: newHasFilter, __resolverType: resolverType, __variableString: variableString, __internal_metadata: true })
               },
               (err) => { this._filterDeferKeys.delete(deferKey); return Promise.reject(err) },
             )
@@ -3319,39 +3291,45 @@ Missing Value ${missingValue} - ${matchedString}
           // Fix for async value resolution. That code file refs returns object with .value
           // (a && ...) guards a null accumulator — a prior filter may have returned null (typeof null
           // is 'object'), which would otherwise crash reading .__internal_only_flag.
-          const theValue = a && typeof a === 'object' && a.__internal_only_flag ? a.value : a
+          const theValue = isResolutionRecord(a) ? a.value : a
           if (typeof c.filter !== 'function') {
             return theValue
           }
           if (c.args) {
-            this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
+            this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(filterCacheKey(c.filterString, this.config))
             return c.filter(theValue, ...c.args)
           }
-          this.filterCache[pathValue] = (this.filterCache[pathValue] || []).concat(filterCacheKey(c.filterString, this.config))
+          this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(filterCacheKey(c.filterString, this.config))
           return c.filter(theValue)
         }, val)
         // console.log('> RESOLVER RETURN newValue', newValue)
         // console.log('> RESOLVER RETURN newValue 5', newValue)
         // Wrap value with resolverType metadata for resolution tracking
         // But don't wrap if it's already an internal flag object
-        if (newValue && typeof newValue === 'object' && newValue.__internal_only_flag) {
+        if (isResolutionRecord(newValue)) {
           // Attach resolverType to existing internal object
           newValue.__resolverType = resolverType
           return Promise.resolve(newValue)
         }
-        return Promise.resolve({
+        return Promise.resolve(resolutionRecord({
           value: newValue,
+          appliedFilters: newHasFilter,
           __resolverType: resolverType,
           __variableString: variableString,
           __internal_metadata: true
-        })
+        }))
       })
 
+      const ownedValuePromise=valuePromise.then(record=>{
+        if(!valueObject.nextOrigin)return record
+        if(isResolutionRecord(record)){record.sourceOrigin=valueObject.nextOrigin;return record}
+        return resolutionRecord({value:record,sourceOrigin:valueObject.nextOrigin})
+      })
       // console.log('valuePromise', valuePromise)
       // console.log(`----------End Resolver [${resolverType}]-------------------`)
       // console.log('newHasFilter', newHasFilter)
       // TODO do something with func here?
-      return this.tracker.add(variableString, valuePromise, propertyString, newHasFilter, promiseKey)
+      return this.tracker.add(variableString, ownedValuePromise, propertyString, newHasFilter, origin.authoredFile ? requestIdentity : promiseKey)
     }
 
     // console.log('fall thru variableString', variableString)
@@ -3525,13 +3503,13 @@ Missing Value ${missingValue} - ${matchedString}
       // The caller substitutes this value at the matched position; returning the
       // full property would re-insert the surrounding context (including this
       // variable) and cause exponential string growth on subsequent passes.
-      return Promise.resolve(encodeUnknown(this.varPrefix + variableString + this.varSuffix))
+      return Promise.resolve(encodeUnknown(originalVar || this.varPrefix + variableString + this.varSuffix))
     }
 
     const message = errorMessage.join('\n')
     const notFoundPromise = Promise.reject(new Error(message))
 
-    return this.tracker.add(variableString, notFoundPromise, propertyString, newHasFilter)
+    return this.tracker.add(variableString, notFoundPromise, propertyString, newHasFilter, requestIdentity)
   }
   getValueFromSelf(variableString, o, x, data) {
     /*
@@ -3559,7 +3537,10 @@ Missing Value ${missingValue} - ${matchedString}
       // Otherwise, keep deepProperties as-is to try top-level lookup
     }
 
-    return this.getDeeperValue(deepProperties, valueToPopulate).then((res) => {
+    const origin=originAt(this.loadContext,deepProperties,this.configFilePath)
+    return this.getDeeperValue(deepProperties, valueToPopulate, origin).then((res) => {
+      if(data.path&&origin.authoredFile)data.nextOrigin=origin
+
       /*
       console.log('self getDeeperValue variableString', variableString)
       console.log('self getDeeperValue result', res)
@@ -3567,69 +3548,6 @@ Missing Value ${missingValue} - ${matchedString}
       return res
     })
   }
-  /**
-   * Record which file refs a file ref expanded into, and fail if that closes a loop
-   * (a.yml -> b.yml -> a.yml), which would otherwise expand forever
-   * @param {string} variableString - The file ref that was expanded
-   * @param {any} value - What it resolved to
-   */
-  recordFileRefExpansion(variableString, value) {
-    const text = typeof value === 'string' ? value : (value && typeof value === 'object' ? JSON.stringify(value) : '')
-    if (!text) return
-    const fileRefKey = (/** @type {string} */ ref) => ref.replace(/\s+/g, '').replace(/^file\(\.\//, 'file(')
-    const from = fileRefKey(variableString)
-    // Variables in a resolved value come back as ${deep:N} placeholders; follow them to their text
-    /** @type {string[]} */
-    const found = []
-    const texts = [text]
-    const seenDeep = new Set()
-    while (texts.length) {
-      const current = /** @type {string} */ (texts.pop())
-      for (const match of current.match(this.variableSyntax) || []) {
-        const inner = match.slice(this.varPrefix.length, match.length - this.varSuffix.length).trim()
-        const deepIndex = inner.match(/^deep:(\d+)/)
-        if (deepIndex && !seenDeep.has(deepIndex[1])) {
-          seenDeep.add(deepIndex[1])
-          const deepText = this.deep[Number(deepIndex[1])]
-          if (typeof deepText === 'string') texts.push(deepText)
-        } else if (inner.startsWith('file(')) {
-          found.push(fileRefKey(inner))
-        }
-      }
-    }
-    if (!found.length) return
-    if (!this._fileRefGraph.has(from)) this._fileRefGraph.set(from, new Set())
-    const edges = this._fileRefGraph.get(from)
-    for (const to of found) {
-      if (edges) edges.add(to)
-      const chain = this.findFileRefPath(to, from)
-      if (chain) {
-        throw new Error(`Circular file reference detected: ${[from].concat(chain).join(' → ')}`)
-      }
-    }
-  }
-
-  /**
-   * Path of file refs from start to target through the recorded expansions, or null
-   * @param {string} start - File ref to search from
-   * @param {string} target - File ref to reach
-   * @returns {string[]|null} Refs from start to target, inclusive
-   */
-  findFileRefPath(start, target) {
-    /** @type {Array<string[]>} */
-    const stack = [[start]]
-    const visited = new Set()
-    while (stack.length) {
-      const chain = /** @type {string[]} */ (stack.pop())
-      const node = chain[chain.length - 1]
-      if (node === target) return chain
-      if (visited.has(node)) continue
-      visited.add(node)
-      for (const next of this._fileRefGraph.get(node) || []) stack.push(chain.concat(next))
-    }
-    return null
-  }
-
   /**
    * Resolve a file() ref, remembering expansions for circular reference detection
    * @param {string} variableString - The file ref, e.g. file(./x.yml):key
@@ -3639,14 +3557,17 @@ Missing Value ${missingValue} - ${matchedString}
   async getValueFromFile(variableString, options) {
     const ctx = {
       configPath: this.configPath,
+      authoredRoot: this.configFilePath,
       fileRefsFound: this.fileRefsFound,
       variableSyntax: this.variableSyntax,
       variablesKnownTypes: this.variablesKnownTypes,
       variableTypes: this.variableTypes,
       opts: this.settings,
+      env: this.loadContext.env,
+      loadContext: this.loadContext,
       originalConfig: this.originalConfig,
       config: this.config,
-      getDeeperValue: this.getDeeperValue.bind(this),
+      getDeeperValue: (segments, value) => this.getDeeperValue(segments, value, options.context.nextOrigin || options.context.origin),
       fileRefSyntax: fileRefSyntax,
       textRefSyntax: textRefSyntax,
       varPrefix: this.varPrefix,
@@ -3655,7 +3576,8 @@ Missing Value ${missingValue} - ${matchedString}
       safetyPolicy: this.safetyPolicy
     }
     const value = await getValueFromFileResolver(ctx, variableString, options)
-    this.recordFileRefExpansion(variableString, value)
+    this.budget.check()
+    validateStructure(value, this.settings.resolutionLimits)
     return value
   }
   getValueFromDeep(variableString, pathValue) {
@@ -3677,21 +3599,25 @@ Missing Value ${missingValue} - ${matchedString}
       outerSource.replace(this.filterMatch, '').split(this.varPrefix).length > 2
     const valueObject = {
       value: variable,
+      origin: this._deepOrigins.get(Number(variableString.replace(deepIndexReplacePattern, ''))) || pathValue && (pathValue.nextOrigin || pathValue.origin),
       path: pathValue ? pathValue.path : undefined,
       originalSource: deepRefIsSelector ? variable : outerSource,
       resolutionHistory: pathValue ? pathValue.resolutionHistory : []
     }
-    let ret = this.populateValue(valueObject, undefined, 'getValueFromDeep')
+    let ret = this.populateValue(valueObject, undefined, 'getValueFromDeep').then(record=>{
+      if(valueObject.nextOrigin){if(pathValue)pathValue.nextOrigin=valueObject.nextOrigin;if(isResolutionRecord(record))record.sourceOrigin=valueObject.nextOrigin}
+      return record
+    })
     if (deepRef.length) {
       // if there is a deep reference remaining
       ret = ret.then((result) => {
         // console.log('DEEP RESULT', result)
         if (isString(result.value) && this.variableSyntaxTest.test(result.value)) {
           // console.log('makeDeepVariable getValueFromDeep', result.value)
-          const deepVariable = this.makeDeepVariable(result.value, 'via getValueFromDeep')
+          const deepVariable = this.makeDeepVariable(result.value, 'via getValueFromDeep', valueObject.nextOrigin || valueObject.origin)
           return Promise.resolve(appendDeepVariable(deepVariable, deepRef))
         }
-        return this.getDeeperValue(deepRef.split('.'), result.value)
+        return this.getDeeperValue(deepRef.split('.'), result.value, valueObject.nextOrigin || valueObject.origin)
       })
     }
     return ret
@@ -3709,12 +3635,25 @@ Missing Value ${missingValue} - ${matchedString}
     /** */
     return this.deep[index]
   }
-  makeDeepVariable(variable, caller) {
-    // variable = variable.replace("dev", '"dev"')
-    let index = this.deep.findIndex((item) => variable === item)
+  recordFallbackSelection(valueObject, expression, index, length) {
+    if(!valueObject.path)return
+    const identity=encodePathIdentity(valueObject.path)
+    const tracking=this.resolutionTracking[identity] || (this.resolutionTracking[identity]={path:displayPath(valueObject.path),pathSegments:valueObject.path.map(String),pathIdentity:identity,calls:[]})
+    if(!tracking.fallbackSelections)tracking.fallbackSelections=[]
+    const selection={expression,index,branches:Array.from({length},(_,itemIndex)=>({itemIndex,outcome:itemIndex===index?'selected':itemIndex>index?'skipped':'missing'}))}
+    if(!tracking.fallbackSelections.some(item=>item.expression===expression&&item.index===index))tracking.fallbackSelections.push(selection)
+  }
+  isWholeReference(value) {
+    const parsed = scanExpression(value, {prefix: this.varPrefix, suffix: this.varSuffix})
+    return parsed.nodes.some(node => node.kind === 'Reference' && node.complete && node.raw.trim() === value.trim())
+  }
+  makeDeepVariable(variable, caller, origin = undefined) {
+    const originIdentity = JSON.stringify(origin)
+    let index = this.deep.findIndex((item, candidate) => variable === item && JSON.stringify(this._deepOrigins.get(candidate)) === originIdentity)
     if (index < 0) {
       // console.log('this.deep.push', variable)
       index = this.deep.push(variable) - 1
+      if(origin)this._deepOrigins.set(index, origin)
     }
     // console.log("makeDeepVariable SET INDEX", index)
     const variableContainer = variable.match(this.variableSyntax)[0]
@@ -3749,7 +3688,7 @@ Missing Value ${missingValue} - ${matchedString}
    * @returns {Promise} A promise resolving to the deeper value or to a `deep` variable that
    * will later resolve to the deeper value
    */
-  getDeeperValue(deepProperties, valueToPopulate) {
+  getDeeperValue(deepProperties, valueToPopulate, origin = undefined) {
     /*
     console.log('deepProperties', deepProperties)
     console.log('valueToPopulate', valueToPopulate)
@@ -3768,14 +3707,14 @@ Missing Value ${missingValue} - ${matchedString}
         if (typeof reducedValue === 'undefined') {
           // was reducedValue = {}
           // Adding internal flag signals this value is unknown
-          reducedValue = {
+          reducedValue = resolutionRecord({
             value: undefined,
             path: undefined,
             originalSource: undefined,
             // set __internal_only_flag to note this is object we make not a resolved value
             __internal_only_flag: true,
             caller: 'getDeeperValue',
-          }
+          })
         } else if (subProperty !== '' || (typeof reducedValue === 'object' && '' in reducedValue)) {
           try {
             // if JSON parse it
@@ -3793,7 +3732,7 @@ Missing Value ${missingValue} - ${matchedString}
         }
         if (typeof reducedValue === 'string' && this.variableSyntaxTest.test(reducedValue)) {
           // console.log('makeDeepVariable reducedValue', reducedValue)
-          reducedValue = this.makeDeepVariable(reducedValue, 'via getDeeperValue')
+          reducedValue = this.makeDeepVariable(reducedValue, 'via getDeeperValue', origin)
         }
       }
       // console.log('fin', reducedValue)
@@ -3808,15 +3747,18 @@ Missing Value ${missingValue} - ${matchedString}
   // ###############
   initialCall(func) {
     this.deep = []
+    this._deepOrigins = new Map()
     // Progress reporting is a debug-only aid; the tracker still coordinates
     // promises and detects cycles regardless.
     this.tracker.start(DEBUG)
     return func().finally(() => {
       this.tracker.stop()
       this.deep = []
+    this._deepOrigins = new Map()
     })
   }
-  runFunction(variableString) {
+  runFunction(variableString, depth = 0) {
+    this.loadContext.budget.visit(depth)
     // console.log('runFunction', variableString)
     /* If json object value return it */
     if (variableString.match(/^\s*{/) && variableString.match(/}\s*$/)) {
@@ -3832,7 +3774,7 @@ Missing Value ${missingValue} - ${matchedString}
     }
     // Skip file/text when they match resolver regex OR contain encoded passthrough values
     // Malformed patterns (with %, \, etc) should still error
-    const hasPassthrough = variableString.includes(PASSTHROUGH_PREFIX)
+    const hasPassthrough = hasEncodedUnknown(variableString)
     if (hasFunc[1] === 'file' && (variableString.match(fileRefSyntax) || hasPassthrough)) {
       return variableString
     }
@@ -3858,7 +3800,7 @@ Missing Value ${missingValue} - ${matchedString}
       // Recursively evaluate any nested function calls in arguments
       const evaluatedArgs = splitter.map((arg) => {
         if (typeof arg === 'string' && funcRegex.test(arg)) {
-          return this.runFunction(arg)
+          return this.runFunction(arg, depth + 1)
         }
         return arg
       })
@@ -3882,14 +3824,15 @@ Missing Value ${missingValue} - ${matchedString}
     // console.log('typeof funcValue', typeof funcValue)
     let replaceVal = funcValue
     if (typeof funcValue === 'string') {
-      const replaceIt = variableString.replace(hasFunc[0], funcValue)
+      const replaceIt = variableString.replace(hasFunc[0], () => funcValue)
       replaceVal = cleanVariable(replaceIt, this.variableSyntax, true, `runFunction ${this.callCount}`)
     }
 
     // If wrapped in outer function, recurse
     const hasMoreFunctions = funcRegex.exec(replaceVal)
     if (hasMoreFunctions) {
-      return this.runFunction(replaceVal)
+      if (replaceVal === variableString) throw new ConfigoramaError('resolution_no_progress', 'Function expression made no progress')
+      return this.runFunction(replaceVal, depth + 1)
     }
     return replaceVal
   }

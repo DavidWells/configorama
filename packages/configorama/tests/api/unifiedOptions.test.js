@@ -115,10 +115,10 @@ test('useDotenv loads env files silently by default', async () => {
   assert.not.ok(messages.some(message => message.includes('[env-stage-loader]')))
 })
 
-test('dotEnvSilent false preserves env-stage-loader output', async () => {
+test('dotEnvSilent false emits progress to stderr', async () => {
   const messages = []
-  const originalLog = console.log
-  console.log = (...args) => messages.push(args.join(' '))
+  const originalLog = console.error
+  console.error = (...args) => messages.push(args.join(' '))
 
   try {
     const result = await configorama({
@@ -131,10 +131,10 @@ test('dotEnvSilent false preserves env-stage-loader output', async () => {
 
     assert.is(result.stage, 'dev')
   } finally {
-    console.log = originalLog
+    console.error = originalLog
   }
 
-  assert.ok(messages.some(message => message.includes('[env-stage-loader] Loading "dev" environment values')))
+  assert.ok(messages.some(message => message.includes('Loading dotenv environment files')))
 })
 
 // ===========================================

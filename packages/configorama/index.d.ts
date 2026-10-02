@@ -71,6 +71,16 @@ interface ConfigoramaSettings {
   dotEnvSilent?: boolean
   /** Enable env-stage-loader debug logs when useDotenv/useDotEnv is enabled */
   dotEnvDebug?: boolean
+  /** Dotenv mutation policy; process is the compatible default. Isolated keeps the snapshot local. */
+  dotEnvMode?: 'process' | 'isolated'
+  /** Executable evaluation cache: legacy format defaults, process graph, or fresh graph per load. */
+  moduleCacheMode?: 'legacy' | 'process' | 'load'
+  /** Cooperative deadline from API entry. Sync work cannot be preempted within the calling thread. */
+  timeoutMs?: number
+  /** Cooperative cancellation; supported by async APIs only. */
+  signal?: AbortSignal
+  /** Resolution bounds: defaults are 1000 passes, depth 512, and 1,000,000 visited nodes. */
+  resolutionLimits?: { maxPasses?: number; maxDepth?: number; maxVisitedNodes?: number }
   /** Keys to merge in arrays of objects */
   mergeKeys?: string[]
   /** Map of file paths to override */

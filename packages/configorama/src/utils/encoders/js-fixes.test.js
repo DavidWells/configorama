@@ -46,7 +46,7 @@ test('encodeJsonArgObjects - a call outside any variable is plain text (VTL #set
 
 test('encodeJsonArgObjects - only the call inside a variable is encoded when both appear', () => {
   const out = encodeJsonArgObjects('#set($m = {"a":1}) ${self:x | help({"k":2})}')
-  assert.ok(out.startsWith('#set($m = {"a":1}) ${self:x | help(__JSON_B64__'), out)
+  assert.ok(out.startsWith('#set($m = {"a":1}) ${self:x | help(__CFG_J_'), out)
 })
 
 test('encodeJsonArgObjects - file() and text() paths are not JSON', () => {

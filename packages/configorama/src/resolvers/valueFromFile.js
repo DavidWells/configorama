@@ -16,7 +16,8 @@ const { applyDotenvFileRefMetadata, isIniLikeFilePath } = require('../utils/secu
 const YAML = require('../parsers/yaml')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
-const { rebaseFileRefs } = require('../utils/paths/rebaseFileRefs')
+const { originAt, selectFileTarget } = require('../utils/paths/fileOrigin')
+const { encodePathIdentity } = require('../utils/paths/pathIdentity')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -51,21 +52,7 @@ function convertHclVarSyntax(obj, varPrefix, varSuffix) {
  * @returns {*} Cleaned object
  */
 function cleanEncodedJson(obj) {
-  if (!obj) return obj
-  if (typeof obj === 'string') {
-    return decodeJsonInVariable(obj)
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(cleanEncodedJson)
-  }
-  if (typeof obj === 'object') {
-    const cleaned = {}
-    for (const key of Object.keys(obj)) {
-      cleaned[key] = cleanEncodedJson(obj[key])
-    }
-    return cleaned
-  }
-  return obj
+  return require('../utils/mapData')(obj, decodeJsonInVariable)
 }
 
 /**
@@ -101,6 +88,7 @@ function isIniLikeExtension(ext, filePath) {
 /**
  * Resolves a value from a file reference
  * @param {object} ctx - Context object with instance properties
+ * @param {string} [ctx.authoredRoot] - Root source file
  * @param {string} ctx.configPath - Base path for file resolution
  * @param {Array} ctx.fileRefsFound - Mutable array tracking file refs
  * @param {RegExp} ctx.variableSyntax - Regex for variable syntax
@@ -115,6 +103,8 @@ function isIniLikeExtension(ext, filePath) {
  * @param {string} ctx.varPrefix - Variable prefix (e.g., '${')
  * @param {string} ctx.varSuffix - Variable suffix (e.g., '}')
  * @param {Map<string, string>} [ctx.fileContentCache] - Optional per-instance read cache keyed by absolute file path
+ * @param {Record<string, string>} [ctx.env] - Load-local environment
+ * @param {object} [ctx.loadContext] - Per-load cache context
  * @param {object} [ctx.safetyPolicy] - Optional safe-mode policy for executable and root checks
  * @param {string} variableString - The variable string to resolve
  * @param {object} options - Resolution options
@@ -127,6 +117,7 @@ async function getValueFromFile(ctx, variableString, options) {
   const syntax = /^\s*text\(/.test(variableString) ? ctx.textRefSyntax : ctx.fileRefSyntax
   // console.log('From file', `"${variableString}"`)
   let matchedFileString = variableString.match(syntax)[0]
+  const matchedCallString = matchedFileString
   // console.log('matchedFileString', matchedFileString)
 
   // Get function input params if any supplied https://regex101.com/r/qlNFVm/1
@@ -171,29 +162,11 @@ async function getValueFromFile(ctx, variableString, options) {
 
   let { fullFilePath, resolvedPath, relativePath } = fileDetails
 
-  // Check for file path overrides
-  let wasOverridden = false
-  let originalFilePath = null
-  const filePathOverrides = ctx.opts && ctx.opts.filePathOverrides
-  if (filePathOverrides) {
-    // Try matching against relativePath (e.g., './env.yml')
-    const overrideKey = Object.keys(filePathOverrides).find((key) => {
-      // Normalize paths for comparison
-      const normalizedKey = key.replace(/^\.\//, '')
-      const normalizedRelPath = relativePath.replace(/^\.\//, '')
-      return normalizedKey === normalizedRelPath || key === relativePath
-    })
-
-    if (overrideKey) {
-      originalFilePath = fullFilePath
-      const overridePath = filePathOverrides[overrideKey]
-      // Resolve the override path (could be relative or absolute)
-      fullFilePath = resolveFilePath(overridePath, ctx.configPath)
-      resolvedPath = overridePath
-      wasOverridden = true
-    }
-  }
-
+  const origin=options.context.origin || originAt(ctx.loadContext,options.context.path,ctx.authoredRoot)
+  const selected=selectFileTarget(relativePath,ctx.configPath,origin,ctx.opts.filePathOverrides)
+  fullFilePath=selected.canonicalTarget
+  const wasOverridden=selected.wasOverridden
+  const originalFilePath=selected.originalFilePath
   const exists = fs.existsSync(fullFilePath)
   if (ctx.safetyPolicy) {
     checkFileAccess(fullFilePath, ctx.safetyPolicy, { variableString })
@@ -206,6 +179,10 @@ async function getValueFromFile(ctx, variableString, options) {
     originalVariableString: options.context.originalSource,
     containsVariables: options.context.value !== options.context.originalSource,
     exists,
+    authoredFile: selected.authoredFile,
+    lexicalTarget: selected.lexicalTarget,
+    canonicalTarget: selected.canonicalTarget,
+    selectionReason: selected.selectionReason,
   }
   applyDotenvFileRefMetadata(fileRefEntry, {
     filePath: fullFilePath,
@@ -275,6 +252,12 @@ ${JSON.stringify(options.context, null, 2)}`,
     return Promise.resolve(undefined)
   }
 
+  const selectionIdentity=JSON.stringify([fullFilePath, variableString.slice(matchedCallString.length)])
+  if(!opts.asRawText && (origin.lineage||[]).includes(selectionIdentity)) {
+    const files=(origin.lineage||[]).concat(selectionIdentity).map(identity=>JSON.parse(identity)[0])
+    throw new Error('Circular file reference detected: '+files.join(' -> '))
+  }
+  options.context.nextOrigin={authoredFile:fullFilePath,configRoot:ctx.configPath,lineage:[...(origin.lineage||[]),selectionIdentity]}
   let valueToPopulate
 
   // Per-instance read cache: identical ${file:...} refs hit fs once per resolve.
@@ -292,7 +275,7 @@ ${JSON.stringify(options.context, null, 2)}`,
     || opts.asRawText
   ) {
     // Encode the ( of foo() (encodeJsSyntax) to avoid function collisions
-    valueToPopulate = encodeJsSyntax(variableFileContents)
+    valueToPopulate = /^\s*text\(/.test(variableString) ? require('../utils/encoders/unknown-values').encodeUnknown(variableFileContents) : encodeJsSyntax(variableFileContents)
     return Promise.resolve(valueToPopulate)
   }
 
@@ -301,6 +284,8 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   // Build context for executable files
   const valueForFunction = {
+    env: ctx.env,
+    environment: ctx.env,
     options: ctx.opts.options || {},
     originalConfig: ctx.originalConfig,
     currentConfig: cleanedCurrentConfig,
@@ -311,8 +296,8 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   // Process JS files
   if (fileExtension === 'js' || fileExtension === 'cjs') {
-    const jsFile = require(fullFilePath)
-    const { moduleName } = parseModuleReference(variableString, matchedFileString)
+    const jsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
+    const { moduleName } = parseModuleReference(variableString, matchedCallString)
     // For default export functions with :property syntax, keep the function and use deep properties
     // For named exports (non-function module), look up the named export
     let returnValueFunction = jsFile
@@ -338,7 +323,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       valueForFunction,
       argsToPass,
       variableString,
-      matchedFileString,
+      matchedFileString: matchedCallString,
       relativePath,
       fileType: 'javascript',
       getDeeperValue: ctx.getDeeperValue,
@@ -348,10 +333,10 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
     const { executeTypeScriptFile } = require('../parsers/typescript')
-    const { moduleName } = parseModuleReference(variableString, matchedFileString)
+    const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {
-      const tsFile = await executeTypeScriptFile(fullFilePath, { dynamicArgs: () => argsToPass })
+      const tsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
       const { returnValueFunction, includeFirstProperty } = selectModuleExport(tsFile, moduleName)
 
       return processExecutableFile({
@@ -360,7 +345,7 @@ ${JSON.stringify(options.context, null, 2)}`,
         valueForFunction,
         argsToPass,
         variableString,
-        matchedFileString,
+        matchedFileString: matchedCallString,
         relativePath,
         fileType: 'TypeScript',
         getDeeperValue: ctx.getDeeperValue,
@@ -373,10 +358,10 @@ ${JSON.stringify(options.context, null, 2)}`,
 
   if (fileExtension === 'mjs' || fileExtension === 'esm') {
     const { executeESMFile } = require('../parsers/esm')
-    const { moduleName } = parseModuleReference(variableString, matchedFileString)
+    const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {
-      const esmFile = await executeESMFile(fullFilePath, { dynamicArgs: () => argsToPass })
+      const esmFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
       const { returnValueFunction, includeFirstProperty } = selectModuleExport(esmFile, moduleName)
 
       return processExecutableFile({
@@ -385,7 +370,7 @@ ${JSON.stringify(options.context, null, 2)}`,
         valueForFunction,
         argsToPass,
         variableString,
-        matchedFileString,
+        matchedFileString: matchedCallString,
         relativePath,
         fileType: 'ESM',
         getDeeperValue: ctx.getDeeperValue,
@@ -399,7 +384,7 @@ ${JSON.stringify(options.context, null, 2)}`,
   // Process everything except JS, TS, and ESM
   if (fileExtension !== 'js' && fileExtension !== 'ts' && fileExtension !== 'mjs' && fileExtension !== 'esm') {
     /* Read initial file. Refs written in it are relative to it when their target is there */
-    valueToPopulate = rebaseFileRefs(variableFileContents, path.dirname(fullFilePath), ctx.configPath)
+    valueToPopulate = variableFileContents
 
     // File reference has :subKey lookup. Must dig deeper
     if (matchedFileString !== variableString) {
@@ -597,7 +582,7 @@ Check if your ${fileType} is exporting a function that returns a value, or a val
 Check if your ${fileType} is returning the correct data.`
         return Promise.reject(new Error(errorMessage))
       }
-      return Promise.resolve(deepValueToPopulateResolved)
+      return Promise.resolve(require('../utils/mapData')(deepValueToPopulateResolved, text => text))
     })
   })
 }

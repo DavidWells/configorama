@@ -11,6 +11,12 @@ function logHeader(message) {
   })
 }
 
+function logDiagnosticHeader(message) {
+  const { makeBox } = require('@davidwells/box-logger')
+  console.error(makeBox({content:message,minWidth:80,borderColor:'cyanBright'}))
+}
+
 module.exports = {
+  logDiagnosticHeader,
   logHeader
 }

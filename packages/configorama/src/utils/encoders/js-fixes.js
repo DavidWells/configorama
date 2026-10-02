@@ -1,148 +1,34 @@
-// Stands in for ( in raw JS file contents so foo() can't read as a function call. A private-use
-// char (U+E001), so no config text can look like it
-const PAREN_OPEN_PLACEHOLDER = '\uE001'
-const OPEN_PAREN_PLACEHOLDER_PATTERN = /\uE001/g
-
-const JSON_ENCODED_PREFIX = '__JSON_B64__'
-const JSON_ENCODED_PATTERN = /__JSON_B64__([A-Za-z0-9+/=]+)__/g
-
-function encodeJsSyntax(value = '') {
-  return value.replace(/\(/g, PAREN_OPEN_PLACEHOLDER)
-}
-
-function decodeJsSyntax(value) {
-  if (!value) return value
-  return value.replace(OPEN_PAREN_PLACEHOLDER_PATTERN, '(')
-}
-
-function hasParenthesesPlaceholder(value = '') {
-  return typeof value === 'string' && value.includes(PAREN_OPEN_PLACEHOLDER)
-}
-
-/**
- * Encode a JSON object to base64 for safe embedding in variable strings
- * @param {object} obj - Object to encode
- * @returns {string} Encoded string like __JSON_B64__eyJmb28iOiJiYXIifQ==__
- */
-function encodeJsonForVariable(obj) {
-  const jsonStr = JSON.stringify(obj)
-  const b64 = Buffer.from(jsonStr).toString('base64')
-  return `${JSON_ENCODED_PREFIX}${b64}__`
-}
-
-/**
- * Decode base64-encoded JSON from variable strings
- * @param {string} value - String potentially containing encoded JSON
- * @returns {string} String with encoded JSON decoded back to JSON strings
- */
-function decodeJsonInVariable(value) {
-  if (!value || typeof value !== 'string') return value
-  // Every match starts with the marker; most strings have none (replace would return them as-is)
-  if (!value.includes('__JSON_B64__')) return value
-  return value.replace(JSON_ENCODED_PATTERN, (match, b64) => {
-    try {
-      const jsonStr = Buffer.from(b64, 'base64').toString('utf8')
-      return jsonStr
-    } catch (e) {
-      return match
-    }
-  })
-}
-
-/**
- * Parse a value that is exactly one encoded JSON object back to the object
- * @param {any} value - Value that may be an encoded JSON string
- * @returns {any} The parsed object, or the value unchanged
- */
+const opaque = require('./opaque')
+function encodeJsSyntax(value = '') { return value.replace(/\(/g, () => opaque.encode('P', '(')) }
+function decodeJsSyntax(value) { return opaque.decode(value, 'P') }
+function hasParenthesesPlaceholder(value) { return opaque.has(value, 'P') }
+function encodeJsonForVariable(obj) { return opaque.encode('J', JSON.stringify(obj)) }
+function encodeJsonText(text) { return opaque.encode('J', text) }
+function decodeJsonInVariable(value) { return opaque.decode(value, 'J') }
+function isEncodedJson(value) { const records = opaque.find(value, 'J'); return records.length === 1 && records[0].match === value }
 function parseEncodedJson(value) {
-  if (typeof value !== 'string') return value
-  const match = value.match(/^__JSON_B64__([A-Za-z0-9+/=]+)__$/)
-  if (!match) return value
-  try {
-    return JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'))
-  } catch (e) {
-    return value
-  }
+  if (!isEncodedJson(value)) return value
+  try { return JSON.parse(decodeJsonInVariable(value)) } catch (_) { return value }
 }
+function hasEncodedJson(value) { return opaque.has(value, 'J') }
 
-/**
- * Whether a value is exactly one encoded JSON token
- * @param {any} value
- * @returns {boolean}
- */
-function isEncodedJson(value) {
-  return typeof value === 'string' && /^__JSON_B64__[A-Za-z0-9+/=]+__$/.test(value)
-}
-
-/**
- * Check if string contains encoded JSON
- * @param {string} value - String to check
- * @returns {boolean}
- */
-function hasEncodedJson(value) {
-  if (!value || typeof value !== 'string') return false
-  return value.includes(JSON_ENCODED_PREFIX)
-}
-
-/**
- * Encode a single-level JSON object literal used as a filter/function argument (`name(... {..} ...)`) so
- * its `{ }` don't break variable matching (whose char class excludes braces); decoded when the argument is
- * parsed (decodeJsonInVariable). Only brace-delimited variable syntaxes (`${`, `#{`) conflict; the
- * lookbehind skips a `{` that is the start of a nested variable (e.g. the `{` in `${x}` / `#{x}`), whose
- * brace is not JSON. `[^{}()]` keeps the match to one object within one call.
- * @param {string} str
- * @param {string} [varPrefix] - the variable opening, e.g. `${` or `#{`
- * @returns {string}
- */
-/**
- * Whether index sits inside a variable expression. Inside one every { } counts, so a JSON object
- * argument (${merge({"a":1})}) doesn't end it early; outside, only varPrefix opens one.
- * @param {string} str
- * @param {number} index
- * @param {string} varPrefix - the variable opening, ending in `{`
- * @returns {boolean}
- */
-function isInsideVariable(str, index, varPrefix) {
-  let depth = 0
-  for (let i = 0; i < index; i++) {
-    if (depth === 0) {
-      if (str.startsWith(varPrefix, i)) {
-        depth = 1
-        i += varPrefix.length - 1
-      }
-    } else if (str[i] === '{') {
-      depth++
-    } else if (str[i] === '}') {
-      depth--
-    }
-  }
-  return depth > 0
-}
-
-function encodeJsonArgObjects(str, varPrefix = '${') {
-  if (!str || typeof str !== 'string' || str.indexOf('{') === -1) return str
-  if (!varPrefix.endsWith('{')) return str // non-brace syntaxes (e.g. `$[`) don't conflict with JSON braces
-  const preBrace = varPrefix.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const guard = preBrace ? `(?<!${preBrace})` : ''
-  const pattern = new RegExp(`(\\w+\\([^{}()]*)(${guard}\\{[^{}]*\\})([^{}()]*\\))`, 'g')
-  return str.replace(pattern, (match, open, obj, close, offset) => {
-    // Only a call inside a variable is configorama syntax; elsewhere (VTL #set($m = {...})) it's text
-    if (!isInsideVariable(str, offset, varPrefix)) return match
-    // file()/text() take a path, where { } are plain characters
-    if (/^(?:file|text)\(/.test(open)) return match
-    // A { inside a quoted string argument ("{" in eval, '{a},{b}' in split) is text, not JSON
-    // An escaped quote (\' in 'it\'s') doesn't open or close a string
-    const unescaped = open.replace(/\\./g, '')
-    const doubleQuotes = (unescaped.match(/"/g) || []).length
-    const singleQuotes = (unescaped.match(/'/g) || []).length
-    if (doubleQuotes % 2 === 1 || singleQuotes % 2 === 1) return match
-    const b64 = Buffer.from(obj).toString('base64')
-    return `${open}${JSON_ENCODED_PREFIX}${b64}__${close}`
+/** Protect JSON argument spans owned by calls inside expressions, never by surrounding code. */
+function encodeJsonArgObjects(str, varPrefix = '${', varSuffix = '}') {
+  if(typeof str!=='string'||!str.includes('{')||!varPrefix.endsWith('{'))return str
+  const {scan,parentReference}=require('../expressions/scan');const syntax=scan(str,{prefix:varPrefix,suffix:varSuffix})
+  const eligible=syntax.nodes.filter(node=>{
+    if(node.kind!=='Object'||!node.complete||!parentReference(syntax,node))return false
+    let id=node.parentId;let call
+    while(id!==null){const p=syntax.nodes[id];if(p.kind==='Call'){call=p;break}id=p.parentId}
+    if(!call||call.name==='file'||call.name==='text')return false
+    try{JSON.parse(node.raw);return true}catch(_){return false}
   })
+  const outer=eligible.filter(node=>!eligible.some(parent=>parent.start<node.start&&parent.end>=node.end)).sort((a,b)=>b.start-a.start)
+  let output=str;for(const node of outer)output=output.slice(0,node.start)+encodeJsonText(node.raw)+output.slice(node.end)
+  return output
 }
 
 module.exports = {
-  OPEN_PAREN_PLACEHOLDER_PATTERN,
   hasParenthesesPlaceholder,
   encodeJsSyntax,
   decodeJsSyntax,

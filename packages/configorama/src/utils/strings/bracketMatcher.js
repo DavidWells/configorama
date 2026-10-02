@@ -1,3 +1,4 @@
+const { scan, references } = require('../expressions/scan')
 /**
  * Finds all outermost matching brace pairs in a string
  * @param {string} text - The text to search
@@ -106,22 +107,10 @@ function findOutermostVariables(text) {
  */
 function findEnclosingVariable(text, variable, prefix, suffix, index) {
   if (!prefix || !suffix) return null
-  if (suffix.length !== 1) return findEnclosingMultiChar(text, variable, prefix, suffix, index)
-  const outermost = findOutermostBraces(text, prefix.slice(-1), suffix, prefix.slice(0, -1))
-  if (typeof index !== 'number') {
-    const enclosing = outermost.find((match) => match.indexOf(variable) > -1)
-    return enclosing || null
-  }
-  if (text.slice(index, index + variable.length) !== variable) return null
-  // Outermost matches are ordered and non-overlapping, so each starts at the first
-  // occurrence of its text after the previous match ends.
-  let cursor = 0
-  for (const match of outermost) {
-    const start = text.indexOf(match, cursor)
-    cursor = start + match.length
-    if (start <= index && index + variable.length <= cursor) return match
-  }
-  return null
+  const at=typeof index==='number'?index:text.indexOf(variable)
+  if(at<0||text.slice(at,at+variable.length)!==variable)return null
+  const spans=references(scan(text,{prefix,suffix})).filter(n=>n.complete&&n.start<=at&&n.end>=at+variable.length)
+  return spans.length?spans.sort((a,b)=>a.start-b.start||b.end-a.end)[0].raw:null
 }
 
 /**
@@ -133,25 +122,7 @@ function findEnclosingVariable(text, variable, prefix, suffix, index) {
  * @returns {Array<{ start: number, end: number }>} Spans; text.slice(start, end) is the variable
  */
 function variableSpans(text, prefix, suffix) {
-  /** @type {number[]} */
-  const opens = []
-  /** @type {Array<{ start: number, end: number }>} */
-  const spans = []
-  // Most characters can't start either token: check one char code before startsWith.
-  const p0 = prefix.charCodeAt(0)
-  const s0 = suffix.charCodeAt(0)
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i)
-    if (c !== p0 && c !== s0) continue
-    if (text.startsWith(prefix, i)) {
-      opens.push(i)
-      i += prefix.length - 1
-    } else if (opens.length && text.startsWith(suffix, i)) {
-      spans.push({ start: /** @type {number} */ (opens.pop()), end: i + suffix.length })
-      i += suffix.length - 1
-    }
-  }
-  return spans
+  return references(scan(text,{prefix,suffix})).filter(n=>n.complete).sort((a,b)=>a.end-b.end||b.start-a.start).map(n=>({start:n.start,end:n.end}))
 }
 
 /**
@@ -185,12 +156,9 @@ function findEnclosingMultiChar(text, variable, prefix, suffix, index) {
  * @returns {{ start: number, text: string }|null} The parent variable and where it starts, or null
  */
 function findParentVariable(text, variable, prefix, suffix, index) {
-  if (!prefix || !suffix) return null
-  if (text.slice(index, index + variable.length) !== variable) return null
-  const end = index + variable.length
-  // Spans close innermost first, so the first one around the occurrence is its parent
-  const parent = variableSpans(text, prefix, suffix).find((span) => span.start < index && span.end >= end)
-  return parent ? { start: parent.start, text: text.slice(parent.start, parent.end) } : null
+  if(!prefix||!suffix||text.slice(index,index+variable.length)!==variable)return null
+  const parent=references(scan(text,{prefix,suffix})).filter(n=>n.complete&&n.start<index&&n.end>=index+variable.length).sort((a,b)=>b.start-a.start)[0]
+  return parent?{start:parent.start,text:parent.raw}:null
 }
 
 /**
@@ -204,21 +172,10 @@ function findParentVariable(text, variable, prefix, suffix, index) {
  * @returns {boolean}
  */
 function isFallbackSlot(enclosing, variable, prefix, suffix) {
-  if (!enclosing || !enclosing.startsWith(prefix) || !enclosing.endsWith(suffix)) return false
-  const inner = enclosing.slice(prefix.length, enclosing.length - suffix.length)
-  if (/^\s*[A-Za-z_][\w.]*\s*\(/.test(inner)) return false
-  const at = inner.indexOf(variable)
-  if (at <= 0) return false
-  const before = inner.slice(0, at)
-  let depth = 0
-  let quote = ''
-  for (const ch of before) {
-    if (quote) { if (ch === quote) quote = ''; continue }
-    if (ch === "'" || ch === '"') quote = ch
-    else if (ch === '(' || ch === '[') depth++
-    else if (ch === ')' || ch === ']') depth--
-  }
-  return depth === 0 && !quote && before.trimEnd().endsWith(',')
+  if(!enclosing||!enclosing.startsWith(prefix)||!enclosing.endsWith(suffix))return false
+  const syntax=scan(enclosing,{prefix,suffix});const root=references(syntax).find(n=>n.start===0)
+  if(!root)return false
+  return syntax.nodes.some(n=>n.parentId===root.id&&n.kind==='Fallback'&&n.itemIndex>0&&n.raw.trim().startsWith(variable))
 }
 
 /**
@@ -233,11 +190,9 @@ function isFallbackSlot(enclosing, variable, prefix, suffix) {
  * @returns {boolean}
  */
 function isWholeFallbackItem(enclosing, variable, prefix, suffix) {
-  if (!isFallbackSlot(enclosing, variable, prefix, suffix)) return false
-  const inner = enclosing.slice(prefix.length, enclosing.length - suffix.length)
-  const after = inner.slice(inner.indexOf(variable) + variable.length)
-  const itemEnd = after.search(/[,|]/)
-  return (itemEnd === -1 ? after : after.slice(0, itemEnd)).trim() === ''
+  if(!isFallbackSlot(enclosing,variable,prefix,suffix))return false
+  const syntax=scan(enclosing,{prefix,suffix});const root=references(syntax).find(n=>n.start===0)
+  return syntax.nodes.some(n=>n.parentId===root.id&&n.kind==='Fallback'&&n.itemIndex>0&&n.raw.trim()===variable)
 }
 
 /**
@@ -251,26 +206,20 @@ function isWholeFallbackItem(enclosing, variable, prefix, suffix) {
  * @returns {boolean}
  */
 function isPathSlot(parent, variable, prefix, suffix) {
-  if (!parent || !parent.startsWith(prefix) || !parent.endsWith(suffix)) return false
-  const inner = parent.slice(prefix.length, parent.length - suffix.length)
-  if (/^\s*[A-Za-z_][\w.]*\s*\(/.test(inner) && !/^\s*(?:file|text)\s*\(/.test(inner)) return false
-  const at = inner.indexOf(variable)
-  if (at < 0) return false
-  let depth = 0
-  let nested = 0
-  let quote = ''
-  for (let i = 0; i < at; i++) {
-    const ch = inner[i]
-    if (quote) { if (ch === quote) quote = ''; continue }
-    if (inner.startsWith(prefix, i)) { nested++; i += prefix.length - 1; continue }
-    if (nested > 0 && inner.startsWith(suffix, i)) { nested--; i += suffix.length - 1; continue }
-    if (nested > 0) continue
-    if (ch === "'" || ch === '"') quote = ch
-    else if (ch === '(' || ch === '[') depth++
-    else if (ch === ')' || ch === ']') depth--
-    else if ((ch === ',' || ch === '|') && depth === 0) return false
+  if(!parent||!parent.startsWith(prefix)||!parent.endsWith(suffix))return false
+  const syntax=scan(parent,{prefix,suffix});const at=parent.indexOf(variable,prefix.length)
+  const nested=references(syntax).find(n=>n.start===at)
+  if(!nested)return false
+  let id=nested.parentId
+  while(id!==null) {
+    const node=syntax.nodes[id]
+    if(node.kind==='Call'||node.kind==='Argument'||node.kind==='Filter')return false
+    if((node.kind==='Literal'||node.kind==='Composition')&&/^\s*["']/.test(node.raw))return false
+    if(node.kind==='Fallback'&&node.itemIndex>0)return false
+    if(node.kind==='Reference')return node.start===0
+    id=node.parentId
   }
-  return depth === 0 && !quote
+  return false
 }
 
 module.exports = {

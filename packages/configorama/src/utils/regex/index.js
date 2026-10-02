@@ -10,79 +10,13 @@
  * @returns {RegExpExecArray|null} Regex-like result array or null
  */
 function parseFunctionCall(str) {
-  if (!str || typeof str !== 'string' || str.indexOf('(') === -1) return null
-
-  // Find a call outside quoted literals. A string argument such as "a(\")"
-  // is data, not a nested call to a(). Escapes apply to both quote styles.
-  let funcMatch = null
-  let quote = null
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i]
-    if (quote) {
-      if (char === '\\') i++
-      else if (char === quote) quote = null
-    } else if (char === '"' || char === "'") {
-      quote = char
-    } else {
-      const match = /^(\w+)\s*\(/.exec(str.slice(i))
-      if (match) {
-        match.index = i
-        funcMatch = match
-        break
-      }
-    }
-  }
-  if (!funcMatch) return null
-  
-  const funcName = funcMatch[1]
-  const openParenIndex = funcMatch.index + funcMatch[0].length - 1
-  const startPos = openParenIndex + 1
-  
-  let depth = 1
-  let pos = startPos
-  let inString = null // null, '"', or "'"
-
-  // Track parenthesis depth to find matching closing paren
-  while (pos < str.length && depth > 0) {
-    const char = str[pos]
-    if (inString && char === '\\') {
-      pos += 2
-      continue
-    }
-    // Toggle string state on unescaped quotes
-    if (char === '"' || char === "'") {
-      if (!inString) {
-        inString = char
-      } else if (char === inString) {
-        inString = null
-      }
-    }
-
-    // Only count parens outside strings
-    if (!inString) {
-      if (char === '(') depth++
-      else if (char === ')') depth--
-    }
-    pos++
-  }
-  
-  if (depth !== 0) return null // Unbalanced parens
-  
-  const args = str.substring(startPos, pos - 1).trim()
-  
-  // Skip trailing whitespace for fullMatch
-  let endPos = pos
-  while (endPos < str.length && /\s/.test(str[endPos])) {
-    endPos++
-  }
-  
-  const fullMatch = str.substring(funcMatch.index, endPos)
-  
-  // Create regex-exec-like result array with index and input properties
-  return Object.assign(/** @type {[string, string, string]} */ ([fullMatch, funcName, args || undefined]), {
-    index: funcMatch.index,
-    input: str
-  })
+  if (typeof str !== 'string' || !str.includes('(')) return null
+  const syntax = require('../expressions/scan').scan(str)
+  const call = syntax.nodes.find(n => n.kind === 'Call' && n.complete)
+  if (!call) return null
+  let end = call.end
+  while (end < str.length && /\s/.test(str[end])) end++
+  return Object.assign(/** @type {[string, string, string]} */ ([str.slice(call.start,end),call.name,str.slice(call.contentStart,call.contentEnd).trim() || undefined]), {index:call.start,input:str})
 }
 
 /**

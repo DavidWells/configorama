@@ -2,13 +2,14 @@
  * Warns if a variable value is not found during resolution
  */
 const { isEmpty } = require('../lodash')
+const { isResolutionRecord } = require('../resolutionRecord')
 
 /**
  * @param {*} val
  * @returns {boolean}
  */
 function isValidValue(val) {
-  if (val !== null && typeof val === 'object' && (val.hasOwnProperty('__internal_only_flag') || val.hasOwnProperty('__internal_metadata'))) {
+  if (isResolutionRecord(val)) {
     return false
   }
   // A Date has no own keys but is a real value, not an empty object

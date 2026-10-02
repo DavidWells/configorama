@@ -1,3 +1,7 @@
+const { setOwn } = require('../objects')
+const markdownBodyKeys = new WeakMap()
+/** @param {Object} value @returns {string|undefined} */
+function getBodyContentKey(value) { return markdownBodyKeys.get(value) }
 // Parses config file contents based on file extension
 const fs = require('fs')
 const path = require('path')
@@ -67,6 +71,8 @@ const KNOWN_EXTENSIONS = new Set([
  * @property {string} filePath - Full file path (used for extension detection and error messages)
  * @property {RegExp} [varRegex] - Variable syntax regex (defaults to configorama syntax)
  * @property {Object|Function} [dynamicArgs] - Arguments passed to JS/TS function exports
+ * @property {Object} [loadContext] - Load-local caches and environment
+ * @property {'legacy'|'process'|'load'} [moduleCacheMode] - Executable module lifecycle
  */
 
 /**
@@ -74,7 +80,7 @@ const KNOWN_EXTENSIONS = new Set([
  * @param {ParseOptions} options
  * @returns {Object} Parsed configuration object
  */
-function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
+function parseFileContents({ contents, filePath, varRegex, dynamicArgs, loadContext, moduleCacheMode }) {
   if (contents === null) {
     throw new Error(`Cannot parse "${filePath}": file contents are null`)
   }
@@ -145,17 +151,20 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       configObject = YAML.parse(ymlText)
     }
     const bodyContent = content.replace(/^\n+|\n+$/g, '')
-    if (configObject.hasOwnProperty('_content')) {
-      console.warn('configorama: frontmatter key "_content" conflicts with reserved body content key. Body stored as "_body" instead.')
-      configObject._body = bodyContent
-    } else {
-      configObject._content = bodyContent
+    let bodyKey = '_content'
+    if (Object.prototype.hasOwnProperty.call(configObject, bodyKey)) {
+      bodyKey = '_body'
+      let index = 1
+      while (Object.prototype.hasOwnProperty.call(configObject, bodyKey)) bodyKey = `_body_${index++}`
+      console.warn(`configorama: frontmatter key "_content" conflicts with reserved body content key. Body stored as "${bodyKey}" instead.`)
     }
+    setOwn(configObject, bodyKey, bodyContent)
+    markdownBodyKeys.set(configObject, bodyKey)
   // TODO detect js syntax and use appropriate parser
   } else if (fileType.match(/\.(js|cjs)/i)) {
     let jsFile
     try {
-      jsFile = require(filePath)
+      jsFile = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
       if (typeof jsFile !== 'function') {
         configObject = jsFile
       } else {
@@ -164,7 +173,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
           jsArgs = jsArgs()
         }
         // console.log('jsArgs', jsArgs)
-        configObject = jsFile(jsArgs)
+        configObject = jsFile(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
       }
     } catch (err) {
       throw err
@@ -175,13 +184,13 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       if (jsArgs && typeof jsArgs === 'function') {
         jsArgs = jsArgs()
       }
-      configObject = require('../../parsers/typescript').executeTypeScriptFileSync(filePath, { dynamicArgs })
+      configObject = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
       if (configObject.config) {
-        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
+        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.config
       } else if (configObject.default) {
-        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.default
       } else if (typeof configObject === 'function') {
-        configObject = configObject(jsArgs)
+        configObject = configObject(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
       }
       // console.log('parseFileContents configObject', configObject)
     } catch (err) {
@@ -193,13 +202,13 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
       if (jsArgs && typeof jsArgs === 'function') {
         jsArgs = jsArgs()
       }
-      configObject = require('../../parsers/esm').executeESMFileSync(filePath, { dynamicArgs })
+      configObject = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
       if (configObject.config) {
-        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs) : configObject.config
+        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.config
       } else if (configObject.default) {
-        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs) : configObject.default
+        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.default
       } else if (typeof configObject === 'function') {
-        configObject = configObject(jsArgs)
+        configObject = configObject(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
       }
       // console.log('parseFileContents ESM configObject', configObject)
     } catch (err) {
@@ -214,6 +223,8 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs }) {
  * @typedef {Object} ParseFileOptions
  * @property {RegExp} [varRegex] - Variable syntax regex (defaults to configorama syntax)
  * @property {Object|Function} [dynamicArgs] - Arguments passed to JS/TS function exports
+ * @property {Object} [loadContext] - Load-local caches and environment
+ * @property {'legacy'|'process'|'load'} [moduleCacheMode] - Executable module lifecycle
  */
 
 /**
@@ -234,5 +245,6 @@ function parseFile(filePath, opts = {}) {
 
 module.exports = {
   parseFileContents,
+  getBodyContentKey,
   parseFile
 }

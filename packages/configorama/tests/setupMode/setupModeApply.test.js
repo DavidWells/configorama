@@ -24,21 +24,21 @@ function restoreEnv() {
   }
 }
 
-async function captureStdout(fn) {
+async function captureOutput(fn) {
   const chunks = []
-  const origWrite = process.stdout.write.bind(process.stdout)
-  const origLog = console.log
-  process.stdout.write = (chunk, ...args) => {
+  const origWrite = process.stderr.write.bind(process.stderr)
+  const origLog = console.error
+  process.stderr.write = (chunk, ...args) => {
     chunks.push(typeof chunk === 'string' ? chunk : chunk.toString())
     return true
   }
-  console.log = (...args) => { chunks.push(args.join(' ')) }
+  console.error = (...args) => { chunks.push(args.join(' ')) }
   try {
     const result = await fn()
     return { result, output: chunks.join('\n') }
   } finally {
-    process.stdout.write = origWrite
-    console.log = origLog
+    process.stderr.write = origWrite
+    console.error = origLog
   }
 }
 
@@ -49,7 +49,7 @@ test('setup mode resolves config with answers from the prompt renderer', async (
     env: { API_KEY: SECRET, REGION: 'us-east-1' },
   })
 
-  const { result, output } = await captureStdout(() =>
+  const { result, output } = await captureOutput(() =>
     configorama(configFile, { setup: true, promptRenderer })
   )
 
@@ -73,7 +73,7 @@ test('setup requirements are exposed on the instance for CLI redaction', async (
   })
 
   const instance = new configorama.Configorama(configFile, { setup: true, promptRenderer })
-  await captureStdout(() => instance.init({}))
+  await captureOutput(() => instance.init({}))
 
   assert.ok(Array.isArray(instance.setupRequirements), 'setupRequirements set')
   const apiKeyReq = instance.setupRequirements.find((r) => r.name === 'API_KEY')

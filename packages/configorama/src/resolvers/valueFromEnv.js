@@ -3,7 +3,7 @@
 
 const envRefSyntax = RegExp(/^env:/g)
 
-function getValueFromEnv(variableString) {
+function getValueFromEnv(variableString, env = process.env) {
   const requestedEnvVar = variableString.split(':')[1]
   // console.log('requestedEnvVar', requestedEnvVar)
   if (requestedEnvVar === '') {
@@ -15,7 +15,7 @@ Example: \${env:MY_ENV_VAR}
 `)
   }
 
-  const valueToPopulate = process.env[requestedEnvVar]
+  const valueToPopulate = env[requestedEnvVar]
   return Promise.resolve(valueToPopulate)
 }
 
