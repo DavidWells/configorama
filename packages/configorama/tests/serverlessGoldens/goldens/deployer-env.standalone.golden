@@ -1,0 +1,31 @@
+{
+  "provider": {
+    "deploymentBucket": {
+      "name": ""
+    },
+    "deploymentPrefix": "serverless",
+    "environment": {
+      "BUCKET": "app-registry-local",
+      "ENABLED": "true",
+      "RETRIES": 3
+    },
+    "iam": {
+      "deploymentRole": "",
+      "role": {
+        "name": "app-registry-qa-us-east-1-lambda",
+        "permissionsBoundary": ""
+      }
+    },
+    "name": "aws",
+    "region": "us-east-1",
+    "stackTags": {
+      "deploymentId": "local",
+      "environment": "qa",
+      "instance": "_",
+      "region": "us-east-1",
+      "tenancy": "pooled"
+    },
+    "stage": "qa"
+  },
+  "service": "app-registry"
+}

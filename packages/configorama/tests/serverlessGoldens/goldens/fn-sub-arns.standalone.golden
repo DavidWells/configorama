@@ -1,0 +1,94 @@
+{
+  "custom": {
+    "defaultStackName": "app-qa-worker",
+    "sender": "noreply@example.com",
+    "stackName": "app-qa-worker"
+  },
+  "functions": {
+    "api": {
+      "environment": {
+        "WORKER_ARN": {
+          "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:app-qa-worker-worker"
+        }
+      },
+      "handler": "handler.api"
+    }
+  },
+  "provider": {
+    "iam": {
+      "role": {
+        "statements": [
+          {
+            "Action": [
+              "states:StartExecution"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+              {
+                "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:app-qa-worker-flow"
+              },
+              {
+                "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:app-qa-worker-flow:*"
+              }
+            ]
+          },
+          {
+            "Action": [
+              "scheduler:CreateSchedule"
+            ],
+            "Effect": "Allow",
+            "Resource": {
+              "Fn::Sub": "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/app-qa-worker/*"
+            }
+          }
+        ]
+      }
+    },
+    "name": "aws",
+    "stage": "qa"
+  },
+  "resources": {
+    "Outputs": {
+      "ApiBaseUrl": {
+        "Value": {
+          "Fn::Sub": "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/qa"
+        }
+      },
+      "HttpBaseUrl": {
+        "Value": {
+          "Fn::Sub": "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/qa/api"
+        }
+      },
+      "PoolDomain": {
+        "Value": {
+          "Fn::If": [
+            "HasCustomDomain",
+            "auth.example.com",
+            {
+              "Fn::Sub": "worker-qa-${AWS::Region}-${AWS::AccountId}"
+            }
+          ]
+        }
+      }
+    },
+    "Resources": {
+      "Bucket": {
+        "Properties": {
+          "BucketName": {
+            "Fn::Sub": "app-artifacts-${AWS::AccountId}-qa"
+          }
+        },
+        "Type": "AWS::S3::Bucket"
+      },
+      "EmailIdentity": {
+        "Properties": {
+          "Arn": {
+            "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/noreply@example.com"
+          }
+        },
+        "Type": "Custom::Identity"
+      }
+    }
+  },
+  "service": "worker"
+}

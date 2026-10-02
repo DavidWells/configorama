@@ -1,0 +1,13 @@
+# Variables configorama leaves for Serverless/CloudFormation to resolve (allowUnknownVariableTypes).
+service: passthrough
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+custom:
+  bucket: app-${self:provider.stage}-ui-${aws:accountId}-${aws:region}
+  ssmKey: ${ssm:/app/${self:provider.stage}/key}
+  stackOutput: ${cf:other-stack-${self:provider.stage}.ApiUrl}
+  frameworkStage: ${sls:stage}
+  inFallback: ${env:SG_UNSET, 'prefix-${sls:stage}-${ssm:/app/x}'}
+  bareFallback: ${env:SG_UNSET, ${sls:stage}}
+  principalTagArn: arn:aws:s3:::bucket/${aws:PrincipalTag/team}/*

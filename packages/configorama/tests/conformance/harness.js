@@ -26,12 +26,12 @@ function stableJsonReplacer(key, value) {
   }, {})
 }
 
-function goldenPath(name) {
-  return path.join(GOLDEN_DIR, `${name}.golden`)
+function goldenPath(name, dir = GOLDEN_DIR) {
+  return path.join(dir, `${name}.golden`)
 }
 
-function assertGolden(name, actual) {
-  const expectedPath = goldenPath(name)
+function assertGolden(name, actual, dir = GOLDEN_DIR) {
+  const expectedPath = goldenPath(name, dir)
   const output = canonicalize(actual)
 
   if (process.env.UPDATE_GOLDENS) {

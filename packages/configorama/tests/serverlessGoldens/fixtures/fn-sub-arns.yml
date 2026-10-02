@@ -1,0 +1,53 @@
+# CloudFormation Fn::Sub strings mixing CloudFormation pseudo params/resource refs (left for
+# CloudFormation) with configorama self refs (resolved).
+service: worker
+custom:
+  stackName: ${env:SG_STACK_NAME, self:custom.defaultStackName}
+  defaultStackName: app-${self:provider.stage}-worker
+  sender: noreply@example.com
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: [states:StartExecution]
+          Resource:
+            - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${self:custom.stackName}-flow
+            - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:${self:custom.stackName}-flow:*
+        - Effect: Allow
+          Action: [scheduler:CreateSchedule]
+          Resource:
+            Fn::Sub: arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${self:custom.stackName}/*
+functions:
+  api:
+    handler: handler.api
+    environment:
+      WORKER_ARN:
+        Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:custom.stackName}-worker
+resources:
+  Resources:
+    Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName:
+          Fn::Sub: app-artifacts-${AWS::AccountId}-${self:provider.stage}
+    EmailIdentity:
+      Type: Custom::Identity
+      Properties:
+        Arn:
+          Fn::Sub: arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${self:custom.sender}
+  Outputs:
+    ApiBaseUrl:
+      Value:
+        Fn::Sub: https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}
+    HttpBaseUrl:
+      Value:
+        Fn::Sub: https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}/api
+    PoolDomain:
+      Value:
+        Fn::If:
+          - HasCustomDomain
+          - auth.example.com
+          - Fn::Sub: ${self:service}-${self:provider.stage}-${AWS::Region}-${AWS::AccountId}

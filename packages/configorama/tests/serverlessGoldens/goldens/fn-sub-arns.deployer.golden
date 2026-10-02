@@ -1,0 +1,94 @@
+{
+  "custom": {
+    "defaultStackName": "app-acme-prod-worker",
+    "sender": "noreply@example.com",
+    "stackName": "app-acme-prod-svc"
+  },
+  "functions": {
+    "api": {
+      "environment": {
+        "WORKER_ARN": {
+          "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:app-acme-prod-svc-worker"
+        }
+      },
+      "handler": "handler.api"
+    }
+  },
+  "provider": {
+    "iam": {
+      "role": {
+        "statements": [
+          {
+            "Action": [
+              "states:StartExecution"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+              {
+                "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:app-acme-prod-svc-flow"
+              },
+              {
+                "Fn::Sub": "arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:app-acme-prod-svc-flow:*"
+              }
+            ]
+          },
+          {
+            "Action": [
+              "scheduler:CreateSchedule"
+            ],
+            "Effect": "Allow",
+            "Resource": {
+              "Fn::Sub": "arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/app-acme-prod-svc/*"
+            }
+          }
+        ]
+      }
+    },
+    "name": "aws",
+    "stage": "acme-prod"
+  },
+  "resources": {
+    "Outputs": {
+      "ApiBaseUrl": {
+        "Value": {
+          "Fn::Sub": "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/acme-prod"
+        }
+      },
+      "HttpBaseUrl": {
+        "Value": {
+          "Fn::Sub": "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/acme-prod/api"
+        }
+      },
+      "PoolDomain": {
+        "Value": {
+          "Fn::If": [
+            "HasCustomDomain",
+            "auth.example.com",
+            {
+              "Fn::Sub": "worker-acme-prod-${AWS::Region}-${AWS::AccountId}"
+            }
+          ]
+        }
+      }
+    },
+    "Resources": {
+      "Bucket": {
+        "Properties": {
+          "BucketName": {
+            "Fn::Sub": "app-artifacts-${AWS::AccountId}-acme-prod"
+          }
+        },
+        "Type": "AWS::S3::Bucket"
+      },
+      "EmailIdentity": {
+        "Properties": {
+          "Arn": {
+            "Fn::Sub": "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/noreply@example.com"
+          }
+        },
+        "Type": "Custom::Identity"
+      }
+    }
+  },
+  "service": "worker"
+}

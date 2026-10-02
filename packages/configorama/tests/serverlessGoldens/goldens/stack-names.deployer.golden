@@ -1,0 +1,24 @@
+{
+  "custom": {
+    "defaultStackName": "admin-ui-acme-prod",
+    "frameworkStackName": "app-acme-prod-svc",
+    "inlineStackName": "app-acme-prod-svc",
+    "prefixed": "app-acme-prod-ui",
+    "prefixedStackName": "app-acme-prod-svc",
+    "stackName": "app-acme-prod-svc",
+    "tableName": "app-acme-prod-svc-table"
+  },
+  "provider": {
+    "apiName": "app-acme-prod-svc",
+    "environment": {
+      "FRAMEWORK_STAGE": "prod",
+      "STAGE_TAG": "prod",
+      "TABLE_NAME": "app-acme-prod-svc-table"
+    },
+    "name": "aws",
+    "region": "us-west-2",
+    "stackName": "app-acme-prod-svc",
+    "stage": "acme-prod"
+  },
+  "service": "admin-ui"
+}
