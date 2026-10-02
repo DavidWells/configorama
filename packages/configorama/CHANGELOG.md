@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.7](https://github.com/DavidWells/configorama/compare/configorama@1.4.6...configorama@1.4.7) (2026-10-02)
+
+
+### Bug Fixes
+
+* **resolver:** unknown variable types inside a quoted fallback pass through ([#79](https://github.com/DavidWells/configorama/issues/79)) ([e071d0d](https://github.com/DavidWells/configorama/commit/e071d0db666735605b3463c844d627eea1db2e58))
+
+
+
+
+
 ## [1.4.6](https://github.com/DavidWells/configorama/compare/configorama@1.4.5...configorama@1.4.6) (2026-10-01)
 
 
