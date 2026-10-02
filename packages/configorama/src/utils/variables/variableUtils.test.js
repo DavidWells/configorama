@@ -203,5 +203,14 @@ test('buildVariableSyntax - bracket [[]] syntax excludes ]', () => {
   assert.is(match[0], "[[env:FOO, 'value']]")
 })
 
+test('buildVariableSyntax - matches a variable holding an encoded passthrough value', () => {
+  const { encodeUnknown } = require('../encoders/unknown-values')
+  const marker = encodeUnknown('${sls:stage}')
+  const variable = `\${env:UNSET, 'sl-${marker}-manifest'}`
+  const match = variable.match(buildVariableSyntax('${', '}'))
+  assert.ok(match)
+  assert.is(match[0], variable)
+})
+
 // Run all tests
 test.run()

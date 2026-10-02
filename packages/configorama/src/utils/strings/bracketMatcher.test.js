@@ -5,6 +5,7 @@ const {
   findOutermostBracesDepthFirst,
   findEnclosingVariable,
   findParentVariable,
+  isFallbackSlot,
   findOutermostBraceRanges,
   findOutermostVariables
 } = require('./bracketMatcher')
@@ -198,6 +199,30 @@ test('findOutermostBraceRanges - returns [start, end) of each outermost pair', (
 
 test('findOutermostBraceRanges - custom chars and unclosed pair', () => {
   assert.equal(findOutermostBraceRanges('[a] [b', '[', ']'), [[0, 3]])
+})
+
+// isFallbackSlot: whether a nested variable is an item of the enclosing variable's fallback list
+test('isFallbackSlot - bare item after a comma is a slot', () => {
+  assert.ok(isFallbackSlot('${env:X, ${sls:stage}}', '${sls:stage}', '${', '}'))
+  assert.ok(isFallbackSlot("${env:X, ${env:Y}, 'z'}", '${env:Y}', '${', '}'))
+})
+
+test('isFallbackSlot - variable inside a quoted item is not a slot', () => {
+  assert.not.ok(isFallbackSlot("${env:X, '${sls:stage}'}", '${sls:stage}', '${', '}'))
+  assert.not.ok(isFallbackSlot("${env:X, 'sl-${sls:stage}-manifest'}", '${sls:stage}', '${', '}'))
+  assert.not.ok(isFallbackSlot('${env:X, "sl-${sls:stage}"}', '${sls:stage}', '${', '}'))
+})
+
+test('isFallbackSlot - variable after other text in an unquoted item is not a slot', () => {
+  assert.not.ok(isFallbackSlot('${env:X, sl-${sls:stage}}', '${sls:stage}', '${', '}'))
+})
+
+test('isFallbackSlot - first item (source path) is not a slot', () => {
+  assert.not.ok(isFallbackSlot('${self:map.${opt:k}}', '${opt:k}', '${', '}'))
+})
+
+test('isFallbackSlot - function call arguments are not slots', () => {
+  assert.not.ok(isFallbackSlot("${merge('a', ${self:y})}", '${self:y}', '${', '}'))
 })
 
 // Run all tests

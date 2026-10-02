@@ -1,0 +1,1 @@
+value: ${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:stage}-manifest'}
