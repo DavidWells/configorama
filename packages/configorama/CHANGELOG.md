@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.8](https://github.com/DavidWells/configorama/compare/configorama@1.4.7...configorama@1.4.8) (2026-10-02)
+
+
+### Bug Fixes
+
+* **resolver:** a variable starting a longer fallback item resolves into its text ([#80](https://github.com/DavidWells/configorama/issues/80)) ([52b0088](https://github.com/DavidWells/configorama/commit/52b0088dbbf45145e9e4393eb74cbf94e7f9bdb3))
+
+
+
+
+
 ## [1.4.7](https://github.com/DavidWells/configorama/compare/configorama@1.4.6...configorama@1.4.7) (2026-10-02)
 
 
