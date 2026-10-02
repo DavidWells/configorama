@@ -239,7 +239,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe, splitOnTopLevelPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable, findParentVariable, isFallbackSlot, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, findParentVariable, isFallbackSlot, isWholeFallbackItem, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 // Metadata, display and setup modules are required where used; plain config loads never need them
@@ -2161,13 +2161,26 @@ class Configorama {
       return inThis.slice(0, matchIndex) + withThis + inThis.slice(matchIndex + replaceThis.length)
     }
     /**
-     * Whether the match at matchIndex is a fallback item of the variable around it (${env:X, ${self:y}})
+     * Whether the match at matchIndex is a whole fallback item of the variable around it
+     * (${env:X, ${self:y}}), not the start of a longer item (${env:X, ${self:y}-z}) where a
+     * whole-value token would be glued to the rest of the text and never decoded
      * @returns {boolean}
      */
     const isFallbackItemHere = () => {
       if (typeof matchIndex !== 'number' || property.slice(matchIndex, matchIndex + matchedString.length) !== matchedString) return false
       const parent = findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
-      return !!parent && isFallbackSlot(parent.text, matchedString, this.varPrefix, this.varSuffix)
+      return !!parent && isWholeFallbackItem(parent.text, matchedString, this.varPrefix, this.varSuffix)
+    }
+    /**
+     * Whether the match at matchIndex starts a fallback item without being all of it
+     * (${env:X, ${self:y}-z}): its value is composed into the item's text
+     * @returns {boolean}
+     */
+    const isPartOfFallbackItemHere = () => {
+      if (typeof matchIndex !== 'number' || property.slice(matchIndex, matchIndex + matchedString.length) !== matchedString) return false
+      const parent = findParentVariable(property, matchedString, this.varPrefix, this.varSuffix, matchIndex)
+      return !!parent && isFallbackSlot(parent.text, matchedString, this.varPrefix, this.varSuffix) &&
+        !isWholeFallbackItem(parent.text, matchedString, this.varPrefix, this.varSuffix)
     }
     /**
      * Whether the match is an argument of an eval()/if() expression directly around it, where values
@@ -2435,7 +2448,8 @@ class Configorama {
       property = withFallbackToken(valueToPopulate, String(valueToPopulate))
 
     // partial replacement, boolean (eval/if keeps the bare true/false; a compose gets the stringified value)
-    } else if (typeof valueToPopulate === 'boolean' && (parentIsEvalOrIf() || !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
+    } else if (typeof valueToPopulate === 'boolean' && (parentIsEvalOrIf() || isPartOfFallbackItemHere() ||
+      !isInsideOuterVariable(property, matchedString, this.varPrefix, this.varSuffix))) {
       // A boolean composed into literal text or a filter arg is stringified (flag=${b} -> "flag=true"), and
       // eval/if get the bare true/false. But when the match sits INSIDE an outer ${...} that is NOT eval/if
       // (a fallback like ${env:X, ${self:flag}}), leave it to the fallback handler below so the boolean's
