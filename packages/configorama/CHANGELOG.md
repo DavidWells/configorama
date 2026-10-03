@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.10](https://github.com/DavidWells/configorama/compare/configorama@1.4.9...configorama@1.4.10) (2026-10-02)
+
+
+### Features
+
+* **resolver:** resolve ${sls:stage}; aws: refs inside fallbacks pass through; filters on resolve-later values error ([#83](https://github.com/DavidWells/configorama/issues/83)) ([6fdc97c](https://github.com/DavidWells/configorama/commit/6fdc97cfac633d12a7d70e1295ae2956098bdb96))
+
+
+
+
+
 ## [1.4.9](https://github.com/DavidWells/configorama/compare/configorama@1.4.8...configorama@1.4.9) (2026-10-02)
 
 

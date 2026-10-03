@@ -1,24 +1,24 @@
 stage: dev
 # Unknown (passthrough) variable types inside a quoted fallback string
-textAround: ${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:stage}-manifest'}
-onlyPassthrough: ${env:CONFIGORAMA_TEST_UNSET, '${sls:stage}'}
-doubleQuoted: ${env:CONFIGORAMA_TEST_UNSET, "sl-${sls:stage}-manifest"}
-twoPassthroughs: ${env:CONFIGORAMA_TEST_UNSET, '${ssm:/app/prefix}-${sls:stage}'}
-mixedWithSelf: ${env:CONFIGORAMA_TEST_UNSET, '${self:stage}-${sls:stage}'}
+textAround: ${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:instanceId}-manifest'}
+onlyPassthrough: ${env:CONFIGORAMA_TEST_UNSET, '${sls:instanceId}'}
+doubleQuoted: ${env:CONFIGORAMA_TEST_UNSET, "sl-${sls:instanceId}-manifest"}
+twoPassthroughs: ${env:CONFIGORAMA_TEST_UNSET, '${ssm:/app/prefix}-${sls:instanceId}'}
+mixedWithSelf: ${env:CONFIGORAMA_TEST_UNSET, '${self:stage}-${sls:instanceId}'}
 derived: ${self:textAround}-tables
-inText: prefix-${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:stage}'}-suffix
+inText: prefix-${env:CONFIGORAMA_TEST_UNSET, 'sl-${sls:instanceId}'}-suffix
 # Outer variable from another resolver
-optMissing: ${opt:missingFlag, 'sl-${sls:stage}-manifest'}
-optSet: ${opt:stage, 'sl-${sls:stage}-manifest'}
+optMissing: ${opt:missingFlag, 'sl-${sls:instanceId}-manifest'}
+optSet: ${opt:stage, 'sl-${sls:instanceId}-manifest'}
 # Inside arrays and nested objects
 nested:
   list:
-    - ${env:CONFIGORAMA_TEST_UNSET, 'a-${sls:stage}'}
+    - ${env:CONFIGORAMA_TEST_UNSET, 'a-${sls:instanceId}'}
   obj:
     key: ${env:CONFIGORAMA_TEST_UNSET, 'b-${ssm:/x/y}'}
 # Passthrough as an unquoted fallback variable
-bareFallback: ${env:CONFIGORAMA_TEST_UNSET, ${sls:stage}}
+bareFallback: ${env:CONFIGORAMA_TEST_UNSET, ${sls:instanceId}}
 # Env set: the fallback is never used
-envSet: ${env:CONFIGORAMA_TEST_SET, 'sl-${sls:stage}-manifest'}
+envSet: ${env:CONFIGORAMA_TEST_SET, 'sl-${sls:instanceId}-manifest'}
 # Controls: passthrough outside a fallback
-bare: sl-${sls:stage}-manifest
+bare: sl-${sls:instanceId}-manifest

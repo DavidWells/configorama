@@ -8,6 +8,7 @@ const { splitOnPipe } = require('../strings/splitOnPipe')
 const { scan, references, parentReference } = require('../expressions/scan')
 const { extractVariableWrapper } = require('../variables/variableUtils')
 const { encodeJsonArgObjects } = require('../encoders/js-fixes')
+const { encodeUnknown } = require('../encoders/unknown-values')
 const { encodeQuotedLiterals } = require('../encoders/literal-braces')
 const { setOwn } = require('../objects')
 
@@ -34,6 +35,30 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
         .map(prefix => prefix + ':')
         .filter(p => p !== 'dot.prop:' && p !== 'string:' && p !== 'number:')
     : ['self:', 'opt:', 'env:', 'file:', 'text:', 'deep:']
+
+  // Refs the syntax excludes (its (?!AWS|aws:|stageVariables) lookahead) belong to Serverless /
+  // CloudFormation / IAM and are never resolved here
+  const excludedLookahead = variableSyntax ? /\(\?!([^)]*)\)/.exec(variableSyntax.source) : null
+  const escapeRegex = (/** @type {string} */ text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const excludedRefPattern = excludedLookahead && excludedLookahead[1]
+    ? new RegExp(`${escapeRegex(varPrefix)}(?:${excludedLookahead[1]})[^${escapeRegex(varSuffix[0])}]*${escapeRegex(varSuffix)}`, 'g')
+    : null
+
+  /**
+   * An excluded ref inside another variable (${env:X, 'app-${aws:accountId}'}) would stop that
+   * variable from matching at all: keep it as an unknown passthrough instead, restored verbatim at
+   * the end. Outside any variable (IAM ${aws:username}) it is plain text and left alone.
+   * @param {string} str
+   * @returns {string}
+   */
+  function encodeNestedExcludedRefs(str) {
+    if (!excludedRefPattern || str.indexOf(varPrefix) === str.lastIndexOf(varPrefix)) return str
+    const authoredReferences = references(scan(str, { prefix: varPrefix, suffix: varSuffix }))
+    return str.replace(excludedRefPattern, (ref, offset) => {
+      const nested = authoredReferences.some(parent => parent.start < offset && parent.end > offset)
+      return nested ? encodeUnknown(ref) : ref
+    })
+  }
 
   /**
    * Escape variables inside help() filter arguments so main resolver skips them
@@ -140,7 +165,8 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
       const hasEvalOrIf = obj.indexOf('if(') !== -1 || obj.indexOf('eval(') !== -1
       const hasComma = obj.indexOf(',') !== -1
 
-      const withHelpEscaped = hasHelp ? escapeHelpVariables(obj) : obj
+      const withExcludedEncoded = encodeNestedExcludedRefs(obj)
+      const withHelpEscaped = hasHelp ? escapeHelpVariables(withExcludedEncoded) : withExcludedEncoded
       const withBareRefsConverted = hasEvalOrIf ? convertBareRefsInIf(withHelpEscaped) : withHelpEscaped
       // Encode JSON object literals used as filter/function args so their { } don't break variable matching.
       const withJsonArgsEncoded = obj.indexOf('{') !== -1 ? encodeJsonArgObjects(withBareRefsConverted, varPrefix, varSuffix) : withBareRefsConverted

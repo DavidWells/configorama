@@ -13,6 +13,8 @@ custom:
   prefixed: app-${self:provider.stage}-ui
   # Framework variable (resolved later by Serverless) inside a quoted fallback
   frameworkStackName: ${env:SG_STACK_NAME, 'app-${sls:stage}-manifest'}
+  # Filter over a fallback holding the framework stage
+  upperStackName: ${env:SG_STACK_NAME, 'app-${sls:stage}' | toUpperCase}
   tableName: ${self:custom.stackName}-table
 provider:
   name: aws

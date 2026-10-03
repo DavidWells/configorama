@@ -185,7 +185,7 @@ const {
 const PromiseTracker = require('./utils/PromiseTracker')
 const handleSignalEvents = require('./utils/handleSignalEvents')
 /* Utils - encoders */
-const { encodeUnknown, decodeUnknown, hasEncodedUnknown } = require('./utils/encoders/unknown-values')
+const { encodeUnknown, decodeUnknown, hasEncodedUnknown, findUnknownValues } = require('./utils/encoders/unknown-values')
 const { decodeEncodedValue } = require('./utils/encoders')
 const { decodeJsSyntax, hasParenthesesPlaceholder, encodeJsonForVariable, parseEncodedJson, isEncodedJson } = require('./utils/encoders/js-fixes')
 const { tagDates, reviveDates } = require('./utils/encoders/dates')
@@ -236,6 +236,7 @@ const getValueFromString = require('./resolvers/valueFromString')
 const getValueFromNumber = require('./resolvers/valueFromNumber')
 const getValueFromEnv = require('./resolvers/valueFromEnv')
 const getValueFromOptions = require('./resolvers/valueFromOptions')
+const getValueFromSls = require('./resolvers/valueFromSls')
 const getValueFromParam = require('./resolvers/valueFromParam')
 const getValueFromCron = require('./resolvers/valueFromCron')
 const getValueFromEval = require('./resolvers/valueFromEval')
@@ -509,6 +510,12 @@ class Configorama {
        * ${opt:other, "fallbackValue"}
        */
       getValueFromOptions,
+      /**
+       * Serverless stage (other sls: addresses pass through)
+       * Usage:
+       * ${sls:stage}
+       */
+      getValueFromSls,
 
       /**
        * Parameters
@@ -2679,8 +2686,19 @@ Missing Value ${missingValue} - ${matchedString}
    * @returns {any} The filtered value
    */
   applyFilters(value, filters, pathValue) {
-    // An unresolved variable kept as text (allowUnresolvedVariables) has no value to filter yet
-    if (isPassthrough(value)) return value
+    if (isPassthrough(value)) {
+      // An unknown type (${ssm:x}, ${cf:x}) gets its value later, outside configorama, so a filter
+      // here would run on the wrong text: an error. A known type left unresolved
+      // (allowUnresolvedVariables) has no value to filter yet: the filter is skipped
+      const kept = findUnknownValues(value).map(({ value: b64 }) => Buffer.from(b64, 'base64').toString('utf8'))
+      const resolvedLater = kept.filter((v) => this.isUnknownTypeAllowed(v))
+      if (!resolvedLater.length) return value
+      const names = filters.map((f) => parseFilter(f, this.config).name).join(', ')
+      const at = pathValue ? ` at "${[].concat(pathValue).join('.')}"` : ''
+      throw new Error(`Filter ${names} can't run on "${decodeUnknown(value)}"${at}: it still holds ` +
+        `${resolvedLater.join(', ')}, which is resolved later, outside configorama. ` +
+        'Remove the filter or give that variable a value first.')
+    }
     const filtered = filters.reduce((acc, filter) => {
       const { name, args } = parseFilter(filter, this.config)
       if (typeof this.filters[name] !== 'function') throw new Error(`Filter "${name}" not found`)
