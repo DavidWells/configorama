@@ -423,6 +423,25 @@ function getExpectedType(varData) {
 }
 
 /**
+ * @param {object} varInfo
+ * @param {boolean} [varInfo.isRequired]
+ * @param {boolean} [varInfo.hasFallback]
+ * @param {string|null} expectedType
+ * @returns {(val: string|undefined) => string|undefined}
+ */
+function createPromptValidator(varInfo, expectedType) {
+  return (val) => {
+    // Only required if no fallback exists
+    if (!val && varInfo.isRequired && !varInfo.hasFallback) {
+      return 'This value is required'
+    }
+    // Type validation
+    const typeError = validateType(val, expectedType)
+    if (typeError) return typeError
+  }
+}
+
+/**
  * Extracts help text from variable data or occurrences
  * @param {object} varData - Variable data with descriptions array or occurrences
  * @returns {string|null} Help text or null
@@ -705,15 +724,7 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
           message,
           placeholder,
           defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
-          validate: (val) => {
-            // Only required if no fallback exists
-            if (!val && varInfo.isRequired && !varInfo.hasFallback) {
-              return 'This value is required'
-            }
-            // Type validation
-            const typeError = validateType(val, expectedType)
-            if (typeError) return typeError
-          }
+          validate: createPromptValidator(varInfo, expectedType)
         })
       }
 
@@ -766,15 +777,7 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
         message,
         placeholder,
         defaultValue,
-        validate: (val) => {
-          // Only required if no fallback exists
-          if (!val && varInfo.isRequired && !varInfo.hasFallback) {
-            return 'This value is required'
-          }
-          // Type validation
-          const typeError = validateType(val, expectedType)
-          if (typeError) return typeError
-        }
+        validate: createPromptValidator(varInfo, expectedType)
       })
 
       if (p.isCancel(value)) {
@@ -810,15 +813,7 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
         message,
         placeholder,
         defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
-        validate: (val) => {
-          // Only required if no fallback exists
-          if (!val && varInfo.isRequired && !varInfo.hasFallback) {
-            return 'This value is required'
-          }
-          // Type validation
-          const typeError = validateType(val, expectedType)
-          if (typeError) return typeError
-        }
+        validate: createPromptValidator(varInfo, expectedType)
       })
 
       if (p.isCancel(value)) {
@@ -854,15 +849,7 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
         message,
         placeholder,
         defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
-        validate: (val) => {
-          // Only required if no fallback exists
-          if (!val && varInfo.isRequired && !varInfo.hasFallback) {
-            return 'This value is required'
-          }
-          // Type validation
-          const typeError = validateType(val, expectedType)
-          if (typeError) return typeError
-        }
+        validate: createPromptValidator(varInfo, expectedType)
       })
 
       if (p.isCancel(value)) {
