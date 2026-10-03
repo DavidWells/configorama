@@ -2854,6 +2854,14 @@ Missing Value ${missingValue} - ${matchedString}
       if (isResolutionRecord(record) && record.appliedFilters) {
         this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(record.appliedFilters.map(f => filterCacheKey(f, this.config)))
       }
+      if (isResolutionRecord(record) && record.sourceOrigin && /^file\(/.test(variableString)) {
+        const lineage = record.sourceOrigin.lineage || []
+        const selectionIdentity = lineage[lineage.length - 1]
+        if (selectionIdentity && (origin.lineage || []).includes(selectionIdentity)) {
+          const files = (origin.lineage || []).concat(selectionIdentity).map(identity => JSON.parse(identity)[0])
+          throw new Error('Circular file reference detected: ' + files.join(' -> '))
+        }
+      }
       if(isResolutionRecord(record)&&record.sourceOrigin)valueObject.nextOrigin=record.sourceOrigin
       return record
     })

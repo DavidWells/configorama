@@ -27,6 +27,14 @@ test('executable exports use their authored directory',()=>temporary(async root=
   const dir=path.join(root,'sub');fs.mkdirSync(dir);fs.writeFileSync(path.join(dir,'leaf.json'),'{"value":"local"}');fs.writeFileSync(path.join(dir,'config.js'),'module.exports={value:"${file(./leaf.json):value}"}')
   for(const resolve of [c,c.sync])assert.equal((await resolve({out:'${file(./sub/config.js)}'},{configDir:root,moduleCacheMode:'load'})).out.value,'local')
 }))
+test('cached file references detect cycles from a canonical root path',()=>temporary(async root=>{
+  fs.writeFileSync(path.join(root,'a.yml'),'a: ${file(./b.yml):value}\n')
+  fs.writeFileSync(path.join(root,'b.yml'),'value: ${file(./a.yml):a}\n')
+  const file=fs.realpathSync(path.join(root,'a.yml'))
+  for(const resolve of [c,c.sync]) {
+    await assert.rejects(async()=>resolve(file,{resolutionLimits:{maxPasses:20}}),/Circular file reference/)
+  }
+}))
 test('composed repeats, cross-file views, canonical cycles and symlink roots',()=>temporary(async root=>{
   const inside=path.join(root,'inside');const outside=path.join(root,'outside');fs.mkdirSync(inside);fs.mkdirSync(outside)
   fs.writeFileSync(path.join(inside,'leaf.json'),'{"a":"A","b":"${file(./leaf.json):a}"}')

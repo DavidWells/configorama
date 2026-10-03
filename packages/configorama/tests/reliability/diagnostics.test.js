@@ -23,8 +23,10 @@ test('CLI debug JSON and configx shell exports remain clean with dotenv enabled'
   const result=await runChild(['../configx/cli.js',file,'--export'],{env})
   assert.equal(result.code,0,result.stderr)
   assert.ok(result.stdout.trim().split('\n').every(line=>line.startsWith('export ')))
-  const shell=await runChild(['-e',`const {spawnSync}=require('node:child_process');const r=spawnSync('/bin/zsh',['-c',process.argv[1]+'\\nprintf %s "$VALUE"'],{encoding:'utf8'});process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exitCode=r.status`,result.stdout])
-  assert.equal(shell.code,0,shell.stderr);assert.equal(shell.stdout,'synthetic&a=1&v=2')
+  for (const shellPath of ['/bin/sh', '/bin/zsh'].filter(file => fs.existsSync(file))) {
+    const shell=await runChild(['-e',`const {spawnSync}=require('node:child_process');const r=spawnSync(process.argv[1],['-c',process.argv[2]+'\\nprintf %s "$VALUE"'],{encoding:'utf8'});if(r.error)throw r.error;process.stdout.write(r.stdout);process.stderr.write(r.stderr);process.exitCode=r.status`,shellPath,result.stdout])
+    assert.equal(shell.code,0,shell.stderr);assert.equal(shell.stdout,'synthetic&a=1&v=2')
+  }
 }))
 test('structural failures use one structured stderr error and expose registered reliability codes',()=>temporary(async root=>{
   const file=path.join(root,'cycle.yml');fs.writeFileSync(file,'root: &loop\n  child: *loop\n')

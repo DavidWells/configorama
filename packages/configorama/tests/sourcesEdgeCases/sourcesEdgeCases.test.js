@@ -18,7 +18,7 @@ const { resolveYamlText } = require('../utils')
 function writeFiles(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'configorama-sources-'))
   for (const [name, contents] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), contents)
-  return dir
+  return fs.realpathSync(dir)
 }
 
 /**
@@ -115,7 +115,7 @@ test('circular file refs fail as circular instead of hanging', async () => {
     const result = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 15000 })
     assert.is(result.signal, null, 'resolution hung and was killed')
     assert.is(result.status, 1)
-    assert.match(result.stderr, /Circular/i)
+    assert.match(result.stderr, /Circular/i, result.stderr)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
@@ -176,7 +176,7 @@ test('a three-file cycle fails as circular', async () => {
       .then(() => { console.error('RESOLVED'); process.exit(0) }, (err) => { console.error(err.message); process.exit(1) })`
     const result = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 15000 })
     assert.is(result.signal, null, 'resolution hung and was killed')
-    assert.match(result.stderr, /Circular/i)
+    assert.match(result.stderr, /Circular/i, result.stderr)
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
