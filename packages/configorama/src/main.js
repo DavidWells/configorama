@@ -2854,7 +2854,7 @@ Missing Value ${missingValue} - ${matchedString}
       if (isResolutionRecord(record) && record.appliedFilters) {
         this.filterCache[pathIdentity] = (this.filterCache[pathIdentity] || []).concat(record.appliedFilters.map(f => filterCacheKey(f, this.config)))
       }
-      if (isResolutionRecord(record) && record.sourceOrigin && /^file\(/.test(variableString)) {
+      if (isResolutionRecord(record) && record.sourceOrigin && !record.fileAsRawText && /^file\(/.test(variableString)) {
         const lineage = record.sourceOrigin.lineage || []
         const selectionIdentity = lineage[lineage.length - 1]
         if (selectionIdentity && (origin.lineage || []).includes(selectionIdentity)) {
@@ -3348,7 +3348,7 @@ Missing Value ${missingValue} - ${matchedString}
 
       const ownedValuePromise=valuePromise.then(record=>{
         if(!valueObject.nextOrigin)return record
-        if(isResolutionRecord(record)){record.sourceOrigin=valueObject.nextOrigin;return record}
+        if(isResolutionRecord(record)){if(!record.sourceOrigin)record.sourceOrigin=valueObject.nextOrigin;return record}
         return resolutionRecord({value:record,sourceOrigin:valueObject.nextOrigin})
       })
       // console.log('valuePromise', valuePromise)
@@ -3581,6 +3581,7 @@ Missing Value ${missingValue} - ${matchedString}
    * @returns {Promise<any>} The file's value
    */
   async getValueFromFile(variableString, options) {
+    const context = { ...options.context, nextOrigin: undefined }
     const ctx = {
       configPath: this.configPath,
       authoredRoot: this.configFilePath,
@@ -3593,7 +3594,7 @@ Missing Value ${missingValue} - ${matchedString}
       loadContext: this.loadContext,
       originalConfig: this.originalConfig,
       config: this.config,
-      getDeeperValue: (segments, value) => this.getDeeperValue(segments, value, options.context.nextOrigin || options.context.origin),
+      getDeeperValue: (segments, value) => this.getDeeperValue(segments, value, context.nextOrigin || context.origin),
       fileRefSyntax: fileRefSyntax,
       textRefSyntax: textRefSyntax,
       varPrefix: this.varPrefix,
@@ -3601,10 +3602,12 @@ Missing Value ${missingValue} - ${matchedString}
       fileContentCache: this._fileContentCache,
       safetyPolicy: this.safetyPolicy
     }
-    const value = await getValueFromFileResolver(ctx, variableString, options)
+    const value = await getValueFromFileResolver(ctx, variableString, { ...options, context })
     this.budget.check()
     validateStructure(value, this.settings.resolutionLimits)
-    return value
+    options.context.nextOrigin = context.nextOrigin
+    if (value == null) return value
+    return resolutionRecord({ value, sourceOrigin: context.nextOrigin, fileAsRawText: options.asRawText })
   }
   getValueFromDeep(variableString, pathValue) {
     const variable = this.getVariableFromDeep(variableString)

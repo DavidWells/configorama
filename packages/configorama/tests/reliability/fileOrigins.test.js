@@ -35,6 +35,15 @@ test('cached file references detect cycles from a canonical root path',()=>tempo
     await assert.rejects(async()=>resolve(file,{resolutionLimits:{maxPasses:20}}),/Circular file reference/)
   }
 }))
+test('raw file cache reuse in mixed Fn::Sub templates remains acyclic',()=>temporary(async root=>{
+  fs.writeFileSync(path.join(root,'data.json'),'{ "ref": "${AWS::Region}" }\n')
+  const file=path.join(root,'config.yml')
+  fs.writeFileSync(file,'provider:\n  stage: dev\nresources:\n  Fn::Sub: ${file(./data.json)} stage=${self:provider.stage} api=${ApiGatewayRestApi}\n')
+  for(const resolve of [c,c.sync]) {
+    const output=await resolve(fs.realpathSync(file))
+    assert.equal(output.resources['Fn::Sub'],'{ "ref": "${AWS::Region}" }\n stage=dev api=${ApiGatewayRestApi}')
+  }
+}))
 test('composed repeats, cross-file views, canonical cycles and symlink roots',()=>temporary(async root=>{
   const inside=path.join(root,'inside');const outside=path.join(root,'outside');fs.mkdirSync(inside);fs.mkdirSync(outside)
   fs.writeFileSync(path.join(inside,'leaf.json'),'{"a":"A","b":"${file(./leaf.json):a}"}')
