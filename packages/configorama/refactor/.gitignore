@@ -2,5 +2,5 @@
 artifacts/**/*.json
 artifacts/**/*.txt
 artifacts/**/*.log
-artifacts/**/slop_scan.md
+artifacts/**/*.md
 artifacts/2026-10-02-pass-1/
