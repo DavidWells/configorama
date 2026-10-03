@@ -1,377 +1,59 @@
-const { splitByComma } = require('../strings/splitByComma')
-const { trimSurroundingQuotes: trimQuotes } = require('../strings/quoteUtils')
-const { getVariableType } = require('./getVariableType')
-const FALLBACK_REGEX = /,\s*/
-const VAR_MATCH_REGEX = /__VAR_\d+__/
-
-/**
- * Finds all nested variable interpolations in a string while preserving original syntax
- *
- * This function handles complex nested variables like:
- * ${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}
- *
- * The returned matches will include:
- * 1. innermost variables first (e.g., ${defaultStage})
- * 2. middle variables next (e.g., ${opt:stage, ${defaultStage}})
- * 3. outermost variables last (e.g., the entire expression)
- *
- * Each variable retains its original syntax even in nested form.
- *
- * @param {string} input - The input string containing variable interpolations
- * @param {RegExp} regex - The regex pattern to match variables
- * @param {RegExp} variablesKnownTypes - Combined regex of all known variable types
- * @param {string} location - The location in config where this variable appears
- * @param {Array} variableTypes - Array of variable type definitions from resolvers
- * @param {boolean} debug - Whether to print debug information
- * @returns {Array} Array of match objects with fullMatch, variable, varString and other properties
- */
-function findNestedVariables(input, regex, variablesKnownTypes, location, variableTypes, debug = false) {
-  // console.log('variablesKnownTypes', variablesKnownTypes)
-  // Create a copy of the input for replacement tracking
-  let current = input
-  // console.log('current', current)
-  // Store matches with their positions in the original string
-  let matches = []
-  // Track original positions and replacements
-  let replacements = []
-  let match
-  let iteration = 0
-  
-  if (debug) console.error(`Initial string: ${input}`)
-
-  // First pass: Find all matches and create unique placeholders
-  while (true) {
-    iteration++
-    if (debug) console.error(`\nIteration ${iteration}:`)
-    
-    // Reset regex index
-    regex.lastIndex = 0
-    
-    // Find the next match in the working string
-    match = regex.exec(current)
-    if (!match) break
-    
-    // Generate a unique placeholder
-    const placeholder = `__VAR_${iteration - 1}__`
-    // Pre-compile regex for this placeholder (perf: avoids recompilation in replaceAllPlaceholders)
-    const placeholderRegex = new RegExp(placeholder, 'g')
-
-    // Store match details
-    const matchInfo = {
-      variableType: undefined,
-      location,
-      originalStringValue: input,
-      varMatch: match[0],
-      variable: match[1].trim(),
-      varString: match[1],
-      resolveOrder: iteration,
-      start: match.index,
-      end: match.index + match[0].length,
-      placeholder,
-      placeholderRegex,
-    }
-    
-    if (debug) {
-      console.error(`Match: ${match[0]}`)
-      console.error(`Captured group: ${match[1]}`)
-      console.error(`Position: ${match.index}`)
-    }
-    
-    matches.push(matchInfo)
-    
-    // Store replacement info
-    replacements.push({
-      original: match[0],
-      placeholder,
-      start: match.index,
-      end: match.index + match[0].length
+const {scan,references,parentReference}=require('../expressions/scan')
+const {classify}=require('../expressions/ownership')
+const {extractVariableWrapper}=require('./variableUtils')
+const {getVariableType}=require('./getVariableType')
+const {trimSurroundingQuotes:trimQuotes}=require('../strings/quoteUtils')
+/** Shared syntax occurrence projection. Discovery never invokes source or filter callbacks. */
+function findNestedVariables(input,regex,variablesKnownTypes,location,variableTypes=[],debug=false) {
+  if(typeof input!=='string'||!input)return []
+  const wrapper=regex?extractVariableWrapper(regex.source):{prefix:'${',suffix:'}'}
+  const syntax=scan(input,wrapper)
+  const known=new Set(variableTypes.flatMap(source=>(source.prefixes||[source.prefix||source.type]).map(prefix=>prefix+':')))
+  const refs=references(syntax).filter(node=>node.complete).sort((a,b)=>a.end-b.end||b.start-a.start)
+  const matches=refs.map((node,index)=>{
+    const body=input.slice(node.contentStart,node.contentEnd).trim()
+    const parent=parentReference(syntax,node)
+    const fallbackNodes=syntax.nodes.filter(n=>n.parentId===node.id&&n.kind==='Fallback')
+    const source=fallbackNodes.length?fallbackNodes[0].raw.trim():body
+    const ownership=classify(source,{...wrapper,knownPrefixes:known})
+    // Custom matcher functions are runtime behavior; static classification uses declared prefixes.
+    const declarativeTypes=variableTypes.filter(type=>type.match instanceof RegExp)
+    const declared=variableTypes.find(type=>(type.prefixes||[type.prefix||type.type]).includes(ownership.type))
+    const variableType=declared?declared.type:getVariableType(source,declarativeTypes.length?declarativeTypes:undefined)
+    const filters=syntax.nodes.filter(n=>n.parentId===node.id&&n.kind==='Filter').map(n=>n.raw.trim())
+    const firstPipe=(node.pipes||[])[0]
+    const variableWithoutFilters=firstPipe===undefined?node.raw:input.slice(node.start,firstPipe).trimEnd()+wrapper.suffix
+    let ancestor=node.parentId;let role='value'
+    while(ancestor!==null){const owner=syntax.nodes[ancestor];if(owner.kind==='Call'&&owner.name==='help'){role='annotation';break}ancestor=owner.parentId}
+    const branches=(fallbackNodes.length ? fallbackNodes : [node]).map((item,itemIndex)=>{
+      const text=item===node?body:item.raw.trim()
+      const inner=refs.find(child=>child.raw===text&&child.start>=item.start&&child.end<=item.end)
+      const clean=inner?input.slice(inner.contentStart,inner.contentEnd).trim():text
+      const branchOwner=classify(clean,{...wrapper,knownPrefixes:known})
+      const quoted=/^(["'])([\s\S]*)\1$/.test(text)
+      const literal=!text.includes(wrapper.prefix)&&(quoted||branchOwner.kind==='literal')
+      return {itemIndex,source:clean,ownership:branchOwner.kind,variableType:literal?'literal':getVariableType(clean,declarativeTypes.length?declarativeTypes:undefined),discovery:'static-possible',availability:literal?'guaranteed':'conditional',start:item.start,end:item.end}
     })
-    
-    // Replace in working string (to find next match)
-    current = current.substring(0, match.index) + placeholder + current.substring(match.index + match[0].length)
-    
-    if (debug) console.error(`After replacement: ${current}`)
-  }
-  
-  if (debug) console.error(`\nTotal matches found: ${matches.length}`)
-  
-  // We need to store varString - the variable string with placeholders
-  for (let i = 0; i < matches.length; i++) {
-    matches[i].varString = matches[i].variable
-    /* Save additional meta data about the variable */
-    // console.log('matches[i].varString', matches[i].varString)
-
-    // if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-    //   matches[i].variableType = matches[i].varString.match(variablesKnownTypes)[1] 
-    //   if (FALLBACK_REGEX.test(matches[i].varString)) {
-    //     const split = splitByComma(matches[i].varString, regex)
-    //     matches[i].hasFallback = true
-
-    //     matches[i].valueBeforeFallback = split[0]
-    //     // remove first element from split
-    //     matches[i].fallbackValues = split.slice(1).map((item) => {
-    //       // console.log('item', item)
-    //       const isVariable = variablesKnownTypes.test(item) || VAR_MATCH_REGEX.test(item)
-    //       const fallbackData = {
-    //         isVariable,
-    //         fullMatch: item,
-    //         variable: item,
-    //       }
-
-    //       if (!isVariable && typeof item === 'string') {
-    //         fallbackData.stringValue = trimQuotes(item)
-    //         fallbackData.isResolvedFallback = true
-    //       }
-          
-    //       return fallbackData
-    //     })
-    //   }
-    // }
-  }
-  
-  // Second pass: Reconstruct each variable with original nested syntax
-  // We need to do this recursively to ensure all placeholders are replaced properly
-  function replaceAllPlaceholders(text = '', matchesArray, key = 'varMatch') {
-    let result = text
-    let needsAnotherPass = false
-
-    // Replace all placeholders with their original matches
-    for (let i = 0; i < matchesArray.length; i++) {
-      const m = matchesArray[i]
-      if (result.includes(m.placeholder)) {
-        // Reset lastIndex before reusing global regex
-        m.placeholderRegex.lastIndex = 0
-        result = result.replace(m.placeholderRegex, m[key])
-        needsAnotherPass = true
-      }
-    }
-
-    // If we made replacements, we might need another pass to handle nested placeholders
-    if (needsAnotherPass) {
-      return replaceAllPlaceholders(result, matchesArray, key)
-    }
-
-    return result
-  }
-  
-  // For each match, reconstruct the original nested syntax
-  for (let i = 0; i < matches.length; i++) {
-    const currentMatch = matches[i]
-
-    // Skip if this match doesn't contain any placeholders
-    if (!currentMatch.varMatch.includes('__VAR_') && !currentMatch.variable.includes('__VAR_')) {
-      continue
-    }
-
-    if (currentMatch.hasFallback) {
-      currentMatch.fallbackValues.forEach((item) => {
-        item.varMatch = replaceAllPlaceholders(item.varMatch, matches, 'varMatch')
-        item.variable = replaceAllPlaceholders(item.variable, matches, 'variable')
-      })
-    }
-
-    // Reconstruct with all nested variables
-    currentMatch.varMatch = replaceAllPlaceholders(currentMatch.varMatch, matches)
-    currentMatch.variable = replaceAllPlaceholders(currentMatch.variable, matches)
-  }
-
-
-    // We need to store varString - the variable string with placeholders
-  for (let i = 0; i < matches.length; i++) {
-    matches[i].varString = matches[i].variable
-    /* Save additional meta data about the variable */
-    // console.log('matches[i].varString', matches[i].varString)
-
-    if (variablesKnownTypes && variablesKnownTypes.test(matches[i].varString)) {
-      matches[i].variableType = getVariableType(matches[i].varString, variableTypes)
-      if (FALLBACK_REGEX.test(matches[i].varString)) {
-        const split = splitByComma(matches[i].varString, regex)
-        matches[i].hasFallback = true
-
-        matches[i].valueBeforeFallback = split[0]
-        // remove first element from split
-        matches[i].fallbackValues = split.slice(1).map((item) => {
-          // console.log('item', item)
-          // Strip ${} wrapper if present to properly test against variablesKnownTypes
-          const innerContent = item.replace(/^\$\{(.*)\}$/, '$1')
-          const isVariable = variablesKnownTypes.test(innerContent) || VAR_MATCH_REGEX.test(item)
-          const fallbackData = {
-            isVariable,
-            varMatch: item,
-            variable: item,
-          }
-
-          if (!isVariable && typeof item === 'string') {
-            fallbackData.stringValue = trimQuotes(item)
-            fallbackData.isResolvedFallback = true
-          }
-
-          if (isVariable) {
-            fallbackData.variableType = getVariableType(innerContent, variableTypes)
-            // if (variableType === 'self:') {
-            //   fallbackData.varMatch = item.replace('self:', '')
-            //   fallbackData.variable = item.replace('self:', '')
-            //   fallbackData.variableType = 'dot.prop'
-            // }
-          }
-          return fallbackData
-        })
-      }
-    } else if (typeof matches[i].variableType === 'undefined') {
-      matches[i].variableType = 'dot.prop'
-    }
-  }
-
-  const finalMatches = matches.map((m) => {
-    delete m.placeholder
-    delete m.placeholderRegex
-    if (typeof m.variableType === 'undefined') {
-      /*
-      {
-        variableType: 'dot.prop',
-        location: 'resolvedDomainName',
-        originalStringValue: '${domainByStage.${opt:stage, ${defaultStage}}}',
-        varMatch: '${domainByStage.${opt:stage, ${defaultStage}}}',
-        variable: 'domainByStage.${opt:stage, ${defaultStage}}',
-        varString: 'domainByStage.__VAR_1__',
-        resolveOrder: 3,
-        start: 0,
-        end: 26
-      }
-      {
-        variableType: 'dot.prop',
-        location: 'resolvedDomainName',
-        originalStringValue: '${domainByStage.${opt:stage, ${defaultStage}}}',
-        varMatch: '${defaultStage}',
-        variable: 'defaultStage',
-        varString: 'defaultStage',
-        resolveOrder: 1,
-        start: 29,
-        end: 44
-      }
-      */
-      // console.log('m', m)
-    }
-    if (m.hasFallback) {
-      const combinedFallbacks = m.fallbackValues.reduce((acc, f) => {
-        const child = matches.find((m) => m.variable === f.variable)
-        if (child && child.fallbackValues && child.fallbackValues.length) {
-          const split = splitByComma(child.variable, regex)
-          f.valueBeforeFallback = split[0]
-          f.fallbackValues = child.fallbackValues
-        }
-        return acc
-      }, m.fallbackValues)
-      m.fallbackValues = combinedFallbacks
-    }
-    if (m.variableType === 'dot.prop') {
-      // const reversedMatches = matches.reverse()
-      // const test = reversedMatches.reduce((acc, f) => {
-      //   console.log('f', f)
-      //   const child = reversedMatches.find((m) => m.variable === f.variable)
-      //   if (child && child.fallbackValues && child.fallbackValues.length) {
-      //     const split = splitByComma(child.variable, regex)
-      //     f.valueBeforeFallback = split[0]
-      //     f.fallbackValues = child.fallbackValues
-      //   }
-      //   return acc
-      // }, reversedMatches)
-      // console.log('test', test)
-    }
-    return m
-  })
-  
-  if (debug) {
-    console.error("\nReconstructed matches:")
-    matches.forEach((m, i) => {
-      console.error(`Match #${i+1} (order ${m.order}):`)
-      console.error(`VarMatch: ${m.varMatch}`)
-      console.error(`Variable: ${m.variable}`)
-      console.error(`VarString: ${m.varString}`)
-      console.error(`Placeholder: ${m.placeholder}`)
-    })
-  }
-  
-  return finalMatches
-}
-
-
-/**
- * Processes nested variable interpolations in a string and collects all matches
- * @param {string} input - The input string containing variable interpolations
- * @param {boolean} debug - Whether to print debug information
- * @returns {Array} Array of match objects containing full match and captured group
- */
-function findNestedVariablesOld(input, regex, variablesKnownTypes, debug = false) {
-  let str = input
-  let matches = []
-  let match
-  let iteration = 0
-
-  // console.log('input', input)
-  
-  if (debug) console.error(`Initial string: ${str}`)
-
-  // Process string until no more matches are found
-  while (true) {
-    iteration++
-    if (debug) console.error(`\nIteration ${iteration}:`)
-    
-    // Reset regex index
-    regex.lastIndex = 0
-    
-    // Find the next match
-    match = regex.exec(str)
-    if (!match) break
-    
-    // Log match details if in debug mode
-    if (debug) {
-      console.error(`Match: ${match[0]}`)
-      console.error(`Captured group: ${match[1]}`)
-    }
-    
-    // Store the match
-    matches.push({
-      fullMatch: match[0],
-      variable: match[1],
-      order: iteration
-    })
-    
-    // Replace the match with placeholder
-    str = str.replace(regex, `__REPLACED_${iteration - 1}__`)
-    if (debug) console.error(`After replacement: ${str}`)
-  }
-
-  // Replace the `__REPLACED_${iteration - 1}__` with the original match
-  matches = matches.map((match, index) => {
-    const indexOfReplaced = match.fullMatch.match(/__REPLACED_(\d+)__/)
-    if (indexOfReplaced) {
-      const replacedIndex = parseInt(indexOfReplaced[1])
-      match.fullMatch = match.fullMatch.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
-      match.variable = match.variable.replace(`__REPLACED_${replacedIndex}__`, matches[replacedIndex].variable)
+    const hasGuaranteedFallback=branches.slice(1).some(branch=>branch.availability==='guaranteed')
+    const defaultAvailability=filters.length?'conditional':hasGuaranteedFallback?'guaranteed':branches.length>1?'conditional':'none'
+    const match={branches,defaultAvailability,filters,variableWithoutFilters,role,variableType,location,originalStringValue:input,varMatch:node.raw,variable:body,varString:body,resolveOrder:index+1,start:node.start,end:node.end,nodeId:node.id,parentNodeId:parent?parent.id:null,occurrenceId:JSON.stringify([location||null,node.start,node.end]),syntaxKind:'reference',ownership:ownership.kind,discovery:'static-possible'}
+    if(fallbackNodes.length>1) {
+      Object.assign(match,{hasFallback:true,valueBeforeFallback:source,fallbackValues:fallbackNodes.slice(1).map(item=>{
+        const text=item.raw.trim();const inner=refs.find(child=>child.start>=item.start&&child.end<=item.end&&child.raw===text)
+        const clean=inner?input.slice(inner.contentStart,inner.contentEnd).trim():text
+        const owner=classify(clean,{...wrapper,knownPrefixes:known})
+        const isVariable=!!inner||owner.kind==='recognized'||owner.kind==='foreign'||owner.kind==='call'
+        const value={isVariable,varMatch:text,variable:text}
+        if(isVariable)Object.assign(value,{variableType:getVariableType(clean,declarativeTypes.length?declarativeTypes:undefined)})
+        else Object.assign(value,{stringValue:trimQuotes(text),isResolvedFallback:true})
+        return value
+      })})
     }
     return match
   })
-
-  if (debug) console.error(`\nTotal matches found: ${matches.length}`)
+  // Carry nested fallback detail by exact span identity, without textual placeholder substitution.
+  for(const match of matches)if(match.hasFallback)for(const item of match.fallbackValues){const child=matches.find(m=>m.parentNodeId===match.nodeId&&m.varMatch===item.varMatch);if(child&&child.hasFallback)Object.assign(item,{valueBeforeFallback:child.valueBeforeFallback,fallbackValues:child.fallbackValues})}
+  if(debug)console.error(`Discovered ${matches.length} syntax occurrences`)
   return matches
 }
-
-// // Test with the example
-// const regex = /\${((?!AWS|aws:|stageVariables)[ ~:a-zA-Z0-9=+!@#%*<>?._'",|\-\/\(\)\\]+?)}/g
-// const input = '${file(./config.${opt:stage, ${defaultStage}}.json):CREDS}'
-
-// // Run the function with debug output
-// const result = findNestedVariables(input, regex, true)
-
-// // Display final result
-// console.log("\nFinal result:")
-// console.log(JSON.stringify(result, null, 2))
-
-// module.exports = {
-//   findNestedVariables
-// }
-
-module.exports = {
-  findNestedVariables
-}
+module.exports={findNestedVariables}

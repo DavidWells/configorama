@@ -1,3 +1,4 @@
+const { setOwn } = require('../objects')
 /**
  * Merge objects by specified keys
  */
@@ -15,13 +16,13 @@ function mergeByKeys(data, path, keysToMerge) {
     const keys = Object.keys(item)
     for (const key of keys) {
       if (mergeAll || keysToMerge.includes(key)) {
-        if (!result[key]) {
-          result[key] = Object.assign({}, item[key])
+        if (!Object.prototype.hasOwnProperty.call(result, key)) {
+          setOwn(result, key, { ...item[key] })
         } else {
-          result[key] = Object.assign({}, result[key], item[key])
+          setOwn(result, key, { ...result[key], ...item[key] })
         }
       } else {
-        result[key] = item[key]
+        setOwn(result, key, item[key])
       }
     }
   }

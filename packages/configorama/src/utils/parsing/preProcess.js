@@ -5,9 +5,9 @@
  */
 const { splitByComma } = require('../strings/splitByComma')
 const { splitOnPipe } = require('../strings/splitOnPipe')
-const { getQuoteRanges } = require('../strings/quoteAware')
+const { scan, references, parentReference } = require('../expressions/scan')
 const { extractVariableWrapper } = require('../variables/variableUtils')
-const { encodeJsonArgObjects, isInsideVariable } = require('../encoders/js-fixes')
+const { encodeJsonArgObjects } = require('../encoders/js-fixes')
 const { encodeUnknown } = require('../encoders/unknown-values')
 const { encodeQuotedLiterals } = require('../encoders/literal-braces')
 const { setOwn } = require('../objects')
@@ -53,8 +53,10 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
    */
   function encodeNestedExcludedRefs(str) {
     if (!excludedRefPattern || str.indexOf(varPrefix) === str.lastIndexOf(varPrefix)) return str
+    const authoredReferences = references(scan(str, { prefix: varPrefix, suffix: varSuffix }))
     return str.replace(excludedRefPattern, (ref, offset) => {
-      return isInsideVariable(str, offset, varPrefix) ? encodeUnknown(ref) : ref
+      const nested = authoredReferences.some(parent => parent.start < offset && parent.end > offset)
+      return nested ? encodeUnknown(ref) : ref
     })
   }
 
@@ -65,23 +67,14 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
    * @returns {string} String with help() variables escaped
    */
   function escapeHelpVariables(str) {
-    if (typeof str !== 'string') return str
-    if (!variableSyntax) return str
-
-    // Match help('...') or help("...") containing variables
-    const helpPattern = /help\(['"]([^'"]+)['"]\)/g
-
-    return str.replace(helpPattern, (match, helpContent) => {
-      // Check if help content contains variables
-      if (!helpContent.match(variableSyntax)) return match
-
-      // Replace each variable match with base64-encoded placeholder
-      const escaped = helpContent.replace(variableSyntax, (varMatch) => {
-        const encoded = Buffer.from(varMatch).toString('base64')
-        return `__CONFIGVAR:${encoded}__`
-      })
-      return `help('${escaped}')`
-    })
+    if(typeof str!=='string'||!variableSyntax)return str
+    const syntax=scan(str,{prefix:varPrefix,suffix:varSuffix})
+    const calls=syntax.nodes.filter(n=>n.kind==='Call'&&n.name==='help'&&n.complete&&parentReference(syntax,n))
+    const refs=references(syntax).filter(ref=>ref.complete&&calls.some(call=>ref.start>=call.contentStart&&ref.end<=call.contentEnd))
+    const outer=refs.filter(ref=>!refs.some(parent=>parent.start<ref.start&&parent.end>=ref.end)).sort((a,b)=>b.start-a.start)
+    let output=str
+    for(const ref of outer)output=output.slice(0,ref.start)+require('../encoders/opaque').encode('H',ref.raw)+output.slice(ref.end)
+    return output
   }
 
   /**
@@ -93,200 +86,41 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
    * @returns {string} String with bare refs converted
    */
   function convertBareRefsInIf(str) {
-    if (typeof str !== 'string') return str
-
-    const reserved = ['true', 'false', 'null', 'undefined', 'NaN', 'Infinity']
-    const prefixLen = varPrefix.length
-    const suffixLen = varSuffix.length
-
-    // Find if( blocks and process them
-    let result = str
-    let i = 0
-
-    while (i < result.length) {
-      // Look for ${if( or similar with custom prefix
-      const ifStart = result.indexOf(varPrefix + 'if(', i)
-      if (ifStart === -1) break
-
-      // Find the matching closing suffix by counting nested prefixes/suffixes
-      const contentStart = ifStart + prefixLen + 3 // after "${if("
-      let depth = 1
-      let j = contentStart
-
-      while (j < result.length && depth > 0) {
-        if (result.substring(j, j + prefixLen) === varPrefix) {
-          depth++
-          j += prefixLen
-        } else if (result.substring(j, j + suffixLen) === varSuffix) {
-          depth--
-          if (depth > 0) j += suffixLen
-        } else {
-          j++
-        }
+    if(typeof str!=='string')return str
+    const syntax=scan(str,{prefix:varPrefix,suffix:varSuffix})
+    const candidates=references(syntax).filter(n=>n.complete&&/^\s*if\(/.test(str.slice(n.contentStart,n.contentEnd))).sort((a,b)=>b.start-a.start)
+    let output=str
+    for(const node of candidates) {
+      const call=scan(node.raw,{prefix:varPrefix,suffix:varSuffix}).nodes.find(n=>n.kind==='Call'&&n.name==='if')
+      if(!call)continue
+      const start=node.start+call.contentStart
+      const original=output.slice(start,node.contentEnd)
+      const inner=scan(original,{prefix:varPrefix,suffix:varSuffix})
+      const refs=references(inner).filter(n=>n.complete)
+      const quotes=inner.nodes.filter(n=>(n.kind==='Literal'||n.kind==='Composition')&&/^['"]/.test(n.raw))
+      const comparisons=['===','!==','==','!=']
+      const inStringComparison=(source,start,end)=>{
+        const before=source.slice(0,start).trimEnd();const after=source.slice(end).trimStart()
+        return comparisons.some(op=>(after.startsWith(op)&&/^['"]/.test(after.slice(op.length).trimStart()))||new RegExp(`["'][^"']*["']\\s*${op}\\s*$`).test(before))
       }
-
-      if (depth === 0) {
-        // Extract the if content (everything between "if(" and the final ")")
-        const fullContent = result.substring(contentStart, j)
-
-        // Process the content: wrap bare refs and unquoted var refs in quotes
-        let processed = fullContent
-
-        // 1. First convert bare refs (word.word or word:word) to quoted var refs
-        // Must do this BEFORE handling ${...} to avoid double-wrapping
-        // Pattern excludes refs inside ${...} by using negative lookbehind for varPrefix
-        const escapedPrefix = varPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const bareRefPattern = new RegExp(
-          `(?<!${escapedPrefix}[^${varSuffix}]*)(?<!")(?<!')(?<=^|[^.\\w])([a-zA-Z_][a-zA-Z0-9_]*(?:[.:][a-zA-Z_][a-zA-Z0-9_]*)+)(?![.\\w])`,
-          'g'
-        )
-
-        // Simpler approach: find bare refs that are NOT inside ${...}
-        // Build list of ${...} ranges to exclude
-        const varRanges = []
-        let pos = 0
-        while (pos < processed.length) {
-          if (processed.substring(pos, pos + prefixLen) === varPrefix) {
-            const start = pos
-            let varDepth = 1
-            pos += prefixLen
-            while (pos < processed.length && varDepth > 0) {
-              if (processed.substring(pos, pos + prefixLen) === varPrefix) {
-                varDepth++
-                pos += prefixLen
-              } else if (processed.substring(pos, pos + suffixLen) === varSuffix) {
-                varDepth--
-                if (varDepth > 0) pos += suffixLen
-              } else {
-                pos++
-              }
-            }
-            pos += suffixLen
-            varRanges.push([start, pos])
-          } else {
-            pos++
-          }
-        }
-
-        // Build list of quoted string ranges to exclude
-        const quoteRanges = getQuoteRanges(fullContent)
-
-        // Comparison operators for detecting string comparison context
-        const comparisonOps = ['===', '!==', '==', '!=']
-        // Pre-compile "preceded by string+op" patterns to avoid regex compilation per bare ref
-        const precededByPatterns = comparisonOps.map(op => {
-          const escaped = op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          return new RegExp(`["'][^"']*["']\\s*${escaped}\\s*$`)
-        })
-
-        // Find and replace bare refs, skipping those inside ${...} or quoted strings
-        // Only quote bare refs that are in string comparison context
-        const simpleBarePat = /([a-zA-Z_][a-zA-Z0-9_]*(?:[.:][a-zA-Z_][a-zA-Z0-9_]*)+)/g
-        let offset = 0
-        let match
-        while ((match = simpleBarePat.exec(fullContent)) !== null) {
-          const bareRef = match[1]
-          const matchStart = match.index
-          const matchEnd = matchStart + bareRef.length
-
-          // Skip if inside a ${...} range
-          const insideVar = varRanges.some(([s, e]) => matchStart >= s && matchEnd <= e)
-          if (insideVar) continue
-
-          // Skip if inside a quoted string
-          const insideQuote = quoteRanges.some(([s, e]) => matchStart >= s && matchEnd <= e)
-          if (insideQuote) continue
-
-          // Skip reserved words
-          if (reserved.includes(bareRef)) continue
-
-          // Check if this ref is in a string comparison context
-          const afterRef = fullContent.substring(matchEnd).trimStart()
-          const beforeRef = fullContent.substring(0, matchStart).trimEnd()
-
-          const isComparedToString = comparisonOps.some((op, idx) => {
-            // Check if followed by: op "string"
-            if (afterRef.startsWith(op)) {
-              const afterOp = afterRef.substring(op.length).trimStart()
-              return afterOp.startsWith('"') || afterOp.startsWith("'")
-            }
-            // Check if preceded by: "string" op
-            return precededByPatterns.some(p => p.test(beforeRef))
-          })
-
-          // Replace with var ref - quoted if string comparison, unquoted otherwise
-          const replacement = isComparedToString
-            ? `"${varPrefix}${bareRef}${varSuffix}"`
-            : `${varPrefix}${bareRef}${varSuffix}`
-          processed = processed.substring(0, matchStart + offset) + replacement + processed.substring(matchEnd + offset)
-          offset += replacement.length - bareRef.length
-        }
-
-        // 2. Quote unquoted ${...} refs that are used in string comparisons
-        // Pattern: ref followed by comparison operator and string, or string followed by operator and ref
-        // e.g., ${foo} === "bar" or "bar" === ${foo}
-        // Find ${...} refs that are in comparison context
-        pos = 0
-        let newProcessed = ''
-        while (pos < processed.length) {
-          if (processed.substring(pos, pos + prefixLen) === varPrefix) {
-            const precededByQuote = pos > 0 && processed[pos - 1] === '"'
-
-            // Find matching suffix
-            let varDepth = 1
-            let endPos = pos + prefixLen
-            while (endPos < processed.length && varDepth > 0) {
-              if (processed.substring(endPos, endPos + prefixLen) === varPrefix) {
-                varDepth++
-                endPos += prefixLen
-              } else if (processed.substring(endPos, endPos + suffixLen) === varSuffix) {
-                varDepth--
-                if (varDepth > 0) endPos += suffixLen
-              } else {
-                endPos++
-              }
-            }
-            endPos += suffixLen
-
-            const varRef = processed.substring(pos, endPos)
-            const followedByQuote = endPos < processed.length && processed[endPos] === '"'
-
-            // Check if this ref is in a string comparison context
-            const afterRef = processed.substring(endPos).trimStart()
-            const beforeRef = processed.substring(0, pos).trimEnd()
-
-            const isComparedToString = comparisonOps.some(op => {
-              // Check if followed by: op "string"
-              if (afterRef.startsWith(op)) {
-                const afterOp = afterRef.substring(op.length).trimStart()
-                return afterOp.startsWith('"') || afterOp.startsWith("'")
-              }
-              // Check if preceded by: "string" op (reuses precededByPatterns)
-              return precededByPatterns.some(p => p.test(beforeRef))
-            })
-
-            if (!precededByQuote && !followedByQuote && isComparedToString) {
-              newProcessed += '"' + varRef + '"'
-            } else {
-              newProcessed += varRef
-            }
-            pos = endPos
-          } else {
-            newProcessed += processed[pos]
-            pos++
-          }
-        }
-        processed = newProcessed
-
-        // Reconstruct
-        result = result.substring(0, contentStart) + processed + result.substring(j)
-        i = contentStart + processed.length + suffixLen
-      } else {
-        i = ifStart + prefixLen
+      const edits=[]
+      const bare=/[a-zA-Z_][a-zA-Z0-9_]*(?:[.:][a-zA-Z_][a-zA-Z0-9_]*)+/g
+      let match
+      while((match=bare.exec(original))) {
+        const begin=match.index;const end=begin+match[0].length
+        if(refs.concat(quotes).some(n=>n.start<=begin&&n.end>=end))continue
+        const ref=varPrefix+match[0]+varSuffix
+        edits.push({start:begin,end,text:inStringComparison(original,begin,end)?'"'+ref+'"':ref})
       }
+      for(const ref of refs.filter(n=>!refs.some(parent=>parent.start<n.start&&parent.end>=n.end))) {
+        if(quotes.some(q=>q.start<ref.start&&q.end>ref.end))continue
+        if(inStringComparison(original,ref.start,ref.end))edits.push({start:ref.start,end:ref.end,text:'"'+ref.raw+'"'})
+      }
+      let processed=original
+      for(const edit of edits.sort((a,b)=>b.start-a.start))processed=processed.slice(0,edit.start)+edit.text+processed.slice(edit.end)
+      output=output.slice(0,start)+processed+output.slice(node.contentEnd)
     }
-
-    return result
+    return output
   }
 
   /**
@@ -295,106 +129,36 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
    * @returns {string} String with fixed fallback references
    */
   function fixFallbacksInString(str) {
-    if (typeof str !== 'string') return str
-
-    let result = str
-    let changed = true
-
-    // Keep iterating until no more changes (to handle nested variables)
-    const prefixLen = varPrefix.length
-    const suffixLen = varSuffix.length
-
-    while (changed) {
-      changed = false
-
-      // Find innermost variable blocks (ones that don't contain other variables)
-      let i = 0
-      while (i < result.length) {
-        if (result.substring(i, i + prefixLen) === varPrefix) {
-          const start = i
-          let depth = 1
-          let j = i + prefixLen
-
-          // Find the matching suffix by counting full prefix/suffix occurrences
-          while (j < result.length && depth > 0) {
-            if (result.substring(j, j + prefixLen) === varPrefix) {
-              depth++
-              j += prefixLen
-            } else if (result.substring(j, j + suffixLen) === varSuffix) {
-              depth--
-              if (depth > 0) j += suffixLen
-            } else {
-              j++
-            }
+    if(typeof str!=='string')return str
+    let output=str
+    while(true) {
+      const syntax=scan(output,{prefix:varPrefix,suffix:varSuffix});let changed=false
+      for(const node of references(syntax).filter(n=>n.complete).sort((a,b)=>(a.end-a.start)-(b.end-b.start))) {
+        const content=output.slice(node.contentStart,node.contentEnd)
+        const parts=splitByComma(content,variableSyntax)
+        if(parts.length<2||parts[0].includes(varPrefix))continue
+        const fixed=parts.map((part,index)=>{
+          if(index===0)return part
+          const trimmed=part.trim()
+          if(refPrefixes.some(prefix=>trimmed.startsWith(prefix))&&!(trimmed.startsWith(varPrefix)&&trimmed.endsWith(varSuffix))) {
+            const [ref,...filters]=index===parts.length-1?splitOnPipe(trimmed):[trimmed]
+            return ` ${varPrefix}${ref.trim()}${varSuffix}${filters.map(f=>` | ${f.trim()}`).join('')}`
           }
-
-          if (depth === 0) {
-            const end = j + suffixLen
-            const match = result.substring(start, end)
-            const content = result.substring(start + prefixLen, end - suffixLen)
-
-            // Only process if there's a comma (indicating fallback syntax)
-            if (content.includes(',')) {
-              // Split by comma
-              const parts = splitByComma(content, variableSyntax)
-
-              if (parts.length > 1) {
-                // Check if the first part has nested variables - if so, skip this (process inner ones first)
-                const firstPart = parts[0]
-                if (firstPart.includes(varPrefix)) {
-                  i = start + prefixLen // Move past prefix to find inner variables
-                  continue
-                }
-
-                // Check each part after the first (these are fallback values)
-                const fixed = parts.map((part, index) => {
-                  if (index === 0) {
-                    return part // Keep the main reference as-is
-                  }
-
-                  const trimmed = part.trim()
-
-                  // Check if this looks like a reference but is not wrapped
-                  const looksLikeRef = refPrefixes.some(prefix => trimmed.startsWith(prefix))
-                  const alreadyWrapped = trimmed.startsWith(varPrefix) && trimmed.endsWith(varSuffix)
-
-                  if (looksLikeRef && !alreadyWrapped) {
-                    // Filters after the last fallback apply to the whole list (${a, self:b | Number}),
-                    // so they stay outside the wrapped reference
-                    const [ref, ...filters] = index === parts.length - 1 ? splitOnPipe(trimmed) : [trimmed]
-                    const filterText = filters.map((f) => ` | ${f.trim()}`).join('')
-                    return ` ${varPrefix}${ref.trim()}${varSuffix}${filterText}`
-                  }
-
-                  return ` ${trimmed}`
-                })
-
-                const replacement = `${varPrefix}${fixed.join(',')}${varSuffix}`
-                if (replacement !== match) {
-                  result = result.substring(0, start) + replacement + result.substring(end)
-                  changed = true
-                  break // Restart search from beginning
-                }
-              }
-            }
-
-            i = start + prefixLen // Move past prefix to continue searching for nested variables
-          } else {
-            i++
-          }
-        } else {
-          i++
-        }
+          return ` ${trimmed}`
+        })
+        const replacement=varPrefix+fixed.join(',')+varSuffix
+        if(replacement!==node.raw){output=output.slice(0,node.start)+replacement+output.slice(node.end);changed=true;break}
       }
+      if(!changed)return output
     }
-
-    return result
   }
 
   /**
    * Recursively traverse and fix the config object
    */
+  const seenContainers = new WeakMap()
   function traverseAndFix(obj) {
+    require('../resolutionBudget').visit()
     if (typeof obj === 'string') {
       // Early exits: skip expensive processing when patterns are absent
       const hasHelp = obj.indexOf('help(') !== -1
@@ -405,7 +169,7 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
       const withHelpEscaped = hasHelp ? escapeHelpVariables(withExcludedEncoded) : withExcludedEncoded
       const withBareRefsConverted = hasEvalOrIf ? convertBareRefsInIf(withHelpEscaped) : withHelpEscaped
       // Encode JSON object literals used as filter/function args so their { } don't break variable matching.
-      const withJsonArgsEncoded = obj.indexOf('{') !== -1 ? encodeJsonArgObjects(withBareRefsConverted, varPrefix) : withBareRefsConverted
+      const withJsonArgsEncoded = obj.indexOf('{') !== -1 ? encodeJsonArgObjects(withBareRefsConverted, varPrefix, varSuffix) : withBareRefsConverted
       // Encode { } $ inside quoted literals (${opt:x, 'a}b'}) so they can't end or break the variable
       const withLiteralsEncoded = encodeQuotedLiterals(withJsonArgsEncoded, varPrefix, varSuffix)
       // Skip fallback fixing for object configs (they handle bare refs differently)
@@ -413,13 +177,18 @@ function preProcess(configObject, variableSyntax, variableTypes, options = {}) {
       return fixFallbacksInString(withLiteralsEncoded)
     }
 
+    if (obj && typeof obj === 'object' && seenContainers.has(obj)) return seenContainers.get(obj)
     if (Array.isArray(obj)) {
-      return obj.map(item => traverseAndFix(item))
+      const result = new Array(obj.length)
+      seenContainers.set(obj, result)
+      for (const key of Object.keys(obj)) setOwn(result, key, traverseAndFix(obj[key]))
+      return result
     }
 
     // Rebuild plain objects only; Date and other class instances are values, not maps
-    if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
-      const result = {}
+    if (obj !== null && typeof obj === 'object' && (Object.getPrototypeOf(obj) === Object.prototype || Object.getPrototypeOf(obj) === null)) {
+      const result = Object.create(Object.getPrototypeOf(obj))
+      seenContainers.set(obj, result)
       for (const key of Object.keys(obj)) {
         setOwn(result, key, traverseAndFix(obj[key]))
       }

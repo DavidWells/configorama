@@ -1,3 +1,4 @@
+const { setOwn } = require('../objects')
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
@@ -68,9 +69,14 @@ function createOccurrence(instance, varMatch, options = {}) {
   const oneOf = parseOneOfFilter(oneOfFilter)
 
   const occurrence = {
+    occurrenceId: instance.occurrenceId,
+    defaultAvailability: instance.defaultAvailability,
+    discovery: 'static-possible',
     originalString: instance.originalStringValue,
     varMatch: varMatch,
     path: instance.path,
+    pathSegments: instance.pathSegments,
+    pathIdentity: instance.pathIdentity,
     filters: filters && filters.length > 0 ? filters : undefined,
     defaultValue: options.defaultValue !== undefined ? options.defaultValue : instance.defaultValue,
     isRequired: options.isRequired !== undefined ? options.isRequired : instance.isRequired,
@@ -209,7 +215,7 @@ async function enrichMetadata(
     const varInstances = metadata.variables[key]
 
     for (const varData of varInstances) {
-      const pathKey = varData.path
+      const pathKey = varData.pathIdentity || require('../paths/pathIdentity').encodePathIdentity(varData.pathSegments || varData.path.split('.'))
       const trackingData = resolutionTracking[pathKey]
 
       if (trackingData && trackingData.resolutionHistory && varData.resolveDetails) {
@@ -331,7 +337,7 @@ async function enrichMetadata(
     
     const entry = resolvedFileRefsDataMap.get(resolvedPath)
     
-    const alreadyExists = entry.refs.some(ref => ref.path === pathKey && ref.value === origPath)
+    const alreadyExists = entry.refs.some(ref => ref.pathIdentity === pathKey && ref.value === origPath)
     if (!alreadyExists) {
       const refEntry = { 
         location: pathKey, 
@@ -364,6 +370,8 @@ async function enrichMetadata(
   
   // Convert map to array for the final metadata object.
   const references = Array.from(resolvedFileRefsDataMap.values())
+
+  metadata.fileDependencies.selectedReferences = fileRefsFound.map(ref => ({...ref}))
 
   // Build the complete, flat list of all file references
   const fileDetailsMap = new Map()
@@ -808,6 +816,13 @@ async function enrichMetadata(
     }
   }
 
+  // Link legacy grouped views to the same authored syntax identities.
+  for(const entry of uniqueVariablesMap.values())for(const occurrence of entry.occurrences||[]) {
+    const candidates=(metadata.occurrences||[]).filter(detail=>detail.pathIdentity===occurrence.pathIdentity)
+    const detail=candidates.find(detail=>detail.varMatch===occurrence.varMatch)||candidates.find(detail=>detail.varString===entry.variable)
+    if(detail){occurrence.occurrenceId=detail.occurrenceId;occurrence.defaultAvailability=detail.defaultAvailability;occurrence.discovery=detail.discovery}
+  }
+
   // Convert map to object for metadata
   metadata.uniqueVariables = Object.fromEntries(uniqueVariablesMap)
 
@@ -816,7 +831,7 @@ async function enrichMetadata(
     metadata.resolutionHistory = {}
     for (const pathKey in resolutionTracking) {
       const tracking = resolutionTracking[pathKey]
-      const keys = pathKey.split('.')
+      const keys = tracking.pathSegments || require('../paths/pathIdentity').decodePathIdentity(pathKey)
       let resolvedValue = resolvedConfig
 
       for (const key of keys) {
@@ -830,19 +845,22 @@ async function enrichMetadata(
 
       // Unescape any __CONFIGVAR:...__ placeholders in tracking data
       // (resolutionTracking uses escaped config during resolution)
-      const cleanTracking = JSON.parse(
-        JSON.stringify(tracking).replace(/__CONFIGVAR:([A-Za-z0-9+/=]+)__/g, (_, encoded) => {
-          return Buffer.from(encoded, 'base64').toString('utf8')
-        })
-      )
+      const cleanTracking = require('../encoders/literal-braces').decodeForDisplay(tracking)
 
-      metadata.resolutionHistory[pathKey] = {
+      setOwn(metadata.resolutionHistory, tracking.path || pathKey, {
         ...cleanTracking,
         resolvedPropertyValue: resolvedValue
-      }
+      })
     }
   }
 
+  for(const occurrence of metadata.occurrences||[]) {
+    const tracking=resolutionTracking[occurrence.pathIdentity]
+    const selected=(tracking&&tracking.resolutionHistory||[]).find(step=>step.match===occurrence.varMatch)
+    occurrence.runtimeOutcome=selected?'selected':resolvedConfig?'unobserved':'unknown'
+    const choice=(tracking&&tracking.fallbackSelections||[]).find(item=>item.expression===occurrence.varMatch || occurrence.parentNodeId===null && occurrence.branches.length===item.branches.length && item.expression.includes(occurrence.branches[0].source))
+    if(choice){occurrence.runtimeOutcome='selected';occurrence.selectedBranch=choice.index;occurrence.branches=occurrence.branches.map((branch,index)=>({...branch,runtimeOutcome:choice.branches[index].outcome}))}
+  }
   return metadata
 }
 

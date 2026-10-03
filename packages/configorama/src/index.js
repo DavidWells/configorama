@@ -1,4 +1,5 @@
 const Configorama = require('./main')
+const opaque = require('./utils/encoders/opaque')
 const parsers = require('./parsers')
 const { buildVariableSyntax } = require('./utils/variables/variableUtils')
 const { ConfigoramaError } = require('./errors')
@@ -21,6 +22,11 @@ const INSPECT_VIEWS = ['requirements', 'audit', 'graph']
  * @property {boolean} [disableDefaultIgnorePaths] - disable built-in CloudFormation and embedded-code ignore paths
  * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
  * @property {boolean} [returnMetadata] - return both config and metadata about variables found
+ * @property {'process'|'isolated'} [dotEnvMode] - Dotenv mutation policy; process is the 1.x default
+ * @property {'legacy'|'process'|'load'} [moduleCacheMode] - Executable module evaluation cache policy
+ * @property {number} [timeoutMs] - Optional cooperative deadline starting at API entry
+ * @property {AbortSignal} [signal] - Optional async cancellation signal (unsupported by sync)
+ * @property {{ maxPasses?: number, maxDepth?: number, maxVisitedNodes?: number }} [resolutionLimits] - Resolution work bounds
  * @property {boolean} [dotEnvSilent] - suppress env-stage-loader logs when useDotenv/useDotEnv is enabled
  * @property {boolean} [dotEnvDebug] - enable env-stage-loader debug logs when useDotenv/useDotEnv is enabled
  * @property {string[]} [mergeKeys] - keys to merge in arrays of objects
@@ -46,9 +52,12 @@ const INSPECT_VIEWS = ['requirements', 'audit', 'graph']
  * @param {ConfigoramaSettings} [settings] - Configuration settings
  * @returns {Promise<T | ConfigoramaResult<T>>} resolved configuration or {config, metadata} if returnMetadata is true
  */
-module.exports = async (configPathOrObject, settings = {}) => {
-  const instance = new Configorama(configPathOrObject, settings)
-  const options = settings.options || {}
+module.exports = (configPathOrObject, settings = {}) => opaque.withContext(async () => {
+  const started = Date.now()
+  const entrySettings = { ...settings, ...(settings.timeoutMs ? { _deadlineAt: started + settings.timeoutMs } : {}) }
+  const instance = new Configorama(configPathOrObject, entrySettings)
+  return instance.budget.run(async () => {
+  const options = instance.loadContext.options
   const config = await instance.init(options)
 
   if (settings.returnMetadata) {
@@ -69,8 +78,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
     )
 
     // Collect custom metadata from variable sources that have collectMetadata
-    if (settings.variableSources && Array.isArray(settings.variableSources)) {
-      for (const source of settings.variableSources) {
+    if (instance.settings.variableSources && Array.isArray(instance.settings.variableSources)) {
+      for (const source of instance.settings.variableSources) {
         if (typeof source.collectMetadata === 'function') {
           const customData = source.collectMetadata()
           if (customData !== undefined && customData !== null) {
@@ -87,7 +96,7 @@ module.exports = async (configPathOrObject, settings = {}) => {
     const metadataOut = decodeForDisplay(enrichedMetadata)
     return {
       variableSyntax: instance.variableSyntax,
-      variableTypes: instance.variableTypes,
+      variableTypes: require('./utils/publicVariableTypes')(instance.variableTypes),
       config,
       originalConfig: decodeLiteralBracesDeep(instance.originalConfig),
       metadata: metadataOut,
@@ -96,7 +105,8 @@ module.exports = async (configPathOrObject, settings = {}) => {
   }
 
   return config
-}
+  })
+})
 
 /**
  * Configorama sync API
@@ -106,23 +116,39 @@ module.exports = async (configPathOrObject, settings = {}) => {
  * @returns {T} resolved configuration object
  */
 module.exports.sync = (configPathOrObject, settings = {}) => {
-  const _settings = settings || {}
-  if (_settings.dynamicArgs && typeof _settings.dynamicArgs === 'function') {
-    throw new Error('Dynamic args must be serializable value for sync usage. Use Async instead')
+  const rejectAccessors = (value, path) => {
+    for (const key of Reflect.ownKeys(value)) {
+      if (!('value' in Object.getOwnPropertyDescriptor(value, key))) throw new ConfigoramaError('unsupported_sync_value', 'Accessor properties are not supported by the sync API', { path: [...path, String(key)], reason: 'accessor property' })
+    }
   }
-  if (!_settings.options) {
-    const cliArgs = require('minimist')(process.argv.slice(2))
-    _settings.options = cliArgs
+  rejectAccessors(settings || {}, ['settings'])
+  const _settings = { ...(settings || {}) }
+  if (_settings.signal) throw new ConfigoramaError('unsupported_sync_value', 'Live AbortSignal is not supported by the sync API')
+  const budget = require('./utils/resolutionBudget').createBudget(_settings)
+  if (budget.deadline !== undefined) Object.assign(_settings, { _deadlineAt: budget.deadline })
+  budget.check()
+  if (!_settings.options) _settings.options = require('minimist')(process.argv.slice(2))
+  const { encode, decode } = require('./utils/encoders/transport')
+  if (Array.isArray(_settings.variableSources)) {
+    rejectAccessors(_settings.variableSources, ['settings', 'variableSources'])
+    _settings.variableSources = _settings.variableSources.map((source, index) => {
+      rejectAccessors(source, ['settings', 'variableSources', String(index)])
+      if (source.syncFactory) return { syncFactory: source.syncFactory, syncOptions: source.syncOptions || {} }
+      if (typeof source.match !== 'string') throw new ConfigoramaError('unsupported_sync_value', 'Variable source must be string for .sync usage')
+      if (typeof source.resolver !== 'string') throw new ConfigoramaError('unsupported_sync_value', 'Variable resolver must be path to file for .sync usage')
+      return { type: source.type, match: source.match, resolver: source.resolver }
+    })
   }
-  const forceSync = require('sync-rpc')
-  const { reviveDates } = require('./utils/encoders/dates')
-  return reviveDates(forceSync(require.resolve('./sync'), _settings.variableSources)({
-    filePath: configPathOrObject,
-    settings: _settings,
-    // The worker process outlives this call; send the caller's current env and cwd
-    env: Object.assign({}, process.env),
-    cwd: process.cwd()
-  }))
+  require('./utils/validateStructure')(configPathOrObject, _settings.resolutionLimits)
+  const request = encode({ filePath: configPathOrObject, settings: _settings, env: { ...process.env }, cwd: process.cwd() }, budget)
+  const response = decode(require('sync-rpc')(require.resolve('./sync'))(request), budget)
+  budget.check()
+  if (!response.ok) {
+    const error = new ConfigoramaError(response.error.code, response.error.message, response.error.details)
+    error.name = response.error.name
+    throw error
+  }
+  return response.value
 }
 
 /**
@@ -132,16 +158,21 @@ module.exports.sync = (configPathOrObject, settings = {}) => {
  * @return {Promise} Pre-resolved variable metadata
  */
 module.exports.analyze = async (configPathOrObject, settings = {}) => {
+  const started = Date.now()
   const instance = new Configorama(configPathOrObject, {
     ...settings,
+    ...(settings.timeoutMs ? { _deadlineAt: started + settings.timeoutMs } : {}),
     returnPreResolvedVariableDetails: true,
   })
-  const options = settings.options || {}
-  const analysis = await instance.init(options)
-  if (settings.instructions) {
-    return require('./utils/requirements/serializeRequirements').serializeRequirements(analysis, { configPathOrObject })
-  }
-  return analysis
+  return instance.budget.run(async () => {
+    const analysis = await instance.init(instance.loadContext.options)
+    instance.budget.check()
+    const result = settings.instructions
+      ? require('./utils/requirements/serializeRequirements').serializeRequirements(analysis, { configPathOrObject })
+      : analysis
+    instance.budget.check()
+    return result
+  })
 }
 
 /**

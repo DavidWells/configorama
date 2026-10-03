@@ -320,6 +320,8 @@ function buildRequirement(varKey, entry) {
     sensitive,
     sensitiveSource,
     required,
+    defaultAvailability: occurrences.some(occ=>occ.defaultAvailability==='conditional')?'conditional':occurrences.some(occ=>occ.defaultAvailability==='guaranteed')?'guaranteed':'none',
+    discovery: 'static-possible',
     default: defaultValue,
     defaultHint,
     obtainHint,

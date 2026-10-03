@@ -2,6 +2,13 @@
 // Single source of truth for the codes referenced by classifyErrorMessage and thrown
 // directly as ConfigoramaError; surfaced by `configorama capabilities`.
 const ERROR_CODES = [
+  { code: 'resolution_timeout', description: 'Configuration resolution exceeded its cooperative deadline.' },
+  { code: 'resolution_aborted', description: 'Configuration resolution was cancelled by an AbortSignal.' },
+  { code: 'resolution_no_progress', description: 'Active references stopped making resolution progress.' },
+  { code: 'circular_structure', description: 'The input contains a cyclic object or array structure.' },
+  { code: 'resolution_limit', description: 'Configuration resolution exceeded its work or depth limit.' },
+  { code: 'unsupported_sync_value', description: 'A value cannot be represented by the sync transport.' },
+  { code: 'invalid_sync_transport', description: 'The sync transport envelope is malformed or has an unsupported version.' },
   { code: 'missing_env', description: 'A referenced environment variable was not set and had no fallback.' },
   { code: 'missing_file', description: 'A referenced file could not be found on disk.' },
   { code: 'unresolved_variable', description: 'A variable could not be resolved to a value.' },

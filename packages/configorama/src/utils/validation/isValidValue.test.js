@@ -1,6 +1,7 @@
 const { test } = require('uvu')
 const assert = require('uvu/assert')
 const { isValidValue } = require('./warnIfNotFound')
+const { resolutionRecord } = require('../resolutionRecord')
 
 test('isValidValue - should return true for non-empty string', () => {
   assert.is(isValidValue('hello'), true)
@@ -40,12 +41,16 @@ test('isValidValue - should return false for empty array', () => {
   assert.is(isValidValue([]), false)
 })
 
-test('isValidValue - should return false for object with __internal_only_flag', () => {
-  assert.is(isValidValue({ __internal_only_flag: true, data: 'value' }), false)
+test('isValidValue - user internal-looking flags are data', () => {
+  assert.is(isValidValue({ __internal_only_flag: true, data: 'value' }), true)
 })
 
-test('isValidValue - should return false for object with __internal_metadata', () => {
-  assert.is(isValidValue({ __internal_metadata: {}, data: 'value' }), false)
+test('isValidValue - user internal-looking metadata is data', () => {
+  assert.is(isValidValue({ __internal_metadata: {}, data: 'value' }), true)
+})
+
+test('isValidValue - authentic private runtime records are not data', () => {
+  assert.is(isValidValue(resolutionRecord({ __internal_only_flag: true })), false)
 })
 
 test('isValidValue - should return true for empty string', () => {

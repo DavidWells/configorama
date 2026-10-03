@@ -55,6 +55,13 @@
   "edges": [
     {
       "from": "configPath:safeData",
+      "to": "variable:file(./data.yml)",
+      "kind": "possible",
+      "occurrenceId": "%5B%22safeData%22%5D:0:25",
+      "itemIndex": 0
+    },
+    {
+      "from": "configPath:safeData",
       "to": "file:./data.yml",
       "kind": "reads"
     },
@@ -62,6 +69,13 @@
       "from": "configPath:safeData",
       "to": "variable:file(./data.yml)",
       "kind": "uses"
+    },
+    {
+      "from": "configPath:unsafeData",
+      "to": "variable:file(./unsafe.js)",
+      "kind": "possible",
+      "occurrenceId": "%5B%22unsafeData%22%5D:0:27",
+      "itemIndex": 0
     },
     {
       "from": "configPath:unsafeData",
@@ -77,7 +91,7 @@
   "diagnostics": [],
   "summary": {
     "nodes": 4,
-    "edges": 4,
+    "edges": 6,
     "diagnostics": 0
   }
 }

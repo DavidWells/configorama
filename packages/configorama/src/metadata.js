@@ -1,3 +1,6 @@
+const { extractVariableWrapper } = require('./utils/variables/variableUtils')
+const { encodePathIdentity, displayPath } = require('./utils/paths/pathIdentity')
+const { setOwn } = require('./utils/objects')
 // Variable metadata collection — traverses config to catalog variable usage
 // Pure function that receives all data as arguments
 
@@ -65,6 +68,8 @@ function collectVariableMetadata({
   varSuffixWithSpacePattern,
   ignorePathPatterns,
 }) {
+  const occurrences=[]
+  const wrapper=extractVariableWrapper(variableSyntax.source)
   const foundVariables = []
   const variableData = {}
   const fileRefs = []
@@ -75,42 +80,21 @@ function collectVariableMetadata({
   let matchCount = 1
 
   forEachNode(displayConfig, function (rawValue) {
-    if (typeof rawValue === 'string' && rawValue.match(variableSyntax)) {
-      const configValuePath = this.path.join('.')
-      /* Skip opaque paths that contain non-configorama ${...} syntax. */
-      if (shouldIgnorePath(this.path, ignorePathPatterns)) {
-        return
-      }
-
-      const nested = findNestedVariables(
-        rawValue,
-        variableSyntax,
-        variablesKnownTypes,
-        configValuePath,
-        variableTypes
-      )
-
+    require('./utils/resolutionBudget').visit(this.path.length)
+    if (typeof rawValue === 'string' && rawValue.includes(wrapper.prefix)) {
+      const configValuePath=displayPath(this.path)
+      const nested=findNestedVariables(rawValue,variableSyntax,variablesKnownTypes,configValuePath,variableTypes)
+      const ignored=shouldIgnorePath(this.path,ignorePathPatterns)
+      for(const detail of nested)occurrences.push({...detail,path:configValuePath,pathSegments:this.path.slice(),pathIdentity:encodePathIdentity(this.path),occurrenceId:encodeURIComponent(encodePathIdentity(this.path))+':'+detail.start+':'+detail.end,ownership:ignored&&(detail.ownership==='foreign'||detail.ownership==='bare')?'opaque':detail.ownership})
+      if(!nested.length||!rawValue.match(variableSyntax))return
+      if(ignored&&nested.every(detail=>detail.ownership==='foreign'||detail.ownership==='bare'))return
       const lastItem = nested[nested.length - 1]
       const lastKeyPath = this.path[this.path.length - 1]
       const itemKey = (lastKeyPath.match(/[\d+]$/)) ? `${this.path[this.path.length - 2]}[${lastKeyPath}]` : lastKeyPath
 
-      // Extract filters from varMatch
-      const originalSrc = lastItem.varMatch || ''
-      const hasFilters = filterMatch && originalSrc.match(filterMatch)
-      let foundFilters = []
-      let keyWithoutFilters = originalSrc
-
-      if (hasFilters) {
-        // Extract filter names from the match (e.g., "| String}" -> ["String"])
-        const filterPart = hasFilters[0].replace(/}?$/, '') // Remove trailing }
-        foundFilters = splitOnPipe(filterPart)
-          .map((filter) => filter.trim())
-          .filter(Boolean)
-
-        // Remove filters from the key (replace "| String}" with suffix)
-        // Also clean up any trailing whitespace before the closing brace
-        keyWithoutFilters = originalSrc.replace(filterMatch, varSuffix).replace(varSuffixWithSpacePattern, varSuffix)
-      }
+      const originalSrc=lastItem.varMatch||''
+      const foundFilters=lastItem.filters||[]
+      const keyWithoutFilters=lastItem.variableWithoutFilters||originalSrc
 
       const key = keyWithoutFilters
 
@@ -198,8 +182,13 @@ function collectVariableMetadata({
       })
 
       const varData = {
+        defaultAvailability: lastItem.defaultAvailability,
+        occurrenceId: encodeURIComponent(encodePathIdentity(this.path))+':'+lastItem.start+':'+lastItem.end,
+        discovery: 'static-possible',
         filters: foundFilters.length > 0 ? foundFilters : undefined,
         path: configValuePath,
+        pathSegments: this.path.slice(),
+        pathIdentity: encodePathIdentity(this.path),
         key: itemKey,
         originalStringValue: rawValue,
         variable: keyWithoutFilters,
@@ -304,7 +293,11 @@ function collectVariableMetadata({
       }
 
       // Extract file references
-      nested.forEach((detail) => {
+      const fileOccurrences=nested.flatMap(detail=>[
+        detail,
+        ...(detail.branches||[]).filter(branch=>branch.itemIndex>0 && (branch.variableType==='file'||branch.variableType==='text')).map(branch=>({...detail,variable:branch.source,variableType:branch.variableType}))
+      ])
+      fileOccurrences.forEach((detail) => {
         // console.log('detail', detail)
         if (detail.variableType && (detail.variableType === 'file' || detail.variableType === 'text')) {
           const extracted = extractFilePath(detail.variable)
@@ -386,7 +379,7 @@ function collectVariableMetadata({
         }
       })
 
-      variableData[key] = (variableData[key] || []).concat(varData)
+      setOwn(variableData, key, (Object.prototype.hasOwnProperty.call(variableData, key) ? variableData[key] : []).concat(varData))
       foundVariables.push(rawValue)
     }
   })
@@ -463,6 +456,7 @@ function collectVariableMetadata({
   })
 
   return {
+    occurrences,
     variables: variableData,
     uniqueVariables: {},
     fileDependencies: {

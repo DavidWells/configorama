@@ -1,9 +1,11 @@
+const opaque = require('./utils/encoders/opaque')
 const path = require('path')
 const fs = require('fs')
 const Configorama = require('./main')
 const getFullPath = require('./utils/paths/getFullFilePath')
 const enrichMetadata = require('./utils/parsing/enrichMetadata')
-const { tagDates } = require('./utils/encoders/dates')
+const { encode, decode } = require('./utils/encoders/transport')
+const { normalizeError } = require('./errors')
 const { decodeLiteralBracesDeep, decodeForDisplay } = require('./utils/encoders/literal-braces')
 
 /**
@@ -25,7 +27,7 @@ function applyCallerEnvironment(env, cwd) {
 /**
  * Force synchronous invocation of async API
  */
-module.exports = function configoramaSync(variableSources = []) {
+function createVariableSources(variableSources = []) {
   const customVariableSources = variableSources.map((varSrc) => {
     /* Plugin factories: match/resolver do not survive the JSON trip through
        sync-rpc, so plugins carry a syncFactory path + JSON syncOptions and
@@ -72,9 +74,15 @@ module.exports = function configoramaSync(variableSources = []) {
       resolver: resolverFunction
     }
   })
-  return async (args) => {
+  return customVariableSources
+}
+module.exports = function configoramaSync() {
+  return (request) => opaque.withContext(async () => {
+    try {
+    const args = decode(request)
     const { filePath, settings = {}, env, cwd } = args
     applyCallerEnvironment(env, cwd)
+    const customVariableSources = createVariableSources(settings.variableSources)
     const syncSettings = { sync: true }
     if (customVariableSources && customVariableSources.length) {
       syncSettings.variableSources = customVariableSources
@@ -82,6 +90,7 @@ module.exports = function configoramaSync(variableSources = []) {
     const finalSettings = Object.assign({}, settings, syncSettings)
     const options = finalSettings.options || {}
     const instance = new Configorama(filePath, finalSettings)
+    return await instance.budget.run(async () => {
     const result = await instance.init(options)
 
     if (finalSettings.returnMetadata) {
@@ -115,17 +124,21 @@ module.exports = function configoramaSync(variableSources = []) {
 
       // Resolution tracking recorded variable text with its quoted { } $ encoded; show the original
       const metadataOut = decodeForDisplay(enrichedMetadata)
-      return {
+      return encode({ ok: true, value: {
         variableSyntax: instance.variableSyntax,
-        variableTypes: instance.variableTypes,
-        config: tagDates(result),
+        variableTypes: require('./utils/publicVariableTypes')(instance.variableTypes),
+        config: result,
         originalConfig: decodeLiteralBracesDeep(instance.originalConfig),
         metadata: metadataOut,
         resolutionHistory: metadataOut.resolutionHistory,
-      }
+      } }, instance.budget)
     }
 
-    /* Dates don't survive sync-rpc's JSON transport; tag them for the parent to revive */
-    return tagDates(result)
-  }
+    return encode({ ok: true, value: result }, instance.budget)
+    })
+    } catch (error) {
+      const normalized = normalizeError(error)
+      return encode({ ok: false, error: { name: normalized.name, code: normalized.code, message: normalized.message, details: normalized.details } })
+    }
+  })
 }

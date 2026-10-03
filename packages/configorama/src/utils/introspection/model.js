@@ -127,6 +127,22 @@ function buildIntrospection(enrichedMetadata = {}, options = {}) {
     }
   }
 
+  // Possible branches remain visible even when execution chooses an earlier fallback.
+  for(const occurrence of enrichedMetadata.occurrences||[]) {
+    if(occurrence.ownership==='opaque'||occurrence.role==='annotation')continue
+    for(const branch of occurrence.branches||[]) {
+      if(branch.ownership==='literal'||branch.ownership==='bare'||branch.ownership==='foreign')continue
+      const variableType=normalizeVariableType(branch.variableType)
+      const risk=riskForVariable(variableType,branch.source)
+      const id=`possible:${occurrence.occurrenceId}:${branch.itemIndex}`
+      const call = (variableType==='file'||variableType==='text') ? require('../regex').parseFunctionCall(branch.source) : null
+      const base = call ? branch.source.slice(call.index,call.index+call[0].length).trim() : branch.source
+      const existing=nodes.find(node=>node.variable===branch.source || node.variable===base)
+      if(!existing)nodes.push({id,kind:'possible',variable:branch.source,variableType,risk,severity:severityForRisk(risk),paths:[occurrence.path],occurrenceId:occurrence.occurrenceId,itemIndex:branch.itemIndex,discovery:'static-possible',runtimeOutcome:occurrence.runtimeOutcome||'unknown'})
+      edges.push({from:`configPath:${occurrence.path}`,to:existing?existing.id:id,kind:'possible',occurrenceId:occurrence.occurrenceId,itemIndex:branch.itemIndex})
+      if((variableType==='file'||variableType==='text')&&branch.source.includes(enrichedMetadata.variablePrefix||'${'))diagnostics.push({code:'dynamic_file_target',severity:'info',variable:branch.source,occurrenceId:occurrence.occurrenceId,message:'File target contains variables; static introspection records a partial edge.'})
+    }
+  }
   const fileDeps = enrichedMetadata.fileDependencies || {}
   for (const dep of fileDeps.byConfigPath || []) {
     const id = `file:${dep.relativePath || dep.filePath}`
