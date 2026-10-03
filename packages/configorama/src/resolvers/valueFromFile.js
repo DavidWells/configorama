@@ -294,6 +294,27 @@ ${JSON.stringify(options.context, null, 2)}`,
     // maybe the lib instance itself for nested lookups
   }
 
+  /**
+   * @param {object} fileModule
+   * @param {Function} returnValueFunction
+   * @param {string} fileType
+   * @param {boolean} includeFirstProperty
+   */
+  function processModule(fileModule, returnValueFunction, fileType, includeFirstProperty) {
+    return processExecutableFile({
+      fileModule,
+      returnValueFunction,
+      valueForFunction,
+      argsToPass,
+      variableString,
+      matchedFileString: matchedCallString,
+      relativePath,
+      fileType,
+      getDeeperValue: ctx.getDeeperValue,
+      includeFirstProperty
+    })
+  }
+
   // Process JS files
   if (fileExtension === 'js' || fileExtension === 'cjs') {
     const jsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
@@ -317,18 +338,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       includeFirstProperty = true
     }
 
-    return processExecutableFile({
-      fileModule: jsFile,
-      returnValueFunction,
-      valueForFunction,
-      argsToPass,
-      variableString,
-      matchedFileString: matchedCallString,
-      relativePath,
-      fileType: 'javascript',
-      getDeeperValue: ctx.getDeeperValue,
-      includeFirstProperty
-    })
+    return processModule(jsFile, returnValueFunction, 'javascript', includeFirstProperty)
   }
 
   if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
@@ -339,18 +349,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       const tsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
       const { returnValueFunction, includeFirstProperty } = selectModuleExport(tsFile, moduleName)
 
-      return processExecutableFile({
-        fileModule: tsFile,
-        returnValueFunction,
-        valueForFunction,
-        argsToPass,
-        variableString,
-        matchedFileString: matchedCallString,
-        relativePath,
-        fileType: 'TypeScript',
-        getDeeperValue: ctx.getDeeperValue,
-        includeFirstProperty
-      })
+      return processModule(tsFile, returnValueFunction, 'TypeScript', includeFirstProperty)
     } catch (err) {
       return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
     }
@@ -364,18 +363,7 @@ ${JSON.stringify(options.context, null, 2)}`,
       const esmFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
       const { returnValueFunction, includeFirstProperty } = selectModuleExport(esmFile, moduleName)
 
-      return processExecutableFile({
-        fileModule: esmFile,
-        returnValueFunction,
-        valueForFunction,
-        argsToPass,
-        variableString,
-        matchedFileString: matchedCallString,
-        relativePath,
-        fileType: 'ESM',
-        getDeeperValue: ctx.getDeeperValue,
-        includeFirstProperty
-      })
+      return processModule(esmFile, returnValueFunction, 'ESM', includeFirstProperty)
     } catch (err) {
       return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
     }
