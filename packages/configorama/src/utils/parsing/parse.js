@@ -178,7 +178,7 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs, loadCont
     } catch (err) {
       throw err
     }
-  } else if (fileType.match(/\.(ts|tsx|mts|cts)/i)) {
+  } else if (fileType.match(/\.(ts|tsx|mts|cts|mjs|esm)/i)) {
     try {
       let jsArgs = dynamicArgs || {}
       if (jsArgs && typeof jsArgs === 'function') {
@@ -194,25 +194,8 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs, loadCont
       }
       // console.log('parseFileContents configObject', configObject)
     } catch (err) {
-      throw new Error(`Failed to execute TypeScript file ${filePath}: ${err.message}`)
-    }
-  } else if (fileType.match(/\.(mjs|esm)/i)) {
-    try {
-      let jsArgs = dynamicArgs || {}
-      if (jsArgs && typeof jsArgs === 'function') {
-        jsArgs = jsArgs()
-      }
-      configObject = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
-      if (configObject.config) {
-        configObject = (typeof configObject.config === 'function') ? configObject.config(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.config
-      } else if (configObject.default) {
-        configObject = (typeof configObject.default === 'function') ? configObject.default(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env }) : configObject.default
-      } else if (typeof configObject === 'function') {
-        configObject = configObject(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
-      }
-      // console.log('parseFileContents ESM configObject', configObject)
-    } catch (err) {
-      throw new Error(`Failed to execute ESM file ${filePath}: ${err.message}`)
+      const fileLabel = fileType.match(/\.(ts|tsx|mts|cts)/i) ? 'TypeScript' : 'ESM'
+      throw new Error(`Failed to execute ${fileLabel} file ${filePath}: ${err.message}`)
     }
   }
 
