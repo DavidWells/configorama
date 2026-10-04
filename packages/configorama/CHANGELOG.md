@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/DavidWells/configorama/compare/configorama@1.4.10...configorama@1.5.0) (2026-10-04)
+
+
+### Bug Fixes
+
+* **resolver:** detect cached file cycles ([afc5db3](https://github.com/DavidWells/configorama/commit/afc5db3c8fd27e55ed47089b58463bfde04d345c))
+* **resolver:** harden runtime and inspection ([81abcd2](https://github.com/DavidWells/configorama/commit/81abcd2a4fa96016e9a403fb5242ca0893c4916c))
+* **resolver:** isolate file origins during concurrent resolution ([2cf0fe1](https://github.com/DavidWells/configorama/commit/2cf0fe15db30306b9f287d35b237d8c951f17282))
+
+
+### Features
+
+* overrides setting supplies values for variable refs ([3c13d2a](https://github.com/DavidWells/configorama/commit/3c13d2a134d2ff0a9afff80e4b20a00d631ea662))
+
+
+
+
+
 ## [1.4.10](https://github.com/DavidWells/configorama/compare/configorama@1.4.9...configorama@1.4.10) (2026-10-02)
 
 
