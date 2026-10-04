@@ -119,6 +119,140 @@ const GIT_KEYS = {
   tag: 'tag',
 }
 
+/**
+ * @typedef {Object} GitOverrideValues
+ * @property {string} [commit] - Full commit sha for ${git:commit}
+ * @property {string} [sha] - Short sha for ${git:sha} (derived from commit when absent)
+ * @property {string} [branch] - Branch for ${git:branch}
+ * @property {string} [url] - Remote URL for ${git:url} / ${git:remote} (normalised, credentials stripped)
+ * @property {string} [repo] - owner/name for ${git:repo} (derived from url when absent)
+ * @property {string} [org] - Owner for ${git:org} (derived from url when absent)
+ * @property {string} [name] - Repo name for ${git:name} (derived from url when absent)
+ * @property {string} [tag] - Value for ${git:tag} / ${git:describe}
+ * @property {string} [message] - Commit message for ${git:message}
+ */
+
+// Lowercased git variable names (and their aliases) that overrides can supply, mapped to their canonical key
+const OVERRIDABLE_GIT_KEYS = {
+  commit: ['commit', 'commitsha', 'commit-sha', 'commithash', 'commit-hash'],
+  sha: ['sha', 'sha1'],
+  branch: ['branch', 'branchname', 'branch-name', 'currentbranch', 'current-branch'],
+  url: ['url', 'repourl', 'repo-url'],
+  repo: ['repo', 'repository', 'reposlug', 'repo-slug'],
+  org: ['org', 'owner', 'organization', 'repoowner', 'repo-owner'],
+  name: ['name', 'reponame', 'repo-name'],
+  message: ['message', 'msg', 'commitmessage', 'commit-message', 'commitmsg', 'commit-msg'],
+  tag: ['tag', 'describe'],
+}
+/** @type {Map<string, keyof GitOverrideValues>} */
+const CANONICAL_GIT_KEY = new Map()
+for (const [canonical, aliases] of Object.entries(OVERRIDABLE_GIT_KEYS)) {
+  for (const alias of aliases) CANONICAL_GIT_KEY.set(alias, /** @type {keyof GitOverrideValues} */ (canonical))
+}
+// Short sha length used when ${git:sha} is derived from an overridden full commit
+const SHORT_SHA_LENGTH = 7
+
+/**
+ * Collect the git: entries of the overrides map into canonical git values (aliases folded in)
+ * @param {Record<string, any>} overrides - The resolved overrides map, keyed by variable ref
+ * @returns {GitOverrideValues}
+ */
+function gitOverrideValues(overrides) {
+  /** @type {GitOverrideValues} */
+  const values = {}
+  for (const [ref, value] of Object.entries(overrides || {})) {
+    if (!ref.startsWith(`${GIT_PREFIX}:`) || value === undefined || value === null) continue
+    const canonical = CANONICAL_GIT_KEY.get(ref.slice(GIT_PREFIX.length + 1).trim().toLowerCase())
+    if (canonical) values[canonical] = String(value)
+  }
+  return values
+}
+
+/**
+ * Normalise a git remote URL to https://<host>/<owner>/<name>, dropping credentials and .git
+ * @param {string} url
+ * @returns {string|undefined}
+ */
+function normaliseRemoteUrl(url) {
+  const parsed = GitUrlParse(url)
+  if (parsed && parsed.source && parsed.full_name) {
+    return `https://${parsed.source}/${parsed.full_name}`
+  }
+}
+
+/**
+ * Parse an overridden git url, throwing a clear error that never echoes the value (it may hold a token)
+ * @param {string} url
+ * @returns {{ url: string, fullName: string, owner: string, name: string }}
+ */
+function parseUrlOverride(url) {
+  let parsed
+  try {
+    parsed = GitUrlParse(url)
+  } catch (err) {
+    parsed = undefined
+  }
+  if (!parsed || !parsed.source || !parsed.full_name) {
+    throw new Error('Unable to parse the git url override (overrides["git:url"]). Expected a git remote URL like https://github.com/owner/repo')
+  }
+  return {
+    url: `https://${parsed.source}/${parsed.full_name}`,
+    fullName: parsed.full_name,
+    owner: parsed.organization || parsed.owner,
+    name: parsed.name,
+  }
+}
+
+/**
+ * Value for a canonical git key from override values, deriving sha from commit and repo/org/name from url
+ * @param {keyof GitOverrideValues} key
+ * @param {GitOverrideValues} values
+ * @returns {string|undefined}
+ */
+function valueFromOverrides(key, values) {
+  switch (key) {
+    case 'sha':
+      if (values.sha) return values.sha
+      return values.commit ? values.commit.slice(0, SHORT_SHA_LENGTH) : undefined
+    case 'url':
+      return values.url ? parseUrlOverride(values.url).url : undefined
+    case 'repo':
+      if (values.repo) return values.repo
+      return values.url ? parseUrlOverride(values.url).fullName : undefined
+    case 'org':
+      if (values.org) return values.org
+      return values.url ? parseUrlOverride(values.url).owner : undefined
+    case 'name':
+      if (values.name) return values.name
+      return values.url ? parseUrlOverride(values.url).name : undefined
+    default:
+      return values[key]
+  }
+}
+
+/**
+ * Override hook for the git resolver: answers a git: variable from the overrides map (aliases, url
+ * normalisation, derived keys) so it resolves without a .git dir or a git exec. Undefined = not covered.
+ * @param {string} variableString - e.g. git:commit or git:remote('origin')
+ * @param {Record<string, any>} overrides - The resolved overrides map, keyed by variable ref
+ * @returns {string|undefined}
+ */
+function overrideGitValue(variableString, overrides) {
+  const values = gitOverrideValues(overrides)
+  if (!Object.keys(values).length) return undefined
+  const variable = (variableString.split(`${GIT_PREFIX}:`)[1] || '').trim()
+  if (variable.match(/^remote/i)) {
+    const hasParams = functionRegex.exec(variableString)
+    const remoteName = (hasParams && hasParams[2]) ? formatFunctionArgs(hasParams[2]) : 'origin'
+    return remoteName === 'origin' ? valueFromOverrides('url', values) : undefined
+  }
+  const canonical = CANONICAL_GIT_KEY.get(variable.toLowerCase())
+  return canonical ? valueFromOverrides(canonical, values) : undefined
+}
+
+/**
+ * @param {string} [cwd] - Config directory
+ */
 function createResolver(cwd) {
   // Capture the config directory once. Caches belong to this config load only,
   // so other repositories and subsequent Git changes cannot reuse stale values.
@@ -394,16 +528,14 @@ async function getGitRemote(name, cwd) {
     throw new Error(`No git remote "${name}" found. Please double check your remote names`)
   }
   // console.log('originUrl', originUrl)
-  const parsed = GitUrlParse(originUrl)
   // @TODO use parsed data for additonal values.
   // @TODO finish git api
-  // console.log('parsed', parsed)
-  if (parsed && parsed.source && parsed.full_name) {
-    const result = `https://${parsed.source}/${parsed.full_name}`
-    return result
-  }
+  return normaliseRemoteUrl(originUrl)
 }
 
+/**
+ * @param {string} [cwd] - Config directory
+ */
 module.exports = function createGitResolver(cwd) {
   return {
     type: 'git',
@@ -412,6 +544,7 @@ module.exports = function createGitResolver(cwd) {
     syntax: '${git:valueType}',
     description: `Resolves Git variables. Available valueTypes: ${Object.values(GIT_KEYS).join(', ')}`,
     match: gitVariableSyntax,
-    resolver: createResolver(cwd)
+    resolver: createResolver(cwd),
+    override: overrideGitValue,
   }
 }

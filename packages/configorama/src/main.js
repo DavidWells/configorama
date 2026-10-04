@@ -243,6 +243,7 @@ const getValueFromEval = require('./resolvers/valueFromEval')
 const { encodeValue: encodeValueForEval } = require('./resolvers/valueFromEval')
 const getValueFromIf = require('./resolvers/valueFromIf')
 const createGitResolver = require('./resolvers/valueFromGit')
+const { buildOverrides, overrideFor } = require('./utils/resolution/overrides')
 const { getValueFromFile: getValueFromFileResolver } = require('./resolvers/valueFromFile')
 /* Parsers */
 /* Functions */
@@ -385,6 +386,8 @@ class Configorama {
       }
     }
     this.settings.allowUnresolvedVariables = unresolvedSetting
+    // Values supplied up front for variable refs (overrides setting over CONFIGORAMA_OVERRIDES env)
+    this.overrides = buildOverrides(this.settings.overrides)
 
     this.filterCache = Object.create(null)
     // Cache for originalValue lookups (perf: avoid repeated dotProp.get)
@@ -3005,6 +3008,8 @@ Missing Value ${missingValue} - ${matchedString}
 
     /** @type {Function|undefined} */
     let resolverFunction
+    /** @type {{ override?: (variableString: string, overrides: Record<string, any>) => any } | undefined} */
+    let resolverEntry
     let resolverType
     let found = false
 
@@ -3015,6 +3020,7 @@ Missing Value ${missingValue} - ${matchedString}
       const resolver = this._resolverByPrefix.get(prefix)
       if (resolver && resolver.match instanceof RegExp && variableString.match(resolver.match)) {
         resolverFunction = resolver.resolver
+        resolverEntry = resolver
         resolverType = resolver.type || 'unknown'
         found = true
       }
@@ -3023,12 +3029,13 @@ Missing Value ${missingValue} - ${matchedString}
     // Fallback: loop over all variable types
     if (!found) {
       found = this.variableTypes.some(/**
-       * @param {{ match: RegExp | ((varString: string, config: any, valueObject: any) => boolean), resolver: Function, type?: string }} r
+       * @param {{ match: RegExp | ((varString: string, config: any, valueObject: any) => boolean), resolver: Function, type?: string, override?: (variableString: string, overrides: Record<string, any>) => any }} r
        * @param {number} i
        */ (r, i) => {
         if (r.match instanceof RegExp && variableString.match(r.match)) {
           // set resolver function
           resolverFunction = r.resolver
+          resolverEntry = r
           resolverType = r.type || 'unknown'
           return true
         } else if (typeof r.match === 'function') {
@@ -3036,6 +3043,7 @@ Missing Value ${missingValue} - ${matchedString}
           if (r.match(variableString, this.config, valueObject)) {
             // set resolver function
             resolverFunction = r.resolver
+            resolverEntry = r
             resolverType = r.type || 'unknown'
             return true
           }
@@ -3091,12 +3099,16 @@ Missing Value ${missingValue} - ${matchedString}
       // get it back as written. Literal resolvers decode their own text later
       const lookupString = KEY_LOOKUP_TYPES.has(resolverType) ? decodeLiteralBraces(variableString) : variableString
       // TODO finalize resolverFunction API
-      const valuePromise = Promise.resolve().then(() => resolverFunction(
-        lookupString,
-        this.options,
-        this.config,
-        valueObject,
-      )).then((val) => {
+      const valuePromise = Promise.resolve().then(() => {
+        const overridden = overrideFor(resolverEntry, lookupString, this.overrides)
+        if (overridden !== undefined) return overridden
+        return resolverFunction(
+          lookupString,
+          this.options,
+          this.config,
+          valueObject,
+        )
+      }).then((val) => {
         this.budget.check()
         // Update the last call with the resolved value
         if (this._trackCalls && pathJoined) {

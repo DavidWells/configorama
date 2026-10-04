@@ -50,6 +50,14 @@ interface ConfigoramaSettings {
   /** Disable the built-in CloudFormation and embedded-code ignore paths */
   disableDefaultIgnorePaths?: boolean
 
+  /**
+   * Values supplied up front for variable refs, so they resolve without running their resolver,
+   * e.g. `{ 'git:commit': process.env.COMMIT_SHA, 'git:url': process.env.REPOSITORY_URL }`.
+   * Beats the CONFIGORAMA_OVERRIDES env var (a JSON object of the same shape). A resolver may map
+   * aliases or derive values (git: strips credentials from url and derives sha/repo/org/name).
+   */
+  overrides?: Record<string, any>
+
   // === Legacy Options (deprecated, use above instead) ===
 
   /** @deprecated Use allowUnknownVariableTypes instead */

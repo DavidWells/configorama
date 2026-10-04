@@ -20,6 +20,7 @@ const INSPECT_VIEWS = ['requirements', 'audit', 'graph']
  * @property {string[]} [ignorePaths] - glob-like config paths whose values should be left verbatim
  * @property {string[]} [skipResolutionPaths] - alias for ignorePaths
  * @property {boolean} [disableDefaultIgnorePaths] - disable built-in CloudFormation and embedded-code ignore paths
+ * @property {Object.<string, any>} [overrides] - values for variable refs (e.g. 'git:commit') that skip their resolver; beats CONFIGORAMA_OVERRIDES env (JSON)
  * @property {Object|Function} [dynamicArgs] - values passed into .js config files if user using javascript config
  * @property {boolean} [returnMetadata] - return both config and metadata about variables found
  * @property {'process'|'isolated'} [dotEnvMode] - Dotenv mutation policy; process is the 1.x default

@@ -1172,6 +1172,75 @@ gitTimestampAbsolutePath: ${git:timestamp('package.json')}
 - Executes git commands via child process
 - Throws error if not in a git repository
 
+**Supplying git values (no `.git` needed):**
+
+Builds that run from a source archive (Docker images, Lambda, CI artifacts) often have no `.git`
+directory. Supply the values with [overrides](#overrides): a supplied `git:` value resolves without
+the `.git` lookup or any git command, and keys you don't supply keep the normal behaviour.
+
+```js
+const config = await configorama('serverless.yml', {
+  overrides: {
+    'git:commit': process.env.COMMIT_SHA,
+    'git:url': process.env.REPOSITORY_URL,
+  },
+})
+```
+
+- Aliases work both ways: `git:commitSha` reads a `git:commit` override and vice versa.
+- `${git:sha}` derives from `git:commit` (first 7 chars); `${git:repo}`, `${git:org}` and `${git:name}`
+  derive from `git:url`. An explicit override for those keys wins over the derived value.
+- `git:url` is normalised the same way as a live remote, to `https://<host>/<owner>/<repo>`. Credentials
+  and `.git` are dropped, so a token-bearing clone URL never leaks into your config. `${git:remote}`
+  (origin) uses it too.
+- `${git:dir}`, `${git:timestamp(...)}` and `${git:isDirty}` always read live git.
+
+--- | --- | --- |
+| `commit` | `CONFIGORAMA_GIT_COMMIT` | `${git:commit}`; `${git:sha}` derives from it (first 7 chars) |
+| `sha` | `CONFIGORAMA_GIT_SHA` | `${git:sha}` / `${git:sha1}` |
+| `branch` | `CONFIGORAMA_GIT_BRANCH` | `${git:branch}` |
+| `url` | `CONFIGORAMA_GIT_URL` | `${git:url}`, `${git:remote}` (origin); `repo`, `org` and `name` derive from it |
+| `repo` | `CONFIGORAMA_GIT_REPO` | `${git:repo}` |
+| `org` | `CONFIGORAMA_GIT_ORG` | `${git:org}` |
+| `name` | `CONFIGORAMA_GIT_NAME` | `${git:name}` |
+| `tag` | `CONFIGORAMA_GIT_TAG` | `${git:tag}` / `${git:describe}` |
+| `message` | `CONFIGORAMA_GIT_MESSAGE` | `${git:message}` |
+
+- The setting beats the env var, and both beat live git. Empty values are ignored.
+- `url` is normalised the same way as a live remote, to `https://<host>/<owner>/<repo>`. Credentials
+  and `.git` are dropped, so a token-bearing clone URL never leaks into your config.
+- `${git:dir}`, `${git:timestamp(...)}` and `${git:isDirty}` always read live git.
+
+---
+
+### Overrides
+
+Supply a value for any variable ref up front, so it resolves without running its resolver. Useful
+when a value is already known (CI, containers, tests) or its source isn't available where the
+config is built.
+
+```js
+const config = await configorama('config.yml', {
+  overrides: {
+    'git:commit': '785fa6b982d67b079d53099d57c27fa87c075211',
+    'env:API_URL': 'https://api.example.com',
+    'opt:stage': 'prod',
+  },
+})
+```
+
+```bash
+CONFIGORAMA_OVERRIDES='{"git:commit":"785fa6b982d67b079d53099d57c27fa87c075211"}' configorama config.yml
+```
+
+- Keys are variable refs exactly as written inside `${...}`, without filters or fallbacks.
+- The `overrides` setting beats the `CONFIGORAMA_OVERRIDES` env var (a JSON object of the same shape).
+  `null`/`undefined` values are ignored; empty strings, `0` and `false` are real values.
+- Filters still run on an overridden value, and fallbacks still apply to refs that have no override.
+- A resolver can refine overrides with an optional `override(variableString, overrides)` hook
+  (return `undefined` to fall back to an exact match). The built-in `git:` resolver uses it for
+  aliases, derived values and credential-stripping (see [Git References](#git-references)).
+
 ---
 
 ### Cron Values
