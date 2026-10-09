@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.1](https://github.com/DavidWells/configorama/compare/configorama@1.5.0...configorama@1.5.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **resolver:** stop false circular file references from leaked origins ([#85](https://github.com/DavidWells/configorama/issues/85)) ([c9da5ee](https://github.com/DavidWells/configorama/commit/c9da5eee3022fe57a374ba4c9756c29cdf0bef9c))
+
+
+
+
+
 # [1.5.0](https://github.com/DavidWells/configorama/compare/configorama@1.4.10...configorama@1.5.0) (2026-10-04)
 
 
