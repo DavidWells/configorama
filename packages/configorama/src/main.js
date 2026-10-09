@@ -1711,8 +1711,12 @@ class Configorama {
     // Spans close innermost first, so the first span around a match is its parent
     const parsed = scanExpression(property,{prefix,suffix})
     const spans = expressionReferences(parsed).filter(n=>n.complete).sort((a,b)=>a.end-b.end||b.start-a.start)
+    // Probing an item records its source origin on valueObject. Only a probe whose value replaces its
+    // list keeps that origin; an unused probe (a file() item past the match) would make the list's own
+    // file() refs look circular on the next pass.
+    const priorOrigin = valueObject.nextOrigin
     /**
-     * @typedef {{ start: number, text: string, filters: string[], commas: number[], outcome: Promise<{ found: boolean, index?: number, value?: any }> }} List
+     * @typedef {{ start: number, text: string, filters: string[], commas: number[], outcome: Promise<{ found: boolean, index?: number, value?: any, origin?: any }> }} List
      * @type {Map<number, List|null>}
      */
     const lists = new Map()
@@ -1744,7 +1748,7 @@ class Configorama {
         !!item.match(this.variablesKnownTypes) || isSurroundedByQuotes(item) || /^-?\d+(\.\d+)?$/.test(item))
       /**
        * @param {number} i
-       * @returns {Promise<{ found: boolean, index?: number, value?: any }>}
+       * @returns {Promise<{ found: boolean, index?: number, value?: any, origin?: any }>}
        */
       const firstValue = (i) => {
         // The last item is the list's own fallback of last resort, resolved on the normal path
@@ -1755,7 +1759,7 @@ class Configorama {
         return pending.then((result) => {
           const value = (isResolutionRecord(result)) ? result.value : result
           if (isString(value) && this.variableSyntaxTest.test(value)) return { found: false }
-          if (isValidValue(value) && !isPassthrough(value)) return { found: true, index: i, value: reviveDates(parseEncodedJson(value)) }
+          if (isValidValue(value) && !isPassthrough(value)) return { found: true, index: i, value: reviveDates(parseEncodedJson(value)), origin: isResolutionRecord(result) ? result.sourceOrigin : undefined }
           return firstValue(i + 1)
         })
       }
@@ -1782,10 +1786,12 @@ class Configorama {
       // A list with a value before a match replaces every match inside it, once
       /** @type {Map<number, { text: string, start: number, value: any }>} */
       const replaced = new Map()
+      valueObject.nextOrigin = priorOrigin
       checks.forEach((c, i) => {
         const outcome = outcomes[i]
         if (c && outcome && outcome.found && /** @type {number} */ (outcome.index) < c.item && !replaced.has(c.list.start)) {
           replaced.set(c.list.start, { text: c.list.text, start: c.list.start, value: outcome.value })
+          if (outcome.origin) valueObject.nextOrigin = outcome.origin
         }
       })
       if (!replaced.size) return matches
@@ -2042,6 +2048,7 @@ class Configorama {
       return Promise.resolve(property)
     }
     let lazyMatches = matches
+    const priorOrigin = valueObject.nextOrigin
     return this.shortCircuitFallbacks(matches, valueObject)
       .then((checked) => {
         lazyMatches = checked
@@ -2050,6 +2057,13 @@ class Configorama {
       .then((results) => {
         // console.log('populateMatches results', results)
         return this.renderMatches(valueObject, lazyMatches, results)
+      })
+      .then((result) => {
+        // A resolved source's origin can become the value's origin only when the value is one whole
+        // reference. Text around a reference stays in the value's own origin, so a file() embedded in
+        // it must not make the value's later file() refs look like they come from that file (circular).
+        if (!this.isWholeReference(property)) valueObject.nextOrigin = priorOrigin
+        return result
       })
       .then((result) => {
         // console.log('renderMatches result', result)
