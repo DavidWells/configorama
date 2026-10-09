@@ -62,4 +62,38 @@ test('composed repeats, cross-file views, canonical cycles and symlink roots',()
     await assert.rejects(async()=>resolve({out:'${file(./cycle.json):value}'},{configDir:inside}),/Circular file reference/)
   }
 }))
+test('a self reference to a value mixing file() and env: is not a cycle',()=>temporary(async root=>{
+  fs.writeFileSync(path.join(root,'mod.cjs'),"module.exports={naming:{name:'ui'}}")
+  const file=path.join(root,'stack.yml')
+  fs.writeFileSync(file,'b: sl-${file(./mod.cjs):naming.name}-${env:ORIGIN_MIX_TOKEN}\nx: ${self:b}\n')
+  process.env.ORIGIN_MIX_TOKEN='abc'
+  try {
+    for(const resolve of [c,c.sync])assert.deepEqual(await resolve(fs.realpathSync(file)),{b:'sl-ui-abc',x:'sl-ui-abc'})
+  } finally { delete process.env.ORIGIN_MIX_TOKEN }
+}))
+test('a fallback chain with failing links before a file() link is not a cycle',()=>temporary(async root=>{
+  const sub=path.join(root,'sub');fs.mkdirSync(sub)
+  fs.writeFileSync(path.join(root,'config.json'),'{"slug":"parent"}');fs.writeFileSync(path.join(sub,'local.json'),'{"slug":"local"}')
+  const chains={
+    "${env:ORIGIN_UNSET_A, env:ORIGIN_UNSET_B, file('./config.json'):slug, 'lit'}":'parent',
+    "${env:ORIGIN_UNSET_A, env:ORIGIN_UNSET_B, file('./local.json'):slug, 'lit'}":'local',
+    "${env:ORIGIN_UNSET_A, env:ORIGIN_UNSET_B, file('./config.json'):slug, file('./local.json'):slug}":'parent',
+  }
+  const file=path.join(sub,'stack.yml')
+  for(const [chain,expected] of Object.entries(chains)) {
+    fs.writeFileSync(file,'slug: '+chain+'\nname: ${self:slug}-service\n')
+    for(const resolve of [c,c.sync])assert.deepEqual(await resolve(fs.realpathSync(file)),{slug:expected,name:expected+'-service'})
+  }
+}))
+test('cycles behind mixed values and fallback chains are still detected',()=>temporary(async root=>{
+  fs.writeFileSync(path.join(root,'loop.yml'),'v: ${file(./loop.yml):v}\n')
+  const file=path.join(root,'stack.yml')
+  process.env.ORIGIN_MIX_TOKEN='abc'
+  try {
+    for(const yml of ['b: sl-${file(./loop.yml):v}-${env:ORIGIN_MIX_TOKEN}\nx: ${self:b}\n',"b: ${env:ORIGIN_UNSET_A, env:ORIGIN_UNSET_B, file('./loop.yml'):v, 'lit'}\n"]) {
+      fs.writeFileSync(file,yml)
+      for(const resolve of [c,c.sync])await assert.rejects(async()=>resolve(fs.realpathSync(file),{resolutionLimits:{maxPasses:20}}),/Circular file reference/)
+    }
+  } finally { delete process.env.ORIGIN_MIX_TOKEN }
+}))
 test.run()
