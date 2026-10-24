@@ -828,17 +828,10 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
   p.outro(chalk.green('Setup complete!'))
 
   // Remove empty sections
-  if (Object.keys(userInputs.options).length === 0) {
-    delete userInputs.options
-  }
-  if (Object.keys(userInputs.env).length === 0) {
-    delete userInputs.env
-  }
-  if (Object.keys(userInputs.self).length === 0) {
-    delete userInputs.self
-  }
-  if (Object.keys(userInputs.dotProp).length === 0) {
-    delete userInputs.dotProp
+  for (const section of ['options', 'env', 'self', 'dotProp']) {
+    if (Object.keys(userInputs[section]).length === 0) {
+      delete userInputs[section]
+    }
   }
 
   return userInputs
