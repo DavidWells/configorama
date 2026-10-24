@@ -2,7 +2,7 @@ const { setOwn } = require('../objects')
 const dotProp = require('dot-prop')
 const fs = require('fs')
 const path = require('path')
-const { normalizePath, extractFilePath, normalizeFileVariable, resolveInnerVariables } = require('../paths/filePathUtils')
+const { normalizePath, extractFilePath, normalizeFileVariable } = require('../paths/filePathUtils')
 const { preResolveString, preResolveSingle } = require('../resolution/preResolveVariable')
 const { parseOneOfFilter } = require('../filters/oneOf')
 const { extractComment } = require('./extractComment')
@@ -719,7 +719,7 @@ async function enrichMetadata(
   }
 
   // Check file existence for file/text variables with fully resolved paths
-  for (const [varKey, entry] of uniqueVariablesMap) {
+  for (const entry of uniqueVariablesMap.values()) {
     if (entry.variableType === 'file' || entry.variableType === 'text') {
       // Extract file path from variable string like "file(./config.other.json)"
       const filePathMatch = entry.variable.match(/^(?:file|text)\((.+?)\)/)
@@ -754,7 +754,7 @@ async function enrichMetadata(
   }
 
   // Aggregate types and descriptions for each uniqueVariable
-  for (const [varKey, entry] of uniqueVariablesMap) {
+  for (const entry of uniqueVariablesMap.values()) {
     // Collect unique types from occurrences
     const types = entry.occurrences
       .map(occ => occ.type)

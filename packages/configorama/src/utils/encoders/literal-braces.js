@@ -1,7 +1,6 @@
 const mapData = require('../mapData')
 // Encodes variable-syntax chars ({ } $ for ${...}) that are plain text inside a ${...}
 // expression, so they can't end, start or break it; decoded when the text becomes a value
-const { setOwn } = require('../objects')
 const opaque = require('./opaque')
 // Chars that would split a key pasted into a variable's path (a paren hides the commas after it)
 const PATH_CHARS = /[|:'"()\s]/
@@ -137,9 +136,6 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   return mapData(value, text => encodeQuotedLiterals(text, prefix, suffix))
 }
 
-/** @type {typeof import('./js-fixes') | undefined} */
-let jsFixes
-
 /**
  * decodeLiteralBracesDeep for metadata shown to people: also turns encoded fallback values
  * (__JSON_B64__...__) back into their JSON text. Not for resolved config values, where such
@@ -148,8 +144,6 @@ let jsFixes
  * @returns {any} Decoded copy
  */
 function decodeForDisplay(value) {
-  // Resolved once, not per node of the tree (still lazy: most loads never display metadata)
-  const decodeJsonInVariable = jsFixes ? jsFixes.decodeJsonInVariable : (jsFixes = require('./js-fixes')).decodeJsonInVariable
   return mapData(value, text => opaque.decodeAll(text), text => opaque.decodeAll(text))
 }
 

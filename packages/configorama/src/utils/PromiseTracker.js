@@ -22,7 +22,6 @@ class PromiseTracker {
     }
   }
   report() {
-    const delta = Date.now() - this.startTime
     const pending = this.getPending()
     const dots = dotDotDot(this.cursor++, 100, '...')
     // Diagnostic progress goes to stderr so it never pollutes stdout (resolved

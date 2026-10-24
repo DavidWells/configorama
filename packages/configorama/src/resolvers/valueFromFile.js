@@ -2,10 +2,9 @@
  * Resolves values from file references (file() and text() syntax)
  */
 const fs = require('fs')
-const path = require('path')
 const { trim } = require('../utils/lodash')
 const { splitCsv } = require('../utils/strings/splitCsv')
-const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
+const { resolveFilePathFromMatch } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 const { checkFileAccess } = require('../utils/security/safetyPolicy')
@@ -17,7 +16,6 @@ const YAML = require('../parsers/yaml')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
 const { originAt, selectFileTarget } = require('../utils/paths/fileOrigin')
-const { encodePathIdentity } = require('../utils/paths/pathIdentity')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -341,31 +339,20 @@ ${JSON.stringify(options.context, null, 2)}`,
     return processModule(jsFile, returnValueFunction, 'javascript', includeFirstProperty)
   }
 
-  if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
-    const { executeTypeScriptFile } = require('../parsers/typescript')
+  // Process TypeScript and ESM files (same steps, labelled for errors)
+  const executableType = (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts')
+    ? 'TypeScript'
+    : (fileExtension === 'mjs' || fileExtension === 'esm') ? 'ESM' : null
+  if (executableType) {
     const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {
-      const tsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
-      const { returnValueFunction, includeFirstProperty } = selectModuleExport(tsFile, moduleName)
+      const fileModule = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
+      const { returnValueFunction, includeFirstProperty } = selectModuleExport(fileModule, moduleName)
 
-      return processModule(tsFile, returnValueFunction, 'TypeScript', includeFirstProperty)
+      return processModule(fileModule, returnValueFunction, executableType, includeFirstProperty)
     } catch (err) {
-      return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
-    }
-  }
-
-  if (fileExtension === 'mjs' || fileExtension === 'esm') {
-    const { executeESMFile } = require('../parsers/esm')
-    const { moduleName } = parseModuleReference(variableString, matchedCallString)
-
-    try {
-      const esmFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
-      const { returnValueFunction, includeFirstProperty } = selectModuleExport(esmFile, moduleName)
-
-      return processModule(esmFile, returnValueFunction, 'ESM', includeFirstProperty)
-    } catch (err) {
-      return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
+      return Promise.reject(new Error(`Error processing ${executableType} file: ${err.message}`))
     }
   }
 

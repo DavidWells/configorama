@@ -16,6 +16,16 @@ function detectSyntax(rawFrontmatter) {
   return 'yaml'
 }
 
+/** @type {Array<[string, string, 'toml'|null]>} [opening line, closing marker, format (null: detect from content)] */
+const FRONTMATTER_DELIMITERS = [
+  // +++ delimiters → TOML
+  ['+++\n', '\n+++', 'toml'],
+  // --- delimiters → detect format from content
+  ['---\n', '\n---', null],
+  // <!-- --> comment frontmatter (strict: position 0)
+  ['<!--\n', '\n-->', null],
+]
+
 /**
  * Extract frontmatter and body content from a markdown file
  * @param {string} fileContents - Full file contents
@@ -31,32 +41,13 @@ function extractFrontmatter(fileContents) {
   // Normalize CRLF to LF for consistent delimiter matching
   fileContents = fileContents.replace(/\r\n/g, '\n')
 
-  // +++ delimiters → TOML
-  if (fileContents.startsWith('+++\n')) {
-    const endIdx = fileContents.indexOf('\n+++', 4)
+  for (const [open, close, fixedFormat] of FRONTMATTER_DELIMITERS) {
+    if (!fileContents.startsWith(open)) continue
+    const endIdx = fileContents.indexOf(close, open.length)
     if (endIdx === -1) return noMatch
-    const frontmatterContent = fileContents.slice(4, endIdx)
-    const content = fileContents.slice(endIdx + 4)
-    return { frontmatterContent, content, format: 'toml' }
-  }
-
-  // --- delimiters → detect format from content
-  if (fileContents.startsWith('---\n')) {
-    const endIdx = fileContents.indexOf('\n---', 4)
-    if (endIdx === -1) return noMatch
-    const frontmatterContent = fileContents.slice(4, endIdx)
-    const content = fileContents.slice(endIdx + 4)
-    const format = detectSyntax(frontmatterContent)
-    return { frontmatterContent, content, format }
-  }
-
-  // <!-- --> comment frontmatter (strict: position 0)
-  if (fileContents.startsWith('<!--\n')) {
-    const endIdx = fileContents.indexOf('\n-->', 5)
-    if (endIdx === -1) return noMatch
-    const frontmatterContent = fileContents.slice(5, endIdx)
-    const content = fileContents.slice(endIdx + 4)
-    const format = detectSyntax(frontmatterContent)
+    const frontmatterContent = fileContents.slice(open.length, endIdx)
+    const content = fileContents.slice(endIdx + close.length)
+    const format = fixedFormat || detectSyntax(frontmatterContent)
     return { frontmatterContent, content, format }
   }
 

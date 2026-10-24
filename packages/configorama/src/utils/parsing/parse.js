@@ -162,21 +162,16 @@ function parseFileContents({ contents, filePath, varRegex, dynamicArgs, loadCont
     markdownBodyKeys.set(configObject, bodyKey)
   // TODO detect js syntax and use appropriate parser
   } else if (fileType.match(/\.(js|cjs)/i)) {
-    let jsFile
-    try {
-      jsFile = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
-      if (typeof jsFile !== 'function') {
-        configObject = jsFile
-      } else {
-        let jsArgs = dynamicArgs || {}
-        if (jsArgs && typeof jsArgs === 'function') {
-          jsArgs = jsArgs()
-        }
-        // console.log('jsArgs', jsArgs)
-        configObject = jsFile(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
+    const jsFile = require('../loadExecutable')(filePath, loadContext, moduleCacheMode)
+    if (typeof jsFile !== 'function') {
+      configObject = jsFile
+    } else {
+      let jsArgs = dynamicArgs || {}
+      if (jsArgs && typeof jsArgs === 'function') {
+        jsArgs = jsArgs()
       }
-    } catch (err) {
-      throw err
+      // console.log('jsArgs', jsArgs)
+      configObject = jsFile(jsArgs, { env: loadContext && loadContext.env, environment: loadContext && loadContext.env })
     }
   } else if (fileType.match(/\.(ts|tsx|mts|cts|mjs|esm)/i)) {
     try {

@@ -2,8 +2,6 @@
 const p = require('@clack/prompts')
 const chalk = require('./chalk')
 const dotProp = require('dot-prop')
-const fs = require('fs')
-const path = require('path')
 const { toClickablePath } = require('./createEditorLink')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { createPromptDescriptors } = require('./promptDescriptors')
@@ -84,7 +82,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
   const addedVars = new Set()
 
   for (const [varKey, varData] of Object.entries(uniqueVariables)) {
-    const { variable, variableType, isRequired, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue, resolvedValue } = varData
+    const { variable, variableType, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue, resolvedValue } = varData
 
     // Handle top-level variables (not file/text types)
     if (variableType !== 'file' && variableType !== 'text') {
@@ -789,16 +787,18 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
     }
   }
 
-  // Prompt for self references (if any need values)
-  if (grouped.self.length > 0) {
-    const selfList = grouped.self.map(v => {
-      const varSyntax = `\${self:${v.cleanName}}`
-      return `  - ${varSyntax}`
-    }).join('\n')
-    const noteContent = `Found ${grouped.self.length} config reference(s)\n${selfList}`
+  // Prompt for self references, then config dot.prop references (if any need values)
+  const configReferenceGroups = [
+    { group: 'self', toVarSyntax: name => `\${self:${name}}` },
+    { group: 'dotProp', toVarSyntax: name => `\${${name}}` },
+  ]
+  for (const { group, toVarSyntax } of configReferenceGroups) {
+    if (grouped[group].length === 0) continue
+    const configList = grouped[group].map(v => `  - ${toVarSyntax(v.cleanName)}`).join('\n')
+    const noteContent = `Found ${grouped[group].length} config reference(s)\n${configList}`
     p.note(noteContent, 'Config References')
 
-    for (const varInfo of grouped.self) {
+    for (const varInfo of grouped[group]) {
       const message = createPromptMessage(varInfo)
       const isSensitive = isVarInfoSensitive(varInfo)
       const promptFn = isSensitive ? p.password : p.text
@@ -821,60 +821,17 @@ async function renderConfigWizard(metadata, originalConfig = {}, configFilePath 
         throw new Error('Setup cancelled')
       }
 
-      userInputs.self[varInfo.cleanName] = value || cleanDefault
-    }
-  }
-
-  // Prompt for config dot.prop references
-  if (grouped.dotProp.length > 0) {
-    const configList = grouped.dotProp.map(v => {
-      const varSyntax = `\${${v.cleanName}}`
-      return `  - ${varSyntax}`
-    }).join('\n')
-    const noteContent = `Found ${grouped.dotProp.length} config reference(s)\n${configList}`
-    p.note(noteContent, 'Config References')
-
-    for (const varInfo of grouped.dotProp) {
-      const message = createPromptMessage(varInfo)
-      const isSensitive = isVarInfoSensitive(varInfo)
-      const promptFn = isSensitive ? p.password : p.text
-      const expectedType = getExpectedType(varInfo.occurrences)
-
-      const cleanDefault = stripQuotes(varInfo.defaultValue)
-      const placeholder = varInfo.hasFallback
-        ? String(cleanDefault)
-        : `Enter value for ${varInfo.cleanName}`
-
-      const value = await promptFn({
-        message,
-        placeholder,
-        defaultValue: varInfo.hasFallback ? String(cleanDefault) : undefined,
-        validate: createPromptValidator(varInfo, expectedType)
-      })
-
-      if (p.isCancel(value)) {
-        p.cancel('Setup cancelled')
-        throw new Error('Setup cancelled')
-      }
-
-      userInputs.dotProp[varInfo.cleanName] = value || cleanDefault
+      userInputs[group][varInfo.cleanName] = value || cleanDefault
     }
   }
 
   p.outro(chalk.green('Setup complete!'))
 
   // Remove empty sections
-  if (Object.keys(userInputs.options).length === 0) {
-    delete userInputs.options
-  }
-  if (Object.keys(userInputs.env).length === 0) {
-    delete userInputs.env
-  }
-  if (Object.keys(userInputs.self).length === 0) {
-    delete userInputs.self
-  }
-  if (Object.keys(userInputs.dotProp).length === 0) {
-    delete userInputs.dotProp
+  for (const section of ['options', 'env', 'self', 'dotProp']) {
+    if (Object.keys(userInputs[section]).length === 0) {
+      delete userInputs[section]
+    }
   }
 
   return userInputs

@@ -10,7 +10,6 @@ const dotProp = require('dot-prop')
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
 const { shouldIgnorePath } = require('./utils/paths/ignorePaths')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
-const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { applyDotenvFileRefMetadata } = require('./utils/security/dotenvFileRefs')
 
 /**
@@ -70,7 +69,6 @@ function collectVariableMetadata({
 }) {
   const occurrences=[]
   const wrapper=extractVariableWrapper(variableSyntax.source)
-  const foundVariables = []
   const variableData = {}
   const fileRefs = []
   const fileGlobPatterns = []
@@ -380,12 +378,9 @@ function collectVariableMetadata({
       })
 
       setOwn(variableData, key, (Object.prototype.hasOwnProperty.call(variableData, key) ? variableData[key] : []).concat(varData))
-      foundVariables.push(rawValue)
     }
   })
 
-  // Make foundVariables array unique
-  const finalFoundVariables = [...new Set(foundVariables)]
   const varKeys = Object.keys(variableData)
 
   // Calculate summary using same logic as CLI display

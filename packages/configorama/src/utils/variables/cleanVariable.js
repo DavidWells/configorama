@@ -1,6 +1,3 @@
-const { findNestedVariables } = require('./findNestedVariables')
-const { functionRegex, fileRefSyntax } = require('../regex')
-
 const DEBUG = false
 // cleanVariable is a pure function of (match, variableSyntax); the same variable
 // strings recur many times per run, so cache results per syntax regex.
@@ -21,10 +18,6 @@ module.exports = function cleanVariable(
   if (DEBUG) {
     console.error(`Clean input  [${caller}]`, match)
   }
-  
-  // const outermostMatch = removeOuterMostBraces(match)
-  // console.log('outermostMatch', outermostMatch)
-  // return outermostMatch
 
   let varToClean = match
 
@@ -80,27 +73,4 @@ module.exports = function cleanVariable(
     console.error(`Clean output [${caller}]`, clean)
   }
   return clean
-}
-
-
-const { findOutermostBraces: findOutermostBracesUtil } = require('../strings/bracketMatcher')
-
-function findOutermostBraces(str) {
-  return findOutermostBracesUtil(str, '{', '}', '$')
-}
-
-/**
- * Removes the outermost ${} from a string
- * @param {string} str - The input string containing ${} syntax
- * @returns {string} The string with outermost ${} removed
- * @example
- * removeOuterMostBraces('${eval(${self:three} > ${self:four})}') 
- * // returns 'eval(${self:three} > ${self:four})'
- */
-function removeOuterMostBraces(str) {
-  const matches = findOutermostBraces(str)
-  if (matches.length === 0) return str
-  
-  const outermostMatch = matches[0]
-  return outermostMatch.slice(2, -1)
 }
