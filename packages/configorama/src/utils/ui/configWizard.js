@@ -2,8 +2,6 @@
 const p = require('@clack/prompts')
 const chalk = require('./chalk')
 const dotProp = require('dot-prop')
-const fs = require('fs')
-const path = require('path')
 const { toClickablePath } = require('./createEditorLink')
 const { buildConfigRequirements } = require('../requirements/configRequirements')
 const { createPromptDescriptors } = require('./promptDescriptors')

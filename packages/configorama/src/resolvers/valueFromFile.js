@@ -2,10 +2,9 @@
  * Resolves values from file references (file() and text() syntax)
  */
 const fs = require('fs')
-const path = require('path')
 const { trim } = require('../utils/lodash')
 const { splitCsv } = require('../utils/strings/splitCsv')
-const { resolveFilePathFromMatch, resolveFilePath } = require('../utils/paths/getFullFilePath')
+const { resolveFilePathFromMatch } = require('../utils/paths/getFullFilePath')
 const { findNestedVariables } = require('../utils/variables/findNestedVariables')
 const { encodeJsSyntax, decodeJsonInVariable, hasEncodedJson } = require('../utils/encoders/js-fixes')
 const { checkFileAccess } = require('../utils/security/safetyPolicy')
@@ -17,7 +16,6 @@ const YAML = require('../parsers/yaml')
 const { bracketsToDots } = require('../utils/paths/bracketsToDots')
 const { decodeLiteralBraces } = require('../utils/encoders/literal-braces')
 const { originAt, selectFileTarget } = require('../utils/paths/fileOrigin')
-const { encodePathIdentity } = require('../utils/paths/pathIdentity')
 
 /**
  * Convert HCL $[...] syntax to the main config's variable syntax
@@ -342,7 +340,6 @@ ${JSON.stringify(options.context, null, 2)}`,
   }
 
   if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
-    const { executeTypeScriptFile } = require('../parsers/typescript')
     const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {
@@ -356,7 +353,6 @@ ${JSON.stringify(options.context, null, 2)}`,
   }
 
   if (fileExtension === 'mjs' || fileExtension === 'esm') {
-    const { executeESMFile } = require('../parsers/esm')
     const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {

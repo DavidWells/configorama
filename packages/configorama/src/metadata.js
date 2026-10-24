@@ -10,7 +10,6 @@ const dotProp = require('dot-prop')
 const { normalizePath, extractFilePath, resolveInnerVariables } = require('./utils/paths/filePathUtils')
 const { shouldIgnorePath } = require('./utils/paths/ignorePaths')
 const { findNestedVariables } = require('./utils/variables/findNestedVariables')
-const { splitOnPipe } = require('./utils/strings/splitOnPipe')
 const { applyDotenvFileRefMetadata } = require('./utils/security/dotenvFileRefs')
 
 /**

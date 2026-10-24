@@ -1,7 +1,6 @@
 const mapData = require('../mapData')
 // Encodes variable-syntax chars ({ } $ for ${...}) that are plain text inside a ${...}
 // expression, so they can't end, start or break it; decoded when the text becomes a value
-const { setOwn } = require('../objects')
 const opaque = require('./opaque')
 // Chars that would split a key pasted into a variable's path (a paren hides the commas after it)
 const PATH_CHARS = /[|:'"()\s]/

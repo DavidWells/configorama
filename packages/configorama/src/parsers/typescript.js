@@ -1,6 +1,3 @@
-const path = require('path')
-const fs = require('fs')
-
 /**
  * Load TypeScript file and return its export (without executing)
  * @param {string} filePath - Full path to the TypeScript file

@@ -1,6 +1,3 @@
-const { findNestedVariables } = require('./findNestedVariables')
-const { functionRegex, fileRefSyntax } = require('../regex')
-
 const DEBUG = false
 // cleanVariable is a pure function of (match, variableSyntax); the same variable
 // strings recur many times per run, so cache results per syntax regex.

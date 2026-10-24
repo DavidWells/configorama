@@ -5,15 +5,12 @@ const validateStructure = require('./utils/validateStructure')
 const opaque = require('./utils/encoders/opaque')
 const { resolutionRecord, isResolutionRecord } = require('./utils/resolutionRecord')
 /* Node built-ins */
-const os = require('os')
 const path = require('path')
 const fs = require('fs')
 /* // disable logs to find broken tests
 console.log = () => {}
 // process.exit(1)
 /** */
-/* External dependencies */
-const findUp = require('find-up')
 /**
  * Pre-order DFS walk that mimics the subset of `traverse(obj).forEach(fn)`
  * we actually use: only `this.path` and `this.update(v)`. ~2x faster than
@@ -211,7 +208,7 @@ const { getTextAfterOccurrence, findNestedVariable } = require('./utils/strings/
 const { ensureQuote, isSurroundedByQuotes, startsWithQuotedPipe } = require('./utils/strings/quoteUtils')
 const { splitOnPipe, splitOnTopLevelPipe } = require('./utils/strings/splitOnPipe')
 const { didYouMean } = require('./utils/strings/didYouMean')
-const { findEnclosingVariable, findParentVariable, isFallbackSlot, isWholeFallbackItem, isPathSlot, variableSpans } = require('./utils/strings/bracketMatcher')
+const { findEnclosingVariable, findParentVariable, isFallbackSlot, isWholeFallbackItem, isPathSlot } = require('./utils/strings/bracketMatcher')
 const { encodeFilterArg, unwrapFilterArg, isResolvedFilterArg } = require('./utils/filters/filterArgs')
 const { validateOneOf } = require('./utils/filters/oneOf')
 // Metadata, display and setup modules are required where used; plain config loads never need them
