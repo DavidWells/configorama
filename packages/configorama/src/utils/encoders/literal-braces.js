@@ -136,9 +136,6 @@ function encodeQuotedLiteralsDeep(value, prefix = '${', suffix = '}') {
   return mapData(value, text => encodeQuotedLiterals(text, prefix, suffix))
 }
 
-/** @type {typeof import('./js-fixes') | undefined} */
-let jsFixes
-
 /**
  * decodeLiteralBracesDeep for metadata shown to people: also turns encoded fallback values
  * (__JSON_B64__...__) back into their JSON text. Not for resolved config values, where such
@@ -147,8 +144,6 @@ let jsFixes
  * @returns {any} Decoded copy
  */
 function decodeForDisplay(value) {
-  // Resolved once, not per node of the tree (still lazy: most loads never display metadata)
-  const decodeJsonInVariable = jsFixes ? jsFixes.decodeJsonInVariable : (jsFixes = require('./js-fixes')).decodeJsonInVariable
   return mapData(value, text => opaque.decodeAll(text), text => opaque.decodeAll(text))
 }
 

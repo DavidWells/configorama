@@ -298,7 +298,6 @@ function unknownFunctionMessage(name, variable, instance) {
 
 // Resolvers that look a key or name up, so get it decoded (see getValueFromSource)
 const KEY_LOOKUP_TYPES = new Set(['self', 'env', 'options', 'opt', 'dot.prop'])
-const logLines = '─────────────────────────────────────────────────'
 const evalIfPattern = /\b(eval|if)\s*\(/
 // Marks a function call still to run. It starts with a private-use char (U+E000) so no config
 // value can look like it
@@ -1076,7 +1075,6 @@ class Configorama {
     }
 
     const variableSyntax = this.variableSyntax
-    const variablesKnownTypes = this.variablesKnownTypes
 
     if (VERBOSE || showFoundVariables || this.settings.returnPreResolvedVariableDetails || this.setupMode) {
       // Metadata is collected from encoded text (quoted { } $); decode once for display and callers
@@ -2221,14 +2219,12 @@ class Configorama {
     const originalSyntax=scanExpression(originalSrc,{prefix:this.varPrefix,suffix:this.varSuffix})
     const originalRoot=expressionReferences(originalSyntax).find(n=>n.complete&&n.raw.trim()===originalSrc.trim())
     const ownFilters=originalRoot?originalSyntax.nodes.filter(n=>n.parentId===originalRoot.id&&n.kind==='Filter'):[]
-    const hasFilters=ownFilters.length>0
     let foundFilters=ownFilters.map(n=>n.raw.trim()).filter(Boolean)
     // console.log('foundFilters', foundFilters)
 
     // total replacement
     if (property === matchedString) {
       if (DEBUG_TYPE) console.error('DEBUG_TYPE total replacement')
-      const v = valueObject.value || ''
       property = valueToPopulate
       // console.log('hasFilters', hasFilters)
       // console.log('valueToPopulate', valueToPopulate)
@@ -2740,7 +2736,6 @@ Missing Value ${missingValue} - ${matchedString}
    *  in the given variable strings string.
    */
   overwrite(variableStrings, valueObject, originalVar, matchIndex) {
-    const propertyString = valueObject.value
     /*
     console.log('overwrite variableStrings', variableStrings)
     console.log('overwrite valueObject', valueObject)

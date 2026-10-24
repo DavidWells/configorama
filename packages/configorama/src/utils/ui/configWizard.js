@@ -82,7 +82,7 @@ function groupVariablesByType(uniqueVariables, originalConfig = {}) {
   const addedVars = new Set()
 
   for (const [varKey, varData] of Object.entries(uniqueVariables)) {
-    const { variable, variableType, isRequired, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue, resolvedValue } = varData
+    const { variable, variableType, defaultValue, defaultValueSrc, occurrences, innerVariables, hasValue, resolvedValue } = varData
 
     // Handle top-level variables (not file/text types)
     if (variableType !== 'file' && variableType !== 'text') {

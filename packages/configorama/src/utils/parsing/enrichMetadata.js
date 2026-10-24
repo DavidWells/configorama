@@ -719,7 +719,7 @@ async function enrichMetadata(
   }
 
   // Check file existence for file/text variables with fully resolved paths
-  for (const [varKey, entry] of uniqueVariablesMap) {
+  for (const entry of uniqueVariablesMap.values()) {
     if (entry.variableType === 'file' || entry.variableType === 'text') {
       // Extract file path from variable string like "file(./config.other.json)"
       const filePathMatch = entry.variable.match(/^(?:file|text)\((.+?)\)/)
@@ -754,7 +754,7 @@ async function enrichMetadata(
   }
 
   // Aggregate types and descriptions for each uniqueVariable
-  for (const [varKey, entry] of uniqueVariablesMap) {
+  for (const entry of uniqueVariablesMap.values()) {
     // Collect unique types from occurrences
     const types = entry.occurrences
       .map(occ => occ.type)

@@ -443,7 +443,7 @@ function displayConfigurableVariables({ uniqueVarKeys, uniqueVariables, lines, f
 
   const configurableBoxes = []
 
-  for (const [sourceType, vars] of Object.entries(bySource)) {
+  for (const vars of Object.values(bySource)) {
     if (vars.length === 0) continue
 
     for (let i = 0; i < vars.length; i++) {
@@ -506,9 +506,6 @@ function displayConfigurableVariables({ uniqueVarKeys, uniqueVariables, lines, f
         locationLabel = 'Config Path:'
       }
       varMsg += `${keyChalk(locationLabel.padEnd(TITLE_TEXT.length, ' '))} ${locationRender}`
-
-      // Get type for center heading (reuse varType from above)
-      const typeText = varType ? chalk.dim(`Type: ${varType}`) : ''
 
       // Get line number for first occurrence
       const firstOccLine = findLineForKey(firstOcc.path, lines, fileType)
