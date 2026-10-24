@@ -230,8 +230,6 @@ function displayVariableDetails({ varKeys, variableData, uniqueVariables, varPre
           const occurrence = uniqueVar.occurrences.find(occ => occ.path === v.path)
           const pathType = occurrence && occurrence.type
           typeText = pathType ? ` ${chalk.dim(`Type: ${pathType}`)}` : ''
-          const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
-          return `${prefix}${pathLink}${typeText}`
         }
         const prefix = idx === 0 ? '' : `${indent}${pathIndent}`
         return `${prefix}${pathLink}${typeText}`
