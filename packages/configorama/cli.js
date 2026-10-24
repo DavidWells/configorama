@@ -246,9 +246,7 @@ function copyToClipboard(value) {
   }
 }
 
-if (requirementsSubcommand) {
-  inputFile = argv._[1] || null
-} else if (auditSubcommand || graphSubcommand || inspectSubcommand) {
+if (requirementsSubcommand || auditSubcommand || graphSubcommand || inspectSubcommand) {
   inputFile = argv._[1] || null
 } else {
   for (const arg of argv._) {

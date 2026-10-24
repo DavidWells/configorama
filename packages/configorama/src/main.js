@@ -3520,15 +3520,9 @@ Missing Value ${missingValue} - ${matchedString}
         const params = this.originalConfig.Parameters || (this.originalConfig.resources || {}).Parameters
         const resources = this.originalConfig.Resources || (this.originalConfig.resources || {}).Resources
         /* Cloudformation Resource References */
-        if (resources && resources[variableString]) {
-          allowSpecialCase = true
-        } else if (params && params[variableString]) {
-          allowSpecialCase = true
-        } else if (variableString === 'ApiGatewayRestApi') {
+        if ((resources && resources[variableString]) || (params && params[variableString]) ||
           // Allow for "hidden" cloudformation variables, set by sls framework
-          allowSpecialCase = true
-        } else if (variableString === 'HttpApi') {
-          // Allow for "hidden" cloudformation variables, set by sls framework
+          variableString === 'ApiGatewayRestApi' || variableString === 'HttpApi') {
           allowSpecialCase = true
         }
       } else {
