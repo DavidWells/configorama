@@ -3762,14 +3762,7 @@ Missing Value ${missingValue} - ${matchedString}
             __internal_only_flag: true,
             caller: 'getDeeperValue',
           })
-        } else if (subProperty !== '' || (typeof reducedValue === 'object' && '' in reducedValue)) {
-          try {
-            // if JSON parse it
-            reducedValue = JSON.parse(reducedValue)
-          } catch (e) {}
-
-          reducedValue = reducedValue[subProperty]
-        } else if (isString(reducedValue)) {
+        } else if (subProperty !== '' || (typeof reducedValue === 'object' && '' in reducedValue) || isString(reducedValue)) {
           try {
             // if JSON parse it
             reducedValue = JSON.parse(reducedValue)
