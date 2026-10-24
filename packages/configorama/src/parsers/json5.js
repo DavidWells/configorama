@@ -1,43 +1,35 @@
 const JSON5 = require('json5')
 
 function parse(contents) {
-  let jsonObject
   try {
-    jsonObject = JSON5.parse(contents)
+    return JSON5.parse(contents)
   } catch (e) {
     throw new Error(e)
   }
-  return jsonObject
 }
 
 function dump(object) {
-  let json
   try {
-    json = JSON5.stringify(object)
+    return JSON5.stringify(object)
   } catch (e) {
     throw new Error(e)
   }
-  return json
 }
 
 function toYaml(jsonContents) {
-  let yml
   try {
-    yml = require('./yaml').dump(parse(jsonContents))
+    return require('./yaml').dump(parse(jsonContents))
   } catch (e) {
     throw new Error(e)
   }
-  return yml
 }
 
 function toToml(jsonContents) {
-  let toml
   try {
-    toml = require('./toml').dump(parse(jsonContents))
+    return require('./toml').dump(parse(jsonContents))
   } catch (e) {
     throw new Error(e)
   }
-  return toml
 }
 
 module.exports = {

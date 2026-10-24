@@ -26,13 +26,11 @@ function load(contents, options) {
  */
 function parse(ymlContents) {
   // Get document, or throw exception on error
-  let ymlObject = {}
   try {
-    ymlObject = YAML.load(ymlContents)
+    return YAML.load(ymlContents)
   } catch (e) {
     throw new Error(e)
   }
-  return ymlObject
 }
 
 /**
@@ -42,15 +40,13 @@ function parse(ymlContents) {
  * @throws {Error} If conversion fails
  */
 function dump(object) {
-  let yml
   try {
-    yml = YAML.dump(object, {
+    return YAML.dump(object, {
       noRefs: true
     })
   } catch (e) {
     throw new Error(e)
   }
-  return yml
 }
 
 /**
@@ -60,13 +56,11 @@ function dump(object) {
  * @throws {Error} If conversion fails
  */
 function toToml(ymlContents) {
-  let toml
   try {
-    toml = require('./toml').dump(parse(ymlContents))
+    return require('./toml').dump(parse(ymlContents))
   } catch (e) {
     throw new Error(e)
   }
-  return toml
 }
 
 /**
@@ -76,13 +70,11 @@ function toToml(ymlContents) {
  * @throws {Error} If conversion fails
  */
 function toJson(ymlContents) {
-  let json
   try {
-    json = require('./json5').dump(parse(ymlContents))
+    return require('./json5').dump(parse(ymlContents))
   } catch (e) {
     throw new Error(e)
   }
-  return json
 }
 
 /*
