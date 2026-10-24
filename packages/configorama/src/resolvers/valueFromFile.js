@@ -491,9 +491,12 @@ function extractDeepProperties(variableString, matchedFileString, includeFirstPr
  * @returns {{ returnValueFunction: any, includeFirstProperty: boolean }}
  */
 function selectModuleExport(fileModule, moduleName) {
-  const isNamedExport = !!moduleName && fileModule !== null &&
-    (typeof fileModule === 'object' || typeof fileModule === 'function') &&
-    Object.prototype.hasOwnProperty.call(fileModule, moduleName)
+  // In load/process mode a module with a default export arrives as a proxy over that
+  // default, so its named exports are not own keys of fileModule; check the exports
+  const ownExports = require('../utils/loadExecutable').moduleExports(fileModule)
+  const isNamedExport = !!moduleName && ownExports !== null &&
+    (typeof ownExports === 'object' || typeof ownExports === 'function') &&
+    Object.prototype.hasOwnProperty.call(ownExports, moduleName)
   if (isNamedExport) {
     // Named function export - call it; named value export - read the path from the module
     return typeof fileModule[moduleName] === 'function'
