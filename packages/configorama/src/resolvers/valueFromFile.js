@@ -339,29 +339,20 @@ ${JSON.stringify(options.context, null, 2)}`,
     return processModule(jsFile, returnValueFunction, 'javascript', includeFirstProperty)
   }
 
-  if (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts') {
+  // Process TypeScript and ESM files (same steps, labelled for errors)
+  const executableType = (fileExtension === 'ts' || fileExtension === 'tsx' || fileExtension === 'mts' || fileExtension === 'cts')
+    ? 'TypeScript'
+    : (fileExtension === 'mjs' || fileExtension === 'esm') ? 'ESM' : null
+  if (executableType) {
     const { moduleName } = parseModuleReference(variableString, matchedCallString)
 
     try {
-      const tsFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
-      const { returnValueFunction, includeFirstProperty } = selectModuleExport(tsFile, moduleName)
+      const fileModule = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
+      const { returnValueFunction, includeFirstProperty } = selectModuleExport(fileModule, moduleName)
 
-      return processModule(tsFile, returnValueFunction, 'TypeScript', includeFirstProperty)
+      return processModule(fileModule, returnValueFunction, executableType, includeFirstProperty)
     } catch (err) {
-      return Promise.reject(new Error(`Error processing TypeScript file: ${err.message}`))
-    }
-  }
-
-  if (fileExtension === 'mjs' || fileExtension === 'esm') {
-    const { moduleName } = parseModuleReference(variableString, matchedCallString)
-
-    try {
-      const esmFile = require('../utils/loadExecutable')(fullFilePath, ctx.loadContext, ctx.opts.moduleCacheMode)
-      const { returnValueFunction, includeFirstProperty } = selectModuleExport(esmFile, moduleName)
-
-      return processModule(esmFile, returnValueFunction, 'ESM', includeFirstProperty)
-    } catch (err) {
-      return Promise.reject(new Error(`Error processing ESM file: ${err.message}`))
+      return Promise.reject(new Error(`Error processing ${executableType} file: ${err.message}`))
     }
   }
 
