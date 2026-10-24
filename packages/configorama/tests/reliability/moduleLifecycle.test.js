@@ -45,4 +45,17 @@ test('failed module loads do not poison the next load', () => temporary(async di
   fs.writeFileSync(file,'module.exports={ok:true}')
   for(const resolve of [configorama,configorama.sync])assert.deepEqual(await resolve(file,{moduleCacheMode:'load'}),{ok:true})
 }))
+test('a syntax error in a referenced .js/.mjs/.ts file throws naming the file in load and process modes', () => temporary(async dir => {
+  for (const ext of ['js', 'mjs', 'ts']) {
+    const file = path.join(dir, `broken.${ext}`)
+    fs.writeFileSync(file, ext === 'js' ? 'module.exports = {\n' : 'export const a = {\n')
+    for (const moduleCacheMode of ['load', 'process']) {
+      for (const resolve of [configorama, configorama.sync]) {
+        const message = new RegExp(`broken\\.${ext}`)
+        await assert.rejects(async () => resolve({ out: `\${file(./broken.${ext})}` }, { configDir: dir, moduleCacheMode }), message)
+        await assert.rejects(async () => resolve(file, { moduleCacheMode }), message)
+      }
+    }
+  }
+}))
 test.run()

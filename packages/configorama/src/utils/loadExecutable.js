@@ -51,6 +51,10 @@ module.exports = function loadExecutable(filePath, context, mode = 'legacy') {
         const transformed = loader.transform({ source, filename: file, ts: /\.[cm]?tsx?$/.test(file), jsx: /\.[jt]sx$/.test(file) })
         const run = vm.compileFunction(transformed, ['exports','require','module','__filename','__dirname','jitiImport','jitiESMResolve'], { filename: file })
         run.call(record.exports, record.exports, ownedRequire, record, file, path.dirname(file), specifier => Promise.resolve(ownedRequire(specifier)), specifier => pathToFileURL(native.resolve(specifier)).href)
+        // jiti's transform does not throw on a syntax error: it returns code that sets
+        // exports.__JITI_ERROR__. Its own require turns that into an error; do the same.
+        const failure = record.exports && record.exports.__JITI_ERROR__
+        if (failure) throw new Error(`${failure.code}: ${String(failure.message).trim()} (${failure.filename || file}:${failure.line}:${failure.column})`)
       }
       record.loaded = true
       const value = interop(record.exports); graph.modules.set(file, value); return value
