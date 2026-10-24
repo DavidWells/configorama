@@ -126,25 +126,6 @@ function variableSpans(text, prefix, suffix) {
 }
 
 /**
- * findEnclosingVariable for a multi-char suffix: the outermost span around the occurrence
- * @param {string} text
- * @param {string} variable
- * @param {string} prefix
- * @param {string} suffix
- * @param {number} [index]
- * @returns {string|null}
- */
-function findEnclosingMultiChar(text, variable, prefix, suffix, index) {
-  const at = typeof index === 'number' ? index : text.indexOf(variable)
-  if (at < 0 || text.slice(at, at + variable.length) !== variable) return null
-  let best = null
-  for (const span of variableSpans(text, prefix, suffix)) {
-    if (span.start <= at && at + variable.length <= span.end && (!best || span.end - span.start > best.end - best.start)) best = span
-  }
-  return best ? text.slice(best.start, best.end) : null
-}
-
-/**
  * Find the innermost variable around the occurrence of `variable` at `index`: its direct
  * parent, e.g. `${env:C, ${env:D}}` for `${env:D}` in `${env:A, ${env:C, ${env:D}}}`,
  * where findEnclosingVariable gives the outermost one.

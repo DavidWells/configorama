@@ -33,23 +33,6 @@ function isGitRepo(dir) {
 }
 
 /**
- * Execute a shell command
- * @param {string} cmd - Command to execute
- * @param {import('child_process').ExecOptions} [options] - Exec options
- * @returns {Promise<string>}
- */
-async function _exec(cmd, options = { timeout: 1000 }) {
-  return new Promise((resolve, reject) => {
-    childProcess.exec(cmd, options, (err, stdout) => {
-      if (err) {
-        return reject(err)
-      }
-      return resolve(String(stdout).trim())
-    })
-  })
-}
-
-/**
  * Execute a command with arguments array (safe from shell injection)
  * @param {string} command - Command to execute
  * @param {string[]} args - Arguments array
