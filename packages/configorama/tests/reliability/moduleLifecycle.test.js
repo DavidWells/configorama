@@ -58,4 +58,16 @@ test('a syntax error in a referenced .js/.mjs/.ts file throws naming the file in
     }
   }
 }))
+test('a non-function named export of a .mjs/.ts file with a default export resolves like .js in load and process modes', () => temporary(async dir => {
+  fs.writeFileSync(path.join(dir, 'named.mjs'), 'export const a = 5\nexport const b = { c: 1 }\nexport default { z: 1 }\n')
+  fs.writeFileSync(path.join(dir, 'named.ts'), 'export const a: number = 5\nexport const b = { c: 1 }\nexport default { z: 1 }\n')
+  fs.writeFileSync(path.join(dir, 'named.js'), 'exports.a = 5\nexports.b = { c: 1 }\n')
+  const config = {}
+  for (const ext of ['js', 'mjs', 'ts']) Object.assign(config, { [`${ext}A`]: `\${file(./named.${ext}):a}`, [`${ext}C`]: `\${file(./named.${ext}):b.c}` })
+  for (const moduleCacheMode of ['legacy', 'load', 'process']) {
+    for (const resolve of [configorama, configorama.sync]) {
+      assert.deepEqual(await resolve(config, { configDir: dir, moduleCacheMode }), { jsA: 5, jsC: 1, mjsA: 5, mjsC: 1, tsA: 5, tsC: 1 })
+    }
+  }
+}))
 test.run()

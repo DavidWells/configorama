@@ -4,6 +4,9 @@ const vm = require('node:vm')
 const { createRequire } = require('node:module')
 const { pathToFileURL } = require('node:url')
 const processGraph = { modules: new Map(), records: Object.create(null) }
+// Interop proxy -> the module's own exports, so callers can tell a named export from
+// a property of the default export (the proxy's target is the default export)
+const interopExports = new WeakMap()
 /** Separate config-owned module evaluation from function invocation. Global
  * require.cache entries and application exports are never deleted or modified.
  * @param {string} filePath @param {Object} [context] @param {'legacy'|'process'|'load'} [mode]
@@ -23,10 +26,12 @@ module.exports = function loadExecutable(filePath, context, mode = 'legacy') {
     if (!exports || !exports.__esModule || !Object.prototype.hasOwnProperty.call(exports, 'default')) return exports
     const value = exports.default
     if (!value || !['object','function'].includes(typeof value)) return value
-    return new Proxy(value, { get(target, key, receiver) {
+    const proxy = new Proxy(value, { get(target, key, receiver) {
       if (Object.prototype.hasOwnProperty.call(exports, key)) return exports[key]
       return Reflect.get(target, key, receiver)
     } })
+    interopExports.set(proxy, exports)
+    return proxy
   }
   function evaluate(filename) {
     const file = fs.realpathSync(filename)
@@ -64,4 +69,11 @@ module.exports = function loadExecutable(filePath, context, mode = 'legacy') {
     }
   }
   return evaluate(file)
+}
+/** The module's own exports behind a load/process-mode interop proxy, else the value itself.
+ * @param {*} value - A value returned by loadExecutable
+ * @returns {*}
+ */
+module.exports.moduleExports = function moduleExports(value) {
+  return (value && interopExports.get(value)) || value
 }
