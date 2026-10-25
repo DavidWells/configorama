@@ -8,6 +8,9 @@ const formatFunctionArgs = require('../utils/strings/formatFunctionArgs')
 const { findProjectRoot } = require('../utils/paths/findProjectRoot')
 const GIT_PREFIX = 'git'
 const gitVariableSyntax = RegExp(/^git:/g)
+// Upper bound for one git read. Git answers in milliseconds, but the timer also counts time the event loop spends
+// on other work before it reads git's exit, which takes seconds when a large config renders on a loaded machine.
+const GIT_TIMEOUT_MS = 30000
 
 /**
  * Parses a git remote URL. git-url-parse is loaded on demand so configs without git refs skip its require cost
@@ -39,7 +42,7 @@ function isGitRepo(dir) {
  * @param {import('child_process').ExecFileOptions} [options] - ExecFile options
  * @returns {Promise<string>}
  */
-async function _execFile(command, args, options = { timeout: 1000 }) {
+async function _execFile(command, args, options = { timeout: GIT_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
     childProcess.execFile(command, args, options, (err, stdout) => {
       if (err) {
@@ -259,7 +262,7 @@ function createResolver(cwd) {
 
   function gitExec(args) {
     const key = `git:${JSON.stringify(args)}`
-    return cachedSafeGit(key, () => _execFile('git', args, { cwd, timeout: 1000 }))
+    return cachedSafeGit(key, () => _execFile('git', args, { cwd, timeout: GIT_TIMEOUT_MS }))
   }
 
   function gitRemote(name = 'origin') {
@@ -483,7 +486,7 @@ async function getGitTimestamp(_file, cwd, throwOnMissing = true) {
 }
 
 async function getGitRemote(name, cwd) {
-  const remoteValues = await _execFile('git', ['remote', '-v'], { cwd, timeout: 1000 })
+  const remoteValues = await _execFile('git', ['remote', '-v'], { cwd, timeout: GIT_TIMEOUT_MS })
   const remotes = remoteValues.toString().split(os.EOL)
     .filter(function filterOnlyFetchRows(remote) {
       return remote.match('(fetch)')
