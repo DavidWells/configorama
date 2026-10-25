@@ -32,6 +32,13 @@ packages whose publishing access disallows them (a token got `E404 Not found` on
 `@davidwells/human-cron` even though it exists), and npm is phasing out 2FA-bypass
 tokens for publishing entirely (January 2027).
 
+0. **Check your npm login first:** `npm whoami` must print your username. A stale
+   `_authToken` in `~/.npmrc` makes `npm whoami` fail with `E401` and makes every publish
+   fail with a misleading `E404 Not found`. Fix it with a fresh web login, which replaces
+   that token:
+   ```bash
+   npm login --auth-type=web     # opens npmjs.com; approve, then rerun npm whoami
+   ```
 1. **Pre-flight, from the repo root on a clean `master`:**
    ```bash
    pnpm -r --if-present typecheck
@@ -70,6 +77,17 @@ Rules:
   fails partway, fix the cause and rerun `pnpm publish` for the packages that are
   missing; don't re-version. (`lerna publish from-package` also publishes whatever
   versions aren't on npm yet, without bumping, if its auth works.)
+- **Finishing a half-done release.** When versions are already bumped, committed and tagged
+  but not on npm (`npm view configorama version` still shows the old one), lerna reports
+  `Current HEAD is already released` / `No changed packages to publish` and uploads nothing:
+  plain `lerna publish` only uploads what it versions in the same run. Upload the tagged
+  versions without re-versioning, either way:
+  ```bash
+  cd packages/configorama && pnpm publish                      # after npm whoami works
+  npm-auth ./node_modules/.bin/lerna publish from-package     # token path, if npm accepts the token
+  ```
+  `pnpm publish` takes no `--auth-type` flag; it hands the upload to npm, which prints an
+  `https://www.npmjs.com/auth/cli/…` URL for the 2FA approval.
 - **A brand-new scoped package** (`@davidwells/…`) needs its first publish to be public:
   `pnpm publish --access public` (only the first time).
 - **Solo terminal can't reach 1Password.** macOS blocks it from 1Password's app data, so
