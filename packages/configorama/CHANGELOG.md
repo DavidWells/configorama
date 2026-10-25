@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.2](https://github.com/DavidWells/configorama/compare/configorama@1.5.1...configorama@1.5.2) (2026-10-25)
+
+
+### Bug Fixes
+
+* **configorama:** named value exports of .mjs/.ts file refs in load/process mode ([f99704e](https://github.com/DavidWells/configorama/commit/f99704ef8ebc563d36dcedbabf7945e9f06b9cb4))
+* **configorama:** throw on syntax errors in executable files in load/process mode ([2e0966f](https://github.com/DavidWells/configorama/commit/2e0966f041d8b362104011fa8f56aac7b3663bbb))
+* **git:** git: variables resolve while the event loop is busy ([#88](https://github.com/DavidWells/configorama/issues/88)) ([cd38d26](https://github.com/DavidWells/configorama/commit/cd38d262332a2c1f04cfe957b163fc0585cd51e3))
+
+
+
+
+
 ## [1.5.1](https://github.com/DavidWells/configorama/compare/configorama@1.5.0...configorama@1.5.1) (2026-10-09)
 
 
