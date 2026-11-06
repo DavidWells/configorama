@@ -20,22 +20,43 @@ async function startDaemon(config, options = {}) {
     let lastConnectionAt = Date.now()
     const server = net.createServer((socket) => {
       lastConnectionAt = Date.now()
+      // A client that hangs up before we reply (its own 2s timeout, a killed
+      // process) surfaces as EPIPE/ECONNRESET here. Unhandled, that crashes
+      // the daemon and drops every cached entry.
+      socket.on('error', () => socket.destroy())
       let buffer = ''
-      socket.on('data', (chunk) => {
+      const onData = (chunk) => {
         buffer += chunk.toString('utf8')
         if (Buffer.byteLength(buffer) > MAX_LINE_BYTES) {
+          socket.off('data', onData)
           socket.end(encode({ type: 'error', message: 'Protocol message too large.' }))
           return
         }
         const index = buffer.indexOf('\n')
         if (index === -1) return
-        const line = buffer.slice(0, index)
-        handleLine(line, socket, cache, config, server)
-      })
+        // One request per connection: later chunks must not re-run it.
+        socket.off('data', onData)
+        handleLine(buffer.slice(0, index), socket, cache, config, server)
+      }
+      socket.on('data', onData)
     })
 
     server.on('error', reject)
-    server.listen(config.socket_path, () => {
+    // bind() creates the socket file synchronously inside listen(); a 0177
+    // umask makes it 0600 from birth instead of world-connectable until the
+    // chmod below runs (matters in a shared /tmp).
+    let previousUmask
+    try {
+      previousUmask = process.umask(0o177)
+    } catch (err) {
+      // Worker threads cannot set umask; the chmod below still applies.
+    }
+    try {
+      server.listen(config.socket_path, onListening)
+    } finally {
+      if (previousUmask !== undefined) process.umask(previousUmask)
+    }
+    function onListening() {
       try {
         fs.chmodSync(config.socket_path, 0o600)
         fs.writeFileSync(pidPath(config.socket_path), String(process.pid), { mode: 0o600 })
@@ -63,7 +84,7 @@ async function startDaemon(config, options = {}) {
       process.once('SIGINT', shutdown)
       if (options.foreground && process.env.DEBUG) process.stderr.write(`op-stash: daemon listening on ${config.socket_path}\n`)
       resolve({ server, cache })
-    })
+    }
   })
 }
 

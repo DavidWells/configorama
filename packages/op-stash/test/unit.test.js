@@ -8,7 +8,8 @@ const { resolveScope } = require('../src/scope')
 const { cacheKey, effectiveAccount } = require('../src/key')
 const { SecretCache } = require('../src/cache')
 const { encode, decode, validateRequest } = require('../src/protocol')
-const { resolveConfig, resetConfigCache } = require('../src/config')
+const { resolveConfig, resetConfigCache, socketDir } = require('../src/config')
+const { daemonEnv } = require('../src/client')
 const { translateError } = require('../src/op')
 
 test('duration parser accepts documented formats', () => {
@@ -149,6 +150,37 @@ test('daemon rejects over-long socket paths with a clear error', async () => {
   } catch (err) {
     assert.match(err.message, /exceeds.*bytes.*OP_STASH_SOCKET_PATH/s)
   }
+})
+
+test('default socket dir prefers XDG_RUNTIME_DIR on linux only', () => {
+  const env = { TMPDIR: '/tmp', XDG_RUNTIME_DIR: '/run/user/1000' }
+  assert.is(socketDir(env, 'linux'), '/run/user/1000')
+  assert.is(socketDir(env, 'darwin'), '/tmp')
+  assert.is(socketDir({ TMPDIR: '/tmp' }, 'linux'), '/tmp')
+  assert.is(socketDir({ TMPDIR: '/tmp', XDG_RUNTIME_DIR: 'relative/dir' }, 'linux'), '/tmp')
+})
+
+test('spawned daemon env is an allowlist without caller secrets', () => {
+  const env = {
+    PATH: '/usr/bin',
+    HOME: '/home/me',
+    TMPDIR: '/tmp/me',
+    XDG_CONFIG_HOME: '/home/me/.config',
+    OP_STASH_TTL_SECONDS: '60',
+    OP_STASH_CONFIG: 'relative/config.json',
+    OP_STASH_DISABLED: '1',
+    OP_SERVICE_ACCOUNT_TOKEN: 'ops_secret',
+    AWS_SECRET_ACCESS_KEY: 'aws_secret',
+    AWS_SESSION_TOKEN: 'aws_session',
+    GITHUB_TOKEN: 'ghp_secret',
+    NODE_OPTIONS: '--require /tmp/evil.js',
+  }
+  const out = daemonEnv(env, { socket_path: 'rel/cache.sock' })
+  assert.equal(Object.keys(out).sort(), [
+    'HOME', 'OP_STASH_CONFIG', 'OP_STASH_SOCKET_PATH', 'OP_STASH_TTL_SECONDS', 'PATH', 'TMPDIR', 'XDG_CONFIG_HOME',
+  ])
+  assert.is(out.OP_STASH_SOCKET_PATH, path.resolve('rel/cache.sock'))
+  assert.is(out.OP_STASH_CONFIG, path.resolve('relative/config.json'))
 })
 
 test.run()

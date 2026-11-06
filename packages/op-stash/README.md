@@ -170,7 +170,7 @@ Optional config file at `~/.config/op-stash/config.json`:
 
 | Env var | Meaning | Default |
 |---|---|---|
-| `OP_STASH_SOCKET_PATH` | Daemon socket location | `$TMPDIR/op-stash-<uid>.sock` |
+| `OP_STASH_SOCKET_PATH` | Daemon socket location | `$TMPDIR/op-stash-<uid>.sock` (Linux: `$XDG_RUNTIME_DIR/op-stash-<uid>.sock` when set) |
 | `OP_STASH_TTL_SECONDS` | Default entry lifetime | `300` |
 | `OP_STASH_MAX_TTL_SECONDS` | Daemon-enforced TTL ceiling | `86400` |
 | `OP_STASH_MAX_ENTRIES` | LRU eviction threshold | `1000` |
@@ -248,6 +248,10 @@ const value = await getOrSet('my-tool://v1/<hash>', async () => {
 
 Only `read` (and the API equivalents) starts the daemon — `status`, `stats`, `clear`, `stop`, and `doctor` never spawn one just to report an empty cache. The daemon exits on its own after `idle_exit_seconds` once the cache is empty, sweeps expired entries every minute, and removes its socket and pid file on shutdown.
 
+The spawned daemon runs from `/` with a minimal environment: `PATH`, `HOME`, `TMPDIR`, `XDG_CONFIG_HOME`, `XDG_RUNTIME_DIR`, `LANG`, `DEBUG` and your `OP_STASH_*` settings. It does not inherit the spawning shell's tokens or cloud credentials (`OP_SERVICE_ACCOUNT_TOKEN`, `AWS_*`, `GITHUB_TOKEN`…), which would otherwise outlive that shell inside the daemon and show up in `ps -E`.
+
+Whichever process starts the daemon first decides which op-stash version serves every cached secret until it exits. Pin op-stash to an exact version in projects that depend on it, and `op-stash stop` after upgrading.
+
 ## Security Model
 
 **Where the secret lives:** in the daemon process's heap, full stop. The socket file is a zero-byte rendezvous point. Nothing is written to disk and nothing is logged.
@@ -255,14 +259,19 @@ Only `read` (and the API equivalents) starts the daemon — `status`, `stats`, `
 **Who can read it:**
 
 - *Other users*: no. Kernel-enforced `0600` socket, uid-suffixed path, and both sides verify ownership — the client refuses unsafe sockets, the daemon refuses to bind over suspicious paths.
-- *Processes running as you*: yes, by design — that is the feature. Any same-user process that knows the ref and key dimensions can fetch the value without a prompt during the TTL window. This is the same trust model as `ssh-agent`, `gpg-agent`, and the 1Password CLI's own session state.
+- *Processes running as you*: yes, by design — that is the feature. The cache key is a hash of things that aren't secret (the `op://` ref, scope, account, op path), so any same-user process can compute it and fetch the value without a prompt during the TTL window. Scopes keep entries apart; they don't decide who can read them. This is the same trust model as `ssh-agent`, `gpg-agent`, and the 1Password CLI's own session state.
 - *Root*: can read any process's memory. No userland tool changes that.
 
 **Why values aren't encrypted:** the decryption key would have to live in the same memory an attacker would be reading, and the daemon must return plaintext to legitimate clients anyway. Encryption there changes which bytes get copied, not who can copy them. What actually bounds exposure: short TTLs, the daemon-side ceiling, the minute-interval sweep, idle exit, and `clear`/`stop` for instant wipe.
 
 **Hygiene guarantees:** stats and diagnostics never contain refs or values (only truncated hashes); raw private-link URLs never reach the daemon; secret values appear on stdout only for `read`; the socket never touches the network.
 
-The one behavioral change to internalize: **during the TTL window, possession of your user account means silent access to cached values.** Scope namespaces, short TTLs, and `OP_STASH_DISABLED=1` exist for contexts where that trade isn't right.
+The one behavioral change to internalize: **during the TTL window, possession of your user account means silent access to cached values.** The 1Password prompt op-stash removes is exactly what would otherwise stop a malicious `postinstall` script, a compromised dependency, or a rogue agent tool from reading your secrets. With the cache warm, that code gets them silently. So:
+
+- Cache as little as you can: individual fields rather than whole notes full of credentials.
+- Keep TTLs short (the 5-minute default, or less).
+- Make caching opt-in for tools other people run, rather than on by default.
+- Set `OP_STASH_DISABLED=1`, or run `op-stash clear`, before running untrusted code such as installing new packages.
 
 ## Troubleshooting
 
@@ -278,7 +287,7 @@ The one behavioral change to internalize: **during the TTL window, possession of
 
 ## Limitations
 
-- **Not a hard security boundary.** Same-user processes can read cached values without a prompt during the TTL. If that's unacceptable for a context, don't enable the cache there.
+- **Not a hard security boundary.** Same-user processes, including any npm install script or agent tool you run, can read cached values without a prompt during the TTL. If that's unacceptable for a context, don't enable the cache there.
 - **Concurrent cold misses both prompt.** Two processes missing the same key simultaneously each run `op`. The target workflow is sequential agent commands, so v1 accepts this rather than adding request coalescing.
 - **No Windows caching.** win32 falls through to direct `op` execution — configs stay portable, Windows users just keep their prompts.
 - **JS strings can't be zeroed.** A cleared value may briefly survive in V8's garbage-collected heap — true of every Node process that ever touches a secret.

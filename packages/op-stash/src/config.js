@@ -28,9 +28,8 @@ function configPath(env = process.env) {
  */
 function defaults(env = process.env) {
   const uid = typeof process.getuid === 'function' ? process.getuid() : 'user'
-  const tmp = env.TMPDIR || os.tmpdir() || '/tmp'
   return {
-    socket_path: path.join(tmp, `op-stash-${uid}.sock`),
+    socket_path: path.join(socketDir(env), `op-stash-${uid}.sock`),
     ttl_seconds: 300,
     max_ttl_seconds: 86400,
     max_entries: 1000,
@@ -39,6 +38,19 @@ function defaults(env = process.env) {
     default_scope: 'user',
     idle_exit_seconds: 1800,
   }
+}
+
+/**
+ * Directory for the default socket. On Linux, $TMPDIR is usually the shared
+ * /tmp, where another user can squat the path; $XDG_RUNTIME_DIR is per-user
+ * (0700, owned by you) whenever a login session provides it.
+ * @param {NodeJS.ProcessEnv} env - Environment object
+ * @param {string} [platform] - process.platform override
+ * @returns {string}
+ */
+function socketDir(env, platform = process.platform) {
+  if (platform === 'linux' && env.XDG_RUNTIME_DIR && path.isAbsolute(env.XDG_RUNTIME_DIR)) return env.XDG_RUNTIME_DIR
+  return env.TMPDIR || os.tmpdir() || '/tmp'
 }
 
 /**
@@ -142,4 +154,4 @@ function resetConfigCache() {
   cachedBase = undefined
 }
 
-module.exports = { configPath, defaults, resolveConfig, resetConfigCache, parsePositiveInt }
+module.exports = { configPath, defaults, socketDir, resolveConfig, resetConfigCache, parsePositiveInt }

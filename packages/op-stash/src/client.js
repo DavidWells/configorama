@@ -2,6 +2,7 @@
    Only read paths auto-start the daemon; diagnostics never spawn. */
 const fs = require('fs')
 const net = require('net')
+const path = require('path')
 const { spawn } = require('child_process')
 const { encode, decode } = require('./protocol')
 const { DaemonUnavailableError, ProtocolError } = require('./errors')
@@ -107,9 +108,38 @@ function spawnDaemon(config) {
   const child = spawn(process.execPath, [require.resolve('./cli'), 'daemon'], {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, OP_STASH_SOCKET_PATH: config.socket_path },
+    // The daemon outlives its spawner by up to idle_exit_seconds, and its
+    // environment is visible to same-user processes (`ps -E`). Hand it only
+    // what config resolution needs, never the caller's tokens or cloud creds,
+    // and don't pin the caller's working directory.
+    cwd: '/',
+    env: daemonEnv(process.env, config),
   })
   child.unref()
+}
+
+// Variables the daemon needs to resolve the same config as its spawner.
+const DAEMON_ENV_KEYS = ['PATH', 'HOME', 'TMPDIR', 'XDG_CONFIG_HOME', 'XDG_RUNTIME_DIR', 'LANG', 'DEBUG']
+
+/**
+ * Minimal environment for a spawned daemon: a fixed allowlist plus OP_STASH_*
+ * settings (minus the client-only OP_STASH_DISABLED). Paths are made absolute
+ * because the daemon runs from `/`.
+ * @param {NodeJS.ProcessEnv} env - Spawner environment
+ * @param {object} config - Effective config
+ * @returns {NodeJS.ProcessEnv}
+ */
+function daemonEnv(env, config) {
+  const out = {}
+  for (const key of DAEMON_ENV_KEYS) {
+    if (env[key] !== undefined) out[key] = env[key]
+  }
+  for (const [key, value] of Object.entries(env)) {
+    if (key.startsWith('OP_STASH_') && key !== 'OP_STASH_DISABLED' && value !== undefined) out[key] = value
+  }
+  if (out.OP_STASH_CONFIG) out.OP_STASH_CONFIG = path.resolve(out.OP_STASH_CONFIG)
+  out.OP_STASH_SOCKET_PATH = path.resolve(config.socket_path)
+  return out
 }
 
 /**
@@ -148,4 +178,4 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-module.exports = { request, ping, ensureDaemon, assertSafeSocket, warnVersionMismatch, sleep }
+module.exports = { request, ping, ensureDaemon, assertSafeSocket, warnVersionMismatch, sleep, daemonEnv }
